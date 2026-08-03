@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "bundler",
+    "rootDir": "../..",
+    "outDir": "../../out-tsc/etl",
+    "types": ["node"]
+  },
+  "include": ["**/*.ts", "../../src/app/shared/**/*.ts"],
+  "exclude": ["**/*.spec.ts", "../../src/app/shared/**/*.spec.ts"]
+}

@@ -1,0 +1,50 @@
+import { Injectable } from '@angular/core';
+
+import { BodyRecord } from '../../shared/models/body.model';
+import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
+import { StarRecord } from '../../shared/models/star.model';
+
+export interface StarField {
+  stars: StarRecord[];
+  /** Positions in parsecs, in the same order as `stars`, packed as [x0,y0,z0,x1,y1,z1,...]. */
+  positions: Float32Array;
+}
+
+/**
+ * Loads the ETL-generated static assets (`src/assets/data/*`, served at `/assets/data/*`).
+ * Each dataset is fetched at most once per app session and cached in memory.
+ */
+@Injectable({ providedIn: 'root' })
+export class DataLoaderService {
+  private starFieldPromise?: Promise<StarField>;
+  private bodiesPromise?: Promise<BodyRecord[]>;
+  private exoplanetsPromise?: Promise<ExoplanetRecord[]>;
+
+  loadStars(): Promise<StarField> {
+    this.starFieldPromise ??= this.fetchStars();
+    return this.starFieldPromise;
+  }
+
+  loadBodies(): Promise<BodyRecord[]> {
+    this.bodiesPromise ??= this.fetchJson<BodyRecord[]>('assets/data/bodies.json');
+    return this.bodiesPromise;
+  }
+
+  loadExoplanets(): Promise<ExoplanetRecord[]> {
+    this.exoplanetsPromise ??= this.fetchJson<ExoplanetRecord[]>('assets/data/exoplanets.json');
+    return this.exoplanetsPromise;
+  }
+
+  private async fetchStars(): Promise<StarField> {
+    const [stars, buffer] = await Promise.all([
+      fetch('assets/data/stars-index.json').then((response) => response.json() as Promise<StarRecord[]>),
+      fetch('assets/data/stars.bin').then((response) => response.arrayBuffer())
+    ]);
+
+    return { stars, positions: new Float32Array(buffer) };
+  }
+
+  private fetchJson<T>(url: string): Promise<T> {
+    return fetch(url).then((response) => response.json() as Promise<T>);
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "caveman",
+  "description": "Ultra-compressed communication mode. Cuts token usage ~75% by dropping filler, articles, and pleasantries while keeping full technical accuracy. Derived from Matt Pocock's MIT-licensed caveman skill (https://github.com/mattpocock/skills) with this repo's `cs-caveman-mode` persona agent + `/cs:caveman` slash command wrapper and stdlib Python tooling (compressor, token-savings estimator, lint). Use when user says \"caveman mode\", \"talk like caveman\", \"use caveman\", \"less tokens\", \"be brief\", or invokes /cs:caveman.",
+  "version": "1.0.0",
+  "author": {
+    "name": "avalon-vanguard",
+    "url": "https://github.com/avalon-vanguard"
+  },
+  "homepage": "https://github.com/avalon-vanguard/star-map",
+  "repository": "https://github.com/avalon-vanguard/star-map",
+  "license": "MIT",
+  "skills": [
+    "./skills/caveman"
+  ],
+  "attribution": {
+    "derived_from": "https://github.com/mattpocock/skills/tree/main/skills/productivity/caveman",
+    "original_author": "Matt Pocock (@mattpocock)",
+    "original_license": "MIT",
+    "derivation_note": "Matt's SKILL.md content reproduced under MIT. Additions: cs-* persona agent + /cs:* command wrapper, stdlib compression/estimator/lint tooling."
+  }
+}

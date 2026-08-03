@@ -1,0 +1,28 @@
+{
+  "name": "star-map",
+  "owner": {
+    "name": "avalon-vanguard",
+    "url": "https://github.com/avalon-vanguard"
+  },
+  "description": "Personal marketplace of cs:* Claude Code commands, agents, and skills.",
+  "plugins": [
+    {
+      "name": "caveman",
+      "source": "./",
+      "description": "Ultra-compressed communication mode. Cuts token usage ~75% by dropping filler, articles, and pleasantries while keeping full technical accuracy. Adds a cs-caveman-mode persona agent, /cs:caveman slash command, and stdlib Python tooling (compressor, token-savings estimator, lint) on top of Matt Pocock's MIT-licensed caveman skill.",
+      "version": "1.0.0",
+      "author": {
+        "name": "avalon-vanguard",
+        "url": "https://github.com/avalon-vanguard"
+      },
+      "license": "MIT",
+      "keywords": [
+        "caveman",
+        "communication",
+        "tokens",
+        "productivity"
+      ],
+      "category": "productivity"
+    }
+  ]
+}

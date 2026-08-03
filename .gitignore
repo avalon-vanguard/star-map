@@ -26,3 +26,15 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# ETL raw-response cache (re-downloadable; see tools/etl/lib/http.ts)
+/tools/etl/.cache/
+
+# Playwright
+/playwright-report/
+/test-results/
+/blob-report/
+
+# Python bytecode (skills/*/scripts)
+__pycache__/
+*.pyc

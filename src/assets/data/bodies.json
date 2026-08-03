@@ -1,0 +1,299 @@
+[
+  {
+    "id": "mercury",
+    "systemStarId": 0,
+    "name": "Mercury",
+    "kind": "planet",
+    "radiusKm": 2439.4,
+    "orbit": {
+      "semiMajorAxisAu": 0.38709857292289906,
+      "eccentricity": 0.2056388859154261,
+      "inclinationDeg": 7.003502017708398,
+      "longitudeOfAscendingNodeDeg": 48.29980532881731,
+      "argumentOfPeriapsisDeg": 29.19561108948743,
+      "meanAnomalyAtEpochDeg": 103.9465145977117,
+      "epochJd": 2460676.5
+    }
+  },
+  {
+    "id": "venus",
+    "systemStarId": 0,
+    "name": "Venus",
+    "kind": "planet",
+    "radiusKm": 6051.84,
+    "orbit": {
+      "semiMajorAxisAu": 0.7233281694940689,
+      "eccentricity": 0.006746576710187382,
+      "inclinationDeg": 3.394393253252075,
+      "longitudeOfAscendingNodeDeg": 76.61185393039594,
+      "argumentOfPeriapsisDeg": 55.15075425343929,
+      "meanAnomalyAtEpochDeg": 280.0749102629981,
+      "epochJd": 2460676.5
+    }
+  },
+  {
+    "id": "earth",
+    "systemStarId": 0,
+    "name": "Earth",
+    "kind": "planet",
+    "radiusKm": 6371.01,
+    "orbit": {
+      "semiMajorAxisAu": 1.0009125494279245,
+      "eccentricity": 0.01756190256786036,
+      "inclinationDeg": 0.002977082685807642,
+      "longitudeOfAscendingNodeDeg": 190.1716375775361,
+      "argumentOfPeriapsisDeg": 272.9783142442708,
+      "meanAnomalyAtEpochDeg": 357.4122246804211,
+      "epochJd": 2460676.5
+    }
+  },
+  {
+    "id": "mars",
+    "systemStarId": 0,
+    "name": "Mars",
+    "kind": "planet",
+    "radiusKm": 3389.92,
+    "orbit": {
+      "semiMajorAxisAu": 1.5237367794976557,
+      "eccentricity": 0.09343026241683372,
+      "inclinationDeg": 1.847583389630714,
+      "longitudeOfAscendingNodeDeg": 49.48673257018439,
+      "argumentOfPeriapsisDeg": 286.7114828288203,
+      "meanAnomalyAtEpochDeg": 124.444888195349,
+      "epochJd": 2460676.5
+    }
+  },
+  {
+    "id": "jupiter",
+    "systemStarId": 0,
+    "name": "Jupiter",
+    "kind": "planet",
+    "radiusKm": 69911,
+    "orbit": {
+      "semiMajorAxisAu": 5.20282710471751,
+      "eccentricity": 0.04830624138918495,
+      "inclinationDeg": 1.303459692430419,
+      "longitudeOfAscendingNodeDeg": 100.5202095061913,
+      "argumentOfPeriapsisDeg": 273.6090683600047,
+      "meanAnomalyAtEpochDeg": 58.98282567286461,
+      "epochJd": 2460676.5
+    }
+  },
+  {
+    "id": "saturn",
+    "systemStarId": 0,
+    "name": "Saturn",
+    "kind": "planet",
+    "radiusKm": 58232,
+    "orbit": {
+      "semiMajorAxisAu": 9.555678383881443,
+      "eccentricity": 0.05522302318620472,
+      "inclinationDeg": 2.485819253218824,
+      "longitudeOfAscendingNodeDeg": 113.5595556634874,
+      "argumentOfPeriapsisDeg": 337.1663598259115,
+      "meanAnomalyAtEpochDeg": 264.9877650588944,
+      "epochJd": 2460676.5
+    }
+  },
+  {
+    "id": "uranus",
+    "systemStarId": 0,
+    "name": "Uranus",
+    "kind": "planet",
+    "radiusKm": 25362,
+    "orbit": {
+      "semiMajorAxisAu": 19.30135052232751,
+      "eccentricity": 0.04562415515293685,
+      "inclinationDeg": 0.7728969735590447,
+      "longitudeOfAscendingNodeDeg": 74.0126541901479,
+      "argumentOfPeriapsisDeg": 90.49593456147204,
+      "meanAnomalyAtEpochDeg": 255.8822481742851,
+      "epochJd": 2460676.5
+    }
+  },
+  {
+    "id": "neptune",
+    "systemStarId": 0,
+    "name": "Neptune",
+    "kind": "planet",
+    "radiusKm": 24624,
+    "orbit": {
+      "semiMajorAxisAu": 30.183632709237763,
+      "eccentricity": 0.01266098870528033,
+      "inclinationDeg": 1.774849832507214,
+      "longitudeOfAscendingNodeDeg": 131.9473970418126,
+      "argumentOfPeriapsisDeg": 268.1146665565159,
+      "meanAnomalyAtEpochDeg": 319.6858384317641,
+      "epochJd": 2460676.5
+    }
+  },
+  {
+    "id": "pluto",
+    "systemStarId": 0,
+    "name": "Pluto",
+    "kind": "dwarf",
+    "radiusKm": 1188.3,
+    "orbit": {
+      "semiMajorAxisAu": 39.28778257358678,
+      "eccentricity": 0.2438605399689669,
+      "inclinationDeg": 16.93906659887321,
+      "longitudeOfAscendingNodeDeg": 110.1714547539489,
+      "argumentOfPeriapsisDeg": 113.5754868232679,
+      "meanAnomalyAtEpochDeg": 51.93655343727463,
+      "epochJd": 2460676.5
+    }
+  },
+  {
+    "id": "moon",
+    "systemStarId": 0,
+    "name": "Moon",
+    "kind": "moon",
+    "radiusKm": 1737.53,
+    "orbit": {
+      "semiMajorAxisAu": 0.0025850155421324465,
+      "eccentricity": 0.04034704696474715,
+      "inclinationDeg": 5.004154175941119,
+      "longitudeOfAscendingNodeDeg": 0.531732989166472,
+      "argumentOfPeriapsisDeg": 6.557682814330136,
+      "meanAnomalyAtEpochDeg": 290.7825171697369,
+      "epochJd": 2460676.5
+    },
+    "parentBodyId": "earth"
+  },
+  {
+    "id": "phobos",
+    "systemStarId": 0,
+    "name": "Phobos",
+    "kind": "moon",
+    "radiusKm": 13.1,
+    "orbit": {
+      "semiMajorAxisAu": 0.00006269319601715431,
+      "eccentricity": 0.01559367482014246,
+      "inclinationDeg": 26.37766999967838,
+      "longitudeOfAscendingNodeDeg": 85.13091230996636,
+      "argumentOfPeriapsisDeg": 356.4060881660871,
+      "meanAnomalyAtEpochDeg": 342.6005509941174,
+      "epochJd": 2460676.5
+    },
+    "parentBodyId": "mars"
+  },
+  {
+    "id": "deimos",
+    "systemStarId": 0,
+    "name": "Deimos",
+    "kind": "moon",
+    "radiusKm": 7.8,
+    "orbit": {
+      "semiMajorAxisAu": 0.00015681797919999554,
+      "eccentricity": 0.0002637395029404219,
+      "inclinationDeg": 24.26157855280465,
+      "longitudeOfAscendingNodeDeg": 80.74605390828611,
+      "argumentOfPeriapsisDeg": 21.65246201037153,
+      "meanAnomalyAtEpochDeg": 273.8943716897566,
+      "epochJd": 2460676.5
+    },
+    "parentBodyId": "mars"
+  },
+  {
+    "id": "io",
+    "systemStarId": 0,
+    "name": "Io",
+    "kind": "moon",
+    "radiusKm": 1821.49,
+    "orbit": {
+      "semiMajorAxisAu": 0.0028210852715482176,
+      "eccentricity": 0.004228419931613188,
+      "inclinationDeg": 2.184262830697117,
+      "longitudeOfAscendingNodeDeg": 338.066968919613,
+      "argumentOfPeriapsisDeg": 164.6533514126175,
+      "meanAnomalyAtEpochDeg": 74.88524962049125,
+      "epochJd": 2460676.5
+    },
+    "parentBodyId": "jupiter"
+  },
+  {
+    "id": "europa",
+    "systemStarId": 0,
+    "name": "Europa",
+    "kind": "moon",
+    "radiusKm": 1560.8,
+    "orbit": {
+      "semiMajorAxisAu": 0.004486887602977481,
+      "eccentricity": 0.009740025569562362,
+      "inclinationDeg": 2.245018421035425,
+      "longitudeOfAscendingNodeDeg": 326.0277596344292,
+      "argumentOfPeriapsisDeg": 349.2045643684611,
+      "meanAnomalyAtEpochDeg": 40.72575250295771,
+      "epochJd": 2460676.5
+    },
+    "parentBodyId": "jupiter"
+  },
+  {
+    "id": "ganymede",
+    "systemStarId": 0,
+    "name": "Ganymede",
+    "kind": "moon",
+    "radiusKm": 2631.2,
+    "orbit": {
+      "semiMajorAxisAu": 0.007156574251479677,
+      "eccentricity": 0.001723569500229484,
+      "inclinationDeg": 2.332721144446764,
+      "longitudeOfAscendingNodeDeg": 339.4869144536639,
+      "argumentOfPeriapsisDeg": 0.02754303249978196,
+      "meanAnomalyAtEpochDeg": 355.7249344187845,
+      "epochJd": 2460676.5
+    },
+    "parentBodyId": "jupiter"
+  },
+  {
+    "id": "callisto",
+    "systemStarId": 0,
+    "name": "Callisto",
+    "kind": "moon",
+    "radiusKm": 2410.3,
+    "orbit": {
+      "semiMajorAxisAu": 0.012583604816889162,
+      "eccentricity": 0.007245216892383587,
+      "inclinationDeg": 1.94976938450231,
+      "longitudeOfAscendingNodeDeg": 336.7558983297979,
+      "argumentOfPeriapsisDeg": 32.65151937817475,
+      "meanAnomalyAtEpochDeg": 126.0198540648681,
+      "epochJd": 2460676.5
+    },
+    "parentBodyId": "jupiter"
+  },
+  {
+    "id": "titan",
+    "systemStarId": 0,
+    "name": "Titan",
+    "kind": "moon",
+    "radiusKm": 2575.5,
+    "orbit": {
+      "semiMajorAxisAu": 0.00816836581932601,
+      "eccentricity": 0.0288317905724529,
+      "inclinationDeg": 27.71117736818323,
+      "longitudeOfAscendingNodeDeg": 169.0716057233001,
+      "argumentOfPeriapsisDeg": 177.4798658320667,
+      "meanAnomalyAtEpochDeg": 32.18862839469676,
+      "epochJd": 2460676.5
+    },
+    "parentBodyId": "saturn"
+  },
+  {
+    "id": "triton",
+    "systemStarId": 0,
+    "name": "Triton",
+    "kind": "moon",
+    "radiusKm": 1352.6,
+    "orbit": {
+      "semiMajorAxisAu": 0.002371477351073512,
+      "eccentricity": 0.0001253161638938937,
+      "inclinationDeg": 129.1766133444893,
+      "longitudeOfAscendingNodeDeg": 222.3992799388247,
+      "argumentOfPeriapsisDeg": 97.422342803062,
+      "meanAnomalyAtEpochDeg": 273.1157438944629,
+      "epochJd": 2460676.5
+    },
+    "parentBodyId": "neptune"
+  }
+]

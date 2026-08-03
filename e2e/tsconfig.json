@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "bundler",
+    "rootDir": "..",
+    "outDir": "../out-tsc/e2e",
+    "types": ["node", "@playwright/test"]
+  },
+  "include": ["**/*.ts"]
+}

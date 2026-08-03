@@ -1,0 +1,36 @@
+/* You can add global styles to this file, and also import other style files */
+@import 'tailwindcss';
+
+/* Design tokens for the sci-fi "HUD" look shared across the app. `--color-*`/`--font-*` names
+ * automatically become Tailwind utilities (e.g. `--color-accent` -> `bg-accent`/`text-accent`). */
+@theme {
+  --font-display: 'Orbitron', 'Segoe UI', sans-serif;
+  --font-body: 'JetBrains Mono', 'Segoe UI', monospace;
+
+  --color-void: #05070d;
+  --color-panel: #0b121f;
+  --color-accent: #4dd7ff;
+  --color-accent-dim: #1c4f66;
+  --color-text: #dbe6f3;
+  --color-muted: #7f93ab;
+  --color-border: #2a4a5c;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--color-void);
+  color: var(--color-text);
+  overflow: hidden;
+  font-family: var(--font-body);
+}
+
+/* Star name labels rendered by CSS2DRenderer (see StarLabelOverlay). These live outside
+ * Angular's view encapsulation as plain DOM nodes, so they're styled with Tailwind utility
+ * classes assigned directly in TypeScript rather than a scoped component stylesheet. */
+.star-label-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+}

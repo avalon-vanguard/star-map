@@ -7,14 +7,16 @@ import { dateToJulianDate } from '../../shared/astro/constants';
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { EngineService } from '../../core/engine/engine.service';
 import { BodyRecord } from '../../shared/models/body.model';
+import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { applyMilkyWaySkybox, createGlowSprite } from '../../shared/rendering/skybox';
 import { loadCachedTexture, MILKY_WAY_SKYBOX_PATH, SUN_TEXTURE_PATH } from '../../shared/rendering/texture-catalog';
 import { StarRecord } from '../../shared/models/star.model';
 import { NavigationStore } from '../../shared/state/navigation.store';
 import { CameraRigController } from './camera-rig-controller';
+import { DeepSkyRenderer } from './deep-sky-renderer';
 import { colorIndexToRgb, StarFieldRenderer } from './star-field-renderer';
-import { StarLabelOverlay } from './star-label-overlay';
+import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
 
 /** HYG catalog id for the Sun itself — the only star we have a real close-up photo of. */
@@ -25,6 +27,12 @@ const SUN_GLOW_SCALE = 3.2;
 const LABEL_MAX_DISTANCE_PC = 20;
 /** Caps how many labels are shown at once, to keep the DOM light. */
 const LABEL_MAX_COUNT = 15;
+/**
+ * How many deep-sky objects get a permanent label. These sit on a fixed backdrop shell rather
+ * than near the camera, so proximity is meaningless for them — the brightest handful are simply
+ * always named.
+ */
+const DEEP_SKY_LABEL_COUNT = 12;
 /** How often (seconds) the visible label set is recomputed; doesn't need to be per-frame. */
 const LABEL_UPDATE_INTERVAL_SECONDS = 0.2;
 /** Raycast pick tolerance around each star point, in parsecs. */
@@ -99,6 +107,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private controls?: OrbitControls;
   private rig?: CameraRigController;
   private starField?: StarFieldRenderer;
+  private deepSky?: DeepSkyRenderer;
+  private deepSkyLabels: readonly LabeledPoint[] = [];
   private labelOverlay?: StarLabelOverlay;
   private stars: readonly StarRecord[] = [];
   private starsById = new Map<number, StarRecord>();
@@ -140,6 +150,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.canvasRef().nativeElement.removeEventListener('click', this.handleClick);
     this.controls?.dispose();
     this.starField?.dispose();
+    this.deepSky?.dispose();
     this.labelOverlay?.dispose();
     this.systemRenderer?.dispose();
     (this.starMarker?.material as THREE.Material | undefined)?.dispose();
@@ -182,10 +193,16 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.systemGroup.visible = false;
     applyMilkyWaySkybox(scene, MILKY_WAY_SKYBOX_PATH);
 
-    const [{ stars, positions }, bodies, exoplanets] = await Promise.all([
+    const [{ stars, positions }, bodies, exoplanets, deepSky] = await Promise.all([
       this.dataLoader.loadStars(),
       this.dataLoader.loadBodies(),
-      this.dataLoader.loadExoplanets()
+      this.dataLoader.loadExoplanets(),
+      // The backdrop is decorative — if its dataset is missing or malformed the star field
+      // should still come up, so this one failure is swallowed rather than aborting bootstrap.
+      this.dataLoader.loadDeepSky().catch((error) => {
+        console.error('Failed to load the deep-sky backdrop; continuing without it.', error);
+        return [] as DeepSkyRecord[];
+      })
     ]);
     this.stars = stars;
     this.starsById = new Map(stars.map((star) => [star.id, star]));
@@ -194,6 +211,12 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     this.starField = new StarFieldRenderer(stars, positions);
     this.galaxyGroup.add(this.starField.object);
+
+    if (deepSky.length > 0) {
+      this.deepSky = new DeepSkyRenderer(deepSky);
+      this.galaxyGroup.add(this.deepSky.object);
+      this.deepSkyLabels = this.deepSky.labelPoints(DEEP_SKY_LABEL_COUNT);
+    }
 
     this.labelOverlay = new StarLabelOverlay(scene);
     this.labelHostRef().nativeElement.appendChild(this.labelOverlay.domElement);
@@ -244,7 +267,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
 
     candidates.sort((a, b) => a.distanceSq - b.distanceSq);
-    this.labelOverlay?.update(candidates.slice(0, LABEL_MAX_COUNT).map((candidate) => candidate.star));
+    const starLabels = candidates.slice(0, LABEL_MAX_COUNT).map((candidate) => candidate.star);
+    this.labelOverlay?.update([...starLabels, ...this.deepSkyLabels]);
   }
 
   private readonly handleClick = (event: MouseEvent): void => {

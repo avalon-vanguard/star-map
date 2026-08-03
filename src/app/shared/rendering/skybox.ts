@@ -22,12 +22,41 @@ export function applyMilkyWaySkybox(scene: THREE.Scene, path: string): void {
 const glowSpriteCache = new Map<string, THREE.Texture>();
 
 /**
- * A soft radial-gradient canvas texture, cached per color, used to fake atmosphere/corona glow.
- * Returns `undefined` if 2D canvas rendering isn't available (e.g. under a test/jsdom
- * environment with no canvas backend) so callers can fall back to a flat-color sprite instead.
+ * Falloff shapes for {@link createGlowTexture}.
+ *
+ * `corona` is a tight, bright core for a star's or planet's halo, where the light really does
+ * come from a small hot source. `diffuse` is a much softer, dimmer profile for deep-sky
+ * objects, which are extended clouds — the same tight curve turns them into hard-edged
+ * billiard balls that read as solid geometry rather than as haze.
  */
-function glowSpriteTexture(color: THREE.ColorRepresentation): THREE.Texture | undefined {
-  const key = new THREE.Color(color).getHexString();
+export type GlowProfile = 'corona' | 'diffuse';
+
+const GLOW_PROFILES: Readonly<Record<GlowProfile, readonly { offset: number; alpha: number }[]>> = {
+  corona: [
+    { offset: 0, alpha: 0.85 },
+    { offset: 0.4, alpha: 0.35 },
+    { offset: 1, alpha: 0 }
+  ],
+  diffuse: [
+    { offset: 0, alpha: 0.5 },
+    { offset: 0.18, alpha: 0.34 },
+    { offset: 0.45, alpha: 0.13 },
+    { offset: 0.75, alpha: 0.03 },
+    { offset: 1, alpha: 0 }
+  ]
+};
+
+/**
+ * A soft radial-gradient canvas texture, cached per color and profile, used to fake
+ * atmosphere/corona glow and to paint deep-sky objects on the galaxy backdrop. Returns
+ * `undefined` if 2D canvas rendering isn't available (e.g. under a test/jsdom environment with
+ * no canvas backend) so callers can fall back to a flat-color sprite instead.
+ *
+ * The cache is process-wide and intentionally not disposed: there is one texture per distinct
+ * color/profile pair, they are tiny, and they outlive any individual scene.
+ */
+export function createGlowTexture(color: THREE.ColorRepresentation, profile: GlowProfile = 'corona'): THREE.Texture | undefined {
+  const key = `${new THREE.Color(color).getHexString()}:${profile}`;
   const cached = glowSpriteCache.get(key);
   if (cached) {
     return cached;
@@ -46,9 +75,9 @@ function glowSpriteTexture(color: THREE.ColorRepresentation): THREE.Texture | un
   const [r, g, b] = [Math.round(rgb.r * 255), Math.round(rgb.g * 255), Math.round(rgb.b * 255)];
 
   const gradient = context.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.85)`);
-  gradient.addColorStop(0.4, `rgba(${r}, ${g}, ${b}, 0.35)`);
-  gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+  for (const stop of GLOW_PROFILES[profile]) {
+    gradient.addColorStop(stop.offset, `rgba(${r}, ${g}, ${b}, ${stop.alpha})`);
+  }
   context.fillStyle = gradient;
   context.fillRect(0, 0, size, size);
 
@@ -66,7 +95,7 @@ function glowSpriteTexture(color: THREE.ColorRepresentation): THREE.Texture | un
  */
 export function createGlowSprite(color: THREE.ColorRepresentation, radius: number, scale: number): THREE.Sprite {
   const material = new THREE.SpriteMaterial({
-    map: glowSpriteTexture(color),
+    map: createGlowTexture(color),
     color: color,
     transparent: true,
     depthWrite: false,

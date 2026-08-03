@@ -2,7 +2,8 @@ import * as THREE from 'three/webgpu';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 
 export interface LabeledPoint {
-  id: number;
+  /** Numeric for HYG stars, string for catalog designations such as deep-sky objects. */
+  id: number | string;
   name: string;
   x: number;
   y: number;
@@ -19,7 +20,7 @@ export class StarLabelOverlay {
   readonly domElement: HTMLElement;
 
   private readonly cssRenderer = new CSS2DRenderer();
-  private readonly labelObjects = new Map<number, CSS2DObject>();
+  private readonly labelObjects = new Map<number | string, CSS2DObject>();
 
   constructor(private readonly scene: THREE.Scene) {
     this.cssRenderer.domElement.classList.add('star-label-layer');
@@ -70,7 +71,7 @@ export class StarLabelOverlay {
     this.labelObjects.set(point.id, object);
   }
 
-  private removeLabel(id: number, object: CSS2DObject): void {
+  private removeLabel(id: number | string, object: CSS2DObject): void {
     this.scene.remove(object);
     object.element.remove();
     this.labelObjects.delete(id);

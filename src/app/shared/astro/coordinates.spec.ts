@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { distanceBetween, parallaxMasToParsecs, raDecDistanceToXyz, raDegDecDistanceToXyz } from './coordinates';
+import { distanceBetween, parallaxMasToParsecs, parseSexagesimal, raDecDistanceToXyz, raDecToUnitVector, raDegDecDistanceToXyz } from './coordinates';
 
 // Reference values taken directly from the HYG v4.1 database (RA/Dec/dist and its own
 // precomputed x/y/z, which uses the same equatorial-Cartesian convention we implement).
@@ -63,5 +63,76 @@ describe('parallaxMasToParsecs', () => {
 describe('distanceBetween', () => {
   it('computes the Euclidean distance between two points', () => {
     expect(distanceBetween({ x: 0, y: 0, z: 0 }, { x: 3, y: 4, z: 0 })).toBeCloseTo(5, 9);
+  });
+});
+
+describe('raDecToUnitVector', () => {
+  it('always returns a unit-length vector', () => {
+    for (const [ra, dec] of [
+      [0, 0],
+      [6, 45],
+      [13.7, -62.7],
+      [23.99, 89.9]
+    ]) {
+      const { x, y, z } = raDecToUnitVector(ra, dec);
+      expect(Math.hypot(x, y, z)).toBeCloseTo(1, 12);
+    }
+  });
+
+  it('points along +Z at the north celestial pole', () => {
+    const { x, y, z } = raDecToUnitVector(0, 90);
+    expect(x).toBeCloseTo(0, 12);
+    expect(y).toBeCloseTo(0, 12);
+    expect(z).toBeCloseTo(1, 12);
+  });
+
+  it('agrees with the distance-carrying conversion, scaled', () => {
+    const unit = raDecToUnitVector(6.752481, -16.716116);
+    const scaled = raDecDistanceToXyz(6.752481, -16.716116, 2.6371);
+
+    expect(unit.x * 2.6371).toBeCloseTo(scaled.x, 12);
+    expect(unit.y * 2.6371).toBeCloseTo(scaled.y, 12);
+    expect(unit.z * 2.6371).toBeCloseTo(scaled.z, 12);
+  });
+});
+
+describe('parseSexagesimal', () => {
+  it('parses a right ascension into decimal hours', () => {
+    // 00:08:27.05 = 8/60 + 27.05/3600 hours
+    expect(parseSexagesimal('00:08:27.05')).toBeCloseTo(0.140847, 6);
+  });
+
+  it('parses a positive declination into decimal degrees', () => {
+    expect(parseSexagesimal('+27:43:03.6')).toBeCloseTo(27.7176667, 6);
+  });
+
+  it('parses a negative declination', () => {
+    expect(parseSexagesimal('-12:49:22.3')).toBeCloseTo(-12.8228611, 6);
+  });
+
+  it('keeps the sign for a negative angle inside the first degree', () => {
+    // The trap: `Number('-00')` is `-0`, which is `=== 0`, so a naive implementation flips
+    // this object into the northern hemisphere.
+    const parsed = parseSexagesimal('-00:24:54.8');
+    expect(parsed).toBeLessThan(0);
+    expect(parsed).toBeCloseTo(-0.4152222, 6);
+  });
+
+  it('treats an unsigned angle as positive', () => {
+    expect(parseSexagesimal('00:24:54.8')).toBeCloseTo(0.4152222, 6);
+  });
+
+  it('tolerates surrounding whitespace', () => {
+    expect(parseSexagesimal('  +27:43:03.6  ')).toBeCloseTo(27.7176667, 6);
+  });
+
+  it('returns null for missing or malformed values', () => {
+    for (const input of ['', '   ', 'not-an-angle', '12:34', '12:34:56:78', '12;34;56', undefined, null]) {
+      expect(parseSexagesimal(input)).toBeNull();
+    }
+  });
+
+  it('returns null rather than a partial value for empty sub-fields', () => {
+    expect(parseSexagesimal('12::56')).toBeNull();
   });
 });

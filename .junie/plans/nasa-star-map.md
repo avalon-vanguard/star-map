@@ -108,12 +108,23 @@ interface ExoplanetRecord {
   orbit: Partial<OrbitalElements>;
 }
 
+// Revised during implementation: OpenNGC publishes no distance column, and the redshift/
+// parallax fallbacks both fail for the best-known objects (M31/M33/M42 are Local Group
+// members with negative or absent redshift; a galaxy's catalog parallax comes from a
+// cross-matched foreground star). The line of sight is always known, so these are stored as
+// unit directions and drawn on a fixed backdrop shell, with distance as optional metadata.
+// See `shared/models/deepsky.model.ts`.
 interface DeepSkyRecord {
   id: string;
   name: string;
   kind: 'nebula' | 'galaxy' | 'cluster';
-  x: number; y: number; z: number; // parsecs
+  x: number; y: number; z: number; // unit vector on the celestial sphere, not a position
   angularSizeDeg: number;
+  magnitude: number | null;
+  distancePc: number | null;
+  distanceMethod: 'parallax' | 'redshift' | null;
+  constellation: string;
+  messier: string | null;
 }
 ```
 

@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 
 import { BodyRecord } from '../../shared/models/body.model';
+import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
 
@@ -19,6 +20,7 @@ export class DataLoaderService {
   private starFieldPromise?: Promise<StarField>;
   private bodiesPromise?: Promise<BodyRecord[]>;
   private exoplanetsPromise?: Promise<ExoplanetRecord[]>;
+  private deepSkyPromise?: Promise<DeepSkyRecord[]>;
 
   loadStars(): Promise<StarField> {
     this.starFieldPromise ??= this.fetchStars();
@@ -33,6 +35,11 @@ export class DataLoaderService {
   loadExoplanets(): Promise<ExoplanetRecord[]> {
     this.exoplanetsPromise ??= this.fetchJson<ExoplanetRecord[]>('assets/data/exoplanets.json');
     return this.exoplanetsPromise;
+  }
+
+  loadDeepSky(): Promise<DeepSkyRecord[]> {
+    this.deepSkyPromise ??= this.fetchJson<DeepSkyRecord[]>('assets/data/deepsky.json');
+    return this.deepSkyPromise;
   }
 
   private async fetchStars(): Promise<StarField> {

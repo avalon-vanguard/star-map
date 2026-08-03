@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataLoaderService, StarField } from '../../core/data/data-loader.service';
 import { EngineService, EngineTickCallback } from '../../core/engine/engine.service';
 import { BodyRecord } from '../../shared/models/body.model';
+import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
 import { NavigationStore } from '../../shared/state/navigation.store';
@@ -25,6 +26,21 @@ const PROXIMA: StarRecord = { id: 2, name: 'Proxima Centauri', x: 0, y: 1.3, z: 
 
 const STARS: StarRecord[] = [SUN, ALPHA_CENTAURI, PROXIMA];
 const STAR_POSITIONS = new Float32Array(STARS.flatMap((star) => [star.x, star.y, star.z]));
+
+const DEEP_SKY_OBJECT: DeepSkyRecord = {
+  id: 'NGC0224',
+  name: 'Andromeda Galaxy',
+  kind: 'galaxy',
+  x: 0,
+  y: 0,
+  z: 1,
+  angularSizeDeg: 2.96,
+  magnitude: 3.44,
+  distancePc: null,
+  distanceMethod: null,
+  constellation: 'And',
+  messier: 'M31'
+};
 
 const EARTH: BodyRecord = {
   id: 'earth',
@@ -98,6 +114,10 @@ class FakeDataLoaderService {
 
   loadExoplanets(): Promise<ExoplanetRecord[]> {
     return Promise.resolve([]);
+  }
+
+  loadDeepSky(): Promise<DeepSkyRecord[]> {
+    return Promise.resolve([DEEP_SKY_OBJECT]);
   }
 }
 

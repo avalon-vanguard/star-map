@@ -34,6 +34,40 @@ export function raDegDecDistanceToXyz(raDeg: number, decDeg: number, distancePc:
 }
 
 /**
+ * Direction to a point on the celestial sphere as a unit vector, in the same equatorial frame
+ * as {@link raDecDistanceToXyz}. Used for sources whose distance is unknown or irrelevant —
+ * e.g. deep-sky objects rendered as a backdrop, where only the line of sight matters.
+ */
+export function raDecToUnitVector(raHours: number, decDeg: number): CartesianCoordinates {
+  return raDecDistanceToXyz(raHours, decDeg, 1);
+}
+
+const SEXAGESIMAL_PATTERN = /^([+-])?(\d+):(\d+):(\d+(?:\.\d+)?)$/;
+
+/**
+ * Parses a sexagesimal angle ("HH:MM:SS.ss" or "+DD:MM:SS.s", as published by OpenNGC and
+ * most catalogs) into a decimal value carrying the unit of its first field — hours for right
+ * ascension, degrees for declination.
+ *
+ * The sign is read from the string rather than from the parsed degrees field: `Number('-00')`
+ * is `-0`, which compares equal to `0`, so a declination like "-00:24:54.8" would otherwise
+ * come out positive and place the object in the wrong hemisphere.
+ *
+ * Returns `null` for anything that isn't a well-formed sexagesimal triple, including the empty
+ * strings that catalogs use for missing values.
+ */
+export function parseSexagesimal(text: string | undefined | null): number | null {
+  const match = SEXAGESIMAL_PATTERN.exec((text ?? '').trim());
+  if (!match) {
+    return null;
+  }
+
+  const [, sign, degreesOrHours, minutes, seconds] = match;
+  const magnitude = Number(degreesOrHours) + Number(minutes) / 60 + Number(seconds) / 3600;
+  return sign === '-' ? -magnitude : magnitude;
+}
+
+/**
  * Converts a parallax (milliarcseconds) into a distance in parsecs.
  * Returns `Infinity` for non-positive parallax (unmeasured/negative parallax).
  */

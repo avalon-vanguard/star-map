@@ -1,8 +1,10 @@
 import { statSync } from 'node:fs';
 
 import { BodyRecord } from '../../src/app/shared/models/body.model';
+import { DeepSkyRecord } from '../../src/app/shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../src/app/shared/models/exoplanet.model';
 import { StarRecord } from '../../src/app/shared/models/star.model';
+import { fetchDeepSky } from './fetchDeepSky';
 import { fetchExoplanets } from './fetchExoplanets';
 import { fetchSolarSystem } from './fetchSolarSystem';
 import { fetchStars } from './fetchStars';
@@ -66,6 +68,42 @@ function validateExoplanets(exoplanets: ExoplanetRecord[], starIds: Set<number>)
   console.log(`  ${crossReferenced}/${exoplanets.length} exoplanets cross-referenced to a HYG host star.`);
 }
 
+const UNIT_VECTOR_TOLERANCE = 1e-6;
+
+function validateDeepSky(objects: DeepSkyRecord[]): void {
+  assertCondition(objects.length > 0, 'No deep-sky objects were produced.');
+
+  const ids = new Set<string>();
+  for (const object of objects) {
+    assertCondition(!!object.id, `Deep-sky object has no id: ${JSON.stringify(object)}`);
+    assertCondition(!ids.has(object.id), `Duplicate deep-sky id: ${object.id}`);
+    ids.add(object.id);
+    assertCondition(!!object.name, `Deep-sky object ${object.id} has no name.`);
+
+    // Positions are directions, so every one of them must be a unit vector — a zero-length
+    // or mis-scaled entry would silently collapse onto the origin on the backdrop shell.
+    const length = Math.hypot(object.x, object.y, object.z);
+    assertCondition(Math.abs(length - 1) < UNIT_VECTOR_TOLERANCE, `Deep-sky object ${object.id} has a non-unit direction (length ${length}).`);
+
+    assertCondition(object.angularSizeDeg >= 0, `Deep-sky object ${object.id} has a negative angular size.`);
+    assertCondition(object.distancePc === null || object.distancePc > 0, `Deep-sky object ${object.id} has a non-positive distance.`);
+    // The distance and its provenance have to travel together, or the UI cannot say where a
+    // number came from.
+    assertCondition(
+      (object.distancePc === null) === (object.distanceMethod === null),
+      `Deep-sky object ${object.id} has a distance/method mismatch.`
+    );
+  }
+
+  const kinds = new Set(objects.map((object) => object.kind));
+  for (const kind of ['galaxy', 'nebula', 'cluster'] as const) {
+    assertCondition(kinds.has(kind), `No deep-sky objects of kind "${kind}" were produced.`);
+  }
+
+  const withDistance = objects.filter((object) => object.distancePc !== null).length;
+  console.log(`  ${withDistance}/${objects.length} deep-sky objects have a derived distance.`);
+}
+
 /**
  * Orchestrates the whole ETL pipeline: fetches every source (each caches its own raw
  * responses under `tools/etl/.cache/`), writes the static assets under `src/assets/data/`,
@@ -80,16 +118,20 @@ async function build(): Promise<void> {
   console.log();
   const exoplanets = await fetchExoplanets(stars);
   console.log();
+  const deepSky = await fetchDeepSky();
+  console.log();
 
   console.log('Validating output...');
   validateStars(stars);
   validateBodies(bodies);
   validateExoplanets(exoplanets, new Set(stars.map((star) => star.id)));
+  validateDeepSky(deepSky);
 
   console.log('\nETL completed successfully:');
   console.log(`  stars:      ${stars.length}`);
   console.log(`  bodies:     ${bodies.length}`);
   console.log(`  exoplanets: ${exoplanets.length}`);
+  console.log(`  deep sky:   ${deepSky.length}`);
 }
 
 build().catch((error) => {

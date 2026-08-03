@@ -45,9 +45,11 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<ExoplanetRe
 
   let matched = 0;
   const exoplanets: ExoplanetRecord[] = rows.map((row, index) => {
-    const raDeg = Number(row['ra']);
-    const decDeg = Number(row['dec']);
-    const distancePc = Number(row['sy_dist']);
+    // `parseOptionalNumber`, not `Number`: a blank cell would otherwise become 0, which is a
+    // finite, plausible-looking coordinate rather than the "not measured" it actually means.
+    const raDeg = parseOptionalNumber(row['ra']) ?? Number.NaN;
+    const decDeg = parseOptionalNumber(row['dec']) ?? Number.NaN;
+    const distancePc = parseOptionalNumber(row['sy_dist']) ?? Number.NaN;
 
     const hostStarId = resolveHostStarId(
       { hostname: row['hostname'], raDeg, decDeg, distancePc },

@@ -41,6 +41,14 @@ export function resolveHostStarId(
     return null;
   }
 
+  // A non-positive distance is never a real measurement, and it is the specific shape a
+  // missing CSV cell takes: `Number('')` is `0`, which passes the finiteness check above and
+  // then places the host exactly at the origin — where it matches the Sun at distance 0 and
+  // hands an alien planet to our own solar system.
+  if (query.distancePc <= 0) {
+    return null;
+  }
+
   const hostPosition = raDegDecDistanceToXyz(query.raDeg, query.decDeg, query.distancePc);
   return findNearestStarWithin(hostPosition, stars, toleranceInPc);
 }

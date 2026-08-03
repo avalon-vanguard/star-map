@@ -3,7 +3,7 @@ import { statSync } from 'node:fs';
 import { BodyRecord } from '../../src/app/shared/models/body.model';
 import { DeepSkyRecord } from '../../src/app/shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../src/app/shared/models/exoplanet.model';
-import { StarRecord } from '../../src/app/shared/models/star.model';
+import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model';
 import { fetchDeepSky } from './fetchDeepSky';
 import { fetchExoplanets } from './fetchExoplanets';
 import { fetchSolarSystem } from './fetchSolarSystem';
@@ -61,6 +61,13 @@ function validateExoplanets(exoplanets: ExoplanetRecord[], starIds: Set<number>)
     assertCondition(!!exoplanet.name, `Exoplanet ${exoplanet.id} has no name.`);
     if (exoplanet.hostStarId !== null) {
       assertCondition(starIds.has(exoplanet.hostStarId), `Exoplanet ${exoplanet.id} references unknown star id ${exoplanet.hostStarId}.`);
+      // The Sun has no exoplanets, so any match to it is a matching failure — historically a
+      // blank distance column parsing as 0, which puts the host at the origin and matches Sol
+      // exactly. Free, permanent tripwire for that whole class of bug.
+      assertCondition(
+        exoplanet.hostStarId !== SUN_STAR_ID,
+        `Exoplanet ${exoplanet.id} was matched to the Sun, which has no exoplanets — the host-star match is wrong.`
+      );
       crossReferenced++;
     }
   }

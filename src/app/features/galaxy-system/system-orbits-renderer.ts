@@ -202,6 +202,12 @@ export class SystemOrbitsRenderer {
       geometry.dispose();
       material.dispose();
     }
+    // Detach as well as dispose. A star-to-star hop builds a new renderer and drops the old
+    // one, but without this the old orbit lines and markers stay parented to the system group
+    // forever — still traversed and re-uploaded every frame despite their geometries being
+    // disposed, and drawn over the new system while being unpickable.
+    this.object.removeFromParent();
+    this.object.clear();
   }
 
   private addTopLevelBody(id: string, kind: SystemMemberKind, elements: OrbitalElements, gmAu3PerDay2: number, radiusKm: number | undefined): TrackedTopLevelBody {

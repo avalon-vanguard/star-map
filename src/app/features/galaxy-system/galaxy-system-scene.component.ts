@@ -37,6 +37,8 @@ const DEEP_SKY_LABEL_COUNT = 12;
 const LABEL_UPDATE_INTERVAL_SECONDS = 0.2;
 /** Raycast pick tolerance around each star point, in parsecs. */
 const PICK_THRESHOLD_PC = 1.2;
+/** Pointer travel (px) above which a press counts as an orbit drag rather than a selection. */
+const CLICK_DRAG_SLOP_PX = 5;
 
 const GALAXY_OVERVIEW_POSITION = new THREE.Vector3(0, 15, 30);
 const GALAXY_OVERVIEW_TARGET = new THREE.Vector3(0, 0, 0);
@@ -117,6 +119,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private resizeObserver?: ResizeObserver;
   private unsubscribeTick?: () => void;
   private labelUpdateAccumulator = 0;
+  private pointerDownAt: { x: number; y: number } | null = null;
   private ready = false;
   private busy = false;
 
@@ -147,6 +150,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     this.unsubscribeTick?.();
     this.resizeObserver?.disconnect();
+    this.canvasRef().nativeElement.removeEventListener('pointerdown', this.handlePointerDown);
     this.canvasRef().nativeElement.removeEventListener('click', this.handleClick);
     this.controls?.dispose();
     this.starField?.dispose();
@@ -224,6 +228,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.labelOverlay.setSize(width, height);
 
     this.raycaster.params.Points!.threshold = PICK_THRESHOLD_PC;
+    canvas.addEventListener('pointerdown', this.handlePointerDown);
     canvas.addEventListener('click', this.handleClick);
     this.observeResize(canvas);
 
@@ -246,7 +251,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       }
     }
 
-    this.systemRenderer?.update(dateToJulianDate());
+    if (this.currentStarId !== null) {
+      this.systemRenderer?.update(dateToJulianDate());
+    }
     this.labelOverlay?.render(camera);
   }
 
@@ -271,8 +278,22 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.labelOverlay?.update([...starLabels, ...this.deepSkyLabels]);
   }
 
+  /** Where the current press started, so a drag can be told apart from a click. */
+  private readonly handlePointerDown = (event: PointerEvent): void => {
+    this.pointerDownAt = { x: event.clientX, y: event.clientY };
+  };
+
   private readonly handleClick = (event: MouseEvent): void => {
     if (this.rig?.isAnimating) {
+      return;
+    }
+
+    // The browser fires `click` on release however far the pointer travelled, and OrbitControls
+    // does not suppress it — so without this every drag-to-rotate that happens to finish over a
+    // star would launch a camera flight into its system.
+    const pressedAt = this.pointerDownAt;
+    this.pointerDownAt = null;
+    if (pressedAt && Math.hypot(event.clientX - pressedAt.x, event.clientY - pressedAt.y) > CLICK_DRAG_SLOP_PX) {
       return;
     }
 
@@ -391,6 +412,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     this.galaxyGroup.visible = false;
     this.systemGroup.visible = true;
+    // Labels are CSS2D objects parented to the scene, not to galaxyGroup, so hiding the group
+    // does not hide them: without this the galaxy-scale star names stay pinned on screen,
+    // clumped over the system's star.
+    this.labelOverlay?.update([]);
 
     camera.near = SYSTEM_NEAR_AU;
     camera.far = SYSTEM_FAR_AU;

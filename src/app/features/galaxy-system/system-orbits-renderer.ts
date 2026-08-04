@@ -4,7 +4,8 @@ import { gmForParent } from '../../shared/astro/constants';
 import { isPropagatableOrbit, orbitEllipsePoints, propagateOrbit, resolveGravitationalParameter, resolveOrbitalElements } from '../../shared/astro/kepler';
 import { CartesianCoordinates, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
 import { BodyRecord, OrbitalElements } from '../../shared/models/body.model';
-import { bodyMarkerRadiusAu } from './system-framing';
+import { bodyMarkerRadiusAu, systemGridRingsAu } from './system-framing';
+import { PolarGridPlane, TetherField } from './grid-plane';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 
 export type SystemMemberKind = 'planet' | 'moon' | 'dwarf' | 'exoplanet';
@@ -30,6 +31,11 @@ const ORBIT_LINE_OPACITY_BY_KIND: Record<SystemMemberKind, number> = {
 
 const EARTH_RADIUS_KM = 6371;
 const DEG_TO_RAD = Math.PI / 180;
+
+/** Spokes on the system's reference grid, and how loudly it is drawn against the orbits. */
+const SYSTEM_GRID_SPOKES = 12;
+const SYSTEM_GRID_OPACITY = 0.28;
+const SYSTEM_TETHER_OPACITY = 0.3;
 
 /**
  * Rotation carrying the **ecliptic** frame into the scene's equatorial one — a turn of the
@@ -145,10 +151,22 @@ export class SystemOrbitsRenderer {
   readonly maxTopLevelSemiMajorAxisAu: number;
   /** Smallest semi-major axis (AU) among top-level bodies/exoplanets; 0 if there are none. */
   readonly minTopLevelSemiMajorAxisAu: number;
+  /**
+   * The plane this system is read against, as a rotation from XY into the scene's equatorial
+   * frame: the ecliptic for the solar system, the plane of the sky for everything else.
+   */
+  readonly referenceFrame: THREE.Quaternion;
 
   private readonly topLevelBodies: TrackedTopLevelBody[] = [];
   private readonly moons: TrackedMoon[] = [];
   private readonly disposables: Array<{ geometry: THREE.BufferGeometry; material: THREE.Material }> = [];
+  private readonly grid?: PolarGridPlane;
+  private readonly tethers?: TetherField;
+  /**
+   * Aliases of the tracked bodies' own position vectors, which `update` writes in place — so
+   * following them each tick costs no allocation at all.
+   */
+  private tetherPoints: readonly THREE.Vector3[] = [];
 
   constructor(
     bodies: readonly BodyRecord[],
@@ -222,6 +240,35 @@ export class SystemOrbitsRenderer {
     }
 
     this.members = members;
+
+    // Which plane the system is read against follows from where its elements came from. Only the
+    // Sun has Horizons bodies and no system has both, so this is a choice between the two rather
+    // than a compromise: the ecliptic if there are solar-system bodies, the sky plane otherwise.
+    this.referenceFrame = bodies.some((body) => !body.parentBodyId) ? ECLIPTIC_FRAME.clone() : exoplanetFrame;
+
+    const rings = systemGridRingsAu(this.maxTopLevelSemiMajorAxisAu);
+    if (rings.length > 0) {
+      this.grid = new PolarGridPlane({
+        ringRadii: rings,
+        spokeCount: SYSTEM_GRID_SPOKES,
+        orientation: this.referenceFrame,
+        // Quieter and dashed, unlike the galaxy view's: here the grid shares a plane with the
+        // orbit ellipses, which are themselves rings, and it must not be mistaken for one.
+        opacity: SYSTEM_GRID_OPACITY,
+        dashed: true,
+        emphasisRadii: [rings[rings.length - 1]]
+      });
+      this.grid.setStrength(1);
+
+      this.tethers = new TetherField(this.topLevelBodies.length, {
+        normal: new THREE.Vector3(0, 0, 1).applyQuaternion(this.referenceFrame),
+        opacity: SYSTEM_TETHER_OPACITY
+      });
+      this.tethers.setStrength(1);
+      this.tetherPoints = this.topLevelBodies.map((body) => body.position);
+
+      this.object.add(this.grid.object, this.tethers.object);
+    }
   }
 
   /** Recomputes every marker's position for the given Julian date. Call once per tick. */
@@ -241,6 +288,10 @@ export class SystemOrbitsRenderer {
       const orbital = propagateOrbit(moon.elements, moon.gmAu3PerDay2, epochJd);
       moon.marker.position.set(orbital.x, orbital.y, orbital.z).applyQuaternion(moon.frame);
     }
+
+    // Moons are left out: their tether would land within a marker's width of their planet's and
+    // say nothing the planet's has not already said.
+    this.tethers?.setTargets(this.tetherPoints);
   }
 
   /** Looks up which system member a marker object belongs to (e.g. from a raycast hit). */
@@ -254,6 +305,8 @@ export class SystemOrbitsRenderer {
   }
 
   dispose(): void {
+    this.grid?.dispose();
+    this.tethers?.dispose();
     for (const { geometry, material } of this.disposables) {
       geometry.dispose();
       material.dispose();

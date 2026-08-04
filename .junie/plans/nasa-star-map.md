@@ -138,7 +138,7 @@ interface DeepSkyRecord {
 - `SearchComponent` — text search across `stars-index.json`, `bodies.json`, `exoplanets.json`; on match, dispatches a navigation action.
 - `NavigationStore` (Angular signals-based) — holds `viewLevel: 'galactic' | 'galaxy' | 'system'`, `selectedStarId`, `selectedBodyId`; consumed by scene components and routed body-detail view.
 - `MilkyWayRenderer` / `milky-way-model.ts` — the Galaxy itself as an instanced particle cloud scattered around the structural model in `shared/astro/galaxy.ts`, crossfaded against the catalogued star field by camera distance.
-- `PolarGridPlane` / `TetherField` (`grid-plane.ts`) — the reference plane the map is read against: rings and spokes lying in the galactic plane, plus drop lines from stars to it.
+- `PolarGridPlane` / `TetherField` (`grid-plane.ts`) — the reference plane a view is read against: rings and spokes lying in a given plane, plus drop lines onto it. Used at all three scales — the galactic plane, the Sun's plane, and each system's own orbital plane.
 - `StarmapHudComponent` — the heads-up display: scale ladder, readout panel, range, reticle and frame.
 
 ### File Structure
@@ -291,3 +291,9 @@ The map opens out from the catalogued neighbourhood to the whole Milky Way, in t
 - Add `MilkyWayRenderer`, crossfaded against the star field by camera distance so the two scales share one continuous parsec space rather than being separate scenes.
 - Add the galactic and local grid planes, star tethers, and the HUD (scale ladder, readout panel, range, reticle, frame).
 - Label the Galaxy model as a model wherever it is shown: its skeleton is measured, its particles are not.
+
+### ✓ Step 8: Put a reference grid under the system view
+The same plane-and-tether reading aid the outer scales got, applied to a single system.
+- Add `systemGridRingsAu`: ring radii snapped to a 1-2-5 ladder so a distance can be read off, at any of the four orders of magnitude real systems span.
+- Draw the grid and the body tethers in the system's own reference plane — the ecliptic for the solar system, the plane of the sky otherwise — dashed, so it is never mistaken for an orbit.
+- Frame the camera against that same plane, so an exoplanet system is presented face-on rather than edge-on.

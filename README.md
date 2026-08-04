@@ -43,7 +43,10 @@ in it is measured and what is not.
 **System view** — selecting a star flies the camera continuously into its system rather than
 cutting to a new scene. The Sun gets the real solar-system bodies from JPL Horizons; other
 stars get their confirmed exoplanets. Orbits are drawn as ellipses and bodies are propagated
-along them by a Kepler solver against the current epoch.
+along them by a Kepler solver against the current epoch. Under them, a dashed grid marks out
+round distances in AU — 5 AU rings for the solar system, 0.01 AU rings for TRAPPIST-1 — with a
+drop line from each body, so eccentricity and inclination read against a circular reference
+instead of having to be inferred from a shape in space.
 
 **Body detail** — a dedicated close-up scene and info panel for one planet, moon or exoplanet,
 with real photography where NASA/ESA/USGS imagery exists.
@@ -66,7 +69,10 @@ same place an in-scene click would.
   to each host star, which is why transiting planets cluster at 90°. Each set of elements is
   rotated from its own reference plane into the scene's equatorial frame, so a direction means
   the same thing everywhere. Systems are still presented face-on — by placing the camera
-  relative to the orbital plane rather than by rotating the world into a convenient pose.
+  relative to whichever plane that system's elements were measured in, rather than by rotating
+  the world into a convenient pose. That plane is per-system, not global: one fixed viewing
+  direction is face-on for the solar system and edge-on for an exoplanet system whose host star
+  lies elsewhere on the sky. It is also the plane the system's reference grid lies in.
 - **Two coordinate scales.** The galaxy view works in parsecs and the system view in AU —
   about eight orders of magnitude apart, which wrecks float precision if rendered in one unit
   space. The camera rig recentres the active star to the origin ("floating origin") and swaps

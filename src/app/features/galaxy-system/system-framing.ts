@@ -1,4 +1,6 @@
-import { CartesianCoordinates, eclipticToEquatorial } from '../../shared/astro/coordinates';
+import * as THREE from 'three/webgpu';
+
+import { CartesianCoordinates } from '../../shared/astro/coordinates';
 
 /**
  * How the system view sizes itself to whatever system it is showing.
@@ -45,17 +47,31 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * Where the camera settles when arriving at a system, as a unit direction from the star in the
- * scene's equatorial frame.
+ * Where the camera settles when arriving at a system, as a unit direction from the star —
+ * expressed in the system's *own* reference plane, before that plane is rotated into the scene.
  *
- * The scene is equatorial so that orbits and stars share one frame, but orbital planes lie
- * close to the *ecliptic*, which is tilted 23.4 degrees out of it. Left to the equatorial axes,
- * a system would be presented edge-on. Rather than rotate the world into a comfortable pose —
- * which would put the orbits back at odds with the sky — the camera is placed relative to the
- * plane instead: this is a three-quarter view, about 37 degrees off the ecliptic normal, so a
- * system reads as a disc while staying where it truly sits.
+ * A three-quarter view, about 37 degrees off the plane's normal, so a system reads as a disc
+ * rather than as a line.
  */
-export const SYSTEM_VIEW_DIRECTION: CartesianCoordinates = eclipticToEquatorial({ x: 0, y: 0.6, z: 0.8 });
+export const SYSTEM_VIEW_DIRECTION_IN_PLANE: CartesianCoordinates = { x: 0, y: 0.6, z: 0.8 };
+
+/**
+ * That direction carried into the scene's equatorial frame by the system's own reference frame.
+ *
+ * The scene is equatorial so that orbits and stars share one frame, but no system's orbits lie
+ * in the equatorial plane: the solar system's are measured against the ecliptic, 23.4 degrees
+ * out of it, and an exoplanet system's against the plane of the sky, which depends on where its
+ * host star happens to be. Left to the equatorial axes — or to any single fixed direction — some
+ * systems come out edge-on.
+ *
+ * Rather than rotate the world into a comfortable pose, which would put the orbits back at odds
+ * with the sky, the camera is placed relative to whichever plane the system was measured in. So
+ * every system reads as a disc while staying exactly where it truly sits.
+ */
+export function systemViewDirection(referenceFrame: THREE.Quaternion): THREE.Vector3 {
+  const { x, y, z } = SYSTEM_VIEW_DIRECTION_IN_PLANE;
+  return new THREE.Vector3(x, y, z).normalize().applyQuaternion(referenceFrame);
+}
 
 /**
  * Radius (AU) to draw the system's star at, given its innermost orbit.
@@ -80,6 +96,43 @@ export function systemFramingDistanceAu(outermostOrbitAu: number): number {
     return EMPTY_SYSTEM_FRAMING_DISTANCE_AU;
   }
   return clamp(outermostOrbitAu * FRAMING_TO_OUTERMOST_ORBIT, MIN_FRAMING_DISTANCE_AU, MAX_FRAMING_DISTANCE_AU);
+}
+
+/** Roughly how many rings the system grid aims for, and how far past the outermost orbit it runs. */
+const TARGET_GRID_RING_COUNT = 8;
+const GRID_EXTENT_TO_OUTERMOST_ORBIT = 1.15;
+/** Ring spacings are always one of these times a power of ten, so the numbers stay readable. */
+const RING_STEP_MANTISSAS = [1, 2, 5, 10];
+
+/**
+ * Ring radii (AU) for the system view's reference grid, given the system's outermost orbit.
+ *
+ * Snapped to a 1-2-5 ladder rather than evenly dividing the system, because the point of the
+ * grid is to put a number on a distance: rings at 5, 10, 15 AU can be read off at a glance, and
+ * rings at 4.34, 8.68, 13.02 AU cannot. That holds across the four orders of magnitude real
+ * systems span — the solar system gets 5 AU rings, TRAPPIST-1 gets 0.01 AU ones.
+ *
+ * Empty for a system with no orbits to scale against; there is no distance to mark out.
+ */
+export function systemGridRingsAu(outermostOrbitAu: number): number[] {
+  if (!Number.isFinite(outermostOrbitAu) || outermostOrbitAu <= 0) {
+    return [];
+  }
+
+  const extent = outermostOrbitAu * GRID_EXTENT_TO_OUTERMOST_ORBIT;
+  const target = extent / TARGET_GRID_RING_COUNT;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(target)));
+  const step = magnitude * (RING_STEP_MANTISSAS.find((mantissa) => magnitude * mantissa >= target) ?? 10);
+
+  // Rounded up, not truncated: the last ring has to enclose the outermost orbit rather than fall
+  // just inside it, or the outermost planet spends its year outside the grid meant to measure it.
+  const count = Math.ceil(extent / step);
+  const rings: number[] = [];
+  // Multiplied rather than accumulated, so a step of 0.01 does not drift into 0.060000000000000005.
+  for (let index = 1; index <= count; index++) {
+    rings.push(index * step);
+  }
+  return rings;
 }
 
 /**

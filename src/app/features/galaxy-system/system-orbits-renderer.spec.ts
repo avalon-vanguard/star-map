@@ -209,6 +209,81 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
       expect(p.z).toBeCloseTo(0, 9);
       renderer.dispose();
     });
+
+    it('reads the solar system against the ecliptic and everything else against the sky plane', () => {
+      const solar = new SystemOrbitsRenderer([EARTH], []);
+      const eclipticPole = eclipticToEquatorial({ x: 0, y: 0, z: 1 });
+      const solarNormal = new THREE.Vector3(0, 0, 1).applyQuaternion(solar.referenceFrame);
+      expect(solarNormal.dot(new THREE.Vector3(eclipticPole.x, eclipticPole.y, eclipticPole.z))).toBeCloseTo(1, 9);
+      solar.dispose();
+
+      const lineOfSight = { x: 0.3, y: -0.5, z: 0.81 };
+      const exo = new SystemOrbitsRenderer([], [exoplanet()], lineOfSight);
+      const exoNormal = new THREE.Vector3(0, 0, 1).applyQuaternion(exo.referenceFrame);
+      const expected = new THREE.Vector3(lineOfSight.x, lineOfSight.y, lineOfSight.z).normalize();
+      expect(exoNormal.dot(expected)).toBeCloseTo(1, 9);
+      exo.dispose();
+    });
+  });
+
+  describe('reference grid', () => {
+    /** A body far enough out to give the grid something to measure. */
+    const JUPITER: BodyRecord = {
+      id: 'jupiter',
+      systemStarId: 0,
+      name: 'Jupiter',
+      kind: 'planet',
+      radiusKm: 69911,
+      orbit: { semiMajorAxisAu: 5.2, eccentricity: 0.048, inclinationDeg: 1.3, longitudeOfAscendingNodeDeg: 100, argumentOfPeriapsisDeg: 275, meanAnomalyAtEpochDeg: 20, epochJd: DEFAULT_EPOCH_JD }
+    };
+
+    /** The grid and the tethers are the only line objects the renderer adds outside a pivot. */
+    function planeObjects(renderer: SystemOrbitsRenderer): THREE.LineSegments[] {
+      return renderer.object.children.filter((child): child is THREE.LineSegments => child instanceof THREE.LineSegments);
+    }
+
+    it('lays a grid and tethers in the system plane', () => {
+      const renderer = new SystemOrbitsRenderer([JUPITER], []);
+      expect(planeObjects(renderer)).toHaveLength(2);
+      renderer.dispose();
+    });
+
+    it('drops a tether from every top-level body onto that plane, and follows them', () => {
+      const renderer = new SystemOrbitsRenderer([], [exoplanet({ periodDays: TRAPPIST_1B_PERIOD_DAYS })]);
+      renderer.update(DEFAULT_EPOCH_JD);
+
+      // The tether field is the one with an explicit draw range; the grid leaves it at Infinity.
+      const tethers = planeObjects(renderer).find((object) => Number.isFinite(object.geometry.drawRange.count))!;
+      const readTop = (): THREE.Vector3 => {
+        const position = tethers.geometry.getAttribute('position');
+        return new THREE.Vector3(position.getX(0), position.getY(0), position.getZ(0));
+      };
+
+      // The tether's top is the marker, wherever the marker currently is.
+      expect(readTop().distanceTo(renderer.members[0].marker.position)).toBeCloseTo(0, 9);
+      const before = readTop();
+
+      renderer.update(DEFAULT_EPOCH_JD + TRAPPIST_1B_PERIOD_DAYS / 2);
+      expect(readTop().distanceTo(renderer.members[0].marker.position)).toBeCloseTo(0, 9);
+      expect(readTop().distanceTo(before)).toBeGreaterThan(0);
+
+      renderer.dispose();
+    });
+
+    it('draws no grid for a star with no known planets', () => {
+      // Nothing to measure, and a bare ring around a lone star would imply a scale it does not
+      // have.
+      const renderer = new SystemOrbitsRenderer([], []);
+      expect(planeObjects(renderer)).toHaveLength(0);
+      renderer.dispose();
+    });
+
+    it('detaches the grid on dispose along with everything else', () => {
+      const renderer = new SystemOrbitsRenderer([JUPITER], []);
+      const [grid] = planeObjects(renderer);
+      renderer.dispose();
+      expect(grid.parent).toBeNull();
+    });
   });
 
   describe('exoplanet inclination is measured from the plane of the sky', () => {

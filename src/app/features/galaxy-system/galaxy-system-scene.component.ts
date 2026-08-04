@@ -18,7 +18,7 @@ import { CameraRigController } from './camera-rig-controller';
 import { DeepSkyRenderer } from './deep-sky-renderer';
 import { galacticNormal, PolarGridPlane, TetherField } from './grid-plane';
 import { MilkyWayRenderer } from './milky-way-renderer';
-import { starMarkerRadiusAu, SYSTEM_VIEW_DIRECTION, systemFramingDistanceAu } from './system-framing';
+import { starMarkerRadiusAu, systemFramingDistanceAu, systemViewDirection } from './system-framing';
 import { HudReadout, StarmapHudComponent } from './starmap-hud.component';
 import { colorIndexToRgb, StarFieldRenderer } from './star-field-renderer';
 import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
@@ -332,15 +332,15 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.galacticLabels = this.milkyWay.labelPoints();
     const centre = galacticCentrePositionPc();
     this.galacticGrid = new PolarGridPlane({
-      ringRadiiPc: GALACTIC_GRID_RINGS_PC,
+      ringRadii: GALACTIC_GRID_RINGS_PC,
       spokeCount: GALACTIC_GRID_SPOKES,
-      centrePc: new THREE.Vector3(centre.x, centre.y, centre.z),
-      emphasisRadiiPc: [SUN_GALACTOCENTRIC_RADIUS_PC]
+      centre: new THREE.Vector3(centre.x, centre.y, centre.z),
+      emphasisRadii: [SUN_GALACTOCENTRIC_RADIUS_PC]
     });
     this.localGrid = new PolarGridPlane({
-      ringRadiiPc: LOCAL_GRID_RINGS_PC,
+      ringRadii: LOCAL_GRID_RINGS_PC,
       spokeCount: LOCAL_GRID_SPOKES,
-      emphasisRadiiPc: [LOCAL_GRID_RINGS_PC[LOCAL_GRID_RINGS_PC.length - 1]]
+      emphasisRadii: [LOCAL_GRID_RINGS_PC[LOCAL_GRID_RINGS_PC.length - 1]]
     });
     // Drop lines for the Sun's nearest neighbours. A fixed set rather than whatever is currently
     // labelled: these are the stars the local view is about, they cluster where the grid is
@@ -731,9 +731,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     const framingDistance = systemFramingDistanceAu(this.systemRenderer.maxTopLevelSemiMajorAxisAu);
     // Arrives along whichever direction the approach came from, then swings round to look down
-    // on the orbital plane as it settles — so the swap stays continuous but the system is not
-    // presented edge-on. See SYSTEM_VIEW_DIRECTION.
-    const viewDirection = new THREE.Vector3(SYSTEM_VIEW_DIRECTION.x, SYSTEM_VIEW_DIRECTION.y, SYSTEM_VIEW_DIRECTION.z).normalize();
+    // on this system's own orbital plane as it settles — so the swap stays continuous but the
+    // system is not presented edge-on. See `systemViewDirection`.
+    const viewDirection = systemViewDirection(this.systemRenderer.referenceFrame);
 
     this.rig!.flyTo({ position: viewDirection.multiplyScalar(framingDistance), target: new THREE.Vector3(0, 0, 0) }, SETTLE_DURATION_SECONDS, () => {
       this.currentStarId = star.id;

@@ -1,6 +1,16 @@
+import * as THREE from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 
-import { bodyMarkerRadiusAu, DEFAULT_STAR_MARKER_RADIUS_AU, starMarkerRadiusAu, systemFramingDistanceAu } from './system-framing';
+import { eclipticToEquatorial, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
+import {
+  bodyMarkerRadiusAu,
+  DEFAULT_STAR_MARKER_RADIUS_AU,
+  starMarkerRadiusAu,
+  systemFramingDistanceAu,
+  systemGridRingsAu,
+  SYSTEM_VIEW_DIRECTION_IN_PLANE,
+  systemViewDirection
+} from './system-framing';
 
 /** Real systems spanning the range the view has to cope with. */
 const TRAPPIST_1 = { innermost: 0.01154, outermost: 0.06189 };
@@ -145,5 +155,103 @@ describe('bodyMarkerRadiusAu', () => {
   it('leaves the solar system essentially as it was before scaling', () => {
     // The constants were tuned at this span, so the scale factor here is ~1.
     expect(bodyMarkerRadiusAu(EARTH_RADIUS_KM, SOLAR_SPAN_AU)).toBeCloseTo(0.09, 2);
+  });
+});
+
+describe('systemGridRingsAu', () => {
+  it('reaches past the outermost orbit, so no planet sits off the edge of the grid', () => {
+    for (const { outermost } of [TRAPPIST_1, GL_357, SOLAR]) {
+      const rings = systemGridRingsAu(outermost);
+      expect(rings.length).toBeGreaterThan(0);
+      expect(rings[rings.length - 1]).toBeGreaterThan(outermost);
+    }
+  });
+
+  it('gives a legible handful of rings at every scale, four orders of magnitude apart', () => {
+    for (const { outermost } of [TRAPPIST_1, GL_357, SOLAR, { outermost: 650 }]) {
+      const rings = systemGridRingsAu(outermost);
+      expect(rings.length).toBeGreaterThanOrEqual(3);
+      expect(rings.length).toBeLessThanOrEqual(10);
+    }
+  });
+
+  it('spaces them evenly, on a round number', () => {
+    const rings = systemGridRingsAu(SOLAR.outermost);
+    // The solar system reads in 5 AU steps: 5, 10, ... out past Neptune at 30.07.
+    expect(rings).toEqual([5, 10, 15, 20, 25, 30, 35]);
+  });
+
+  it('scales the step down to the system rather than defaulting to whole AU', () => {
+    // TRAPPIST-1's outermost planet orbits at 0.062 AU. Whole-AU rings would put the entire
+    // system inside the first one.
+    const rings = systemGridRingsAu(TRAPPIST_1.outermost);
+    expect(rings[0]).toBeLessThan(TRAPPIST_1.outermost / 2);
+    for (const radius of rings) {
+      expect(Number.isFinite(radius)).toBe(true);
+      expect(radius).toBeGreaterThan(0);
+    }
+  });
+
+  it('keeps the step free of floating-point drift, so labels would read cleanly', () => {
+    for (const radius of systemGridRingsAu(TRAPPIST_1.outermost)) {
+      // Multiplying the step out rather than accumulating it keeps these exact to 1e-12.
+      expect(Math.abs(radius * 1000 - Math.round(radius * 1000))).toBeLessThan(1e-9);
+    }
+  });
+
+  it('draws no grid for a system with nothing to measure against', () => {
+    for (const outermost of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(systemGridRingsAu(outermost)).toEqual([]);
+    }
+  });
+});
+
+describe('systemViewDirection', () => {
+  const RAD_TO_DEG = 180 / Math.PI;
+  const ECLIPTIC_FRAME = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), (OBLIQUITY_J2000_DEG * Math.PI) / 180);
+
+  /** Angle between the camera direction and the plane's own normal, in degrees. */
+  function angleFromNormalDeg(frame: THREE.Quaternion): number {
+    const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(frame);
+    return Math.acos(Math.abs(systemViewDirection(frame).dot(normal))) * RAD_TO_DEG;
+  }
+
+  it('returns a unit direction', () => {
+    expect(systemViewDirection(ECLIPTIC_FRAME).length()).toBeCloseTo(1, 12);
+  });
+
+  it('holds the same three-quarter angle to the plane whatever plane that is', () => {
+    // The whole point: one fixed direction in the scene's frame would be face-on for the solar
+    // system and edge-on for an exoplanet system measured against the plane of the sky.
+    const skyPlanes = [
+      new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0.3, -0.5, 0.81).normalize()),
+      new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(-1, 0, 0)),
+      new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 1, 0))
+    ];
+
+    // atan(0.6 / 0.8) — the angle the in-plane direction was chosen at, held exactly.
+    const expected = Math.atan2(SYSTEM_VIEW_DIRECTION_IN_PLANE.y, SYSTEM_VIEW_DIRECTION_IN_PLANE.z) * RAD_TO_DEG;
+    for (const frame of [ECLIPTIC_FRAME, ...skyPlanes]) {
+      expect(angleFromNormalDeg(frame)).toBeCloseTo(expected, 9);
+    }
+  });
+
+  it('is well clear of edge-on in every case, which is what it exists to prevent', () => {
+    for (const axis of [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0.2, 0.9, -0.4).normalize()]) {
+      const frame = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), axis);
+      expect(angleFromNormalDeg(frame)).toBeLessThan(60);
+    }
+  });
+
+  it('leaves the solar system framed exactly as the ecliptic conversion used to frame it', () => {
+    // The previous behaviour was correct for the one system whose elements are ecliptic; this
+    // pins that it did not move while the other systems were fixed.
+    const previous = eclipticToEquatorial(SYSTEM_VIEW_DIRECTION_IN_PLANE);
+    const current = systemViewDirection(ECLIPTIC_FRAME);
+    const length = Math.hypot(previous.x, previous.y, previous.z);
+
+    expect(current.x).toBeCloseTo(previous.x / length, 12);
+    expect(current.y).toBeCloseTo(previous.y / length, 12);
+    expect(current.z).toBeCloseTo(previous.z / length, 12);
   });
 });

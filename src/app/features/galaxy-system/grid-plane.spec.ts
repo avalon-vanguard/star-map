@@ -30,7 +30,7 @@ describe('galacticFrameQuaternion', () => {
 describe('PolarGridPlane', () => {
   const rings = [10, 20, 50];
   const spokes = 8;
-  const grid = new PolarGridPlane({ ringRadiiPc: rings, spokeCount: spokes, emphasisRadiiPc: [50] });
+  const grid = new PolarGridPlane({ ringRadii: rings, spokeCount: spokes, emphasisRadii: [50] });
 
   it('draws every ring segment and every spoke', () => {
     expect(grid.object.geometry.getAttribute('position').count).toBe(rings.length * SEGMENTS_PER_RING * 2 + spokes * 2);
@@ -72,9 +72,9 @@ describe('PolarGridPlane', () => {
   it('sits on the galactic centre when given it, still in the plane', () => {
     const centre = galacticCentrePositionPc();
     const galacticGrid = new PolarGridPlane({
-      ringRadiiPc: [2500, 8178],
+      ringRadii: [2500, 8178],
       spokeCount: 4,
-      centrePc: new THREE.Vector3(centre.x, centre.y, centre.z)
+      centre: new THREE.Vector3(centre.x, centre.y, centre.z)
     });
     galacticGrid.object.updateMatrixWorld(true);
 
@@ -84,6 +84,31 @@ describe('PolarGridPlane', () => {
     expect(world.dot(normal)).toBeCloseTo(-SUN_HEIGHT_ABOVE_MIDPLANE_PC, 4);
 
     galacticGrid.dispose();
+  });
+
+  it('lies in whatever plane it is oriented into, for a system read against its own', () => {
+    // The system view passes the frame its orbital elements were measured in, which has nothing
+    // to do with the Galaxy's plane.
+    const orientation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+    const systemGrid = new PolarGridPlane({ ringRadii: [1, 2, 3], spokeCount: 6, orientation });
+    systemGrid.object.updateMatrixWorld(true);
+
+    const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(orientation);
+    for (const index of [0, 200, systemGrid.object.geometry.getAttribute('position').count - 1]) {
+      const world = vertexAt(systemGrid.object.geometry, index).applyMatrix4(systemGrid.object.matrixWorld);
+      expect(world.dot(normal)).toBeCloseTo(0, 6);
+    }
+    // ...and it is genuinely a different plane from the default.
+    expect(Math.abs(normal.dot(galacticNormal()))).toBeLessThan(0.99);
+
+    systemGrid.dispose();
+  });
+
+  it('honours an explicit peak opacity, for a grid that has to sit under other rings', () => {
+    const quiet = new PolarGridPlane({ ringRadii: [1, 2], spokeCount: 4, opacity: 0.2 });
+    quiet.setStrength(1);
+    expect((quiet.object.material as THREE.LineBasicMaterial).opacity).toBeCloseTo(0.2, 6);
+    quiet.dispose();
   });
 
   it('keeps the emphasised ring brighter than the rest', () => {
@@ -145,6 +170,27 @@ describe('TetherField', () => {
     expect(field.object.geometry.drawRange.count).toBe(4);
     expect(field.object.geometry.getAttribute('position').count).toBe(4);
 
+    field.dispose();
+  });
+
+  it('drops down whatever normal it was built with, not always the galactic one', () => {
+    const normal = new THREE.Vector3(0, 1, 0);
+    const field = new TetherField(2, { normal });
+    field.setTargets([new THREE.Vector3(3, 7, 5)]);
+
+    const foot = vertexAt(field.object.geometry, 1);
+    // The foot keeps the in-plane components and loses only the height along the normal.
+    expect(foot.x).toBeCloseTo(3, 6);
+    expect(foot.y).toBeCloseTo(0, 6);
+    expect(foot.z).toBeCloseTo(5, 6);
+
+    field.dispose();
+  });
+
+  it('normalises the normal it is given, so an unnormalised frame axis still lands on the plane', () => {
+    const field = new TetherField(2, { normal: new THREE.Vector3(0, 0, 4) });
+    field.setTargets([new THREE.Vector3(1, 1, 9)]);
+    expect(vertexAt(field.object.geometry, 1).z).toBeCloseTo(0, 6);
     field.dispose();
   });
 

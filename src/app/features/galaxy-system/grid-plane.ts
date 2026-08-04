@@ -21,31 +21,53 @@ export function galacticNormal(): THREE.Vector3 {
   return new THREE.Vector3(z.x, z.y, z.z);
 }
 
+/**
+ * Distances here carry no unit of their own: they are whatever the group the grid is added to
+ * works in — parsecs in the galaxy view, AU in the system view.
+ */
 export interface PolarGridOptions {
-  /** Ring radii to draw, in parsecs, innermost first. */
-  readonly ringRadiiPc: readonly number[];
+  /** Ring radii to draw, innermost first. */
+  readonly ringRadii: readonly number[];
   /** Radial spokes drawn from the innermost to the outermost ring. */
   readonly spokeCount: number;
   /**
-   * Centre of the grid in the scene's equatorial frame, which also fixes the plane it lies in.
-   * Defaults to the Sun (the origin) — note that the Sun's own plane is
-   * {@link SUN_HEIGHT_ABOVE_MIDPLANE_PC} above the Galaxy's midplane, which matters at the local
+   * Rotation from the grid's own XY plane onto the plane it should lie in. Defaults to the
+   * galactic plane; the system view passes the frame its orbital elements were measured in.
+   */
+  readonly orientation?: THREE.Quaternion;
+  /**
+   * Centre of the grid, which also fixes the plane it lies in. Defaults to the origin — note
+   * that in the galaxy view the origin is the Sun, whose own plane is
+   * {@link SUN_HEIGHT_ABOVE_MIDPLANE_PC} above the Galaxy's midplane; that matters at the local
    * scale and is invisible at the galactic one.
    */
-  readonly centrePc?: THREE.Vector3;
+  readonly centre?: THREE.Vector3;
   readonly color?: THREE.ColorRepresentation;
   /** Rings listed here are drawn at full strength — used to call out a meaningful radius. */
-  readonly emphasisRadiiPc?: readonly number[];
+  readonly emphasisRadii?: readonly number[];
+  /** Peak opacity, for a grid that should read louder or quieter than the default. */
+  readonly opacity?: number;
+  /**
+   * Breaks the rings into dashes. Worth it where the grid shares a plane with real curves it
+   * could be mistaken for — the system view draws orbit ellipses in the same plane, and a solid
+   * ring there is indistinguishable at a glance from a circular orbit. Dashed reads as
+   * "reference", solid as "something is actually there".
+   */
+  readonly dashed?: boolean;
 }
 
+/** Ring segments per dash and per gap when {@link PolarGridOptions.dashed} is set. */
+const DASH_SEGMENTS = 2;
+
 /**
- * A polar grid lying in the galactic plane: concentric rings and radial spokes, fading out with
+ * A polar grid lying in a reference plane: concentric rings and radial spokes, fading out with
  * radius.
  *
- * This is the one piece of chrome that makes a 3D star map readable. Without a reference plane
- * a cloud of points has no depth at all — two stars a thousand parsecs apart look like
- * neighbours. With a plane under them, and a tether from each to the plane, the eye reads their
- * height directly. It is also the signature of the map this view is modelled on.
+ * This is the one piece of chrome that makes a 3D map readable. Without a reference plane a
+ * cloud of points has no depth at all — two stars a thousand parsecs apart look like neighbours,
+ * and a planet above its system's plane looks like one inside it. With a plane under them, and a
+ * tether from each down to it, the eye reads height directly. It is also the signature of the
+ * map this view is modelled on.
  */
 export class PolarGridPlane {
   readonly object: THREE.LineSegments;
@@ -56,9 +78,9 @@ export class PolarGridPlane {
 
   constructor(options: PolarGridOptions) {
     const color = new THREE.Color(options.color ?? 0x4dd7ff);
-    const emphasis = new Set(options.emphasisRadiiPc ?? []);
-    const outerRadius = Math.max(...options.ringRadiiPc);
-    const innerRadius = Math.min(...options.ringRadiiPc);
+    const emphasis = new Set(options.emphasisRadii ?? []);
+    const outerRadius = Math.max(...options.ringRadii);
+    const innerRadius = Math.min(...options.ringRadii);
 
     const vertices: number[] = [];
     const colors: number[] = [];
@@ -68,10 +90,17 @@ export class PolarGridPlane {
       colors.push(color.r * brightness, color.g * brightness, color.b * brightness);
     };
 
-    for (const radius of options.ringRadiiPc) {
+    for (const radius of options.ringRadii) {
       // Rings dim toward the edge of the grid so it dissolves into the void instead of ending.
       const brightness = emphasis.has(radius) ? 1 : 0.55 * (1 - (0.6 * radius) / outerRadius);
       for (let segment = 0; segment < SEGMENTS_PER_RING; segment++) {
+        // Dashes are cut by dropping whole segments rather than by a dashed material: the ring is
+        // already built from independent segment pairs, so a material's dash pattern would
+        // restart at each one. Skipping segments also keeps the dash angular, so every ring is
+        // dashed at the same rate however large it is.
+        if (options.dashed && segment % (DASH_SEGMENTS * 2) >= DASH_SEGMENTS) {
+          continue;
+        }
         const a = (segment / SEGMENTS_PER_RING) * Math.PI * 2;
         const b = ((segment + 1) / SEGMENTS_PER_RING) * Math.PI * 2;
         push(Math.cos(a) * radius, Math.sin(a) * radius, brightness);
@@ -91,7 +120,7 @@ export class PolarGridPlane {
     this.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
     // Deliberately restrained: the grid is the reference the map is read against, not the map.
-    this.baseOpacity = 0.55;
+    this.baseOpacity = options.opacity ?? 0.55;
     this.material = new THREE.LineBasicMaterial({
       vertexColors: true,
       transparent: true,
@@ -101,9 +130,9 @@ export class PolarGridPlane {
     });
 
     this.object = new THREE.LineSegments(this.geometry, this.material);
-    // Built flat in its own XY plane, then rotated onto the galactic plane and slid to centre.
-    this.object.quaternion.copy(galacticFrameQuaternion());
-    this.object.position.copy(options.centrePc ?? new THREE.Vector3());
+    // Built flat in its own XY plane, then rotated onto the reference plane and slid to centre.
+    this.object.quaternion.copy(options.orientation ?? galacticFrameQuaternion());
+    this.object.position.copy(options.centre ?? new THREE.Vector3());
     this.object.visible = false;
     this.object.renderOrder = -1;
   }
@@ -137,10 +166,15 @@ export class TetherField {
   private readonly material: THREE.LineBasicMaterial;
   private readonly positions: Float32Array;
   private readonly maxCount: number;
+  private readonly normal: THREE.Vector3;
+  private readonly peakOpacity: number;
 
-  constructor(maxCount: number, color: THREE.ColorRepresentation = 0x4dd7ff) {
+  constructor(maxCount: number, options: { color?: THREE.ColorRepresentation; normal?: THREE.Vector3; opacity?: number } = {}) {
     this.maxCount = maxCount;
+    this.normal = (options.normal ?? galacticNormal()).clone().normalize();
+    this.peakOpacity = options.opacity ?? 0.45;
     this.positions = new Float32Array(maxCount * 6);
+    const color = options.color ?? 0x4dd7ff;
     this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     this.geometry.setDrawRange(0, 0);
 
@@ -153,19 +187,20 @@ export class TetherField {
   }
 
   /**
-   * Drops a tether from each point onto a plane parallel to the galactic plane.
+   * Drops a tether from each point onto the plane through the origin with this field's normal,
+   * offset along that normal by `planeOffset`.
    *
-   * `planeHeightPc` is that plane's height above the Sun along the galactic normal, so it is `0`
-   * for a grid through the Sun and `-SUN_HEIGHT_ABOVE_MIDPLANE_PC` for one on the Galaxy's true
+   * The offset is `0` for a plane through the origin — the Sun in the galaxy view, the host star
+   * in the system view — and `-SUN_HEIGHT_ABOVE_MIDPLANE_PC` for a grid on the Galaxy's true
    * midplane. Points past the field's capacity are dropped.
    */
-  setTargets(points: readonly THREE.Vector3[], planeHeightPc = 0): void {
-    const normal = galacticNormal();
+  setTargets(points: readonly THREE.Vector3[], planeOffset = 0): void {
+    const normal = this.normal;
     const count = Math.min(points.length, this.maxCount);
 
     for (let index = 0; index < count; index++) {
       const point = points[index];
-      const height = point.dot(normal) - planeHeightPc;
+      const height = point.dot(normal) - planeOffset;
       this.positions.set(
         [point.x, point.y, point.z, point.x - normal.x * height, point.y - normal.y * height, point.z - normal.z * height],
         index * 6
@@ -179,7 +214,7 @@ export class TetherField {
   /** Crossfades the tethers, matching whichever grid they are dropping onto. */
   setStrength(strength: number): void {
     const clamped = Math.max(0, Math.min(1, strength));
-    this.material.opacity = clamped * 0.45;
+    this.material.opacity = clamped * this.peakOpacity;
     this.object.visible = clamped > 0;
   }
 

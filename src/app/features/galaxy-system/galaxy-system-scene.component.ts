@@ -1,9 +1,10 @@
-import { AfterViewInit, Component, effect, ElementRef, OnDestroy, viewChild } from '@angular/core';
+import { AfterViewInit, Component, effect, ElementRef, OnDestroy, signal, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import * as THREE from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { dateToJulianDate } from '../../shared/astro/constants';
+import { galacticCentrePositionPc, galacticToEquatorial, MILKY_WAY_ARMS, SUN_GALACTOCENTRIC_RADIUS_PC } from '../../shared/astro/galaxy';
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { EngineService } from '../../core/engine/engine.service';
 import { BodyRecord } from '../../shared/models/body.model';
@@ -12,10 +13,13 @@ import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { applyMilkyWaySkybox, createGlowSprite } from '../../shared/rendering/skybox';
 import { loadCachedTexture, MILKY_WAY_SKYBOX_PATH, SUN_TEXTURE_PATH } from '../../shared/rendering/texture-catalog';
 import { StarRecord } from '../../shared/models/star.model';
-import { NavigationStore } from '../../shared/state/navigation.store';
+import { NavigationStore, ViewLevel } from '../../shared/state/navigation.store';
 import { CameraRigController } from './camera-rig-controller';
 import { DeepSkyRenderer } from './deep-sky-renderer';
+import { galacticNormal, PolarGridPlane, TetherField } from './grid-plane';
+import { MilkyWayRenderer } from './milky-way-renderer';
 import { starMarkerRadiusAu, SYSTEM_VIEW_DIRECTION, systemFramingDistanceAu } from './system-framing';
+import { HudReadout, StarmapHudComponent } from './starmap-hud.component';
 import { colorIndexToRgb, StarFieldRenderer } from './star-field-renderer';
 import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
@@ -29,6 +33,11 @@ const LABEL_MAX_DISTANCE_PC = 20;
 /** Caps how many labels are shown at once, to keep the DOM light. */
 const LABEL_MAX_COUNT = 15;
 /**
+ * Minimum on-screen separation between two labels, in NDC (roughly 6% of the viewport height).
+ * Nearer stars win the space; see `spreadLabels`.
+ */
+const LABEL_MIN_SEPARATION_NDC = 0.12;
+/**
  * How many deep-sky objects get a permanent label. These sit on a fixed backdrop shell rather
  * than near the camera, so proximity is meaningless for them — the brightest handful are simply
  * always named.
@@ -39,14 +48,52 @@ const LABEL_UPDATE_INTERVAL_SECONDS = 0.2;
 /** Pointer travel (px) above which a press counts as an orbit drag rather than a selection. */
 const CLICK_DRAG_SLOP_PX = 5;
 
-const GALAXY_OVERVIEW_POSITION = new THREE.Vector3(0, 15, 30);
+/**
+ * Opening pose for the local view, expressed in the galactic frame rather than the equatorial
+ * one: about 35 degrees above the galactic plane, looking down at the Sun. Picked so the grid
+ * reads as a floor under the star field instead of slicing across it edge-on, which is what an
+ * arbitrary equatorial direction gives — the plane is tilted 63 degrees to the equator.
+ */
+const GALAXY_OVERVIEW_POSITION = (() => {
+  const view = galacticToEquatorial({ x: -21, y: -46, z: 35 });
+  return new THREE.Vector3(view.x, view.y, view.z);
+})();
 const GALAXY_OVERVIEW_TARGET = new THREE.Vector3(0, 0, 0);
 const GALAXY_NEAR_PC = 0.01;
 const GALAXY_FAR_PC = 5000;
 const GALAXY_MIN_DISTANCE_PC = 0.5;
-const GALAXY_MAX_DISTANCE_PC = 2000;
+/** Far enough out to hold the whole Galaxy in frame; the near/far planes swap to match. */
+const GALAXY_MAX_DISTANCE_PC = 70000;
 /** How close (pc) the camera dives toward a selected star before the unit-space swap. */
 const GALAXY_APPROACH_DISTANCE_PC = 0.05;
+
+/**
+ * Depth range for the galactic scale. The local view needs a 1-centimetre-of-a-parsec near
+ * plane to fly into a star; the galactic view needs a far plane a hundred thousand parsecs out.
+ * Asking one projection to span both would leave the depth buffer with nothing left to
+ * distinguish two arms with. They swap at the crossfade instead, which happens while the camera
+ * is hundreds of parsecs from anything and so is invisible.
+ */
+const GALACTIC_NEAR_PC = 5;
+const GALACTIC_FAR_PC = 250000;
+
+/** Rings for the local grid (parsecs from the Sun), with the catalogue's edge called out. */
+const LOCAL_GRID_RINGS_PC = [10, 20, 30, 40, 50];
+const LOCAL_GRID_SPOKES = 12;
+/** Rings for the galactic grid (parsecs from the centre), with the Sun's orbit called out. */
+const GALACTIC_GRID_RINGS_PC = [2500, 5000, SUN_GALACTOCENTRIC_RADIUS_PC, 11000, 14000];
+const GALACTIC_GRID_SPOKES = 24;
+/** The local grid passes through the Sun, which is the origin, so tethers drop to height zero. */
+const LOCAL_PLANE_HEIGHT_PC = 0;
+/** How many of the Sun's nearest neighbours get a permanent drop line to the local grid. */
+const TETHERED_STAR_COUNT = 28;
+
+/** Camera pose for the whole-Galaxy overview: above the disc, out past the Sun, looking in. */
+const GALACTIC_OVERVIEW_HEIGHT_PC = 26000;
+const GALACTIC_OVERVIEW_BACK_PC = 11000;
+
+/** Above this share of the Galaxy-model crossfade, the HUD calls the view galactic. */
+const GALACTIC_LEVEL_THRESHOLD = 0.5;
 
 const SYSTEM_NEAR_AU = 0.002;
 const SYSTEM_FAR_AU = 20000;
@@ -61,6 +108,29 @@ const APPROACH_DURATION_SECONDS = 1.0;
 const SETTLE_DURATION_SECONDS = 0.9;
 const EXIT_DURATION_SECONDS = 0.9;
 const RETURN_DURATION_SECONDS = 1.1;
+const GALACTIC_FLIGHT_SECONDS = 2.4;
+
+/** Camera range for the readout panel, in the unit that suits the distance. */
+function formatParsecs(distancePc: number): string {
+  return distancePc >= 1000 ? `${(distancePc / 1000).toFixed(1)} kpc` : `${distancePc.toFixed(distancePc < 10 ? 2 : 0)} pc`;
+}
+
+function formatAu(distanceAu: number): string {
+  return distanceAu >= 100 ? `${distanceAu.toFixed(0)} AU` : `${distanceAu.toFixed(2)} AU`;
+}
+
+/**
+ * Where the camera sits to hold the whole Galaxy: above the disc and back past the Sun, looking
+ * at the centre — near enough to the angle the Galaxy is usually drawn from, and it keeps the
+ * Sun between the camera and the centre so "you are here" stays legible.
+ */
+function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector3 } {
+  const centre = galacticCentrePositionPc();
+  const target = new THREE.Vector3(centre.x, centre.y, centre.z);
+  const awayFromCentre = target.clone().negate().normalize();
+  const position = target.clone().add(galacticNormal().multiplyScalar(GALACTIC_OVERVIEW_HEIGHT_PC)).add(awayFromCentre.multiplyScalar(GALACTIC_OVERVIEW_BACK_PC));
+  return { position, target };
+}
 
 /**
  * Hosts the shared galaxy + system scene: pan/zoom/rotate camera controls, click-to-select
@@ -72,22 +142,21 @@ const RETURN_DURATION_SECONDS = 1.1;
 @Component({
   selector: 'app-galaxy-system-scene',
   providers: [EngineService],
+  imports: [StarmapHudComponent],
   template: `
     <div class="relative h-full w-full">
       <canvas #canvas data-testid="scene-canvas" class="block h-full w-full"></canvas>
       <div #labelHost class="absolute inset-0 overflow-hidden pointer-events-none"></div>
-      @if (navigationStore.viewLevel() === 'system') {
-        <button
-          type="button"
-          (click)="exitSystem()"
-          class="absolute top-4 left-4 flex items-center gap-1.5 rounded-md border border-border bg-panel/70 px-3 py-1.5 font-body text-xs tracking-wide text-muted uppercase backdrop-blur-md transition-colors hover:border-accent hover:text-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
-        >
-          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M15 6l-6 6 6 6" />
-          </svg>
-          Galaxy
-        </button>
-      }
+      <app-starmap-hud
+        [level]="navigationStore.viewLevel()"
+        [eyebrow]="hudEyebrow()"
+        [title]="hudTitle()"
+        [subtitle]="hudSubtitle()"
+        [readouts]="hudReadouts()"
+        [note]="hudNote()"
+        [range]="hudRange()"
+        (levelSelected)="goToLevel($event)"
+      />
     </div>
   `
 })
@@ -102,11 +171,26 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   /** Rebuilt per system, since the star's radius is derived from that system's innermost orbit. */
   private starMarkerGeometry?: THREE.SphereGeometry;
 
+  /** Readout panel contents, refreshed on the same cadence as the labels rather than per frame. */
+  readonly hudEyebrow = signal('');
+  readonly hudTitle = signal('');
+  readonly hudSubtitle = signal('');
+  readonly hudReadouts = signal<readonly HudReadout[]>([]);
+  readonly hudNote = signal('');
+  readonly hudRange = signal('');
+
   private controls?: OrbitControls;
   private rig?: CameraRigController;
   private starField?: StarFieldRenderer;
   private deepSky?: DeepSkyRenderer;
   private deepSkyLabels: readonly LabeledPoint[] = [];
+  private milkyWay?: MilkyWayRenderer;
+  private galacticLabels: readonly LabeledPoint[] = [];
+  private galacticGrid?: PolarGridPlane;
+  private localGrid?: PolarGridPlane;
+  private tethers?: TetherField;
+  /** Strength of the Galaxy-model crossfade, 0 (local view) to 1 (galactic view). */
+  private galacticStrength = 0;
   private labelOverlay?: StarLabelOverlay;
   private stars: readonly StarRecord[] = [];
   private starsById = new Map<number, StarRecord>();
@@ -118,6 +202,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private pointerDownAt: { x: number; y: number } | null = null;
   private ready = false;
   private busy = false;
+  /** Scale the HUD asked for while a system transition was still unwinding. */
+  private pendingLevel: ViewLevel | null = null;
 
   /** Id of the star whose system is currently shown (or being flown to/from); null = galaxy view. */
   private currentStarId: number | null = null;
@@ -151,6 +237,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.controls?.dispose();
     this.starField?.dispose();
     this.deepSky?.dispose();
+    this.milkyWay?.dispose();
+    this.galacticGrid?.dispose();
+    this.localGrid?.dispose();
+    this.tethers?.dispose();
     this.labelOverlay?.dispose();
     this.systemRenderer?.dispose();
     (this.starMarker?.material as THREE.Material | undefined)?.dispose();
@@ -160,8 +250,34 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.engine.dispose();
   }
 
-  exitSystem(): void {
-    this.navigationStore.selectStar(null);
+  /**
+   * Moves the view to a wider scale, from the HUD's scale ladder.
+   *
+   * The two outer levels are one continuous space, so "go to the Milky Way" is a camera flight
+   * rather than a scene change. Leaving a system is not: it has to unwind the unit-space swap
+   * first, so a request made from inside a system is parked until the exit flight lands.
+   */
+  goToLevel(level: ViewLevel): void {
+    if (level === 'system') {
+      return;
+    }
+
+    if (this.currentStarId !== null || this.busy) {
+      this.pendingLevel = level;
+      this.navigationStore.selectStar(null);
+      return;
+    }
+
+    this.flyToOverview(level);
+  }
+
+  private flyToOverview(level: ViewLevel): void {
+    if (!this.rig) {
+      return;
+    }
+    const pose = level === 'galactic' ? galacticOverviewPose() : { position: GALAXY_OVERVIEW_POSITION.clone(), target: GALAXY_OVERVIEW_TARGET.clone() };
+    // The galactic flight covers four orders of magnitude, so it gets longer than a local hop.
+    this.rig.flyTo(pose, level === 'galactic' ? GALACTIC_FLIGHT_SECONDS : RETURN_DURATION_SECONDS);
   }
 
   private async bootstrap(): Promise<void> {
@@ -212,6 +328,33 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.starField = new StarFieldRenderer(stars, positions);
     this.galaxyGroup.add(this.starField.object);
 
+    this.milkyWay = new MilkyWayRenderer();
+    this.galacticLabels = this.milkyWay.labelPoints();
+    const centre = galacticCentrePositionPc();
+    this.galacticGrid = new PolarGridPlane({
+      ringRadiiPc: GALACTIC_GRID_RINGS_PC,
+      spokeCount: GALACTIC_GRID_SPOKES,
+      centrePc: new THREE.Vector3(centre.x, centre.y, centre.z),
+      emphasisRadiiPc: [SUN_GALACTOCENTRIC_RADIUS_PC]
+    });
+    this.localGrid = new PolarGridPlane({
+      ringRadiiPc: LOCAL_GRID_RINGS_PC,
+      spokeCount: LOCAL_GRID_SPOKES,
+      emphasisRadiiPc: [LOCAL_GRID_RINGS_PC[LOCAL_GRID_RINGS_PC.length - 1]]
+    });
+    // Drop lines for the Sun's nearest neighbours. A fixed set rather than whatever is currently
+    // labelled: these are the stars the local view is about, they cluster where the grid is
+    // densest, and a tether that appears and vanishes as the camera drifts reads as a glitch.
+    this.tethers = new TetherField(TETHERED_STAR_COUNT);
+    this.tethers.setTargets(
+      [...stars]
+        .sort((a, b) => Math.hypot(a.x, a.y, a.z) - Math.hypot(b.x, b.y, b.z))
+        .slice(0, TETHERED_STAR_COUNT)
+        .map((star) => new THREE.Vector3(star.x, star.y, star.z)),
+      LOCAL_PLANE_HEIGHT_PC
+    );
+    this.galaxyGroup.add(this.milkyWay.object, this.galacticGrid.object, this.localGrid.object, this.tethers.object);
+
     if (deepSky.length > 0) {
       this.deepSky = new DeepSkyRenderer(deepSky);
       this.galaxyGroup.add(this.deepSky.object);
@@ -243,11 +386,18 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // `currentStarId` is still null, so labels were being recomputed from galaxy-scale positions
     // and pinned over the system — the whole point of clearing them on the swap.
     if (this.galaxyGroup.visible) {
-      this.labelUpdateAccumulator += deltaSeconds;
-      if (this.labelUpdateAccumulator >= LABEL_UPDATE_INTERVAL_SECONDS) {
-        this.labelUpdateAccumulator = 0;
+      // Per-frame, unlike the labels: this is a handful of uniform writes, and it is what keeps
+      // the zoom continuous rather than stepping between two discrete scales.
+      this.updateGalacticCrossfade(camera);
+    }
+
+    this.labelUpdateAccumulator += deltaSeconds;
+    if (this.labelUpdateAccumulator >= LABEL_UPDATE_INTERVAL_SECONDS) {
+      this.labelUpdateAccumulator = 0;
+      if (this.galaxyGroup.visible) {
         this.updateLabels(camera);
       }
+      this.updateHud(camera);
     }
 
     if (this.systemGroup.visible) {
@@ -256,9 +406,60 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.labelOverlay?.render(camera);
   }
 
+  /**
+   * Blends between the two things that share parsec space: the catalogued 50 pc star field with
+   * its local grid, and the Milky Way model with its galactic one. Driven by how far the camera
+   * has pulled back from the Sun, so the scale ladder reports where the view already is instead
+   * of switching it.
+   */
+  private updateGalacticCrossfade(camera: THREE.PerspectiveCamera): void {
+    if (!this.milkyWay) {
+      return;
+    }
+
+    const distancePc = camera.position.length();
+    this.galacticStrength = this.milkyWay.setViewerDistancePc(distancePc);
+
+    this.galacticGrid?.setStrength(this.galacticStrength);
+    this.localGrid?.setStrength(1 - this.galacticStrength);
+    this.tethers?.setStrength(1 - this.galacticStrength);
+    // The backdrop shell is the sky as seen from here; from outside it, it is a wall.
+    this.deepSky?.setStrength(1 - this.galacticStrength);
+    // Same argument for the skybox, and more sharply: it is a photograph of the Milky Way taken
+    // from inside it, so it cannot also be the sky behind a view of the Galaxy from outside.
+    this.engine.getScene().backgroundIntensity = 1 - this.galacticStrength;
+
+    this.applyGalaxyDepthRange(camera, distancePc);
+    const level: ViewLevel = this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD ? 'galactic' : 'galaxy';
+    if (this.navigationStore.viewLevel() !== level && !this.systemGroup.visible) {
+      this.navigationStore.setViewLevel(level);
+    }
+  }
+
+  /**
+   * Keeps the depth range proportional to how far out the camera is. One fixed pair cannot serve
+   * both ends of this view: flying into a star needs a near plane a hundredth of a parsec out,
+   * and holding the Galaxy needs a far plane a hundred thousand parsecs out, and a projection
+   * spanning both has no precision left to separate one spiral arm from the next.
+   */
+  private applyGalaxyDepthRange(camera: THREE.PerspectiveCamera, distancePc: number): void {
+    const near = THREE.MathUtils.clamp(distancePc / 2000, GALAXY_NEAR_PC, GALACTIC_NEAR_PC);
+    const far = THREE.MathUtils.clamp(distancePc * 8, GALAXY_FAR_PC, GALACTIC_FAR_PC);
+    // Only when it has drifted enough to matter, so a slow zoom isn't rebuilding the projection
+    // matrix on every frame of it.
+    if (Math.abs(near - camera.near) > camera.near * 0.05 || Math.abs(far - camera.far) > camera.far * 0.05) {
+      camera.near = near;
+      camera.far = far;
+      camera.updateProjectionMatrix();
+    }
+  }
+
   private updateLabels(camera: THREE.PerspectiveCamera): void {
     const selectedId = this.navigationStore.selectedStarId();
-    const { x: cx, y: cy, z: cz } = camera.position;
+    // Measured from what the camera is looking at, not from where it is. Those differ by the
+    // orbit distance, so a camera-relative rule names the stars closest to the near edge of the
+    // view — a ring of labels around the outside of the thing the user is actually looking at.
+    const { x: cx, y: cy, z: cz } = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
     const maxDistanceSq = LABEL_MAX_DISTANCE_PC * LABEL_MAX_DISTANCE_PC;
 
     const candidates: Array<{ star: StarRecord; distanceSq: number }> = [];
@@ -273,8 +474,96 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
 
     candidates.sort((a, b) => a.distanceSq - b.distanceSq);
-    const starLabels = candidates.slice(0, LABEL_MAX_COUNT).map((candidate) => candidate.star);
-    this.labelOverlay?.update([...starLabels, ...this.deepSkyLabels]);
+    // Individual star names mean nothing once the whole Galaxy is in frame — at that range the
+    // entire catalogue is inside one pixel — so the labels hand over to the structural ones.
+    const isGalactic = this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD;
+    const starLabels = isGalactic ? [] : this.spreadLabels(candidates, camera, selectedId);
+    const backdropLabels = isGalactic ? this.galacticLabels : this.deepSkyLabels;
+    this.labelOverlay?.update([...starLabels, ...backdropLabels]);
+  }
+
+  /**
+   * Takes the nearest stars in order and keeps only those that land clear of the labels already
+   * placed, dropping the rest.
+   *
+   * Nearest-first alone is not enough: the Sun's fifteen nearest neighbours are all inside four
+   * parsecs, so from anything but point-blank range their names print on top of each other in a
+   * single unreadable clump. Rejecting on screen separation instead of on distance means the set
+   * naturally opens up as the camera closes in, and stays legible when it pulls back.
+   */
+  private spreadLabels(candidates: readonly { star: StarRecord }[], camera: THREE.PerspectiveCamera, selectedId: number | null): StarRecord[] {
+    const placed: THREE.Vector2[] = [];
+    const chosen: StarRecord[] = [];
+    const projected = new THREE.Vector3();
+
+    for (const { star } of candidates) {
+      if (chosen.length >= LABEL_MAX_COUNT) {
+        break;
+      }
+
+      projected.set(star.x, star.y, star.z).project(camera);
+      const isSelected = star.id === selectedId;
+      // Offscreen or behind the camera. The selection is exempt: it is about to be flown to, and
+      // its label going missing mid-flight reads as the target having been lost.
+      if (!isSelected && (projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1)) {
+        continue;
+      }
+
+      const point = new THREE.Vector2(projected.x * camera.aspect, projected.y);
+      if (!isSelected && placed.some((other) => other.distanceTo(point) < LABEL_MIN_SEPARATION_NDC)) {
+        continue;
+      }
+
+      placed.push(point);
+      chosen.push(star);
+    }
+
+    return chosen;
+  }
+
+  /** Refreshes the readout panel for whichever scale the view is currently at. */
+  private updateHud(camera: THREE.PerspectiveCamera): void {
+    const star = this.currentStarId === null ? undefined : this.starsById.get(this.currentStarId);
+
+    if (this.systemGroup.visible && star) {
+      const planetCount = this.bodies.filter((body) => body.systemStarId === star.id && !body.parentBodyId).length + this.exoplanets.filter((exoplanet) => exoplanet.hostStarId === star.id).length;
+      this.hudEyebrow.set('System');
+      this.hudTitle.set(star.name);
+      this.hudSubtitle.set(star.spectralType ? `Spectral type ${star.spectralType}` : '');
+      this.hudReadouts.set([
+        { label: 'Bodies', value: `${planetCount}` },
+        { label: 'Distance', value: `${Math.hypot(star.x, star.y, star.z).toFixed(2)} pc` },
+        { label: 'Magnitude', value: star.magnitude.toFixed(2) }
+      ]);
+      this.hudNote.set('Orbits propagated from published elements to the current date.');
+      this.hudRange.set(formatAu(camera.position.distanceTo(this.controls?.target ?? GALAXY_OVERVIEW_TARGET)));
+      return;
+    }
+
+    this.hudRange.set(formatParsecs(camera.position.length()));
+
+    if (this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD) {
+      this.hudEyebrow.set('Galactic Scale');
+      this.hudTitle.set('Milky Way');
+      this.hudSubtitle.set('Barred spiral galaxy · our own');
+      this.hudReadouts.set([
+        { label: 'Sun to centre', value: `${(SUN_GALACTOCENTRIC_RADIUS_PC / 1000).toFixed(2)} kpc` },
+        { label: 'Arms modelled', value: `${MILKY_WAY_ARMS.length}` },
+        { label: 'Catalogued', value: `${this.stars.length} stars` }
+      ]);
+      this.hudNote.set('Galactic structure is an illustrative model built on measured arm geometry — no catalogue holds the Galaxy’s stars. Everything inside 50 pc is real.');
+      return;
+    }
+
+    this.hudEyebrow.set('Solar Neighbourhood');
+    this.hudTitle.set('Local Stars');
+    this.hudSubtitle.set('Hipparcos · Yale Bright Star · Gliese');
+    this.hudReadouts.set([
+      { label: 'Stars', value: `${this.stars.length}` },
+      { label: 'Radius', value: `${LOCAL_GRID_RINGS_PC[LOCAL_GRID_RINGS_PC.length - 1]} pc` },
+      { label: 'Exoplanets', value: `${this.exoplanets.length}` }
+    ]);
+    this.hudNote.set('Positions from measured parallaxes. Grid marks the galactic plane through the Sun.');
   }
 
   /** Where the current press started, so a drag can be told apart from a click. */
@@ -354,6 +643,13 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private finishTransition(): void {
     this.busy = false;
     this.reconcileSelection(this.navigationStore.selectedStarId());
+
+    // Only once the scene is settled back in parsec space can a scale request be honoured.
+    const pending = this.pendingLevel;
+    this.pendingLevel = null;
+    if (pending && !this.busy && this.currentStarId === null) {
+      this.flyToOverview(pending);
+    }
   }
 
   private enterSystem(starId: number, onComplete: () => void): void {

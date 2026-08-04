@@ -26,6 +26,56 @@ body {
   font-family: var(--font-body);
 }
 
+/* --- HUD chrome ------------------------------------------------------------------------- */
+
+/* Angled top-left/bottom-right corners, a thin lit edge and a blurred dark fill: the panel
+ * shape the whole heads-up display is built from. Written here rather than as utilities
+ * because `clip-path` and the layered border need to travel together. */
+.hud-panel {
+  position: relative;
+  background: color-mix(in srgb, var(--color-panel) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 85%, transparent);
+  backdrop-filter: blur(8px);
+  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+}
+
+/* The lit inner hairline that reads as a bevel on the two square corners. */
+.hud-panel::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-top: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
+  pointer-events: none;
+}
+
+/* Corner brackets around the whole viewport, drawn as four gradients so the element stays a
+ * single node with no children. */
+.hud-frame {
+  pointer-events: none;
+  --bracket: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  --arm-long: 76px;
+  --arm-thin: 1px;
+  background-image:
+    linear-gradient(var(--bracket), var(--bracket)), linear-gradient(var(--bracket), var(--bracket)),
+    linear-gradient(var(--bracket), var(--bracket)), linear-gradient(var(--bracket), var(--bracket)),
+    linear-gradient(var(--bracket), var(--bracket)), linear-gradient(var(--bracket), var(--bracket)),
+    linear-gradient(var(--bracket), var(--bracket)), linear-gradient(var(--bracket), var(--bracket));
+  background-repeat: no-repeat;
+  background-size:
+    var(--arm-long) var(--arm-thin), var(--arm-thin) var(--arm-long), var(--arm-long) var(--arm-thin), var(--arm-thin) var(--arm-long),
+    var(--arm-long) var(--arm-thin), var(--arm-thin) var(--arm-long), var(--arm-long) var(--arm-thin), var(--arm-thin) var(--arm-long);
+  background-position:
+    18px 18px, 18px 18px, right 18px top 18px, right 18px top 18px, 18px bottom 18px, 18px bottom 18px, right 18px bottom 18px,
+    right 18px bottom 18px;
+}
+
+/* Darkens the edges of the frame so the map reads as a lit display rather than a flat page. */
+.hud-vignette {
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 45%, color-mix(in srgb, var(--color-void) 72%, transparent) 100%);
+}
+
 /* Star name labels rendered by CSS2DRenderer (see StarLabelOverlay). These live outside
  * Angular's view encapsulation as plain DOM nodes, so they're styled with Tailwind utility
  * classes assigned directly in TypeScript rather than a scoped component stylesheet. */

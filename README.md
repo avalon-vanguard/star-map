@@ -29,8 +29,16 @@ npm run e2e:typecheck
 
 **Galaxy view** — every HYG-catalogue star within 50 parsecs as instanced camera-facing
 billboards, positioned from real RA/Dec/parallax, coloured by spectral index and sized by
-magnitude. Names label the stars nearest the camera. Behind them sits a backdrop of notable
-deep-sky objects and a Milky Way panorama.
+magnitude. A polar grid in the galactic plane runs under them with a drop line from each of the
+Sun's nearest neighbours, and names label the stars nearest whatever the camera is looking at.
+Behind them sits a backdrop of notable deep-sky objects and a Milky Way panorama.
+
+**Galactic view** — keep pulling back and the neighbourhood becomes a point inside the Milky
+Way: the bar and bulge, five spiral arms, the disc and a thin halo, with the arms and the
+galactic centre named. It is the same parsec-scale space as the galaxy view, crossfaded by
+camera distance rather than switched, so the Sun stays where it really is — 8.18 kpc out, on the
+Orion Spur, between the Sagittarius and Perseus arms. See "On the Galaxy model" below for what
+in it is measured and what is not.
 
 **System view** — selecting a star flies the camera continuously into its system rather than
 cutting to a new scene. The Sun gets the real solar-system bodies from JPL Horizons; other
@@ -63,8 +71,32 @@ same place an in-scene click would.
   about eight orders of magnitude apart, which wrecks float precision if rendered in one unit
   space. The camera rig recentres the active star to the origin ("floating origin") and swaps
   the unit scale and near/far planes at the transition point.
+- **The galactic scale is not a third space.** It is the same parsec space as the galaxy view,
+  four orders of magnitude further out, so no swap is needed — the Milky Way model and the
+  catalogued star field crossfade against camera distance and the depth range scales with it.
+  One fixed near/far pair cannot serve both ends: flying into a star needs a near plane a
+  hundredth of a parsec out, and holding the Galaxy needs a far plane a hundred thousand
+  parsecs out, and a projection spanning both has no precision left to separate one arm from
+  the next.
 - **No backend.** Every dataset is baked at build time into `src/assets/data/` and served as a
   static asset. Nothing queries an astronomy API at runtime.
+
+### On the Galaxy model
+
+Every other dataset here is measured. The Galaxy is the exception, and not for want of trying:
+we sit inside its disc, and dust blocks the view across it, so no catalogue holds the positions
+of its stars. Every rendering of the Milky Way seen face-on — including NASA's — is a model.
+
+What *is* measured is the skeleton, and that is what `shared/astro/galaxy.ts` contains: the
+directions of the galactic centre and the north galactic pole, which fix the disc's 63° tilt
+against the celestial equator; the 8.18 kpc from the Sun to the centre, from the orbit of the
+star S2 around Sgr A*; and a reference radius, azimuth and pitch angle per spiral arm,
+approximating the maser-parallax fits. The Sun's placement on the Orion Spur and the arms either
+side of it follow from those numbers rather than being posed by hand.
+
+The particles scattered around that skeleton are illustrative — a seeded, reproducible cloud, not
+observations. The galactic view says so on screen, and the model fades out entirely before the
+camera reaches the catalogued 50 pc the real stars occupy.
 
 ## Data pipeline
 
@@ -105,11 +137,13 @@ the 463 cataloged objects get a distance; the rest honestly report none.
 src/app/
   core/engine/          Three.js renderer, render loop, resize
   core/data/            static-asset loading and caching
-  features/galaxy-system/  shared galaxy+system scene, camera rig, star field,
-                           deep-sky backdrop, orbits, labels
+  features/galaxy-system/  shared galactic+galaxy+system scene, camera rig, star field,
+                           Milky Way model, grid planes, deep-sky backdrop, orbits,
+                           labels, HUD
   features/body-detail/    close-up scene and info panel
   features/search/         name search across every dataset
-  shared/astro/         coordinates, Kepler propagator, deep-sky classification
+  shared/astro/         coordinates, Kepler propagator, deep-sky classification,
+                        Milky Way structure
   shared/models/        record contracts shared by the app and the ETL
   shared/rendering/     skybox, glow sprites, texture catalog
   shared/state/         navigation store (Angular signals)

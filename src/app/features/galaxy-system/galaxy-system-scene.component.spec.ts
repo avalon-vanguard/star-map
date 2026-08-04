@@ -211,7 +211,11 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     const component = fixture.componentInstance as unknown as { galaxyGroup: THREE.Group; systemGroup: THREE.Group };
     expect(component.galaxyGroup.visible).toBe(true);
     expect(component.systemGroup.visible).toBe(false);
-    expect(engine.getCamera().near).toBeCloseTo(0.01, 9);
+    // Parsec-scale rather than an exact figure: in galaxy space the depth range scales with how
+    // far the camera has pulled back, so what identifies it is the far plane it settles on
+    // (5000 pc) versus the AU-space one (20000 AU), not a fixed near plane.
+    expect(engine.getCamera().far).toBeCloseTo(5000, 6);
+    expect(engine.getCamera().near).toBeLessThan(0.1);
     expect(navigationStore.viewLevel()).toBe('galaxy');
   });
 
@@ -228,6 +232,59 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     const component = fixture.componentInstance as unknown as { currentStarId: number | null };
     expect(navigationStore.viewLevel()).toBe('system');
     expect(component.currentStarId).toBe(ALPHA_CENTAURI.id);
+  });
+
+  it('reports the galactic scale once the camera has pulled back far enough, and comes back', async () => {
+    const camera = engine.getCamera();
+
+    camera.position.set(0, 0, 30000);
+    await advanceFrames(engine, 0.3);
+    expect(navigationStore.viewLevel()).toBe('galactic');
+
+    camera.position.set(0, 15, 30);
+    await advanceFrames(engine, 0.3);
+    expect(navigationStore.viewLevel()).toBe('galaxy');
+  });
+
+  it('widens the depth range as the camera pulls back, instead of holding one range for both scales', async () => {
+    const camera = engine.getCamera();
+
+    await advanceFrames(engine, 0.3);
+    const localFar = camera.far;
+
+    camera.position.set(0, 0, 30000);
+    await advanceFrames(engine, 0.3);
+
+    expect(camera.far).toBeGreaterThan(localFar);
+    // A near plane a hundredth of a parsec out has no precision left to spare at this range.
+    expect(camera.near).toBeGreaterThan(1);
+  });
+
+  it('flies out to the Galaxy when the scale ladder asks for it', async () => {
+    const camera = engine.getCamera();
+    fixture.componentInstance.goToLevel('galactic');
+    await advanceFrames(engine, 3);
+
+    expect(camera.position.length()).toBeGreaterThan(10000);
+    expect(navigationStore.viewLevel()).toBe('galactic');
+  });
+
+  it('leaves the system first when the scale ladder is used from inside one', async () => {
+    navigationStore.selectStar(SUN.id);
+    await flushAsync();
+    await advanceFrames(engine, 2.5);
+    expect(navigationStore.viewLevel()).toBe('system');
+
+    fixture.componentInstance.goToLevel('galactic');
+    await flushAsync();
+    // Exit leg, then the return leg, then the galactic flight: the request has to wait out the
+    // unit-space unwind rather than firing a parsec-scale flight while the scene is in AU.
+    await advanceFrames(engine, 6);
+
+    const component = fixture.componentInstance as unknown as { currentStarId: number | null; systemGroup: THREE.Group };
+    expect(component.currentStarId).toBeNull();
+    expect(component.systemGroup.visible).toBe(false);
+    expect(navigationStore.viewLevel()).toBe('galactic');
   });
 
   it('ignores a new selection while a transition is already in flight, then resolves to the latest requested star once idle', async () => {

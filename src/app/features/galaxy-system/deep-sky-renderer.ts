@@ -7,10 +7,14 @@ import { LabeledPoint } from './star-label-overlay';
 /**
  * Radius (parsecs) of the shell the backdrop is painted on.
  *
- * Chosen to sit clear of everything else the galaxy camera deals with: well outside the 50 pc
- * star field, beyond the camera's 2000 pc orbit limit so it can never be flown through, and
- * close enough that even the far side of the shell (2000 + 2500 = 4500 pc) stays inside the
- * 5000 pc far plane rather than being clipped away.
+ * Chosen to sit clear of the local star field it is a backdrop for: well outside its 50 pc
+ * radius, and close enough that the far side of the shell stays inside the local view's far
+ * plane rather than being clipped away.
+ *
+ * The shell only makes sense from inside it — it is the sky as seen from the Sun, with every
+ * object's true distance flattened onto one radius. The camera can now pull back far past it to
+ * the galactic scale, so {@link DeepSkyRenderer.setStrength} fades it out on the way rather than
+ * letting the view fly through a wall of nebulae.
  */
 export const BACKDROP_RADIUS_PC = 2500;
 
@@ -87,6 +91,11 @@ export function deepSkyLabelPoints(
   });
 }
 
+/** Material keys are `kind:band`; the band is what fixes an object's base opacity. */
+function bandIndexFromKey(key: string): number {
+  return Number(key.slice(key.indexOf(':') + 1));
+}
+
 /**
  * Paints the notable deep-sky objects from `deepsky.json` onto a fixed shell around the star
  * field, as soft additive billboards coloured by kind and sized by real angular extent.
@@ -119,6 +128,18 @@ export class DeepSkyRenderer {
   /** Label anchors for the brightest `limit` objects on this backdrop. */
   labelPoints(limit: number): LabeledPoint[] {
     return deepSkyLabelPoints(this.records, limit, this.radiusPc);
+  }
+
+  /**
+   * Scales the whole backdrop's opacity, keeping each object's brightness band relative to the
+   * others. Used to dissolve the shell as the camera leaves the neighbourhood it belongs to.
+   */
+  setStrength(strength: number): void {
+    const clamped = THREE.MathUtils.clamp(strength, 0, 1);
+    for (const [key, material] of this.materials) {
+      material.opacity = BRIGHTNESS_BANDS[bandIndexFromKey(key)].opacity * clamped;
+    }
+    this.object.visible = clamped > 0;
   }
 
   dispose(): void {

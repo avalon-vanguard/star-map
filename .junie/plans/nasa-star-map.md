@@ -136,7 +136,10 @@ interface DeepSkyRecord {
 - `KeplerPropagator` (`shared/astro/kepler.ts`) — pure function(s) converting `OrbitalElements` + epoch → Cartesian position; independently unit-testable.
 - `BodyDetailSceneComponent` — separate route/component with its own dedicated scene for a close-up view of one selected body, plus an `InfoPanelComponent` showing its data.
 - `SearchComponent` — text search across `stars-index.json`, `bodies.json`, `exoplanets.json`; on match, dispatches a navigation action.
-- `NavigationStore` (Angular signals-based) — holds `viewLevel: 'galaxy' | 'system'`, `selectedStarId`, `selectedBodyId`; consumed by scene components and routed body-detail view.
+- `NavigationStore` (Angular signals-based) — holds `viewLevel: 'galactic' | 'galaxy' | 'system'`, `selectedStarId`, `selectedBodyId`; consumed by scene components and routed body-detail view.
+- `MilkyWayRenderer` / `milky-way-model.ts` — the Galaxy itself as an instanced particle cloud scattered around the structural model in `shared/astro/galaxy.ts`, crossfaded against the catalogued star field by camera distance.
+- `PolarGridPlane` / `TetherField` (`grid-plane.ts`) — the reference plane the map is read against: rings and spokes lying in the galactic plane, plus drop lines from stars to it.
+- `StarmapHudComponent` — the heads-up display: scale ladder, readout panel, range, reticle and frame.
 
 ### File Structure
 ```
@@ -281,3 +284,10 @@ Users can search by name and jump directly to the matching star, system, or body
 - Implement `SearchComponent` querying `stars-index.json`, `bodies.json`, and `exoplanets.json` for name matches.
 - On selecting a search result, dispatch the appropriate `NavigationStore` update (galaxy star, system body, or exoplanet) and trigger the corresponding camera transition or route change.
 - Ensure consistent state across `GalaxySystemSceneComponent` and `BodyDetailSceneComponent` when navigation originates from search rather than in-scene clicks.
+
+### ✓ Step 7: Add the galactic scale and the heads-up display
+The map opens out from the catalogued neighbourhood to the whole Milky Way, in the visual language of the reference.
+- Add `shared/astro/galaxy.ts`: the galactic↔equatorial rotation, the Sun's galactocentric position, and logarithmic-spiral parameters per arm.
+- Add `MilkyWayRenderer`, crossfaded against the star field by camera distance so the two scales share one continuous parsec space rather than being separate scenes.
+- Add the galactic and local grid planes, star tethers, and the HUD (scale ladder, readout panel, range, reticle, frame).
+- Label the Galaxy model as a model wherever it is shown: its skeleton is measured, its particles are not.

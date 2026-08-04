@@ -88,6 +88,54 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
     renderer.dispose();
   });
 
+  describe('orbits with no published eccentricity', () => {
+    // The archive publishes a semi-major axis far more often than an eccentricity. Requiring
+    // both dropped 1509 otherwise drawable planets.
+    it('draws a planet that has an axis but no eccentricity', () => {
+      const renderer = new SystemOrbitsRenderer([], [exoplanet({ orbit: { semiMajorAxisAu: 0.4 } })]);
+
+      expect(renderer.members).toHaveLength(1);
+      renderer.dispose();
+    });
+
+    it('places it on a circle of the right radius', () => {
+      const renderer = new SystemOrbitsRenderer([], [exoplanet({ orbit: { semiMajorAxisAu: 0.4 } })]);
+
+      for (const offset of [0, 5, 20, 60]) {
+        expect(positionAt(renderer, DEFAULT_EPOCH_JD + offset).length()).toBeCloseTo(0.4, 6);
+      }
+      renderer.dispose();
+    });
+
+    it('still honours the measured period', () => {
+      const renderer = new SystemOrbitsRenderer(
+        [],
+        [exoplanet({ orbit: { semiMajorAxisAu: TRAPPIST_1B_SEMI_MAJOR_AXIS_AU }, periodDays: TRAPPIST_1B_PERIOD_DAYS })]
+      );
+
+      const start = positionAt(renderer, DEFAULT_EPOCH_JD);
+      const afterOnePeriod = positionAt(renderer, DEFAULT_EPOCH_JD + TRAPPIST_1B_PERIOD_DAYS);
+      expect(afterOnePeriod.distanceTo(start)).toBeLessThan(1e-6);
+      renderer.dispose();
+    });
+  });
+
+  it('skips an escape trajectory rather than emitting NaN positions', () => {
+    // e >= 1 is not an ellipse; propagating it anyway yields NaN, which poisons the geometry's
+    // bounding sphere and disables culling for the whole object.
+    const renderer = new SystemOrbitsRenderer([], [exoplanet({ orbit: { semiMajorAxisAu: 1, eccentricity: 1.4 } })]);
+
+    expect(renderer.members).toHaveLength(0);
+    renderer.dispose();
+  });
+
+  it('skips a non-positive semi-major axis', () => {
+    const renderer = new SystemOrbitsRenderer([], [exoplanet({ orbit: { semiMajorAxisAu: 0, eccentricity: 0.1 } })]);
+
+    expect(renderer.members).toHaveLength(0);
+    renderer.dispose();
+  });
+
   it('keeps every propagated position finite', () => {
     const renderer = new SystemOrbitsRenderer([], [exoplanet({ periodDays: TRAPPIST_1B_PERIOD_DAYS, orbit: { semiMajorAxisAu: TRAPPIST_1B_SEMI_MAJOR_AXIS_AU, eccentricity: 0.62 } })]);
 

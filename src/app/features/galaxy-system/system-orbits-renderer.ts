@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 
 import { gmForParent } from '../../shared/astro/constants';
-import { orbitEllipsePoints, propagateOrbit, resolveGravitationalParameter, resolveOrbitalElements } from '../../shared/astro/kepler';
+import { isPropagatableOrbit, orbitEllipsePoints, propagateOrbit, resolveGravitationalParameter, resolveOrbitalElements } from '../../shared/astro/kepler';
 import { BodyRecord, OrbitalElements } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 
@@ -147,18 +147,14 @@ export class SystemOrbitsRenderer {
     }
 
     for (const exoplanet of exoplanets) {
-      if (!exoplanet.orbit.semiMajorAxisAu || exoplanet.orbit.eccentricity === undefined) {
-        continue; // not enough data to place on an orbit.
+      // Only a semi-major axis is genuinely required; resolveOrbitalElements defaults the rest,
+      // eccentricity included. Demanding a published eccentricity as well used to drop 1509
+      // otherwise drawable planets, so a user could open one's detail page, jump to its system,
+      // and find it missing from the very system it belongs to.
+      if (!isPropagatableOrbit(exoplanet.orbit)) {
+        continue;
       }
-      const elements = resolveOrbitalElements({
-        semiMajorAxisAu: exoplanet.orbit.semiMajorAxisAu,
-        eccentricity: exoplanet.orbit.eccentricity,
-        inclinationDeg: exoplanet.orbit.inclinationDeg,
-        longitudeOfAscendingNodeDeg: exoplanet.orbit.longitudeOfAscendingNodeDeg,
-        argumentOfPeriapsisDeg: exoplanet.orbit.argumentOfPeriapsisDeg,
-        meanAnomalyAtEpochDeg: exoplanet.orbit.meanAnomalyAtEpochDeg,
-        epochJd: exoplanet.orbit.epochJd
-      });
+      const elements = resolveOrbitalElements(exoplanet.orbit);
       const radiusKm = exoplanet.radiusEarth ? exoplanet.radiusEarth * EARTH_RADIUS_KM : undefined;
       // Not `gmForParent(undefined)`: that assumes a solar-mass host for every system, and
       // most exoplanet hosts are red dwarfs a fraction of the Sun's mass.

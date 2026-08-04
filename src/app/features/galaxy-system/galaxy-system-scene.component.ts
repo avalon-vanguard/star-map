@@ -240,7 +240,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.rig?.update(deltaSeconds);
     this.controls?.update();
 
-    if (this.currentStarId === null) {
+    // Gated on the galaxy group rather than on `currentStarId`, which is only assigned once the
+    // arrival flight finishes. In between, the scene has already swapped to system space while
+    // `currentStarId` is still null, so labels were being recomputed from galaxy-scale positions
+    // and pinned over the system — the whole point of clearing them on the swap.
+    if (this.galaxyGroup.visible) {
       this.labelUpdateAccumulator += deltaSeconds;
       if (this.labelUpdateAccumulator >= LABEL_UPDATE_INTERVAL_SECONDS) {
         this.labelUpdateAccumulator = 0;
@@ -248,7 +252,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       }
     }
 
-    if (this.currentStarId !== null) {
+    if (this.systemGroup.visible) {
       this.systemRenderer?.update(dateToJulianDate());
     }
     this.labelOverlay?.render(camera);

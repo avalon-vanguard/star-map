@@ -7,21 +7,54 @@ const TWO_PI = Math.PI * 2;
 
 /**
  * Fills in the elements the Kepler propagator needs but that some sources (e.g. exoplanets,
- * see `ExoplanetRecord.orbit: Partial<OrbitalElements>`) don't report: inclination, longitude
- * of ascending node, mean anomaly at epoch, and the epoch itself. Missing angles default to
- * zero (a face-on, unrotated ellipse) and the missing epoch defaults to J2000 — enough to draw
- * a plausible, period-correct orbit even without full data.
+ * see `ExoplanetRecord.orbit: Partial<OrbitalElements>`) don't report: eccentricity,
+ * inclination, longitude of ascending node, mean anomaly at epoch, and the epoch itself.
+ * Missing angles default to zero (a face-on, unrotated ellipse) and the missing epoch defaults
+ * to J2000 — enough to draw a plausible, period-correct orbit even without full data.
+ *
+ * A missing eccentricity defaults to 0, a circle. That is the conventional assumption for an
+ * orbit whose shape has not been constrained, and it is also the only honest one available: the
+ * semi-major axis alone says nothing about elongation. It matters because the archive publishes
+ * an axis far more often than an eccentricity — 1509 exoplanets have the first without the
+ * second — and treating those as undrawable simply hid them.
  */
-export function resolveOrbitalElements(partial: Partial<OrbitalElements> & Pick<OrbitalElements, 'semiMajorAxisAu' | 'eccentricity'>): OrbitalElements {
+export function resolveOrbitalElements(partial: Partial<OrbitalElements> & Pick<OrbitalElements, 'semiMajorAxisAu'>): OrbitalElements {
   return {
     semiMajorAxisAu: partial.semiMajorAxisAu,
-    eccentricity: partial.eccentricity,
+    eccentricity: partial.eccentricity ?? 0,
     inclinationDeg: partial.inclinationDeg ?? 0,
     longitudeOfAscendingNodeDeg: partial.longitudeOfAscendingNodeDeg ?? 0,
     argumentOfPeriapsisDeg: partial.argumentOfPeriapsisDeg ?? 0,
     meanAnomalyAtEpochDeg: partial.meanAnomalyAtEpochDeg ?? 0,
     epochJd: partial.epochJd ?? DEFAULT_EPOCH_JD
   };
+}
+
+/**
+ * Whether a partially-specified orbit can actually be propagated as an ellipse.
+ *
+ * Everything downstream — the mean motion, the Kepler solver, the ellipse sampling — assumes a
+ * closed elliptical orbit around a positive semi-major axis. Feed it anything else and it does
+ * not throw: `sqrt` of a negative number and division by zero both yield `NaN`, which
+ * propagates silently into the vertex buffer and poisons the geometry's bounding sphere, taking
+ * out culling for the whole object rather than just the bad orbit.
+ *
+ * A missing eccentricity is fine and defaults to a circle (see {@link resolveOrbitalElements});
+ * a present but non-elliptical one (`e >= 1`, an escape trajectory) is not, since no ellipse
+ * describes it.
+ */
+export function isPropagatableOrbit(
+  partial: Partial<OrbitalElements>
+): partial is Partial<OrbitalElements> & Pick<OrbitalElements, 'semiMajorAxisAu'> {
+  const { semiMajorAxisAu, eccentricity } = partial;
+
+  if (semiMajorAxisAu === undefined || !Number.isFinite(semiMajorAxisAu) || semiMajorAxisAu <= 0) {
+    return false;
+  }
+  if (eccentricity !== undefined && (!Number.isFinite(eccentricity) || eccentricity < 0 || eccentricity >= 1)) {
+    return false;
+  }
+  return true;
 }
 
 /** Mean motion (rad/day) of a body via Kepler's third law: n = sqrt(GM / a^3). */

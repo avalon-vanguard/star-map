@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { GM_SUN_AU3_PER_DAY2, DEFAULT_EPOCH_JD } from './constants';
 import {
   gravitationalParameterFromPeriod,
+  isPropagatableOrbit,
   meanMotionRadPerDay,
   orbitEllipsePoints,
   orbitalPeriodDays,
@@ -250,5 +251,60 @@ describe('resolveGravitationalParameter', () => {
     // 51 Pegasi b: 0.0527 AU in 4.23 days around a ~1.1 solar-mass star.
     const gm = resolveGravitationalParameter({ semiMajorAxisAu: 0.0527, periodDays: 4.230785 });
     expect(gm / GM_SUN_AU3_PER_DAY2).toBeCloseTo(1.1, 1);
+  });
+});
+
+describe('isPropagatableOrbit', () => {
+  it('accepts an orbit with only a semi-major axis', () => {
+    // 1509 archive records publish an axis and no eccentricity; they are perfectly drawable.
+    expect(isPropagatableOrbit({ semiMajorAxisAu: 1 })).toBe(true);
+  });
+
+  it('accepts a fully specified elliptical orbit', () => {
+    expect(isPropagatableOrbit({ semiMajorAxisAu: 0.05, eccentricity: 0.62 })).toBe(true);
+  });
+
+  it('accepts the boundary eccentricities of an ellipse', () => {
+    expect(isPropagatableOrbit({ semiMajorAxisAu: 1, eccentricity: 0 })).toBe(true);
+    expect(isPropagatableOrbit({ semiMajorAxisAu: 1, eccentricity: 0.999 })).toBe(true);
+  });
+
+  it('rejects an orbit with no semi-major axis at all', () => {
+    expect(isPropagatableOrbit({})).toBe(false);
+    expect(isPropagatableOrbit({ eccentricity: 0.1 })).toBe(false);
+  });
+
+  it('rejects a non-positive or non-finite semi-major axis', () => {
+    // sqrt of a negative and division by zero both yield NaN rather than throwing.
+    for (const semiMajorAxisAu of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(isPropagatableOrbit({ semiMajorAxisAu })).toBe(false);
+    }
+  });
+
+  it('rejects an eccentricity that is not an ellipse', () => {
+    // e >= 1 is a parabolic or hyperbolic escape trajectory, which no ellipse describes.
+    for (const eccentricity of [1, 1.4, -0.2, Number.NaN]) {
+      expect(isPropagatableOrbit({ semiMajorAxisAu: 1, eccentricity })).toBe(false);
+    }
+  });
+});
+
+describe('resolveOrbitalElements eccentricity default', () => {
+  it('treats a missing eccentricity as a circle', () => {
+    expect(resolveOrbitalElements({ semiMajorAxisAu: 2 }).eccentricity).toBe(0);
+  });
+
+  it('keeps a published eccentricity, including exactly zero', () => {
+    expect(resolveOrbitalElements({ semiMajorAxisAu: 2, eccentricity: 0.35 }).eccentricity).toBe(0.35);
+    expect(resolveOrbitalElements({ semiMajorAxisAu: 2, eccentricity: 0 }).eccentricity).toBe(0);
+  });
+
+  it('produces a genuine circle, not a degenerate ellipse', () => {
+    const elements = resolveOrbitalElements({ semiMajorAxisAu: 2 });
+    const radii = orbitEllipsePoints(elements).map((point) => Math.hypot(point.x, point.y, point.z));
+
+    for (const radius of radii) {
+      expect(radius).toBeCloseTo(2, 9);
+    }
   });
 });

@@ -35,8 +35,6 @@ const LABEL_MAX_COUNT = 15;
 const DEEP_SKY_LABEL_COUNT = 12;
 /** How often (seconds) the visible label set is recomputed; doesn't need to be per-frame. */
 const LABEL_UPDATE_INTERVAL_SECONDS = 0.2;
-/** Raycast pick tolerance around each star point, in parsecs. */
-const PICK_THRESHOLD_PC = 1.2;
 /** Pointer travel (px) above which a press counts as an orbit drag rather than a selection. */
 const CLICK_DRAG_SLOP_PX = 5;
 
@@ -227,7 +225,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const { width, height } = canvas.getBoundingClientRect();
     this.labelOverlay.setSize(width, height);
 
-    this.raycaster.params.Points!.threshold = PICK_THRESHOLD_PC;
     canvas.addEventListener('pointerdown', this.handlePointerDown);
     canvas.addEventListener('click', this.handleClick);
     this.observeResize(canvas);
@@ -304,18 +301,19 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.raycaster.setFromCamera(pointerNdc, camera);
 
     if (this.currentStarId === null) {
-      this.handleGalaxyClick();
+      this.handleGalaxyClick(pointerNdc, camera);
     } else {
       this.handleSystemClick();
     }
   };
 
-  private handleGalaxyClick(): void {
+  private handleGalaxyClick(pointerNdc: THREE.Vector2, camera: THREE.PerspectiveCamera): void {
     if (!this.starField) {
       return;
     }
-    const [hit] = this.raycaster.intersectObject(this.starField.object);
-    const starId = hit?.index !== undefined ? this.starField.starIdAt(hit.index) : undefined;
+    // Screen-space rather than a raycast: the star field billboards in the vertex shader, so
+    // its CPU-side geometry is a single quad at the origin. See `StarFieldRenderer.pickAt`.
+    const starId = this.starField.pickAt(pointerNdc, camera);
     if (starId !== undefined) {
       this.navigationStore.selectStar(starId);
     }

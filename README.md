@@ -27,10 +27,10 @@ npm run e2e:typecheck
 
 ## What's in it
 
-**Galaxy view** — every HYG-catalogue star within 50 parsecs as a point field, positioned from
-real RA/Dec/parallax, coloured by spectral index and sized by magnitude. Names label the stars
-nearest the camera. Behind them sits a backdrop of notable deep-sky objects and a Milky Way
-panorama.
+**Galaxy view** — every HYG-catalogue star within 50 parsecs as instanced camera-facing
+billboards, positioned from real RA/Dec/parallax, coloured by spectral index and sized by
+magnitude. Names label the stars nearest the camera. Behind them sits a backdrop of notable
+deep-sky objects and a Milky Way panorama.
 
 **System view** — selecting a star flies the camera continuously into its system rather than
 cutting to a new scene. The Sun gets the real solar-system bodies from JPL Horizons; other
@@ -47,6 +47,11 @@ same place an in-scene click would.
 
 - **Rendering** runs on Three.js `WebGPURenderer`, which falls back to a WebGL2 backend
   automatically. The render loop runs outside Angular's change detection.
+- **Stars are billboards, not points.** The WebGPU backend caps point primitives at a single
+  pixel, so a points cloud renders every star as an identical dot regardless of magnitude. The
+  star field is instanced quads on a `SpriteNodeMaterial` instead, which behaves the same on
+  both backends. Their size is angular rather than world-space — real stars are unresolvable
+  point sources, so apparent size should follow brightness, not distance.
 - **Two coordinate scales.** The galaxy view works in parsecs and the system view in AU —
   about eight orders of magnitude apart, which wrecks float precision if rendered in one unit
   space. The camera rig recentres the active star to the origin ("floating origin") and swaps

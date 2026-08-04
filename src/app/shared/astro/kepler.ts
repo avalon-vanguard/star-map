@@ -1,5 +1,5 @@
 import { CartesianCoordinates } from './coordinates';
-import { DEFAULT_EPOCH_JD } from './constants';
+import { DEFAULT_EPOCH_JD, GM_SUN_AU3_PER_DAY2 } from './constants';
 import { OrbitalElements } from '../models/body.model';
 
 const DEG_TO_RAD = Math.PI / 180;
@@ -32,6 +32,72 @@ export function meanMotionRadPerDay(semiMajorAxisAu: number, gmAu3PerDay2: numbe
 /** Orbital period (days) of a body via Kepler's third law: T = 2*pi / n. */
 export function orbitalPeriodDays(semiMajorAxisAu: number, gmAu3PerDay2: number): number {
   return TWO_PI / meanMotionRadPerDay(semiMajorAxisAu, gmAu3PerDay2);
+}
+
+/**
+ * Gravitational parameter implied by a measured orbital period — the inverse of
+ * {@link orbitalPeriodDays}: `GM = n^2 * a^3`, with `n = 2*pi / T`.
+ *
+ * This is how an exoplanet's host star gets its mass into the propagator. Nothing about the
+ * star needs to be known or guessed: the period and the semi-major axis between them pin the
+ * gravitational parameter exactly.
+ */
+export function gravitationalParameterFromPeriod(semiMajorAxisAu: number, periodDays: number): number {
+  const meanMotion = TWO_PI / periodDays;
+  return meanMotion * meanMotion * semiMajorAxisAu * semiMajorAxisAu * semiMajorAxisAu;
+}
+
+/**
+ * Plausible range for a host star's mass, in solar masses — from below the hydrogen-burning
+ * limit to beyond the heaviest known stars. Used only to reject a derived value that cannot be
+ * a star, which would otherwise send a planet spinning at a visibly absurd rate.
+ */
+const MIN_PLAUSIBLE_STELLAR_MASS_SOLAR = 0.01;
+const MAX_PLAUSIBLE_STELLAR_MASS_SOLAR = 150;
+
+function isPositiveFinite(value: number | undefined): value is number {
+  return value !== undefined && Number.isFinite(value) && value > 0;
+}
+
+/**
+ * The gravitational parameter to propagate a planet with, in AU^3/day^2, best source first:
+ *
+ * 1. **Its measured orbital period.** Exact, and independent of any stellar model.
+ * 2. **Its host star's measured mass.**
+ * 3. **One solar mass**, as a last resort.
+ *
+ * Falling back to the Sun is a real approximation, not a neutral default. Most exoplanet hosts
+ * are red dwarfs far lighter than the Sun, and a heavier central mass pulls harder and shortens
+ * the period, so assuming solar mass makes their planets whirl round far too fast. TRAPPIST-1
+ * is 0.09 solar masses; its planets were completing an orbit in roughly a third of the true
+ * time.
+ */
+export function resolveGravitationalParameter(input: {
+  semiMajorAxisAu: number;
+  periodDays?: number;
+  hostStarMassSolar?: number;
+}): number {
+  const { semiMajorAxisAu, periodDays, hostStarMassSolar } = input;
+
+  if (isPositiveFinite(periodDays) && isPositiveFinite(semiMajorAxisAu)) {
+    const derived = gravitationalParameterFromPeriod(semiMajorAxisAu, periodDays);
+    const impliedMassSolar = derived / GM_SUN_AU3_PER_DAY2;
+    // A period and axis drawn from disagreeing solutions can imply something that is not a
+    // star; prefer a known-approximate answer over a confidently wrong one.
+    if (impliedMassSolar >= MIN_PLAUSIBLE_STELLAR_MASS_SOLAR && impliedMassSolar <= MAX_PLAUSIBLE_STELLAR_MASS_SOLAR) {
+      return derived;
+    }
+  }
+
+  if (
+    isPositiveFinite(hostStarMassSolar) &&
+    hostStarMassSolar >= MIN_PLAUSIBLE_STELLAR_MASS_SOLAR &&
+    hostStarMassSolar <= MAX_PLAUSIBLE_STELLAR_MASS_SOLAR
+  ) {
+    return GM_SUN_AU3_PER_DAY2 * hostStarMassSolar;
+  }
+
+  return GM_SUN_AU3_PER_DAY2;
 }
 
 /** Normalizes an angle (radians) into [0, 2*pi). */

@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 
 import { gmForParent } from '../../shared/astro/constants';
-import { orbitEllipsePoints, propagateOrbit, resolveOrbitalElements } from '../../shared/astro/kepler';
+import { orbitEllipsePoints, propagateOrbit, resolveGravitationalParameter, resolveOrbitalElements } from '../../shared/astro/kepler';
 import { BodyRecord, OrbitalElements } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 
@@ -160,7 +160,14 @@ export class SystemOrbitsRenderer {
         epochJd: exoplanet.orbit.epochJd
       });
       const radiusKm = exoplanet.radiusEarth ? exoplanet.radiusEarth * EARTH_RADIUS_KM : undefined;
-      const tracked = this.addTopLevelBody(exoplanet.id, 'exoplanet', elements, gmForParent(undefined), radiusKm);
+      // Not `gmForParent(undefined)`: that assumes a solar-mass host for every system, and
+      // most exoplanet hosts are red dwarfs a fraction of the Sun's mass.
+      const gm = resolveGravitationalParameter({
+        semiMajorAxisAu: exoplanet.orbit.semiMajorAxisAu,
+        periodDays: exoplanet.periodDays,
+        hostStarMassSolar: exoplanet.hostStarMassSolar
+      });
+      const tracked = this.addTopLevelBody(exoplanet.id, 'exoplanet', elements, gm, radiusKm);
       members.push({ id: exoplanet.id, kind: 'exoplanet', marker: tracked.marker });
     }
 

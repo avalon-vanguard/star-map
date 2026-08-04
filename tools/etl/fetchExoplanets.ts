@@ -22,6 +22,7 @@ const TAP_COLUMNS = [
   'pl_orbper',
   'pl_rade',
   'pl_bmasse',
+  'st_mass',
   'disc_year'
 ].join(',');
 const TAP_QUERY = `select+${TAP_COLUMNS}+from+ps+where+default_flag=1&format=csv`;
@@ -69,6 +70,11 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<ExoplanetRe
       radiusEarth: parseOptionalNumber(row['pl_rade']),
       massEarth: parseOptionalNumber(row['pl_bmasse']),
       discoveryYear: parseOptionalNumber(row['disc_year']),
+      // The period was already being downloaded and thrown away. With the semi-major axis it
+      // determines the host's gravitational parameter, so keeping it is the difference between
+      // propagating a planet at its real rate and pretending every host is the Sun.
+      periodDays: parseOptionalNumber(row['pl_orbper']),
+      hostStarMassSolar: parseOptionalNumber(row['st_mass']),
       orbit: {
         semiMajorAxisAu: parseOptionalNumber(row['pl_orbsmax']),
         eccentricity: parseOptionalNumber(row['pl_orbeccen']),

@@ -70,9 +70,23 @@ function validateExoplanets(exoplanets: ExoplanetRecord[], starIds: Set<number>)
       );
       crossReferenced++;
     }
+
+    assertCondition(
+      exoplanet.periodDays === undefined || exoplanet.periodDays > 0,
+      `Exoplanet ${exoplanet.id} has a non-positive orbital period.`
+    );
+    assertCondition(
+      exoplanet.hostStarMassSolar === undefined || exoplanet.hostStarMassSolar > 0,
+      `Exoplanet ${exoplanet.id} has a non-positive host star mass.`
+    );
   }
 
   console.log(`  ${crossReferenced}/${exoplanets.length} exoplanets cross-referenced to a HYG host star.`);
+
+  // How many can be propagated at their real rate rather than as if the host were the Sun.
+  const withPeriod = exoplanets.filter((exoplanet) => exoplanet.periodDays !== undefined).length;
+  const withHostMass = exoplanets.filter((exoplanet) => exoplanet.hostStarMassSolar !== undefined).length;
+  console.log(`  ${withPeriod}/${exoplanets.length} have a measured period, ${withHostMass} a host star mass.`);
 }
 
 const UNIT_VECTOR_TOLERANCE = 1e-6;

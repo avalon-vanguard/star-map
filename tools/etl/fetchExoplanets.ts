@@ -4,7 +4,7 @@ import { buildStarNameIndex, resolveHostStarId } from '../../src/app/shared/astr
 import { ExoplanetRecord } from '../../src/app/shared/models/exoplanet.model';
 import { StarRecord } from '../../src/app/shared/models/star.model';
 import { fetchStars } from './fetchStars';
-import { parseCsvObjects } from './lib/csv';
+import { parseCsvObjects, parseOptionalNumber } from './lib/csv';
 import { fetchTextCached } from './lib/http';
 import { dataPath, ensureDataDir } from './lib/paths';
 
@@ -82,14 +82,6 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<ExoplanetRe
   writeFileSync(dataPath('exoplanets.json'), JSON.stringify(exoplanets));
   console.log(`  wrote ${exoplanets.length} exoplanets (${matched} cross-referenced to a HYG host star).`);
   return exoplanets;
-}
-
-function parseOptionalNumber(value: string | undefined): number | undefined {
-  if (!value) {
-    return undefined;
-  }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 if (require.main === module) {

@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { attribute } from 'three/tsl';
 
+import { spectralTypeToColorIndex } from '../../shared/astro/spectral';
 import { StarRecord } from '../../shared/models/star.model';
 
 const MIN_POINT_SIZE = 1.5;
@@ -13,10 +14,20 @@ const WARM_STAR_COLOR = new THREE.Color(1.0, 0.6, 0.35);
 /**
  * Crude but effective B-V color-index -> RGB tint: hot/blue stars (low/negative index) skew
  * blue-white, cool/red stars (high index) skew orange-red, matching real spectral colors.
+ *
+ * `colorIndex` is `null` for the ~10% of stars HYG never photometered. Those fall back to a
+ * value derived from `spectralType`, and to neutral white only when the catalog records no
+ * classification at all — never to 0, which is itself a real color index meaning "hot A-type"
+ * and would paint several hundred red dwarfs blue-white.
  */
-export function colorIndexToRgb(colorIndex: number): THREE.Color {
-  const t = THREE.MathUtils.clamp((colorIndex + 0.4) / 2.4, 0, 1);
+export function colorIndexToRgb(colorIndex: number | null, spectralType?: string): THREE.Color {
+  const resolved = colorIndex ?? spectralTypeToColorIndex(spectralType);
   const color = new THREE.Color();
+  if (resolved === null) {
+    return color.copy(NEUTRAL_STAR_COLOR);
+  }
+
+  const t = THREE.MathUtils.clamp((resolved + 0.4) / 2.4, 0, 1);
   return t < 0.5 ? color.lerpColors(COLD_STAR_COLOR, NEUTRAL_STAR_COLOR, t * 2) : color.lerpColors(NEUTRAL_STAR_COLOR, WARM_STAR_COLOR, (t - 0.5) * 2);
 }
 
@@ -49,7 +60,7 @@ export class StarFieldRenderer {
     const sizes = new Float32Array(stars.length);
 
     stars.forEach((star, index) => {
-      const color = colorIndexToRgb(star.colorIndex);
+      const color = colorIndexToRgb(star.colorIndex, star.spectralType);
       colors[index * 3] = color.r;
       colors[index * 3 + 1] = color.g;
       colors[index * 3 + 2] = color.b;

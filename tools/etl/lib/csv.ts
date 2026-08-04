@@ -51,6 +51,23 @@ export function parseCsv(text: string, delimiter = ','): string[][] {
   return rows;
 }
 
+/**
+ * Reads a numeric CSV cell, treating a missing/blank/unparseable value as absent.
+ *
+ * Always prefer this to a bare `Number(cell)`: catalogs leave unmeasured fields empty, and
+ * `Number('')` is `0` — a finite, entirely plausible-looking value. That single coercion has
+ * already produced two separate bugs here, painting 875 unphotometered stars as if they had a
+ * measured colour index of 0, and placing exoplanet hosts at the origin where they matched the
+ * Sun.
+ */
+export function parseOptionalNumber(value: string | undefined): number | undefined {
+  if (value === undefined || value.trim() === '') {
+    return undefined;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 /** Parses `text` as CSV and maps each data row to an object keyed by the header row. */
 export function parseCsvObjects(text: string, delimiter = ','): Array<Record<string, string>> {
   const rows = parseCsv(text, delimiter).filter((row) => row.some((cell) => cell.length > 0));

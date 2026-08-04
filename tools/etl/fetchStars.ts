@@ -2,12 +2,18 @@ import { writeFileSync } from 'node:fs';
 
 import { raDecDistanceToXyz } from '../../src/app/shared/astro/coordinates';
 import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model';
-import { parseCsvObjects } from './lib/csv';
+import { parseCsvObjects, parseOptionalNumber } from './lib/csv';
 import { fetchTextCached } from './lib/http';
 import { dataPath, ensureDataDir } from './lib/paths';
 
 const HYG_CSV_URL = 'https://raw.githubusercontent.com/astronexus/HYG-Database/main/hyg/CURRENT/hygdata_v41.csv';
 const HYG_UNKNOWN_DISTANCE_PC = 100000; // HYG's placeholder for unmeasured/unreliable parallax
+
+/**
+ * Stand-in magnitude for a star with no photometry. Faint rather than 0, because 0 would mean
+ * "as bright as Vega" and render it as one of the largest points on the map.
+ */
+const UNKNOWN_MAGNITUDE = 15;
 
 /** Stars within this distance (parsecs) of the Sun are kept for the galaxy view. */
 const DISTANCE_CUTOFF_PC = Number(process.env['ETL_STAR_DISTANCE_PC'] ?? 50);
@@ -26,7 +32,10 @@ function resolveName(row: Record<string, string>): string {
     return `HD ${row['hd']}`;
   }
   if (row['gl']) {
-    return `Gl ${row['gl']}`;
+    // Already a complete designation ("Gl 581", "GJ 3512"), unlike the bare numbers in `hd`
+    // and `hip` — prefixing it again produced 2331 stars named "Gl GJ 1076", which broke
+    // search, the on-screen labels, and exoplanet host-star name matching alike.
+    return row['gl'];
   }
   if (row['hip']) {
     return `HIP ${row['hip']}`;
@@ -51,7 +60,7 @@ export async function fetchStars(): Promise<StarRecord[]> {
     const distancePc = Number(row['dist']);
 
     if (id === SUN_STAR_ID) {
-      stars.push({ id, name: 'Sol', x: 0, y: 0, z: 0, magnitude: Number(row['mag']), spectralType: row['spect'] || 'G2V', colorIndex: Number(row['ci']) || 0 });
+      stars.push({ id, name: 'Sol', x: 0, y: 0, z: 0, magnitude: parseOptionalNumber(row['mag']) ?? UNKNOWN_MAGNITUDE, spectralType: row['spect'] || 'G2V', colorIndex: parseOptionalNumber(row['ci']) ?? null });
       continue;
     }
 
@@ -73,9 +82,9 @@ export async function fetchStars(): Promise<StarRecord[]> {
       x,
       y,
       z,
-      magnitude: Number(row['mag']) || 0,
+      magnitude: parseOptionalNumber(row['mag']) ?? UNKNOWN_MAGNITUDE,
       spectralType: row['spect'] || 'Unknown',
-      colorIndex: Number(row['ci']) || 0
+      colorIndex: parseOptionalNumber(row['ci']) ?? null
     });
   }
 

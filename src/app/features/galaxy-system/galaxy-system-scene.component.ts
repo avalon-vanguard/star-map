@@ -396,7 +396,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.systemGroup.add(this.systemRenderer.object);
 
     const starMarkerMaterial = this.starMarkerMaterial.clone();
-    const starColor = colorIndexToRgb(star.colorIndex);
+    const starColor = colorIndexToRgb(star.colorIndex, star.spectralType);
     if (star.id === SOL_STAR_ID) {
       // The Sun is the only star we have (and could ever have) a real photograph of; every
       // other point in the galaxy view is far too distant to be resolved as a disk.

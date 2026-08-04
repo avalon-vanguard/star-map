@@ -15,7 +15,7 @@ import { StarRecord } from '../../shared/models/star.model';
 import { NavigationStore } from '../../shared/state/navigation.store';
 import { CameraRigController } from './camera-rig-controller';
 import { DeepSkyRenderer } from './deep-sky-renderer';
-import { starMarkerRadiusAu, systemFramingDistanceAu } from './system-framing';
+import { starMarkerRadiusAu, SYSTEM_VIEW_DIRECTION, systemFramingDistanceAu } from './system-framing';
 import { colorIndexToRgb, StarFieldRenderer } from './star-field-renderer';
 import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
@@ -431,8 +431,12 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.rig!.setImmediate({ position: direction.clone().multiplyScalar(SYSTEM_ENTRY_DISTANCE_AU), target: new THREE.Vector3(0, 0, 0) });
 
     const framingDistance = systemFramingDistanceAu(this.systemRenderer.maxTopLevelSemiMajorAxisAu);
+    // Arrives along whichever direction the approach came from, then swings round to look down
+    // on the orbital plane as it settles — so the swap stays continuous but the system is not
+    // presented edge-on. See SYSTEM_VIEW_DIRECTION.
+    const viewDirection = new THREE.Vector3(SYSTEM_VIEW_DIRECTION.x, SYSTEM_VIEW_DIRECTION.y, SYSTEM_VIEW_DIRECTION.z).normalize();
 
-    this.rig!.flyTo({ position: direction.clone().multiplyScalar(framingDistance), target: new THREE.Vector3(0, 0, 0) }, SETTLE_DURATION_SECONDS, () => {
+    this.rig!.flyTo({ position: viewDirection.multiplyScalar(framingDistance), target: new THREE.Vector3(0, 0, 0) }, SETTLE_DURATION_SECONDS, () => {
       this.currentStarId = star.id;
       this.navigationStore.setViewLevel('system');
       onComplete();

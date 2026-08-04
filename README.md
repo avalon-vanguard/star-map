@@ -52,6 +52,11 @@ same place an in-scene click would.
   star field is instanced quads on a `SpriteNodeMaterial` instead, which behaves the same on
   both backends. Their size is angular rather than world-space — real stars are unresolvable
   point sources, so apparent size should follow brightness, not distance.
+- **One reference frame.** The two data sources disagree: HYG gives star positions in
+  equatorial J2000, while JPL Horizons reports orbital elements against the ecliptic, tilted
+  23.4° away. The scene is equatorial throughout and orbits are rotated into it, so a direction
+  means the same thing in both views. Systems are still presented face-on — by placing the
+  camera relative to the orbital plane rather than by rotating the world into a convenient pose.
 - **Two coordinate scales.** The galaxy view works in parsecs and the system view in AU —
   about eight orders of magnitude apart, which wrecks float precision if rendered in one unit
   space. The camera rig recentres the active star to the origin ("floating origin") and swaps

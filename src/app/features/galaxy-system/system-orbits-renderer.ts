@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 
 import { gmForParent } from '../../shared/astro/constants';
 import { isPropagatableOrbit, orbitEllipsePoints, propagateOrbit, resolveGravitationalParameter, resolveOrbitalElements } from '../../shared/astro/kepler';
+import { eclipticToEquatorial } from '../../shared/astro/coordinates';
 import { BodyRecord, OrbitalElements } from '../../shared/models/body.model';
 import { bodyMarkerRadiusAu } from './system-framing';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
@@ -46,9 +47,12 @@ function buildOrbitLine(elements: OrbitalElements, kind: SystemMemberKind): THRE
   const points = orbitEllipsePoints(elements);
   const positions = new Float32Array(points.length * 3);
   points.forEach((point, index) => {
-    positions[index * 3] = point.x;
-    positions[index * 3 + 1] = point.z; // AU "up" (ecliptic normal) maps to scene Y.
-    positions[index * 3 + 2] = point.y;
+    // Elements are ecliptic (Horizons' default reference plane); the scene is equatorial, to
+    // match the star catalogue. Without this the orbits sit 23.4 degrees off the sky.
+    const { x, y, z } = eclipticToEquatorial(point);
+    positions[index * 3] = x;
+    positions[index * 3 + 1] = y;
+    positions[index * 3 + 2] = z;
   });
 
   const geometry = new THREE.BufferGeometry();
@@ -175,8 +179,8 @@ export class SystemOrbitsRenderer {
   /** Recomputes every marker's position for the given Julian date. Call once per tick. */
   update(epochJd: number): void {
     for (const body of this.topLevelBodies) {
-      const { x, y, z } = propagateOrbit(body.elements, body.gmAu3PerDay2, epochJd);
-      body.position.set(x, z, y); // AU "up" maps to scene Y, matching buildOrbitLine.
+      const { x, y, z } = eclipticToEquatorial(propagateOrbit(body.elements, body.gmAu3PerDay2, epochJd));
+      body.position.set(x, y, z); // Equatorial, matching buildOrbitLine and the star field.
       body.marker.position.copy(body.position);
     }
 
@@ -186,8 +190,8 @@ export class SystemOrbitsRenderer {
         continue;
       }
       moon.pivot.position.copy(parent.position);
-      const { x, y, z } = propagateOrbit(moon.elements, moon.gmAu3PerDay2, epochJd);
-      moon.marker.position.set(x, z, y);
+      const { x, y, z } = eclipticToEquatorial(propagateOrbit(moon.elements, moon.gmAu3PerDay2, epochJd));
+      moon.marker.position.set(x, y, z);
     }
   }
 

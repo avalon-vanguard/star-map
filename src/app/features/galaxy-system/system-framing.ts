@@ -1,3 +1,5 @@
+import { CartesianCoordinates, eclipticToEquatorial } from '../../shared/astro/coordinates';
+
 /**
  * How the system view sizes itself to whatever system it is showing.
  *
@@ -41,6 +43,19 @@ const EMPTY_SYSTEM_FRAMING_DISTANCE_AU = 3;
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
+
+/**
+ * Where the camera settles when arriving at a system, as a unit direction from the star in the
+ * scene's equatorial frame.
+ *
+ * The scene is equatorial so that orbits and stars share one frame, but orbital planes lie
+ * close to the *ecliptic*, which is tilted 23.4 degrees out of it. Left to the equatorial axes,
+ * a system would be presented edge-on. Rather than rotate the world into a comfortable pose —
+ * which would put the orbits back at odds with the sky — the camera is placed relative to the
+ * plane instead: this is a three-quarter view, about 37 degrees off the ecliptic normal, so a
+ * system reads as a disc while staying where it truly sits.
+ */
+export const SYSTEM_VIEW_DIRECTION: CartesianCoordinates = eclipticToEquatorial({ x: 0, y: 0.6, z: 0.8 });
 
 /**
  * Radius (AU) to draw the system's star at, given its innermost orbit.

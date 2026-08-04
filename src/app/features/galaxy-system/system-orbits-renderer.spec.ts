@@ -2,6 +2,8 @@ import * as THREE from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_EPOCH_JD } from '../../shared/astro/constants';
+import { eclipticToEquatorial, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
+import { BodyRecord } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
 
@@ -144,5 +146,68 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
       expect([x, y, z].every(Number.isFinite)).toBe(true);
     }
     renderer.dispose();
+  });
+
+  describe('reference frame', () => {
+    /** Earth: inclination 0 by definition — its orbit *is* the ecliptic plane. */
+    const EARTH: BodyRecord = {
+      id: 'earth',
+      systemStarId: 0,
+      name: 'Earth',
+      kind: 'planet',
+      radiusKm: 6371,
+      orbit: {
+        semiMajorAxisAu: 1,
+        eccentricity: 0.0167,
+        inclinationDeg: 0,
+        longitudeOfAscendingNodeDeg: 0,
+        argumentOfPeriapsisDeg: 0,
+        meanAnomalyAtEpochDeg: 0,
+        epochJd: DEFAULT_EPOCH_JD
+      }
+    };
+
+    it('places an ecliptic orbit in the ecliptic plane of the equatorial scene', () => {
+      // Horizons reports elements against the ecliptic; the scene is equatorial, to match the
+      // star catalogue. So Earth's orbit must come out tilted, lying perpendicular to the
+      // *ecliptic* pole rather than to the scene's own vertical.
+      const renderer = new SystemOrbitsRenderer([EARTH], []);
+      const eclipticPole = eclipticToEquatorial({ x: 0, y: 0, z: 1 });
+
+      for (const offset of [0, 40, 91, 200, 300]) {
+        renderer.update(DEFAULT_EPOCH_JD + offset);
+        const p = renderer.members[0].marker.position;
+        const outOfPlane = p.x * eclipticPole.x + p.y * eclipticPole.y + p.z * eclipticPole.z;
+        expect(Math.abs(outOfPlane)).toBeLessThan(1e-9);
+      }
+      renderer.dispose();
+    });
+
+    it('tilts that orbit away from the celestial equator by the obliquity', () => {
+      // The discriminating check: before the frames were reconciled, the orbit sat flat in the
+      // scene and this angle was zero.
+      const renderer = new SystemOrbitsRenderer([EARTH], []);
+      renderer.update(DEFAULT_EPOCH_JD + 91); // a quarter orbit on, well away from the equinox
+
+      const p = renderer.members[0].marker.position;
+      const latitudeDeg = (Math.asin(p.z / p.length()) * 180) / Math.PI;
+
+      expect(Math.abs(latitudeDeg)).toBeGreaterThan(1);
+      expect(Math.abs(latitudeDeg)).toBeLessThanOrEqual(OBLIQUITY_J2000_DEG + 1e-6);
+      renderer.dispose();
+    });
+
+    it('keeps the vernal equinox direction shared between the two frames', () => {
+      // A body at ecliptic longitude 0 sits on the +X axis in both frames, so it must not move.
+      const atEquinox: BodyRecord = { ...EARTH, orbit: { ...EARTH.orbit, eccentricity: 0 } };
+      const renderer = new SystemOrbitsRenderer([atEquinox], []);
+      renderer.update(DEFAULT_EPOCH_JD);
+
+      const p = renderer.members[0].marker.position;
+      expect(p.x).toBeCloseTo(1, 6);
+      expect(p.y).toBeCloseTo(0, 9);
+      expect(p.z).toBeCloseTo(0, 9);
+      renderer.dispose();
+    });
   });
 });

@@ -392,7 +392,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     const systemBodies = this.bodies.filter((body) => body.systemStarId === star.id);
     const systemExoplanets = this.exoplanets.filter((exoplanet) => exoplanet.hostStarId === star.id);
-    this.systemRenderer = new SystemOrbitsRenderer(systemBodies, systemExoplanets);
+    // The star's own position is the line of sight to it, which is the plane the archive
+    // measures exoplanet inclinations against. The Sun sits at the origin and has no
+    // exoplanets, so it has no meaningful direction and the renderer falls back.
+    this.systemRenderer = new SystemOrbitsRenderer(systemBodies, systemExoplanets, { x: star.x, y: star.y, z: star.z });
     this.systemGroup.add(this.systemRenderer.object);
 
     // Sized against this system's innermost orbit, so the star never swallows its own planets.

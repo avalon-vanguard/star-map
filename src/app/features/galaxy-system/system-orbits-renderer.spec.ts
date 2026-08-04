@@ -210,4 +210,90 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
       renderer.dispose();
     });
   });
+
+  describe('exoplanet inclination is measured from the plane of the sky', () => {
+    // A host somewhere off all three axes, so nothing can pass by coincidence.
+    const LINE_OF_SIGHT = new THREE.Vector3(0.37, -0.62, 0.69).normalize();
+
+    function circular(inclinationDeg: number): ExoplanetRecord {
+      return exoplanet({ orbit: { semiMajorAxisAu: 0.5, eccentricity: 0, inclinationDeg } });
+    }
+
+    /** Normal of the plane the rendered orbit actually lies in. */
+    function orbitNormal(renderer: SystemOrbitsRenderer): THREE.Vector3 {
+      const a = positionAt(renderer, DEFAULT_EPOCH_JD);
+      const b = positionAt(renderer, DEFAULT_EPOCH_JD + 20);
+      return new THREE.Vector3().crossVectors(a, b).normalize();
+    }
+
+    it('tilts the orbit by the published inclination away from the line of sight', () => {
+      // The definition: inclination is the angle between the orbital axis and our line of
+      // sight to the star. Reading it as an ecliptic inclination instead tips the orbit against
+      // a plane it was never measured against.
+      for (const inclinationDeg of [0, 30, 60, 88.9, 90]) {
+        const renderer = new SystemOrbitsRenderer([], [circular(inclinationDeg)], LINE_OF_SIGHT);
+        const angleDeg = (Math.acos(Math.abs(orbitNormal(renderer).dot(LINE_OF_SIGHT))) * 180) / Math.PI;
+
+        expect(angleDeg).toBeCloseTo(inclinationDeg <= 90 ? inclinationDeg : 180 - inclinationDeg, 4);
+        renderer.dispose();
+      }
+    });
+
+    it('makes an edge-on planet actually transit its star as seen from Earth', () => {
+      // 90 degrees means edge-on to us, which is why transiting planets cluster there. So some
+      // point on the orbit must lie along the line of sight — in front of or behind the star.
+      const renderer = new SystemOrbitsRenderer([], [circular(90)], LINE_OF_SIGHT);
+
+      let closestToLineOfSight = 0;
+      for (let day = 0; day < 120; day++) {
+        const p = positionAt(renderer, DEFAULT_EPOCH_JD + day).normalize();
+        closestToLineOfSight = Math.max(closestToLineOfSight, Math.abs(p.dot(LINE_OF_SIGHT)));
+      }
+
+      expect(closestToLineOfSight).toBeGreaterThan(0.99);
+      renderer.dispose();
+    });
+
+    it('keeps a face-on planet in the plane of the sky, never transiting', () => {
+      const renderer = new SystemOrbitsRenderer([], [circular(0)], LINE_OF_SIGHT);
+
+      for (let day = 0; day < 120; day += 7) {
+        const p = positionAt(renderer, DEFAULT_EPOCH_JD + day).normalize();
+        expect(Math.abs(p.dot(LINE_OF_SIGHT))).toBeLessThan(1e-9);
+      }
+      renderer.dispose();
+    });
+
+    it('places identical elements differently for hosts in different directions', () => {
+      // Each system is oriented against its own line of sight, so the same elements around two
+      // stars in different parts of the sky do not land in the same place.
+      //
+      // Note this checks position, not the plane's normal. With no published node angle the
+      // rotation about the line of sight is arbitrary, so two planes can come out near-parallel
+      // by coincidence while each still sits at its correct inclination to its own host — which
+      // is the property the test above pins.
+      const here = new SystemOrbitsRenderer([], [circular(88.9)], new THREE.Vector3(1, 0, 0));
+      const there = new SystemOrbitsRenderer([], [circular(88.9)], new THREE.Vector3(0, 0, 1));
+
+      expect(positionAt(here, DEFAULT_EPOCH_JD).distanceTo(positionAt(there, DEFAULT_EPOCH_JD))).toBeGreaterThan(0.1);
+      here.dispose();
+      there.dispose();
+    });
+
+    it('falls back to the ecliptic frame when the host direction is unknown', () => {
+      const withoutHost = new SystemOrbitsRenderer([], [circular(0)]);
+      const eclipticPole = eclipticToEquatorial({ x: 0, y: 0, z: 1 });
+
+      expect(Math.abs(orbitNormal(withoutHost).dot(new THREE.Vector3(eclipticPole.x, eclipticPole.y, eclipticPole.z)))).toBeCloseTo(1, 9);
+      withoutHost.dispose();
+    });
+
+    it('ignores a zero-length host direction rather than producing NaN', () => {
+      const renderer = new SystemOrbitsRenderer([], [circular(45)], new THREE.Vector3(0, 0, 0));
+      const p = positionAt(renderer, DEFAULT_EPOCH_JD);
+
+      expect([p.x, p.y, p.z].every(Number.isFinite)).toBe(true);
+      renderer.dispose();
+    });
+  });
 });

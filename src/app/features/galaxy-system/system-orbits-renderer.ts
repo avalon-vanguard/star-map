@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 
 import { gmForParent } from '../../shared/astro/constants';
 import { isPropagatableOrbit, orbitEllipsePoints, propagateOrbit, resolveGravitationalParameter, resolveOrbitalElements } from '../../shared/astro/kepler';
-import { eclipticToEquatorial } from '../../shared/astro/coordinates';
+import { CartesianCoordinates, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
 import { BodyRecord, OrbitalElements } from '../../shared/models/body.model';
 import { bodyMarkerRadiusAu } from './system-framing';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
@@ -29,6 +29,42 @@ const ORBIT_LINE_OPACITY_BY_KIND: Record<SystemMemberKind, number> = {
 };
 
 const EARTH_RADIUS_KM = 6371;
+const DEG_TO_RAD = Math.PI / 180;
+
+/**
+ * Rotation carrying the **ecliptic** frame into the scene's equatorial one — a turn of the
+ * obliquity about the shared vernal-equinox axis. Solar-system elements come from Horizons
+ * against the ecliptic, so this is their frame.
+ */
+const ECLIPTIC_FRAME = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), OBLIQUITY_J2000_DEG * DEG_TO_RAD);
+
+/**
+ * Rotation carrying the frame an **exoplanet's** elements are measured in into the scene.
+ *
+ * The Exoplanet Archive measures inclination from the *plane of the sky* — the plane
+ * perpendicular to our line of sight to the host star — not from the ecliptic. 90 degrees means
+ * edge-on as seen from Earth, which is why transiting planets cluster there: 1643 of the 2061
+ * published inclinations are within 5 degrees of 90. Treating that as an ecliptic inclination
+ * tips every transiting system on its side against a plane it was never measured against.
+ *
+ * Carrying the elements' +Z onto the line of sight fixes it: an inclination of `i` then means
+ * the orbit's normal sits `i` from our line of sight, which is exactly the definition. The
+ * rotation about that axis is the node's position angle on the sky, which the archive does not
+ * publish, so the shortest arc from +Z is used — deterministic, and no less arbitrary than any
+ * other choice given no data.
+ *
+ * Falls back to the ecliptic frame when there is no direction to work with.
+ */
+function skyPlaneFrame(lineOfSight: CartesianCoordinates | undefined): THREE.Quaternion {
+  if (!lineOfSight) {
+    return ECLIPTIC_FRAME.clone();
+  }
+  const direction = new THREE.Vector3(lineOfSight.x, lineOfSight.y, lineOfSight.z);
+  if (direction.lengthSq() === 0) {
+    return ECLIPTIC_FRAME.clone();
+  }
+  return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction.normalize());
+}
 
 function colorForKind(kind: SystemMemberKind): THREE.Color {
   switch (kind) {
@@ -43,13 +79,14 @@ function colorForKind(kind: SystemMemberKind): THREE.Color {
   }
 }
 
-function buildOrbitLine(elements: OrbitalElements, kind: SystemMemberKind): THREE.Line {
+function buildOrbitLine(elements: OrbitalElements, kind: SystemMemberKind, frame: THREE.Quaternion): THREE.Line {
   const points = orbitEllipsePoints(elements);
   const positions = new Float32Array(points.length * 3);
+  const scratch = new THREE.Vector3();
   points.forEach((point, index) => {
-    // Elements are ecliptic (Horizons' default reference plane); the scene is equatorial, to
-    // match the star catalogue. Without this the orbits sit 23.4 degrees off the sky.
-    const { x, y, z } = eclipticToEquatorial(point);
+    // Elements are measured against their source's own reference plane; `frame` rotates that
+    // plane into the scene's equatorial one.
+    const { x, y, z } = scratch.set(point.x, point.y, point.z).applyQuaternion(frame);
     positions[index * 3] = x;
     positions[index * 3 + 1] = y;
     positions[index * 3 + 2] = z;
@@ -79,6 +116,8 @@ interface TrackedTopLevelBody {
   elements: OrbitalElements;
   gmAu3PerDay2: number;
   marker: THREE.Mesh;
+  /** Rotation from this body's own element frame into the scene's equatorial one. */
+  frame: THREE.Quaternion;
   /** AU position last computed for this body; moons read their parent's here. */
   position: THREE.Vector3;
 }
@@ -88,6 +127,7 @@ interface TrackedMoon {
   elements: OrbitalElements;
   gmAu3PerDay2: number;
   marker: THREE.Mesh;
+  frame: THREE.Quaternion;
   pivot: THREE.Group;
   parentId: string;
 }
@@ -110,7 +150,12 @@ export class SystemOrbitsRenderer {
   private readonly moons: TrackedMoon[] = [];
   private readonly disposables: Array<{ geometry: THREE.BufferGeometry; material: THREE.Material }> = [];
 
-  constructor(bodies: readonly BodyRecord[], exoplanets: readonly ExoplanetRecord[]) {
+  constructor(
+    bodies: readonly BodyRecord[],
+    exoplanets: readonly ExoplanetRecord[],
+    /** Direction from the Sun to this system's host star, equatorial — the exoplanet line of sight. */
+    hostStarDirection?: CartesianCoordinates
+  ) {
     const members: SystemMember[] = [];
     const topLevelBodiesById = new Map<string, BodyRecord>();
 
@@ -135,7 +180,7 @@ export class SystemOrbitsRenderer {
       }
       // A body reaches here only when it has no parentBodyId, so `kind` is 'planet' or 'dwarf'.
       const kind: SystemMemberKind = body.kind;
-      const tracked = this.addTopLevelBody(body.id, kind, body.orbit, gmForParent(undefined), body.radiusKm);
+      const tracked = this.addTopLevelBody(body.id, kind, body.orbit, gmForParent(undefined), body.radiusKm, ECLIPTIC_FRAME);
       members.push({ id: body.id, kind, marker: tracked.marker });
     }
 
@@ -148,9 +193,12 @@ export class SystemOrbitsRenderer {
       if (!parentTracked) {
         continue; // orphaned moon reference; skip rather than crash.
       }
-      const moon = this.addMoon(body.id, body.orbit, gmForParent(body.parentBodyId), body.radiusKm, parentTracked);
+      const moon = this.addMoon(body.id, body.orbit, gmForParent(body.parentBodyId), body.radiusKm, parentTracked, ECLIPTIC_FRAME);
       members.push({ id: body.id, kind: 'moon', marker: moon.marker });
     }
+
+    // Every exoplanet in a system shares the same line of sight, so the frame is built once.
+    const exoplanetFrame = skyPlaneFrame(hostStarDirection);
 
     for (const exoplanet of exoplanets) {
       // Only a semi-major axis is genuinely required; resolveOrbitalElements defaults the rest,
@@ -169,7 +217,7 @@ export class SystemOrbitsRenderer {
         periodDays: exoplanet.periodDays,
         hostStarMassSolar: exoplanet.hostStarMassSolar
       });
-      const tracked = this.addTopLevelBody(exoplanet.id, 'exoplanet', elements, gm, radiusKm);
+      const tracked = this.addTopLevelBody(exoplanet.id, 'exoplanet', elements, gm, radiusKm, exoplanetFrame);
       members.push({ id: exoplanet.id, kind: 'exoplanet', marker: tracked.marker });
     }
 
@@ -179,8 +227,8 @@ export class SystemOrbitsRenderer {
   /** Recomputes every marker's position for the given Julian date. Call once per tick. */
   update(epochJd: number): void {
     for (const body of this.topLevelBodies) {
-      const { x, y, z } = eclipticToEquatorial(propagateOrbit(body.elements, body.gmAu3PerDay2, epochJd));
-      body.position.set(x, y, z); // Equatorial, matching buildOrbitLine and the star field.
+      const orbital = propagateOrbit(body.elements, body.gmAu3PerDay2, epochJd);
+      body.position.set(orbital.x, orbital.y, orbital.z).applyQuaternion(body.frame);
       body.marker.position.copy(body.position);
     }
 
@@ -190,8 +238,8 @@ export class SystemOrbitsRenderer {
         continue;
       }
       moon.pivot.position.copy(parent.position);
-      const { x, y, z } = eclipticToEquatorial(propagateOrbit(moon.elements, moon.gmAu3PerDay2, epochJd));
-      moon.marker.position.set(x, y, z);
+      const orbital = propagateOrbit(moon.elements, moon.gmAu3PerDay2, epochJd);
+      moon.marker.position.set(orbital.x, orbital.y, orbital.z).applyQuaternion(moon.frame);
     }
   }
 
@@ -218,28 +266,42 @@ export class SystemOrbitsRenderer {
     this.object.clear();
   }
 
-  private addTopLevelBody(id: string, kind: SystemMemberKind, elements: OrbitalElements, gmAu3PerDay2: number, radiusKm: number | undefined): TrackedTopLevelBody {
-    const orbitLine = buildOrbitLine(elements, kind);
+  private addTopLevelBody(
+    id: string,
+    kind: SystemMemberKind,
+    elements: OrbitalElements,
+    gmAu3PerDay2: number,
+    radiusKm: number | undefined,
+    frame: THREE.Quaternion
+  ): TrackedTopLevelBody {
+    const orbitLine = buildOrbitLine(elements, kind, frame);
     const marker = buildMarker(kind, radiusKm, this.maxTopLevelSemiMajorAxisAu);
     this.object.add(orbitLine, marker);
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);
     this.trackDisposable(marker.geometry, marker.material as THREE.Material);
 
-    const tracked: TrackedTopLevelBody = { id, kind, elements, gmAu3PerDay2, marker, position: new THREE.Vector3() };
+    const tracked: TrackedTopLevelBody = { id, kind, elements, gmAu3PerDay2, marker, frame, position: new THREE.Vector3() };
     this.topLevelBodies.push(tracked);
     return tracked;
   }
 
-  private addMoon(id: string, elements: OrbitalElements, gmAu3PerDay2: number, radiusKm: number | undefined, parent: TrackedTopLevelBody): TrackedMoon {
+  private addMoon(
+    id: string,
+    elements: OrbitalElements,
+    gmAu3PerDay2: number,
+    radiusKm: number | undefined,
+    parent: TrackedTopLevelBody,
+    frame: THREE.Quaternion
+  ): TrackedMoon {
     const pivot = new THREE.Group();
-    const orbitLine = buildOrbitLine(elements, 'moon');
+    const orbitLine = buildOrbitLine(elements, 'moon', frame);
     const marker = buildMarker('moon', radiusKm, this.maxTopLevelSemiMajorAxisAu);
     pivot.add(orbitLine, marker);
     this.object.add(pivot);
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);
     this.trackDisposable(marker.geometry, marker.material as THREE.Material);
 
-    const moon: TrackedMoon = { id, elements, gmAu3PerDay2, marker, pivot, parentId: parent.id };
+    const moon: TrackedMoon = { id, elements, gmAu3PerDay2, marker, frame, pivot, parentId: parent.id };
     this.moons.push(moon);
     return moon;
   }

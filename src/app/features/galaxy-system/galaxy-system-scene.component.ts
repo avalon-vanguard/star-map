@@ -15,6 +15,7 @@ import { StarRecord } from '../../shared/models/star.model';
 import { NavigationStore } from '../../shared/state/navigation.store';
 import { CameraRigController } from './camera-rig-controller';
 import { DeepSkyRenderer } from './deep-sky-renderer';
+import { starMarkerRadiusAu, systemFramingDistanceAu } from './system-framing';
 import { colorIndexToRgb, StarFieldRenderer } from './star-field-renderer';
 import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
@@ -55,15 +56,11 @@ const SYSTEM_MAX_DISTANCE_AU = 5000;
 const SYSTEM_ENTRY_DISTANCE_AU = 200;
 /** How far out (AU) the camera flies before swapping back to galaxy/parsec space. */
 const SYSTEM_EXIT_DISTANCE_AU = 400;
-const MIN_SYSTEM_FRAMING_DISTANCE_AU = 3;
-const MAX_SYSTEM_FRAMING_DISTANCE_AU = 80;
 
 const APPROACH_DURATION_SECONDS = 1.0;
 const SETTLE_DURATION_SECONDS = 0.9;
 const EXIT_DURATION_SECONDS = 0.9;
 const RETURN_DURATION_SECONDS = 1.1;
-
-const STAR_MARKER_RADIUS_AU = 0.2;
 
 /**
  * Hosts the shared galaxy + system scene: pan/zoom/rotate camera controls, click-to-select
@@ -102,7 +99,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private readonly galaxyGroup = new THREE.Group();
   private readonly systemGroup = new THREE.Group();
   private readonly starMarkerMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  private readonly starMarkerGeometry = new THREE.SphereGeometry(STAR_MARKER_RADIUS_AU, 24, 16);
+  /** Rebuilt per system, since the star's radius is derived from that system's innermost orbit. */
+  private starMarkerGeometry?: THREE.SphereGeometry;
 
   private controls?: OrbitControls;
   private rig?: CameraRigController;
@@ -157,7 +155,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.systemRenderer?.dispose();
     (this.starMarker?.material as THREE.Material | undefined)?.dispose();
     (this.starGlow?.material as THREE.SpriteMaterial | undefined)?.dispose();
-    this.starMarkerGeometry.dispose();
+    this.starMarkerGeometry?.dispose();
     this.starMarkerMaterial.dispose();
     this.engine.dispose();
   }
@@ -397,6 +395,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.systemRenderer = new SystemOrbitsRenderer(systemBodies, systemExoplanets);
     this.systemGroup.add(this.systemRenderer.object);
 
+    // Sized against this system's innermost orbit, so the star never swallows its own planets.
+    const starRadiusAu = starMarkerRadiusAu(this.systemRenderer.minTopLevelSemiMajorAxisAu);
+    this.starMarkerGeometry?.dispose();
+    this.starMarkerGeometry = new THREE.SphereGeometry(starRadiusAu, 24, 16);
+
     const starMarkerMaterial = this.starMarkerMaterial.clone();
     const starColor = colorIndexToRgb(star.colorIndex, star.spectralType);
     if (star.id === SOL_STAR_ID) {
@@ -404,10 +407,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       // other point in the galaxy view is far too distant to be resolved as a disk.
       starMarkerMaterial.map = loadCachedTexture(SUN_TEXTURE_PATH);
       starMarkerMaterial.color.set(0xffffff);
-      this.starGlow = createGlowSprite(0xfff2c0, STAR_MARKER_RADIUS_AU, SUN_GLOW_SCALE);
+      this.starGlow = createGlowSprite(0xfff2c0, starRadiusAu, SUN_GLOW_SCALE);
     } else {
       starMarkerMaterial.color.copy(starColor);
-      this.starGlow = createGlowSprite(starColor, STAR_MARKER_RADIUS_AU, SUN_GLOW_SCALE * 0.6);
+      this.starGlow = createGlowSprite(starColor, starRadiusAu, SUN_GLOW_SCALE * 0.6);
     }
     this.starMarker = new THREE.Mesh(this.starMarkerGeometry, starMarkerMaterial);
     this.systemGroup.add(this.starMarker, this.starGlow);
@@ -427,11 +430,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     this.rig!.setImmediate({ position: direction.clone().multiplyScalar(SYSTEM_ENTRY_DISTANCE_AU), target: new THREE.Vector3(0, 0, 0) });
 
-    const framingDistance = THREE.MathUtils.clamp(
-      this.systemRenderer.maxTopLevelSemiMajorAxisAu * 2.4 || MIN_SYSTEM_FRAMING_DISTANCE_AU,
-      MIN_SYSTEM_FRAMING_DISTANCE_AU,
-      MAX_SYSTEM_FRAMING_DISTANCE_AU
-    );
+    const framingDistance = systemFramingDistanceAu(this.systemRenderer.maxTopLevelSemiMajorAxisAu);
 
     this.rig!.flyTo({ position: direction.clone().multiplyScalar(framingDistance), target: new THREE.Vector3(0, 0, 0) }, SETTLE_DURATION_SECONDS, () => {
       this.currentStarId = star.id;

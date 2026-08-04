@@ -3,6 +3,7 @@ import * as THREE from 'three/webgpu';
 import { gmForParent } from '../../shared/astro/constants';
 import { isPropagatableOrbit, orbitEllipsePoints, propagateOrbit, resolveGravitationalParameter, resolveOrbitalElements } from '../../shared/astro/kepler';
 import { BodyRecord, OrbitalElements } from '../../shared/models/body.model';
+import { bodyMarkerRadiusAu } from './system-framing';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 
 export type SystemMemberKind = 'planet' | 'moon' | 'dwarf' | 'exoplanet';
@@ -27,16 +28,6 @@ const ORBIT_LINE_OPACITY_BY_KIND: Record<SystemMemberKind, number> = {
 };
 
 const EARTH_RADIUS_KM = 6371;
-const MIN_MARKER_RADIUS_AU = 0.012;
-const MAX_MARKER_RADIUS_AU = 0.09;
-
-/** Exaggerated (non-physical) marker radius so planets stay visible at AU scale. */
-function markerRadiusAu(radiusKm: number | undefined): number {
-  if (!radiusKm) {
-    return MIN_MARKER_RADIUS_AU;
-  }
-  return THREE.MathUtils.clamp(radiusKm / 18000, MIN_MARKER_RADIUS_AU, MAX_MARKER_RADIUS_AU);
-}
 
 function colorForKind(kind: SystemMemberKind): THREE.Color {
   switch (kind) {
@@ -72,8 +63,8 @@ function buildOrbitLine(elements: OrbitalElements, kind: SystemMemberKind): THRE
   return new THREE.Line(geometry, material);
 }
 
-function buildMarker(kind: SystemMemberKind, radiusKm: number | undefined): THREE.Mesh {
-  const geometry = new THREE.SphereGeometry(markerRadiusAu(radiusKm), 16, 12);
+function buildMarker(kind: SystemMemberKind, radiusKm: number | undefined, systemSpanAu: number): THREE.Mesh {
+  const geometry = new THREE.SphereGeometry(bodyMarkerRadiusAu(radiusKm, systemSpanAu), 16, 12);
   const material = new THREE.MeshBasicMaterial({ color: colorForKind(kind) });
   return new THREE.Mesh(geometry, material);
 }
@@ -108,6 +99,8 @@ export class SystemOrbitsRenderer {
   readonly members: readonly SystemMember[];
   /** Largest semi-major axis (AU) among top-level bodies/exoplanets; 0 if there are none. */
   readonly maxTopLevelSemiMajorAxisAu: number;
+  /** Smallest semi-major axis (AU) among top-level bodies/exoplanets; 0 if there are none. */
+  readonly minTopLevelSemiMajorAxisAu: number;
 
   private readonly topLevelBodies: TrackedTopLevelBody[] = [];
   private readonly moons: TrackedMoon[] = [];
@@ -116,6 +109,15 @@ export class SystemOrbitsRenderer {
   constructor(bodies: readonly BodyRecord[], exoplanets: readonly ExoplanetRecord[]) {
     const members: SystemMember[] = [];
     const topLevelBodiesById = new Map<string, BodyRecord>();
+
+    // Measured before anything is built, because marker sizes are scaled against the span and
+    // the markers are created as the bodies are added.
+    const topLevelAxes = [
+      ...bodies.filter((body) => !body.parentBodyId).map((body) => body.orbit.semiMajorAxisAu),
+      ...exoplanets.filter((exoplanet) => isPropagatableOrbit(exoplanet.orbit)).map((exoplanet) => exoplanet.orbit.semiMajorAxisAu!)
+    ].filter((axis) => Number.isFinite(axis) && axis > 0);
+    this.maxTopLevelSemiMajorAxisAu = topLevelAxes.length > 0 ? Math.max(...topLevelAxes) : 0;
+    this.minTopLevelSemiMajorAxisAu = topLevelAxes.length > 0 ? Math.min(...topLevelAxes) : 0;
 
     for (const body of bodies) {
       if (!body.parentBodyId) {
@@ -168,7 +170,6 @@ export class SystemOrbitsRenderer {
     }
 
     this.members = members;
-    this.maxTopLevelSemiMajorAxisAu = this.topLevelBodies.reduce((max, body) => Math.max(max, body.elements.semiMajorAxisAu), 0);
   }
 
   /** Recomputes every marker's position for the given Julian date. Call once per tick. */
@@ -215,7 +216,7 @@ export class SystemOrbitsRenderer {
 
   private addTopLevelBody(id: string, kind: SystemMemberKind, elements: OrbitalElements, gmAu3PerDay2: number, radiusKm: number | undefined): TrackedTopLevelBody {
     const orbitLine = buildOrbitLine(elements, kind);
-    const marker = buildMarker(kind, radiusKm);
+    const marker = buildMarker(kind, radiusKm, this.maxTopLevelSemiMajorAxisAu);
     this.object.add(orbitLine, marker);
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);
     this.trackDisposable(marker.geometry, marker.material as THREE.Material);
@@ -228,7 +229,7 @@ export class SystemOrbitsRenderer {
   private addMoon(id: string, elements: OrbitalElements, gmAu3PerDay2: number, radiusKm: number | undefined, parent: TrackedTopLevelBody): TrackedMoon {
     const pivot = new THREE.Group();
     const orbitLine = buildOrbitLine(elements, 'moon');
-    const marker = buildMarker('moon', radiusKm);
+    const marker = buildMarker('moon', radiusKm, this.maxTopLevelSemiMajorAxisAu);
     pivot.add(orbitLine, marker);
     this.object.add(pivot);
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);

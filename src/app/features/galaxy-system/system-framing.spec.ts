@@ -1,0 +1,149 @@
+import { describe, expect, it } from 'vitest';
+
+import { bodyMarkerRadiusAu, DEFAULT_STAR_MARKER_RADIUS_AU, starMarkerRadiusAu, systemFramingDistanceAu } from './system-framing';
+
+/** Real systems spanning the range the view has to cope with. */
+const TRAPPIST_1 = { innermost: 0.01154, outermost: 0.06189 };
+const GL_357 = { innermost: 0.035, outermost: 0.204 };
+const SOLAR = { innermost: 0.387, outermost: 30.07 };
+
+describe('starMarkerRadiusAu', () => {
+  it('never reaches the innermost orbit', () => {
+    for (const { innermost } of [TRAPPIST_1, GL_357, SOLAR]) {
+      expect(starMarkerRadiusAu(innermost)).toBeLessThan(innermost);
+    }
+  });
+
+  it('shrinks to fit a compact system whose orbits were all inside the old fixed radius', () => {
+    // Every TRAPPIST-1 orbit is inside 0.2 AU, so the star used to swallow the entire system.
+    expect(starMarkerRadiusAu(TRAPPIST_1.innermost)).toBeLessThan(TRAPPIST_1.outermost);
+    expect(starMarkerRadiusAu(GL_357.innermost)).toBeLessThan(GL_357.outermost);
+  });
+
+  it('never grows beyond the default, however wide the system', () => {
+    expect(starMarkerRadiusAu(SOLAR.innermost)).toBeLessThanOrEqual(DEFAULT_STAR_MARKER_RADIUS_AU);
+    expect(starMarkerRadiusAu(500)).toBe(DEFAULT_STAR_MARKER_RADIUS_AU);
+  });
+
+  it('scales in proportion to the innermost orbit', () => {
+    expect(starMarkerRadiusAu(0.02) / starMarkerRadiusAu(0.01)).toBeCloseTo(2, 9);
+  });
+
+  it('falls back to the default when there are no planets to scale against', () => {
+    for (const innermost of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(starMarkerRadiusAu(innermost)).toBe(DEFAULT_STAR_MARKER_RADIUS_AU);
+    }
+  });
+
+  it('stays positive for an extremely tight orbit', () => {
+    expect(starMarkerRadiusAu(0.0001)).toBeGreaterThan(0);
+  });
+});
+
+describe('systemFramingDistanceAu', () => {
+  it('fits the whole system in view', () => {
+    for (const { outermost } of [TRAPPIST_1, GL_357, SOLAR]) {
+      expect(systemFramingDistanceAu(outermost)).toBeGreaterThan(outermost);
+    }
+  });
+
+  it('closes right in on a compact system instead of hanging back at a fixed floor', () => {
+    // The old floor was 3 AU — some 48x the width of the entire TRAPPIST-1 system.
+    expect(systemFramingDistanceAu(TRAPPIST_1.outermost)).toBeLessThan(1);
+    expect(systemFramingDistanceAu(GL_357.outermost)).toBeLessThan(1);
+  });
+
+  it('scales in proportion to the outermost orbit', () => {
+    expect(systemFramingDistanceAu(0.2) / systemFramingDistanceAu(0.1)).toBeCloseTo(2, 9);
+  });
+
+  it('caps the distance so a far-flung companion cannot shrink the star to nothing', () => {
+    expect(systemFramingDistanceAu(1000)).toBe(systemFramingDistanceAu(5000));
+    expect(systemFramingDistanceAu(SOLAR.outermost)).toBeLessThanOrEqual(80);
+  });
+
+  it('stays outside the orbit controls minimum distance', () => {
+    // Framing closer than the controls allow would be clamped straight back out again.
+    expect(systemFramingDistanceAu(0.00001)).toBeGreaterThanOrEqual(0.05);
+  });
+
+  it('uses a sensible default for a star with no known planets', () => {
+    for (const outermost of [0, -1, Number.NaN]) {
+      expect(systemFramingDistanceAu(outermost)).toBe(3);
+    }
+  });
+});
+
+describe('star and framing together', () => {
+  it('gives compact and wide systems a comparable apparent star size', () => {
+    // Both scale with the system, so the star subtends a similar angle either way — the point
+    // of deriving them from the same measurements rather than fixing them.
+    const apparent = ({ innermost, outermost }: { innermost: number; outermost: number }) =>
+      starMarkerRadiusAu(innermost) / systemFramingDistanceAu(outermost);
+
+    const compact = apparent(TRAPPIST_1);
+    const midRange = apparent(GL_357);
+
+    expect(compact).toBeGreaterThan(0);
+    expect(compact / midRange).toBeGreaterThan(0.25);
+    expect(compact / midRange).toBeLessThan(4);
+  });
+
+  it('always leaves the innermost orbit outside the star, at every scale', () => {
+    for (const innermost of [0.005, 0.01, 0.05, 0.2, 1, 5, 40]) {
+      expect(starMarkerRadiusAu(innermost)).toBeLessThan(innermost);
+    }
+  });
+});
+
+describe('bodyMarkerRadiusAu', () => {
+  const EARTH_RADIUS_KM = 6371;
+  const SOLAR_SPAN_AU = 30.07;
+
+  it('scales in proportion to the system span', () => {
+    const wide = bodyMarkerRadiusAu(EARTH_RADIUS_KM, SOLAR_SPAN_AU);
+    const compact = bodyMarkerRadiusAu(EARTH_RADIUS_KM, SOLAR_SPAN_AU / 100);
+
+    expect(compact / wide).toBeCloseTo(0.01, 6);
+  });
+
+  it('keeps a marker far smaller than the orbits it sits on, at any scale', () => {
+    // A fixed 0.09 AU marker inside Gl 357's 0.204 AU system was wider than the orbits, so one
+    // planet swallowed the whole view.
+    for (const span of [0.06, 0.204, 1, 30.07, 800]) {
+      expect(bodyMarkerRadiusAu(EARTH_RADIUS_KM, span)).toBeLessThan(span / 5);
+    }
+  });
+
+  it('gives compact and wide systems the same apparent marker size', () => {
+    const apparent = (span: number) => bodyMarkerRadiusAu(EARTH_RADIUS_KM, span) / systemFramingDistanceAu(span);
+
+    expect(apparent(0.204)).toBeCloseTo(apparent(10), 6);
+  });
+
+  it('still renders a bigger body as a bigger marker', () => {
+    const jupiter = bodyMarkerRadiusAu(69911, SOLAR_SPAN_AU);
+    const pluto = bodyMarkerRadiusAu(1188, SOLAR_SPAN_AU);
+
+    expect(jupiter).toBeGreaterThan(pluto);
+  });
+
+  it('falls back to the smallest marker for a body with no known radius', () => {
+    const unknown = bodyMarkerRadiusAu(undefined, SOLAR_SPAN_AU);
+    const pluto = bodyMarkerRadiusAu(1188, SOLAR_SPAN_AU);
+
+    expect(unknown).toBeGreaterThan(0);
+    expect(unknown).toBeLessThanOrEqual(pluto);
+  });
+
+  it('treats a missing span as the reference scale rather than collapsing to zero', () => {
+    for (const span of [0, -5, Number.NaN]) {
+      expect(bodyMarkerRadiusAu(EARTH_RADIUS_KM, span)).toBeGreaterThan(0);
+    }
+  });
+
+  it('leaves the solar system essentially as it was before scaling', () => {
+    // The constants were tuned at this span, so the scale factor here is ~1.
+    expect(bodyMarkerRadiusAu(EARTH_RADIUS_KM, SOLAR_SPAN_AU)).toBeCloseTo(0.09, 2);
+  });
+});

@@ -169,6 +169,11 @@ export class SystemOrbitsRenderer {
    * frame: the ecliptic for the solar system, the plane of the sky for everything else.
    */
   readonly referenceFrame: THREE.Quaternion;
+  /**
+   * Outer radius (AU) of the reference grid, or 0 where there is none. This — not the outermost
+   * orbit — is the widest thing the system draws, so it is what the camera has to frame.
+   */
+  readonly gridOuterRadiusAu: number;
 
   private readonly topLevelBodies: TrackedTopLevelBody[] = [];
   private readonly moons: TrackedMoon[] = [];
@@ -266,6 +271,7 @@ export class SystemOrbitsRenderer {
     this.referenceFrame = bodies.some((body) => !body.parentBodyId) ? ECLIPTIC_FRAME.clone() : exoplanetFrame;
 
     const rings = systemGridRingsAu(this.maxTopLevelSemiMajorAxisAu);
+    this.gridOuterRadiusAu = rings.length > 0 ? rings[rings.length - 1] : 0;
     if (rings.length > 0) {
       this.grid = new PolarGridPlane({
         ringRadii: rings,

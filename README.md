@@ -46,7 +46,9 @@ stars get their confirmed exoplanets. Orbits are drawn as ellipses and bodies ar
 along them by a Kepler solver against the current epoch. Under them, a dashed grid marks out
 round distances in AU — 5 AU rings for the solar system, 0.01 AU rings for TRAPPIST-1 — with a
 drop line from each body, so eccentricity and inclination read against a circular reference
-instead of having to be inferred from a shape in space.
+instead of having to be inferred from a shape in space. The camera frames that grid rather than
+the orbits, from the field of view it actually has, so the outermost ring sits inside the frame
+with room around it at any system scale and any window shape.
 
 **Body detail** — a dedicated close-up scene and info panel for one planet, moon or exoplanet,
 with real photography where NASA/ESA/USGS imagery exists, and a surface derived from the body's

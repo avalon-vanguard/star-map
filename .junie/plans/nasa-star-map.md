@@ -306,3 +306,8 @@ Real photography where it exists, and a surface reasoned from measurements where
 - Derive equilibrium temperature and bulk density from it, and classify each world by size, temperature and density; validate against the solar system's own bodies.
 - Paint the surface procedurally from that class, seeded per body so it is stable between visits, and apply it in both the body-detail view and the system-view markers.
 - State the derivation and its limits on screen, next to the measurements it rests on.
+
+### ✓ Step 10: Frame the system view from the camera it actually has
+- Replace the fixed distance-to-outermost-orbit multiple with a distance derived from the camera's vertical field of view and aspect, so what fits is a radius on screen rather than a guess.
+- Frame against the reference grid's outer ring, which is always wider than the outermost orbit, and leave an explicit margin around it.
+- Raise the framing ceiling far enough to hold the solar system out to Pluto in a portrait window; only companions hundreds of AU out reach it now.

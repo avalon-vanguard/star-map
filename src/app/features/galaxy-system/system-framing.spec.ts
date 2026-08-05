@@ -6,8 +6,10 @@ import {
   bodyMarkerRadiusAu,
   DEFAULT_STAR_MARKER_RADIUS_AU,
   starMarkerRadiusAu,
+  systemFrameRadiusAu,
   systemFramingDistanceAu,
   systemGridRingsAu,
+  SystemViewport,
   SYSTEM_VIEW_DIRECTION_IN_PLANE,
   systemViewDirection
 } from './system-framing';
@@ -51,9 +53,9 @@ describe('starMarkerRadiusAu', () => {
 });
 
 describe('systemFramingDistanceAu', () => {
-  it('fits the whole system in view', () => {
-    for (const { outermost } of [TRAPPIST_1, GL_357, SOLAR]) {
-      expect(systemFramingDistanceAu(outermost)).toBeGreaterThan(outermost);
+  it('fits the radius it is given in view, with room around it', () => {
+    for (const radius of [TRAPPIST_1.outermost, GL_357.outermost, SOLAR.outermost]) {
+      expect(systemFrameRadiusAu(systemFramingDistanceAu(radius))).toBeGreaterThan(radius);
     }
   });
 
@@ -63,13 +65,39 @@ describe('systemFramingDistanceAu', () => {
     expect(systemFramingDistanceAu(GL_357.outermost)).toBeLessThan(1);
   });
 
-  it('scales in proportion to the outermost orbit', () => {
+  it('scales in proportion to the radius it has to frame', () => {
     expect(systemFramingDistanceAu(0.2) / systemFramingDistanceAu(0.1)).toBeCloseTo(2, 9);
+  });
+
+  it('backs off further for a narrower field of view, which a fixed multiple could not', () => {
+    // The bug this replaced: the multiple was tuned by eye against a 55-degree field and the
+    // engine's camera is 50, so everything sat that much too close.
+    const wide = systemFramingDistanceAu(1, { fovDegrees: 70, aspect: 1.78 });
+    const narrow = systemFramingDistanceAu(1, { fovDegrees: 30, aspect: 1.78 });
+    expect(narrow).toBeGreaterThan(wide);
+  });
+
+  it('backs off further for a portrait window, where the horizontal axis is the tighter one', () => {
+    const landscape = systemFramingDistanceAu(1, { fovDegrees: 50, aspect: 1.78 });
+    const portrait = systemFramingDistanceAu(1, { fovDegrees: 50, aspect: 0.6 });
+    expect(portrait).toBeCloseTo(landscape / 0.6, 6);
+  });
+
+  it('ignores aspect once the window is landscape, since the vertical binds there', () => {
+    const square = systemFramingDistanceAu(1, { fovDegrees: 50, aspect: 1 });
+    expect(systemFramingDistanceAu(1, { fovDegrees: 50, aspect: 2.5 })).toBeCloseTo(square, 9);
   });
 
   it('caps the distance so a far-flung companion cannot shrink the star to nothing', () => {
     expect(systemFramingDistanceAu(1000)).toBe(systemFramingDistanceAu(5000));
-    expect(systemFramingDistanceAu(SOLAR.outermost)).toBeLessThanOrEqual(80);
+  });
+
+  it('reaches far enough to frame the solar system out to Pluto', () => {
+    // The old 80 AU ceiling could not: at the camera's real field of view this needs 120.
+    const rings = systemGridRingsAu(39.288);
+    const distance = systemFramingDistanceAu(rings[rings.length - 1]);
+    expect(distance).toBeLessThan(200);
+    expect(systemFrameRadiusAu(distance)).toBeGreaterThan(39.288);
   });
 
   it('stays outside the orbit controls minimum distance', () => {
@@ -78,8 +106,50 @@ describe('systemFramingDistanceAu', () => {
   });
 
   it('uses a sensible default for a star with no known planets', () => {
-    for (const outermost of [0, -1, Number.NaN]) {
-      expect(systemFramingDistanceAu(outermost)).toBe(3);
+    for (const radius of [0, -1, Number.NaN]) {
+      expect(systemFramingDistanceAu(radius)).toBe(3);
+    }
+  });
+});
+
+describe('the grid and the framing together', () => {
+  /** What the scene actually composes: rings from the orbits, then a distance from the rings. */
+  function fit(outermostOrbitAu: number, viewport?: SystemViewport): { ring: number; frame: number } {
+    const rings = systemGridRingsAu(outermostOrbitAu);
+    const ring = rings[rings.length - 1];
+    return { ring, frame: systemFrameRadiusAu(systemFramingDistanceAu(ring, viewport), viewport) };
+  }
+
+  const VIEWPORTS: SystemViewport[] = [
+    { fovDegrees: 50, aspect: 1.78 },
+    { fovDegrees: 50, aspect: 1 },
+    { fovDegrees: 50, aspect: 0.6 }
+  ];
+
+  it('leaves the outermost ring clear of the frame edge at every scale and window shape', () => {
+    // The whole point of framing against the grid rather than the orbits: before this, 368 of
+    // the 371 systems in the datasets drew a grid wider than the view that was meant to hold it.
+    for (const viewport of VIEWPORTS) {
+      for (const { outermost } of [TRAPPIST_1, GL_357, SOLAR, { outermost: 1 }, { outermost: 12.4 }]) {
+        const { ring, frame } = fit(outermost, viewport);
+        expect(ring).toBeLessThan(frame);
+        expect(ring / frame).toBeLessThan(0.93);
+      }
+    }
+  });
+
+  it('still encloses the outermost orbit, so no planet sits off the edge of the grid', () => {
+    for (const { outermost } of [TRAPPIST_1, GL_357, SOLAR, { outermost: 1 }, { outermost: 12.4 }]) {
+      expect(fit(outermost).ring).toBeGreaterThan(outermost);
+    }
+  });
+
+  it('does not overshoot either: the grid still fills most of the frame', () => {
+    // A margin is not the same as framing a system from orbit. Half the frame empty would be as
+    // wrong as none of it.
+    for (const { outermost } of [TRAPPIST_1, GL_357, SOLAR]) {
+      const { ring, frame } = fit(outermost);
+      expect(ring / frame).toBeGreaterThan(0.6);
     }
   });
 });

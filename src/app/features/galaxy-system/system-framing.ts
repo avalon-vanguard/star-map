@@ -27,8 +27,30 @@ export const DEFAULT_STAR_MARKER_RADIUS_AU = 0.2;
  */
 const STAR_RADIUS_TO_INNERMOST_ORBIT = 0.35;
 
-/** Camera distance as a multiple of the outermost orbit, so the whole system fits in view. */
-const FRAMING_TO_OUTERMOST_ORBIT = 2.4;
+/**
+ * Clear space left around the framed radius, as a fraction of it. The camera backs off this
+ * much further than the geometry strictly needs, so the outermost ring sits inside the frame
+ * with room around it rather than grazing the edge.
+ */
+const FRAME_MARGIN = 0.12;
+
+/**
+ * The camera the system view is framed for. The vertical field of view is what
+ * `EngineService` creates its camera with; the aspect decides which screen axis is the tighter
+ * one, since a perspective camera's `fov` is vertical and the horizontal extent scales with the
+ * aspect. Anything landscape is bound by the vertical, anything portrait by the horizontal.
+ */
+export interface SystemViewport {
+  fovDegrees: number;
+  aspect: number;
+}
+
+export const DEFAULT_SYSTEM_VIEWPORT: SystemViewport = { fovDegrees: 50, aspect: 1 };
+
+/** Half-angle tangent along whichever screen axis is the tighter of the two. */
+function tightHalfExtent(viewport: SystemViewport): number {
+  return Math.tan((viewport.fovDegrees * Math.PI) / 360) * Math.min(1, viewport.aspect);
+}
 
 /**
  * Floor on the framing distance. Only guards the degenerate case — it sits just above the
@@ -36,8 +58,16 @@ const FRAMING_TO_OUTERMOST_ORBIT = 2.4;
  */
 const MIN_FRAMING_DISTANCE_AU = 0.06;
 
-/** Ceiling on the framing distance, so a distant companion does not push the star to a dot. */
-const MAX_FRAMING_DISTANCE_AU = 80;
+/**
+ * Ceiling on the framing distance, so a distant companion does not push the star to a dot.
+ *
+ * Generous enough to frame the solar system out to Pluto in any window shape, which needs 120 AU
+ * on a landscape display and 140 on a portrait one once the camera's real field of view is
+ * accounted for. Only genuinely pathological systems reach it now — the handful with
+ * directly-imaged companions hundreds of AU out — and those still arrive framed on their inner
+ * region, with the orbit controls reaching far enough to pull back to the rest.
+ */
+const MAX_FRAMING_DISTANCE_AU = 200;
 
 /** Framing for a star with no known planets, where there is nothing to fit. */
 const EMPTY_SYSTEM_FRAMING_DISTANCE_AU = 3;
@@ -88,14 +118,32 @@ export function starMarkerRadiusAu(innermostOrbitAu: number): number {
 }
 
 /**
- * Distance (AU) to settle the camera at, given the system's outermost orbit — far enough that
- * every orbit fits in frame, close enough that a compact system is not a cluster of specks.
+ * Radius, in AU, that the camera can see at the star's own distance — the half-height of the
+ * view frustum where the system sits, along whichever screen axis is tighter.
  */
-export function systemFramingDistanceAu(outermostOrbitAu: number): number {
-  if (!Number.isFinite(outermostOrbitAu) || outermostOrbitAu <= 0) {
+export function systemFrameRadiusAu(distanceAu: number, viewport: SystemViewport = DEFAULT_SYSTEM_VIEWPORT): number {
+  return distanceAu * tightHalfExtent(viewport);
+}
+
+/**
+ * Distance (AU) to settle the camera at so that `framedRadiusAu` fits in view with a margin
+ * around it.
+ *
+ * Derived from the camera's actual field of view rather than from a multiple of the outermost
+ * orbit. A plain multiple cannot be right: what has to fit is a *radius* on screen, and how much
+ * radius a given distance buys depends entirely on the lens. The multiple that used to be here
+ * was tuned by eye against a 55-degree field, and the engine's camera is 50 — which left the
+ * grid overflowing the frame in 368 of the 371 systems the datasets contain.
+ *
+ * Callers pass the outermost thing actually drawn, which is the reference grid's outer ring
+ * rather than the outermost orbit — the ring is always the wider of the two, by construction.
+ */
+export function systemFramingDistanceAu(framedRadiusAu: number, viewport: SystemViewport = DEFAULT_SYSTEM_VIEWPORT): number {
+  if (!Number.isFinite(framedRadiusAu) || framedRadiusAu <= 0) {
     return EMPTY_SYSTEM_FRAMING_DISTANCE_AU;
   }
-  return clamp(outermostOrbitAu * FRAMING_TO_OUTERMOST_ORBIT, MIN_FRAMING_DISTANCE_AU, MAX_FRAMING_DISTANCE_AU);
+  const required = (framedRadiusAu * (1 + FRAME_MARGIN)) / tightHalfExtent(viewport);
+  return clamp(required, MIN_FRAMING_DISTANCE_AU, MAX_FRAMING_DISTANCE_AU);
 }
 
 /** Roughly how many rings the system grid aims for, and how far past the outermost orbit it runs. */

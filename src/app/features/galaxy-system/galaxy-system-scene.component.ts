@@ -733,7 +733,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     this.rig!.setImmediate({ position: direction.clone().multiplyScalar(SYSTEM_ENTRY_DISTANCE_AU), target: new THREE.Vector3(0, 0, 0) });
 
-    const framingDistance = systemFramingDistanceAu(this.systemRenderer.maxTopLevelSemiMajorAxisAu);
+    // Framed against the grid's outer ring rather than the outermost orbit — the ring is always
+    // the wider of the two — and against the camera this scene actually has, so the margin holds
+    // whatever the window shape.
+    const framingDistance = systemFramingDistanceAu(this.systemRenderer.gridOuterRadiusAu, { fovDegrees: camera.fov, aspect: camera.aspect });
     // Arrives along whichever direction the approach came from, then swings round to look down
     // on this system's own orbital plane as it settles — so the swap stays continuous but the
     // system is not presented edge-on. See `systemViewDirection`.

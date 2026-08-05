@@ -38,12 +38,17 @@ const PICK_NDC_SLOP = 0.01;
  * So the *data* is the catalogue and the *drawing* is a budget, and the two are allowed to
  * differ. Everything still exists for search, for flying to, and for hosting planets.
  *
- * The figure is set low deliberately. A real GPU would draw the whole catalogue without
- * noticing — this is one instanced draw call — but the value that matters is what a weak one
- * does, and the software rasterizer this was measured against costs a third of its frame rate
- * per 12000 stars. Raise it freely on hardware that can take it; nothing else depends on it.
+ * Currently set to the whole catalogue, which is what a GPU should be asked to do — this is one
+ * instanced draw call, and a discrete card will not notice it. The budget still exists because
+ * the catalogue is meant to grow past what any machine should draw at once: Gaia alone could
+ * contribute a million stars, and at that point the selection below is what keeps the field
+ * legible rather than a grey wash.
+ *
+ * Machines without a GPU do feel it. A software rasterizer measured here lost about a third of
+ * its frame rate per 12000 stars drawn; if that matters for a deployment, this is the one number
+ * to turn down.
  */
-export const STAR_RENDER_BUDGET = 12000;
+export const STAR_RENDER_BUDGET = 68388;
 
 /**
  * Radius (parsecs) inside which every star is drawn regardless of brightness.
@@ -128,6 +133,20 @@ function createQuadGeometry(instanceCount: number): THREE.InstancedBufferGeometr
  * them. Returns them in catalogue order rather than in selection order, purely so the drawn set
  * is stable and inspectable.
  */
+/**
+ * Reads a render budget override off the page URL (`?stars=20000`), falling back to the default.
+ *
+ * Two uses, one real and one incidental. The real one is a deployment or a machine that cannot
+ * draw the whole catalogue — a number in a URL beats a rebuild. The incidental one is the
+ * end-to-end suite, which runs against a software rasterizer whose frame rate is two orders of
+ * magnitude below a real GPU's: those tests are checking navigation and state, and making them
+ * wait on a rasterizer measures nothing about the app.
+ */
+export function starRenderBudgetFromUrl(search: string, fallback = STAR_RENDER_BUDGET): number {
+  const requested = Number(new URLSearchParams(search).get('stars'));
+  return Number.isFinite(requested) && requested > 0 ? Math.floor(requested) : fallback;
+}
+
 export function selectDrawnStars(stars: readonly StarRecord[], budget = STAR_RENDER_BUDGET): Uint32Array {
   if (stars.length <= budget) {
     return Uint32Array.from(stars.keys());

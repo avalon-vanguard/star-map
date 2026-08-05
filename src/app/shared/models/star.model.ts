@@ -20,6 +20,12 @@ export interface StarRecord {
    * `colorIndexToRgb`.
    */
   colorIndex: number | null;
+  /**
+   * Which catalogue this star's position came from, once more than one contributes. Absent for a
+   * single-source build; see `star-merge.ts`, where overlapping catalogues are reconciled and
+   * the better-measured parallax wins.
+   */
+  source?: string;
 }
 
 /** HYG id used for the Sun itself, so solar-system bodies can reference their host star. */

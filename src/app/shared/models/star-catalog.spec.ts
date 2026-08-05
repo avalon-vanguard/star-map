@@ -54,9 +54,13 @@ describe('encodeStarCatalog / decodeStarCatalog', () => {
   });
 
   it('keeps the index free of anything that is not a string, since the numbers are elsewhere', () => {
-    expect(Object.keys(encoded.index).sort()).toEqual(['count', 'names', 'spectralTypes']);
     expect(encoded.index.count).toBe(STARS.length);
     expect(encoded.index.names).toEqual(STARS.map((star) => star.name));
+  });
+
+  it('writes no per-star source column when every star came from the same place', () => {
+    // It would be a couple of hundred kilobytes to say nothing.
+    expect(encoded.index.sourceIndices).toEqual([]);
   });
 
   it('is smaller than the array of objects it replaced', () => {
@@ -89,5 +93,42 @@ describe('encodeStarCatalog / decodeStarCatalog', () => {
 
     expect(round[4999].spectralType).toBe('S4999');
     expect(round[4999].id).toBe(4999);
+  });
+});
+
+
+describe('star catalogue provenance and derived names', () => {
+  const MIXED: StarRecord[] = [
+    { id: 5, name: 'Sirius', x: 1, y: 0, z: 0, magnitude: -1.4, spectralType: 'A0', colorIndex: 0.0, source: 'hyg' },
+    // A survey star with no name of its own: what it is called is its catalogue designation.
+    { id: 900, name: 'Gaia DR3 900', x: 0, y: 2, z: 0, magnitude: 11, spectralType: 'Unknown', colorIndex: 1.2, source: 'gaia' },
+    { id: 901, name: 'Gaia DR3 901', x: 0, y: 0, z: 3, magnitude: 11.5, spectralType: 'Unknown', colorIndex: 1.3, source: 'gaia' }
+  ];
+
+  const encoded = encodeStarCatalog(MIXED);
+  const decoded = decodeStarCatalog(encoded.index, encoded.positions, encoded.meta);
+
+  it('stores nothing for a name that is just the catalogue designation', () => {
+    // 25 bytes per star, per million stars, to repeat what two adjacent fields already say.
+    expect(encoded.index.names).toEqual(['Sirius', '', '']);
+  });
+
+  it('regenerates those names exactly on the way back', () => {
+    expect(decoded.map((star) => star.name)).toEqual(['Sirius', 'Gaia DR3 900', 'Gaia DR3 901']);
+  });
+
+  it('carries each star provenance through', () => {
+    expect(decoded.map((star) => star.source)).toEqual(['hyg', 'gaia', 'gaia']);
+  });
+
+  it('writes the source column only once the stars differ', () => {
+    expect(encoded.index.sources.map((source) => source.id)).toEqual(['hyg', 'gaia']);
+    expect(encoded.index.sourceIndices).toEqual([0, 1, 1]);
+  });
+
+  it('keeps a real name even when the star has a source that could generate one', () => {
+    const named = encodeStarCatalog([{ ...MIXED[1], name: 'Some Proper Name' }]);
+    expect(named.index.names).toEqual(['Some Proper Name']);
+    expect(decodeStarCatalog(named.index, named.positions, named.meta)[0].name).toBe('Some Proper Name');
   });
 });

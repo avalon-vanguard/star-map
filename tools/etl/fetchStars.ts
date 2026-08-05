@@ -1,8 +1,11 @@
 import { writeFileSync } from 'node:fs';
 
 import { raDecDistanceToXyz } from '../../src/app/shared/astro/coordinates';
+import { mergeStarCatalogues } from '../../src/app/shared/astro/star-merge';
 import { encodeStarCatalog } from '../../src/app/shared/models/star-catalog';
 import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model';
+import { positionalSources } from './sources/registry';
+import { PARALLAX_PRECISION_MAS } from './sources/star-sources';
 import { parseCsvObjects, parseOptionalNumber } from './lib/csv';
 import { fetchTextCached } from './lib/http';
 import { dataPath, ensureDataDir } from './lib/paths';
@@ -100,10 +103,50 @@ export async function fetchStars(): Promise<StarRecord[]> {
     });
   }
 
-  stars.sort((a, b) => a.id - b.id);
-  writeStarAssets(stars);
-
   console.log(`  kept ${stars.length} stars (of ${rows.length} in the catalog).`);
+
+  const merged = await mergeWithOtherSources(stars);
+  merged.sort((a, b) => a.id - b.id);
+  writeStarAssets(merged);
+  return merged;
+}
+
+/**
+ * Unions HYG with every other positional source that is wired in and reachable.
+ *
+ * A source that cannot be reached is reported and skipped rather than failing the run. That is
+ * not defensive padding: the archives this would draw on are frequently unavailable, and a build
+ * that produces a smaller catalogue is far better than one that produces none.
+ */
+async function mergeWithOtherSources(hygStars: StarRecord[]): Promise<StarRecord[]> {
+  const others = positionalSources().filter((source) => source.id !== 'hyg');
+  if (others.length === 0) {
+    return hygStars;
+  }
+
+  const candidates = [{ sourceId: 'hyg', parallaxPrecisionMas: PARALLAX_PRECISION_MAS['hyg'], stars: hygStars }];
+
+  for (const source of others) {
+    try {
+      candidates.push({
+        sourceId: source.id,
+        parallaxPrecisionMas: PARALLAX_PRECISION_MAS[source.id] ?? 1,
+        stars: await source.fetch!()
+      });
+    } catch (error) {
+      console.log(`  skipping ${source.name}: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+
+  if (candidates.length === 1) {
+    return hygStars;
+  }
+
+  const { stars, summary } = mergeStarCatalogues(candidates);
+  console.log(`  merged ${summary.total} stars from ${candidates.length} catalogues (${summary.duplicates} duplicates resolved to the better parallax):`);
+  for (const [sourceId, count] of Object.entries(summary.bySource)) {
+    console.log(`    ${sourceId}: ${count}`);
+  }
   return stars;
 }
 

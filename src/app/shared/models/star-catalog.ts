@@ -37,11 +37,41 @@ export const BYTES_PER_STAR_META =
 /** `stars-index.json`: everything that is a string, plus the count the columns are sized by. */
 export interface StarCatalogIndex {
   count: number;
-  /** One per star, in catalogue order. */
+  /**
+   * One per star, in catalogue order — but empty where the name is simply the star's catalogue
+   * designation, which is regenerated on load from the source and the id.
+   *
+   * A survey-scale catalogue has no proper names to speak of. Gaia's designations are its
+   * 19-digit source ids, so writing "Gaia DR3 4472832130942575872" once per star would cost
+   * 25 MB per million stars — more than the whole rest of the catalogue — to store a string that
+   * is already implied by two fields next to it. An empty entry costs three bytes.
+   *
+   * Dense with holes rather than a list of pairs, because which one is smaller depends entirely
+   * on the catalogue: every HYG star has a designation worth keeping, and paying an index per
+   * entry to say so would be 60% larger than just writing them in order.
+   */
   names: string[];
   /** Distinct spectral classifications; the meta column holds indices into this. */
   spectralTypes: string[];
+  /**
+   * Distinct source ids, in the same dictionary form as the spectral types, plus the designation
+   * prefix each one names its unnamed stars with.
+   */
+  sources: { id: string; designationPrefix: string }[];
+  /**
+   * One per star: an index into `sources`. Empty when every star came from the same place, which
+   * would otherwise cost a couple of hundred kilobytes to say nothing.
+   */
+  sourceIndices: number[];
 }
+
+/**
+ * How a source names a star that has no name of its own. `Gaia DR3 <id>` for Gaia; HYG's own
+ * fallbacks already produce real designations, so it never needs this.
+ */
+const DESIGNATION_PREFIXES: Readonly<Record<string, string>> = {
+  gaia: 'Gaia DR3'
+};
 
 interface StarMetaColumns {
   ids: Int32Array;
@@ -85,13 +115,29 @@ export function encodeStarCatalog(stars: readonly StarRecord[]): {
   const spectralTypes: string[] = [];
   const spectralTypeIds = new Map<string, number>();
   const names: string[] = [];
+  const sources: { id: string; designationPrefix: string }[] = [];
+  const sourceIds = new Map<string, number>();
+  const sourceIndices: number[] = [];
 
   stars.forEach((star, index) => {
     positions[index * 3] = star.x;
     positions[index * 3 + 1] = star.y;
     positions[index * 3 + 2] = star.z;
 
-    names.push(star.name);
+    let sourceIndex = -1;
+    if (star.source !== undefined) {
+      const known = sourceIds.get(star.source);
+      if (known === undefined) {
+        sourceIndex = sources.push({ id: star.source, designationPrefix: DESIGNATION_PREFIXES[star.source] ?? star.source }) - 1;
+        sourceIds.set(star.source, sourceIndex);
+      } else {
+        sourceIndex = known;
+      }
+    }
+    sourceIndices.push(sourceIndex);
+
+    // Left empty when it is simply the designation the source would generate anyway.
+    names.push(star.name === designationFor(sources[sourceIndex]?.designationPrefix, star.id) ? '' : star.name);
 
     let spectralTypeId = spectralTypeIds.get(star.spectralType);
     if (spectralTypeId === undefined) {
@@ -105,7 +151,14 @@ export function encodeStarCatalog(stars: readonly StarRecord[]): {
     columns.spectralTypeIndices[index] = spectralTypeId;
   });
 
-  return { index: { count, names, spectralTypes }, positions, meta };
+  // A per-star column is only worth writing when the stars actually differ.
+  const mixedSources = sources.length > 1;
+  return { index: { count, names, spectralTypes, sources, sourceIndices: mixedSources ? sourceIndices : [] }, positions, meta };
+}
+
+/** The name a source gives a star it has no other name for. */
+function designationFor(prefix: string | undefined, id: number): string | undefined {
+  return prefix === undefined ? undefined : `${prefix} ${id}`;
 }
 
 /** Rebuilds the star records the app works with from the three loaded assets. */
@@ -115,15 +168,20 @@ export function decodeStarCatalog(index: StarCatalogIndex, positions: Float32Arr
 
   for (let i = 0; i < index.count; i++) {
     const colorIndex = columns.colorIndices[i];
+    const id = columns.ids[i];
+    const sourceIndex = index.sourceIndices.length > 0 ? index.sourceIndices[i] : index.sources.length === 1 ? 0 : -1;
+    const source = index.sources[sourceIndex];
+
     stars[i] = {
-      id: columns.ids[i],
-      name: index.names[i],
+      id,
+      name: index.names[i] || designationFor(source?.designationPrefix, id) || `HYG ${id}`,
       x: positions[i * 3],
       y: positions[i * 3 + 1],
       z: positions[i * 3 + 2],
       magnitude: columns.magnitudes[i],
       spectralType: index.spectralTypes[columns.spectralTypeIndices[i]],
-      colorIndex: Number.isNaN(colorIndex) ? null : colorIndex
+      colorIndex: Number.isNaN(colorIndex) ? null : colorIndex,
+      ...(source ? { source: source.id } : {})
     };
   }
 

@@ -9,6 +9,7 @@ import { fetchExoplanets } from './fetchExoplanets';
 import { fetchSolarSystem } from './fetchSolarSystem';
 import { BYTES_PER_STAR_META, BYTES_PER_STAR_POSITION, decodeStarCatalog, encodeStarCatalog } from '../../src/app/shared/models/star-catalog';
 import { fetchStars } from './fetchStars';
+import { describeSources } from './sources/registry';
 import { rematchHostStars } from '../../src/app/shared/astro/host-star-matching';
 import { dataPath } from './lib/paths';
 
@@ -147,6 +148,9 @@ function validateDeepSky(objects: DeepSkyRecord[]): void {
  */
 async function build(): Promise<void> {
   console.log('=== NASA star map ETL ===\n');
+  console.log('Catalogues:');
+  console.log(describeSources());
+  console.log();
 
   const stars = await fetchStars();
   console.log();

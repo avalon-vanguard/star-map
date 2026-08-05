@@ -169,7 +169,7 @@ re-runs are cheap and offline-friendly; set `ETL_FORCE_REFRESH=1` to bypass the 
 
 | Script | Source | Output |
 | --- | --- | --- |
-| `fetchStars.ts` | HYG database (Hipparcos/Yale/Gliese) | `stars.bin`, `stars-meta.bin`, `stars-index.json` |
+| `fetchStars.ts` | HYG database, plus any other positional catalogue wired in (see below) | `stars.bin`, `stars-meta.bin`, `stars-index.json` |
 | `fetchSolarSystem.ts` | JPL Horizons / SSD | `bodies.json` |
 | `fetchExoplanets.ts` | NASA Exoplanet Archive (TAP) | `exoplanets.json` |
 | `fetchDeepSky.ts` | OpenNGC | `deepsky.json` |
@@ -184,6 +184,40 @@ dictionary. The result is 2.6 MB for 7.8× the stars. `star-catalog.ts` defines 
 and both the ETL and the app use it, so the writer and the reader cannot drift apart.
 
 `ETL_STAR_DISTANCE_PC` (default `250`) sets the star-field distance cutoff.
+
+### On aggregating other surveys
+
+`tools/etl/sources/registry.ts` lists every catalogue the pipeline knows about, and `npm run etl`
+prints it. Sources are wired in by role, because the roles are not interchangeable:
+
+| Source | Role | What it adds |
+| --- | --- | --- |
+| HYG | positional | The named, spectrally classified bright-star spine — 68 388 stars within 250 pc. |
+| Gaia DR3 | positional | Parallaxes fifty times more precise, for 1.8 billion sources. |
+| DECaPS2 | backdrop | 3.32 billion objects across the southern galactic plane. |
+| SDSS-V Milky Way Mapper | enrichment | Spectroscopic temperatures, gravities, metallicities, radial velocities. |
+| Euclid Bulge Survey (Q2) | backdrop | High-resolution imagery and astrometry of the inner bulge. |
+| SAGA | enrichment | Compiled elemental abundances for metal-poor stars. |
+
+The distinction that matters is not size — it is whether a catalogue knows how **far away** its
+objects are, because a 3D map cannot place a star it only has a direction for. **Gaia is the only
+one of these that can add stars to this map**, because it is the only one that measures
+parallaxes. DECaPS2 has fifty times Gaia's object count and photometry alone: not one of its
+3.32 billion objects can be placed in depth, so it can only ever be a direction-only backdrop
+beside the deep-sky shell. Euclid's bulge sits 8 kpc away, where a parallax is microarcseconds —
+its natural contribution here is imagery, not positions. SDSS-V and SAGA are keyed to stars
+another catalogue already places; they enrich what is there and cannot extend it.
+
+Where two positional catalogues overlap they are reconciled by `star-merge.ts`, which matches on
+**direction** rather than on 3D proximity. Two surveys agree on a star's direction to within an
+arcsecond and disagree on its distance by tens of per cent — so a star at 200 pc can be 50 pc
+from itself between catalogues while being unmistakably the same object. Where both have a star,
+the one with the better parallax wins; where only one reaches, the star is still there.
+
+Only HYG has ever run. Every ESA, NOIRLab, SDSS and Euclid endpoint is unreachable from the
+environment this was developed in, so the Gaia query is written against the published DR3 schema
+and has not been executed against it. A source that cannot be reached is reported and skipped
+rather than failing the build.
 
 ### On how many stars
 

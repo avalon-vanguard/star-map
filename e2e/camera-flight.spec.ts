@@ -9,7 +9,10 @@ test.describe('Camera-flight transitions (click-to-select)', () => {
     // per-test budget covers that only just, and stopped covering it once a second flight-heavy
     // spec started running alongside this one.
     test.setTimeout(90_000);
-    await page.goto('/');
+    // A reduced star field, because this suite runs against a software rasterizer two orders of
+    // magnitude slower than a GPU, and what is under test here is the navigation state machine
+    // rather than how fast 68388 sprites rasterize. See `starRenderBudgetFromUrl`.
+    await page.goto('/?stars=4000');
 
     const canvas = page.getByTestId('scene-canvas');
     await expect(canvas).toBeVisible();

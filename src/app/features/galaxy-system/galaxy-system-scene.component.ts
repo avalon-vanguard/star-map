@@ -21,7 +21,7 @@ import { galacticNormal, PolarGridPlane, TetherField } from './grid-plane';
 import { MilkyWayRenderer } from './milky-way-renderer';
 import { starGlowExtentAu, starMarkerRadiusAu, systemFrameRadiusAu, systemFramingDistanceAu, systemViewDirection } from './system-framing';
 import { HudReadout, StarmapHudComponent } from './starmap-hud.component';
-import { colorIndexToRgb, StarFieldRenderer } from './star-field-renderer';
+import { colorIndexToRgb, StarFieldRenderer, starRenderBudgetFromUrl } from './star-field-renderer';
 import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
 
@@ -340,7 +340,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.bodies = bodies;
     this.exoplanets = exoplanets;
 
-    this.starField = new StarFieldRenderer(stars, positions);
+    this.starField = new StarFieldRenderer(stars, positions, starRenderBudgetFromUrl(window.location.search));
     this.galaxyGroup.add(this.starField.object);
 
     this.milkyWay = new MilkyWayRenderer();

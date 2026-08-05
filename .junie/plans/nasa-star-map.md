@@ -318,3 +318,9 @@ Real photography where it exists, and a surface reasoned from measurements where
 - Raise the distance cutoff from 50 pc to 250 pc — where Hipparcos parallaxes stop being trustworthy — taking the catalogue from 8750 stars to 68388.
 - Give the star field a render budget: every star inside 25 pc plus the brightest of the rest. Search, navigation and the cross-reference still see the whole catalogue.
 - Store each exoplanet's host coordinates and re-resolve the cross-reference against the current catalogue at build time, so widening the star list rescues systems without re-downloading the archive. Renderable systems: 371 to 609.
+
+### ✓ Step 12: Aggregate additional surveys, and draw the whole catalogue
+- Raise the render budget to the full catalogue, with a `?stars=` override for machines (and test runs) that cannot draw it.
+- Add a source registry with roles — positional, enrichment, backdrop — recording what each named survey can and cannot contribute, as data the ETL prints rather than as prose in a README.
+- Add a Gaia DR3 TAP fetcher and a catalogue merge that matches on direction rather than 3D proximity, prefers the better parallax, and records provenance per star.
+- Make names dense-with-holes and add a source dictionary, so a survey-scale catalogue with no proper names does not cost 25 MB per million stars to say what its id already says.

@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 
 import { raDecDistanceToXyz } from '../../src/app/shared/astro/coordinates';
+import { encodeStarCatalog } from '../../src/app/shared/models/star-catalog';
 import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model';
 import { parseCsvObjects, parseOptionalNumber } from './lib/csv';
 import { fetchTextCached } from './lib/http';
@@ -15,8 +16,19 @@ const HYG_UNKNOWN_DISTANCE_PC = 100000; // HYG's placeholder for unmeasured/unre
  */
 const UNKNOWN_MAGNITUDE = 15;
 
-/** Stars within this distance (parsecs) of the Sun are kept for the galaxy view. */
-const DISTANCE_CUTOFF_PC = Number(process.env['ETL_STAR_DISTANCE_PC'] ?? 50);
+/**
+ * Stars within this distance (parsecs) of the Sun are kept for the galaxy view.
+ *
+ * Set at the range HYG's own measurements reach rather than at a round number. 98.6% of its
+ * rows carry a Hipparcos identifier, and Hipparcos parallaxes are good to roughly a
+ * milliarcsecond — so at 250 pc (4 mas) a star's distance is uncertain by some tens of per
+ * cent, and beyond it the catalogue is plotting noise. Note that only the *radial* placement
+ * blurs: a star's direction on the sky stays exact at any distance.
+ *
+ * The catalogue is also magnitude-limited, so this is not a volume-complete sample beyond about
+ * 50 pc: it thins to the intrinsically bright, which is the same selection the naked eye makes.
+ */
+const DISTANCE_CUTOFF_PC = Number(process.env['ETL_STAR_DISTANCE_PC'] ?? 250);
 
 function resolveName(row: Record<string, string>): string {
   if (row['proper']) {
@@ -98,15 +110,13 @@ export async function fetchStars(): Promise<StarRecord[]> {
 function writeStarAssets(stars: StarRecord[]): void {
   ensureDataDir();
 
-  const positions = new Float32Array(stars.length * 3);
-  stars.forEach((star, index) => {
-    positions[index * 3] = star.x;
-    positions[index * 3 + 1] = star.y;
-    positions[index * 3 + 2] = star.z;
-  });
+  // The layout lives in `star-catalog.ts`, which the app decodes with — one definition, so the
+  // writer and the reader cannot drift.
+  const { index, positions, meta } = encodeStarCatalog(stars);
 
   writeFileSync(dataPath('stars.bin'), Buffer.from(positions.buffer));
-  writeFileSync(dataPath('stars-index.json'), JSON.stringify(stars));
+  writeFileSync(dataPath('stars-meta.bin'), Buffer.from(meta));
+  writeFileSync(dataPath('stars-index.json'), JSON.stringify(index));
 }
 
 if (require.main === module) {

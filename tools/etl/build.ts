@@ -7,7 +7,9 @@ import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model'
 import { fetchDeepSky } from './fetchDeepSky';
 import { fetchExoplanets } from './fetchExoplanets';
 import { fetchSolarSystem } from './fetchSolarSystem';
+import { BYTES_PER_STAR_META, BYTES_PER_STAR_POSITION, decodeStarCatalog, encodeStarCatalog } from '../../src/app/shared/models/star-catalog';
 import { fetchStars } from './fetchStars';
+import { rematchHostStars } from '../../src/app/shared/astro/host-star-matching';
 import { dataPath } from './lib/paths';
 
 class ValidationError extends Error {}
@@ -30,8 +32,21 @@ function validateStars(stars: StarRecord[]): void {
     assertCondition([star.x, star.y, star.z].every(Number.isFinite), `Star ${star.id} has a non-finite position.`);
   }
 
-  const binSize = statSync(dataPath('stars.bin')).size;
-  assertCondition(binSize === stars.length * 3 * 4, `stars.bin size (${binSize}) does not match ${stars.length} stars.`);
+  const positionBytes = statSync(dataPath('stars.bin')).size;
+  assertCondition(positionBytes === stars.length * BYTES_PER_STAR_POSITION, `stars.bin size (${positionBytes}) does not match ${stars.length} stars.`);
+  const metaBytes = statSync(dataPath('stars-meta.bin')).size;
+  assertCondition(metaBytes === stars.length * BYTES_PER_STAR_META, `stars-meta.bin size (${metaBytes}) does not match ${stars.length} stars.`);
+
+  // Round-trips the written assets back through the decoder the app uses, so a format change
+  // that only half-lands fails here rather than as a silently wrong star map.
+  const { index, positions, meta } = encodeStarCatalog(stars);
+  const decoded = decodeStarCatalog(index, positions, meta);
+  assertCondition(decoded.length === stars.length, `Star catalogue round-trip lost records: ${decoded.length} of ${stars.length}.`);
+  for (let i = 0; i < stars.length; i++) {
+    assertCondition(decoded[i].id === stars[i].id && decoded[i].name === stars[i].name, `Star catalogue round-trip altered record ${i}.`);
+    assertCondition(decoded[i].spectralType === stars[i].spectralType, `Star catalogue round-trip lost the spectral type of star ${stars[i].id}.`);
+    assertCondition(decoded[i].colorIndex === null === (stars[i].colorIndex === null), `Star catalogue round-trip changed whether star ${stars[i].id} has a colour index.`);
+  }
 }
 
 function validateBodies(bodies: BodyRecord[]): void {
@@ -140,6 +155,18 @@ async function build(): Promise<void> {
   const exoplanets = await fetchExoplanets(stars);
   console.log();
   const deepSky = await fetchDeepSky();
+  console.log();
+
+  // The cross-reference depends on the star catalogue as much as on the archive, so it is
+  // resolved again here against whatever catalogue this run produced. A no-op when the two were
+  // fetched together, and the whole point when only one of them was.
+  const rematch = rematchHostStars(exoplanets, stars);
+  console.log(
+    `Cross-referencing exoplanet hosts against ${stars.length} stars...\n` +
+      `  ${rematch.matched}/${rematch.total} matched` +
+      (rematch.resolvable < rematch.total ? ` (${rematch.total - rematch.resolvable} records predate stored host coordinates and kept their existing match)` : '') +
+      (rematch.gained || rematch.lost ? `; ${rematch.gained} gained, ${rematch.lost} lost` : '')
+  );
   console.log();
 
   console.log('Validating output...');

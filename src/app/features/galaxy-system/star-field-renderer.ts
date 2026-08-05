@@ -30,6 +30,36 @@ const PIXELS_TO_ANGULAR_SIZE =
  */
 const PICK_NDC_SLOP = 0.01;
 
+/**
+ * How many stars the field draws at once, however many the catalogue holds.
+ *
+ * The catalogue reaches as far as its parallaxes do — 68388 stars at 250 pc — but drawing all of
+ * them is a cost paid every frame by every machine, and most of that cost buys 1.5-pixel dots.
+ * So the *data* is the catalogue and the *drawing* is a budget, and the two are allowed to
+ * differ. Everything still exists for search, for flying to, and for hosting planets.
+ *
+ * The figure is set low deliberately. A real GPU would draw the whole catalogue without
+ * noticing — this is one instanced draw call — but the value that matters is what a weak one
+ * does, and the software rasterizer this was measured against costs a third of its frame rate
+ * per 12000 stars. Raise it freely on hardware that can take it; nothing else depends on it.
+ */
+export const STAR_RENDER_BUDGET = 12000;
+
+/**
+ * Radius (parsecs) inside which every star is drawn regardless of brightness.
+ *
+ * A pure brightness cut would be defensible — apparent magnitude is exactly "how visible this
+ * is" — but it would drop the solar neighbourhood, because the nearest stars are overwhelmingly
+ * faint red dwarfs. Proxima Centauri is magnitude 11. Those are the stars this map is most about
+ * and the ones that hold the nearby planets, so the neighbourhood is kept whole and the budget
+ * is spent on the brightest of everything beyond it.
+ *
+ * Kept deliberately small against the catalogue's 250 pc reach. The guaranteed core occupies a
+ * thousandth of that volume, so a generous radius spends most of the budget inside it and draws
+ * a dense knot surrounded by nothing — which is a worse picture than the smaller catalogue was.
+ */
+export const ALWAYS_DRAWN_RADIUS_PC = 25;
+
 const COLD_STAR_COLOR = new THREE.Color(0.65, 0.75, 1.0);
 const NEUTRAL_STAR_COLOR = new THREE.Color(1.0, 1.0, 1.0);
 const WARM_STAR_COLOR = new THREE.Color(1.0, 0.6, 0.35);
@@ -90,22 +120,58 @@ function createQuadGeometry(instanceCount: number): THREE.InstancedBufferGeometr
  * close the camera gets. That is deliberate and physically right: real stars are unresolvable
  * point sources, and their apparent size on screen is a function of brightness, not distance.
  */
+/**
+ * Chooses which stars to draw when the catalogue is larger than the budget: everything inside
+ * the neighbourhood radius, then the brightest of the rest until the budget is spent.
+ *
+ * Returns indices into the original list, so the caller can subset the positions that go with
+ * them. Returns them in catalogue order rather than in selection order, purely so the drawn set
+ * is stable and inspectable.
+ */
+export function selectDrawnStars(stars: readonly StarRecord[], budget = STAR_RENDER_BUDGET): Uint32Array {
+  if (stars.length <= budget) {
+    return Uint32Array.from(stars.keys());
+  }
+
+  const near: number[] = [];
+  const far: number[] = [];
+  stars.forEach((star, index) => {
+    (Math.hypot(star.x, star.y, star.z) <= ALWAYS_DRAWN_RADIUS_PC ? near : far).push(index);
+  });
+
+  far.sort((a, b) => stars[a].magnitude - stars[b].magnitude);
+  const selected = near.concat(far.slice(0, Math.max(0, budget - near.length)));
+  selected.sort((a, b) => a - b);
+  return Uint32Array.from(selected);
+}
+
 export class StarFieldRenderer {
   readonly object: THREE.Mesh;
+  /** How many of the catalogue's stars this field actually draws. */
+  readonly drawnCount: number;
 
   private readonly geometry: THREE.InstancedBufferGeometry;
   private readonly material: THREE.SpriteNodeMaterial;
-  /** Angular diameter per star, in the same order as `stars` — reused for picking. */
+  /** The subset of the catalogue that is drawn, and so the only set that can be clicked. */
+  private readonly stars: readonly StarRecord[];
+  /** Angular diameter per drawn star, in the same order as `stars` — reused for picking. */
   private readonly angularSizes: Float32Array;
 
-  constructor(
-    private readonly stars: readonly StarRecord[],
-    positions: Float32Array
-  ) {
+  constructor(catalogue: readonly StarRecord[], cataloguePositions: Float32Array, budget = STAR_RENDER_BUDGET) {
+    const drawn = selectDrawnStars(catalogue, budget);
+    this.stars = drawn.length === catalogue.length ? catalogue : Array.from(drawn, (index) => catalogue[index]);
+    this.drawnCount = this.stars.length;
+
+    const stars = this.stars;
     this.geometry = createQuadGeometry(stars.length);
 
     const colors = new Float32Array(stars.length * 3);
     this.angularSizes = new Float32Array(stars.length);
+    // Repacked only when the drawn set is a subset; otherwise the ETL's buffer is used as-is.
+    const positions =
+      drawn.length === catalogue.length
+        ? cataloguePositions
+        : Float32Array.from({ length: drawn.length * 3 }, (_, i) => cataloguePositions[drawn[(i / 3) | 0] * 3 + (i % 3)]);
 
     stars.forEach((star, index) => {
       const color = colorIndexToRgb(star.colorIndex, star.spectralType);
@@ -115,7 +181,6 @@ export class StarFieldRenderer {
       this.angularSizes[index] = magnitudeToPointSize(star.magnitude) * PIXELS_TO_ANGULAR_SIZE;
     });
 
-    // `positions` is the ETL's packed buffer, already in the same order as `stars`.
     const positionAttribute = new THREE.InstancedBufferAttribute(positions, 3);
     const colorAttribute = new THREE.InstancedBufferAttribute(colors, 3);
     const sizeAttribute = new THREE.InstancedBufferAttribute(this.angularSizes, 1);

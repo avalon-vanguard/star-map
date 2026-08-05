@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 
 import { StarRecord } from '../../shared/models/star.model';
-import { colorIndexToRgb, magnitudeToPointSize, StarFieldRenderer } from './star-field-renderer';
+import { colorIndexToRgb, magnitudeToPointSize, selectDrawnStars, StarFieldRenderer } from './star-field-renderer';
 
 function star(overrides: Partial<StarRecord> = {}): StarRecord {
   return {
@@ -221,5 +221,73 @@ describe('StarFieldRenderer', () => {
       expect(renderer.pickAt(new THREE.Vector2(0, 0), camera)).toBeUndefined();
       renderer.dispose();
     });
+  });
+});
+
+/** A star at a given distance along +X, with a given apparent magnitude. */
+function catalogueStar(id: number, distancePc: number, magnitude: number): StarRecord {
+  return { id, name: `star-${id}`, x: distancePc, y: 0, z: 0, magnitude, spectralType: 'G2V', colorIndex: 0.6 };
+}
+
+describe('selectDrawnStars', () => {
+  it('draws everything when the catalogue fits the budget', () => {
+    const catalogue = [catalogueStar(1, 10, 5), catalogueStar(2, 20, 6)];
+    expect(Array.from(selectDrawnStars(catalogue, 10))).toEqual([0, 1]);
+  });
+
+  it('never draws more than the budget', () => {
+    const catalogue = Array.from({ length: 500 }, (_, i) => catalogueStar(i, 200, i));
+    expect(selectDrawnStars(catalogue, 50)).toHaveLength(50);
+  });
+
+  it('keeps the whole solar neighbourhood, however faint', () => {
+    // The load-bearing case: the nearest stars are overwhelmingly faint red dwarfs, and Proxima
+    // Centauri is magnitude 11. A pure brightness cut would delete the part of the map that
+    // matters most and holds the nearby planets.
+    const proxima = catalogueStar(999, 1.3, 11.1);
+    const catalogue = [proxima, ...Array.from({ length: 200 }, (_, i) => catalogueStar(i, 240, 2))];
+    const drawn = selectDrawnStars(catalogue, 20);
+
+    expect(Array.from(drawn)).toContain(0);
+    expect(drawn).toHaveLength(20);
+  });
+
+  it('spends what is left on the brightest stars beyond the neighbourhood', () => {
+    const catalogue = [catalogueStar(0, 10, 12), catalogueStar(1, 200, 8), catalogueStar(2, 200, 2), catalogueStar(3, 200, 5)];
+    const drawn = Array.from(selectDrawnStars(catalogue, 3));
+
+    // The nearby faint one, then the two brightest distant ones — not the magnitude-8 straggler.
+    expect(drawn).toEqual([0, 2, 3]);
+  });
+
+  it('returns catalogue indices in order, so positions can be subset alongside', () => {
+    const catalogue = Array.from({ length: 100 }, (_, i) => catalogueStar(i, 150, 100 - i));
+    const drawn = Array.from(selectDrawnStars(catalogue, 10));
+    expect(drawn).toEqual([...drawn].sort((a, b) => a - b));
+  });
+});
+
+describe('StarFieldRenderer render budget', () => {
+  it('draws only the budget, and reports how many that was', () => {
+    const catalogue = Array.from({ length: 300 }, (_, i) => catalogueStar(i, 200, i));
+    const positions = new Float32Array(catalogue.flatMap((s) => [s.x, s.y, s.z]));
+    const renderer = new StarFieldRenderer(catalogue, positions, 40);
+
+    expect(renderer.drawnCount).toBe(40);
+    expect((renderer.object.geometry as THREE.InstancedBufferGeometry).instanceCount).toBe(40);
+    renderer.dispose();
+  });
+
+  it('keeps each drawn star with its own position after subsetting', () => {
+    // The subtle failure this guards: repacking positions for a subset while the colours and
+    // sizes follow a different order would give every star someone else's place in the sky.
+    const catalogue = [catalogueStar(0, 5, 9), catalogueStar(1, 200, 1), catalogueStar(2, 200, 7)];
+    const positions = new Float32Array(catalogue.flatMap((s) => [s.x, s.y, s.z]));
+    const renderer = new StarFieldRenderer(catalogue, positions, 2);
+
+    expect(renderer.drawnCount).toBe(2);
+    expect(renderer.starIdAt(0)).toBe(0);
+    expect(renderer.starIdAt(1)).toBe(1);
+    renderer.dispose();
   });
 });

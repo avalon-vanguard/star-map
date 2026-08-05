@@ -215,7 +215,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     // far the camera has pulled back, so what identifies it is the far plane it settles on
     // (5000 pc) versus the AU-space one (20000 AU), not a fixed near plane.
     expect(engine.getCamera().far).toBeCloseTo(5000, 6);
-    expect(engine.getCamera().near).toBeLessThan(0.1);
+    // The near plane tracks how far back the camera is rather than sitting at a constant, so
+    // what identifies galaxy space is that it is a small fraction of that far plane.
+    expect(engine.getCamera().near).toBeLessThan(engine.getCamera().far / 1000);
     expect(navigationStore.viewLevel()).toBe('galaxy');
   });
 

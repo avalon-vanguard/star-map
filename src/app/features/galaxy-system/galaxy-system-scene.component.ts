@@ -30,8 +30,14 @@ const SOL_STAR_ID = 0;
 /** Stars drawn from a colour rather than a photograph get a more restrained halo. */
 const DIM_STAR_GLOW_SCALE = 0.6;
 
-/** Stars closer than this to the camera get a name label (always includes the selection). */
-const LABEL_MAX_DISTANCE_PC = 20;
+/**
+ * How far from what the camera is looking at a star can be and still be named, as a fraction of
+ * how far back the camera is — so the net widens as the view pulls out and closes as it dives
+ * in, instead of naming the same handful of stars at every scale. Bounded at both ends.
+ */
+const LABEL_RADIUS_TO_ORBIT_DISTANCE = 0.35;
+const MIN_LABEL_RADIUS_PC = 4;
+const MAX_LABEL_RADIUS_PC = 400;
 /** Caps how many labels are shown at once, to keep the DOM light. */
 const LABEL_MAX_COUNT = 15;
 /**
@@ -57,7 +63,7 @@ const CLICK_DRAG_SLOP_PX = 5;
  * arbitrary equatorial direction gives — the plane is tilted 63 degrees to the equator.
  */
 const GALAXY_OVERVIEW_POSITION = (() => {
-  const view = galacticToEquatorial({ x: -21, y: -46, z: 35 });
+  const view = galacticToEquatorial({ x: -105, y: -230, z: 175 });
   return new THREE.Vector3(view.x, view.y, view.z);
 })();
 const GALAXY_OVERVIEW_TARGET = new THREE.Vector3(0, 0, 0);
@@ -80,15 +86,22 @@ const GALACTIC_NEAR_PC = 5;
 const GALACTIC_FAR_PC = 250000;
 
 /** Rings for the local grid (parsecs from the Sun), with the catalogue's edge called out. */
-const LOCAL_GRID_RINGS_PC = [10, 20, 30, 40, 50];
+const LOCAL_GRID_RINGS_PC = [50, 100, 150, 200, 250];
 const LOCAL_GRID_SPOKES = 12;
 /** Rings for the galactic grid (parsecs from the centre), with the Sun's orbit called out. */
 const GALACTIC_GRID_RINGS_PC = [2500, 5000, SUN_GALACTOCENTRIC_RADIUS_PC, 11000, 14000];
 const GALACTIC_GRID_SPOKES = 24;
 /** The local grid passes through the Sun, which is the origin, so tethers drop to height zero. */
 const LOCAL_PLANE_HEIGHT_PC = 0;
-/** How many of the Sun's nearest neighbours get a permanent drop line to the local grid. */
-const TETHERED_STAR_COUNT = 28;
+/**
+ * How many stars get a permanent drop line to the local grid, and which ones: the brightest in
+ * the catalogue rather than the Sun's nearest neighbours.
+ *
+ * Nearest-to-the-Sun was the right set when the catalogue stopped at 50 pc and the camera sat
+ * just outside it. Across 250 pc those same stars are a speck at the centre, while the brightest
+ * are spread through the whole volume — and are the ones the eye is already on.
+ */
+const TETHERED_STAR_COUNT = 60;
 
 /** Camera pose for the whole-Galaxy overview: above the disc, out past the Sun, looking in. */
 const GALACTIC_OVERVIEW_HEIGHT_PC = 26000;
@@ -344,13 +357,12 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       spokeCount: LOCAL_GRID_SPOKES,
       emphasisRadii: [LOCAL_GRID_RINGS_PC[LOCAL_GRID_RINGS_PC.length - 1]]
     });
-    // Drop lines for the Sun's nearest neighbours. A fixed set rather than whatever is currently
-    // labelled: these are the stars the local view is about, they cluster where the grid is
-    // densest, and a tether that appears and vanishes as the camera drifts reads as a glitch.
+    // A fixed set rather than whatever is currently labelled: a tether that appears and vanishes
+    // as the camera drifts reads as a glitch.
     this.tethers = new TetherField(TETHERED_STAR_COUNT);
     this.tethers.setTargets(
       [...stars]
-        .sort((a, b) => Math.hypot(a.x, a.y, a.z) - Math.hypot(b.x, b.y, b.z))
+        .sort((a, b) => a.magnitude - b.magnitude)
         .slice(0, TETHERED_STAR_COUNT)
         .map((star) => new THREE.Vector3(star.x, star.y, star.z)),
       LOCAL_PLANE_HEIGHT_PC
@@ -461,8 +473,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // Measured from what the camera is looking at, not from where it is. Those differ by the
     // orbit distance, so a camera-relative rule names the stars closest to the near edge of the
     // view — a ring of labels around the outside of the thing the user is actually looking at.
-    const { x: cx, y: cy, z: cz } = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
-    const maxDistanceSq = LABEL_MAX_DISTANCE_PC * LABEL_MAX_DISTANCE_PC;
+    const target = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
+    const { x: cx, y: cy, z: cz } = target;
+    const orbitDistance = (this.controls ? camera.position.distanceTo(target) : GALAXY_OVERVIEW_POSITION.length()) * LABEL_RADIUS_TO_ORBIT_DISTANCE;
+    const labelRadius = THREE.MathUtils.clamp(orbitDistance, MIN_LABEL_RADIUS_PC, MAX_LABEL_RADIUS_PC);
+    const maxDistanceSq = labelRadius * labelRadius;
 
     const candidates: Array<{ star: StarRecord; distanceSq: number }> = [];
     for (const star of this.stars) {
@@ -475,7 +490,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       }
     }
 
-    candidates.sort((a, b) => a.distanceSq - b.distanceSq);
+    // Brightest first, not nearest first. Proximity was the right ranking when the catalogue was
+    // a 50 pc bubble and everything in it was equally worth naming; across 250 pc it labels a
+    // clump of whatever happens to be closest to the middle of the screen and never names the
+    // stars that are actually prominent. Brightness is what makes a star worth a name.
+    candidates.sort((a, b) => a.star.magnitude - b.star.magnitude);
     // Individual star names mean nothing once the whole Galaxy is in frame — at that range the
     // entire catalogue is inside one pixel — so the labels hand over to the structural ones.
     const isGalactic = this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD;
@@ -561,7 +580,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.hudTitle.set('Local Stars');
     this.hudSubtitle.set('Hipparcos · Yale Bright Star · Gliese');
     this.hudReadouts.set([
-      { label: 'Stars', value: `${this.stars.length}` },
+      // Both numbers, because they differ: the catalogue is what the map knows and the first is
+      // what it draws. See `STAR_RENDER_BUDGET`.
+      { label: 'Stars', value: this.starField && this.starField.drawnCount < this.stars.length ? `${this.starField.drawnCount} / ${this.stars.length}` : `${this.stars.length}` },
       { label: 'Radius', value: `${LOCAL_GRID_RINGS_PC[LOCAL_GRID_RINGS_PC.length - 1]} pc` },
       { label: 'Exoplanets', value: `${this.exoplanets.length}` }
     ]);

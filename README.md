@@ -27,10 +27,12 @@ npm run e2e:typecheck
 
 ## What's in it
 
-**Galaxy view** — every HYG-catalogue star within 50 parsecs as instanced camera-facing
-billboards, positioned from real RA/Dec/parallax, coloured by spectral index and sized by
-magnitude. A polar grid in the galactic plane runs under them with a drop line from each of the
-Sun's nearest neighbours, and names label the stars nearest whatever the camera is looking at.
+**Galaxy view** — the HYG catalogue out to 250 parsecs, 68 388 stars, as instanced
+camera-facing billboards positioned from real RA/Dec/parallax, coloured by spectral index and
+sized by magnitude. The field draws a budget of the most visible of them rather than all — see
+"On how many stars" below. A polar grid in the galactic plane runs under them with a drop line
+from each of the brightest, and names label the most prominent stars near whatever the camera is
+looking at.
 Behind them sits a backdrop of notable deep-sky objects and a Milky Way panorama.
 
 **Galactic view** — keep pulling back and the neighbourhood becomes a point inside the Milky
@@ -167,16 +169,42 @@ re-runs are cheap and offline-friendly; set `ETL_FORCE_REFRESH=1` to bypass the 
 
 | Script | Source | Output |
 | --- | --- | --- |
-| `fetchStars.ts` | HYG database (Hipparcos/Yale/Gliese) | `stars.bin`, `stars-index.json` |
+| `fetchStars.ts` | HYG database (Hipparcos/Yale/Gliese) | `stars.bin`, `stars-meta.bin`, `stars-index.json` |
 | `fetchSolarSystem.ts` | JPL Horizons / SSD | `bodies.json` |
 | `fetchExoplanets.ts` | NASA Exoplanet Archive (TAP) | `exoplanets.json` |
 | `fetchDeepSky.ts` | OpenNGC | `deepsky.json` |
 
-Star positions ship as a packed `Float32Array` (`stars.bin`) rather than JSON to keep the
-initial payload and parse cost down; `stars-index.json` carries everything else in the same
-order.
+The star catalogue ships as two binary column stores plus a small JSON file, not as an array of
+objects. At 68 388 stars the old encoding — one JSON object per star, its eight key names
+repeated each time — would have been about 17 MB to download and parse before the first frame.
+Splitting it puts the numbers in `stars.bin` (positions, handed to the GPU verbatim) and
+`stars-meta.bin` (id, magnitude, colour index, spectral-type index), and leaves `stars-index.json`
+holding only the strings, with the ~2 600 distinct spectral classifications collapsed into a
+dictionary. The result is 2.6 MB for 7.8× the stars. `star-catalog.ts` defines the layout once
+and both the ETL and the app use it, so the writer and the reader cannot drift apart.
 
-`ETL_STAR_DISTANCE_PC` (default `50`) sets the star-field distance cutoff.
+`ETL_STAR_DISTANCE_PC` (default `250`) sets the star-field distance cutoff.
+
+### On how many stars
+
+Not many, against the Galaxy. It holds 100–400 billion stars and this map ships 68 388 of them —
+about 0.00003%. That gap is not this project's to close: Gaia DR3, the largest stellar catalogue
+ever assembled, has ~1.8 billion sources, roughly 1% of the Galaxy, and is itself blocked by dust
+and blind to most red dwarfs beyond a few hundred parsecs. It is the same reason the galactic
+view is a model.
+
+The 250 pc cutoff is where HYG's own measurements stop. 98.6% of its rows carry a Hipparcos
+identifier, and Hipparcos parallaxes are good to about a milliarcsecond — so at 250 pc a
+distance is uncertain by some tens of per cent and beyond it the catalogue would be plotting
+noise. Only the *radial* placement blurs; a star's direction on the sky stays exact at any
+distance. Note also that beyond about 50 pc the sample is magnitude-limited rather than
+volume-complete: it thins to the intrinsically bright, which is the same selection the naked eye
+makes.
+
+Drawing and knowing are separate. The field draws `STAR_RENDER_BUDGET` stars — every one inside
+25 pc, then the brightest of the rest — while search, navigation and the planet cross-reference
+all see the full catalogue. A real GPU would draw all 68 388 without noticing; the budget exists
+for the machines that would not, and is a single constant to raise.
 
 ### On deep-sky distances
 
@@ -246,7 +274,7 @@ for details on `user` / `project` / `local` scope.
 ## Data credits
 
 Star catalogue: [HYG database](https://github.com/astronexus/HYG-Database) (Hipparcos, Yale
-Bright Star, Gliese). Solar-system ephemerides: NASA/JPL Horizons. Exoplanets: NASA Exoplanet
+Bright Star, Gliese) — 68 388 stars within 250 pc. Solar-system ephemerides: NASA/JPL Horizons. Exoplanets: NASA Exoplanet
 Archive. Deep-sky objects: [OpenNGC](https://github.com/mattiaverga/OpenNGC). Body and skybox
 imagery: NASA/JPL/USGS public domain and Solar System Scope (CC BY 4.0) — per-file provenance
 is recorded in `src/app/shared/rendering/texture-catalog.ts`.

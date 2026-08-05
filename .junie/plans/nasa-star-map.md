@@ -312,3 +312,9 @@ Real photography where it exists, and a surface reasoned from measurements where
 - Frame against the reference grid's outer ring, which is always wider than the outermost orbit, and leave an explicit margin around it.
 - Raise the framing ceiling far enough to hold the solar system out to Pluto in a portrait window; only companions hundreds of AU out reach it now.
 - Floor the star's halo against the framed radius, so a star sized against its innermost orbit still reads at the distance that frames its outermost one.
+
+### ✓ Step 11: Widen the star catalogue, and separate what is drawn from what is known
+- Repack the catalogue as two binary column stores plus a string-only JSON index (`star-catalog.ts`, shared by the ETL and the app), so 7.8x the stars costs 1.7x the bytes instead of 12x.
+- Raise the distance cutoff from 50 pc to 250 pc — where Hipparcos parallaxes stop being trustworthy — taking the catalogue from 8750 stars to 68388.
+- Give the star field a render budget: every star inside 25 pc plus the brightest of the rest. Search, navigation and the cross-reference still see the whole catalogue.
+- Store each exoplanet's host coordinates and re-resolve the cross-reference against the current catalogue at build time, so widening the star list rescues systems without re-downloading the archive. Renderable systems: 371 to 609.

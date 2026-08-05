@@ -75,6 +75,11 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<ExoplanetRe
       // propagating a planet at its real rate and pretending every host is the Sun.
       periodDays: parseOptionalNumber(row['pl_orbper']),
       hostStarMassSolar: parseOptionalNumber(row['st_mass']),
+      // Kept so the cross-reference can be redone without the archive; see the record's own
+      // documentation. Undefined rather than NaN, which JSON cannot represent.
+      hostRaDeg: parseOptionalNumber(row['ra']),
+      hostDecDeg: parseOptionalNumber(row['dec']),
+      hostDistancePc: parseOptionalNumber(row['sy_dist']),
       orbit: {
         semiMajorAxisAu: parseOptionalNumber(row['pl_orbsmax']),
         eccentricity: parseOptionalNumber(row['pl_orbeccen']),

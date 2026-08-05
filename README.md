@@ -56,7 +56,9 @@ system those differ by a factor of a hundred. At the distance that fits Pluto in
 that stays clear of Mercury is about a pixel across, and no radius satisfies both. So the disc
 stays honest to the orbits and the star's halo carries its visibility, floored against the framed
 radius: light is not a surface, and a glow reaching past the innermost orbit says the star is
-bright rather than that it is large.
+bright rather than that it is large. That floor is bounded from both sides — large enough that
+the star reads at a glance, small enough that Venus's and Earth's orbits stay legible as rings
+around it. Mercury's, three pixels wide at that range, does not survive either way.
 
 **Body detail** — a dedicated close-up scene and info panel for one planet, moon or exoplanet,
 with real photography where NASA/ESA/USGS imagery exists, and a surface derived from the body's

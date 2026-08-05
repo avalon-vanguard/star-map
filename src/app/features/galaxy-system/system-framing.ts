@@ -41,9 +41,16 @@ const STAR_RADIUS_TO_INNERMOST_ORBIT = 0.45;
  * The halo resolves it, because light is not a surface: a glow that reaches past the innermost
  * orbit does not claim the star is that large, it claims the star is bright. So the disc stays
  * honest to the orbits and the halo is floored against the frame.
+ *
+ * The floor is set by what it must not cover. Its visual radius is half the extent, so a floor
+ * of `f` puts the halo's edge at `f / 2` of the frame radius — and the orbits it has to leave
+ * legible sit at their own fraction of that same radius. In the solar system, framed to hold
+ * Pluto, Venus's orbit is at 1.3% of the frame radius and Earth's at 1.8%, so a floor of 2%
+ * leaves both of them outside the halo. Mercury's, at 0.7%, is inside it — and would be at any
+ * halo large enough to see, since the orbit itself is only a few pixels wide there.
  */
 const STAR_GLOW_TO_MARKER = 3.2;
-const MIN_STAR_GLOW_TO_FRAME = 0.035;
+const MIN_STAR_GLOW_TO_FRAME = 0.02;
 
 /**
  * Clear space left around the framed radius, as a fraction of it. The camera backs off this

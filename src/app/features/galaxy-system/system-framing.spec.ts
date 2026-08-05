@@ -114,13 +114,27 @@ describe('systemFramingDistanceAu', () => {
 });
 
 describe('starGlowExtentAu', () => {
+  /** A typical viewport, so a screen-space claim can be made in pixels rather than in ratios. */
+  const REFERENCE_VIEWPORT_HALF_HEIGHT_PX = 450;
+
+  /** The halo's visual radius, in AU, at the distance this system is framed from. */
+  function haloRadiusAu(innermostAu: number, outermostAu: number, glowScale = 1): number {
+    // The sprite's extent is its full width, so half of it is what reaches out from the star.
+    return starGlowExtentAu(starMarkerRadiusAu(innermostAu), frameRadiusFor(outermostAu), glowScale) / 2;
+  }
+
+  function frameRadiusFor(outermostAu: number): number {
+    const rings = systemGridRingsAu(outermostAu);
+    return systemFrameRadiusAu(systemFramingDistanceAu(rings[rings.length - 1]));
+  }
+
   /** Apparent size on screen, as a fraction of the frame's half-height. */
   function apparentFraction(innermostAu: number, outermostAu: number, glowScale = 1): number {
-    const rings = systemGridRingsAu(outermostAu);
-    const distance = systemFramingDistanceAu(rings[rings.length - 1]);
-    const frame = systemFrameRadiusAu(distance);
-    // The sprite's extent is its full width, so half of it is what reaches out from the star.
-    return starGlowExtentAu(starMarkerRadiusAu(innermostAu), frame, glowScale) / 2 / frame;
+    return haloRadiusAu(innermostAu, outermostAu, glowScale) / frameRadiusFor(outermostAu);
+  }
+
+  function apparentPixels(innermostAu: number, outermostAu: number): number {
+    return apparentFraction(innermostAu, outermostAu) * REFERENCE_VIEWPORT_HALF_HEIGHT_PX;
   }
 
   it('scales with the star for a compact system, where the star is already big enough', () => {
@@ -142,7 +156,23 @@ describe('starGlowExtentAu', () => {
   it('keeps the Sun visible at the distance that frames the solar system', () => {
     // The case that prompted this: the solar system spans a factor of a hundred from Mercury to
     // Pluto, so a disc that stays clear of Mercury is about a pixel across once Pluto is in view.
-    expect(apparentFraction(0.387, 39.288)).toBeGreaterThan(0.015);
+    expect(apparentPixels(0.387, 39.288)).toBeGreaterThan(4);
+  });
+
+  it('leaves the inner orbits clear of the halo', () => {
+    // The other half of the same trade. Venus and Earth have to stay legible as rings around the
+    // star, which bounds the halo from above just as visibility bounds it from below.
+    const halo = haloRadiusAu(0.387, 39.288);
+    const VENUS_AU = 0.723;
+    const EARTH_AU = 1;
+    expect(halo).toBeLessThan(VENUS_AU);
+    expect(halo).toBeLessThan(EARTH_AU);
+  });
+
+  it('cannot clear Mercury as well, and does not pretend to', () => {
+    // Mercury's orbit is 0.7% of the framed radius — about three pixels — so it is inside any
+    // halo big enough to see. Pinned so the trade is a decision rather than an oversight.
+    expect(haloRadiusAu(0.387, 39.288)).toBeGreaterThan(0.387);
   });
 
   it('holds the floor across every system scale the datasets contain', () => {
@@ -154,7 +184,7 @@ describe('starGlowExtentAu', () => {
       [0.01154, 0.06189],
       [1.2, 12.4]
     ]) {
-      expect(apparentFraction(innermost, outermost)).toBeGreaterThan(0.015);
+      expect(apparentPixels(innermost, outermost)).toBeGreaterThan(4);
     }
   });
 

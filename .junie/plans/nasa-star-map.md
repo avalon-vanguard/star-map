@@ -135,6 +135,8 @@ interface DeepSkyRecord {
 - `SystemOrbitsRenderer` — draws orbit ellipses and planet/exoplanet markers for the currently focused star system, using the Kepler propagator.
 - `KeplerPropagator` (`shared/astro/kepler.ts`) — pure function(s) converting `OrbitalElements` + epoch → Cartesian position; independently unit-testable.
 - `BodyDetailSceneComponent` — separate route/component with its own dedicated scene for a close-up view of one selected body, plus an `InfoPanelComponent` showing its data.
+- `planet-appearance.ts` / `stellar.ts` (`shared/astro/`) — derives a host star's luminosity from its catalogued magnitude and distance, a planet's equilibrium temperature and bulk density from that, and a class of world from those.
+- `procedural-planet-texture.ts` (`shared/rendering/`) — paints an equirectangular surface from that derivation: zonal bands for a fluid envelope, fractal terrain for a solid one, polar caps sized by temperature. A pure function over a byte array, no canvas.
 - `SearchComponent` — text search across `stars-index.json`, `bodies.json`, `exoplanets.json`; on match, dispatches a navigation action.
 - `NavigationStore` (Angular signals-based) — holds `viewLevel: 'galactic' | 'galaxy' | 'system'`, `selectedStarId`, `selectedBodyId`; consumed by scene components and routed body-detail view.
 - `MilkyWayRenderer` / `milky-way-model.ts` — the Galaxy itself as an instanced particle cloud scattered around the structural model in `shared/astro/galaxy.ts`, crossfaded against the catalogued star field by camera distance.
@@ -297,3 +299,10 @@ The same plane-and-tether reading aid the outer scales got, applied to a single 
 - Add `systemGridRingsAu`: ring radii snapped to a 1-2-5 ladder so a distance can be read off, at any of the four orders of magnitude real systems span.
 - Draw the grid and the body tethers in the system's own reference plane — the ecliptic for the solar system, the plane of the sky otherwise — dashed, so it is never mistaken for an orbit.
 - Frame the camera against that same plane, so an exoplanet system is presented face-on rather than edge-on.
+
+### ✓ Step 9: Give every body a surface
+Real photography where it exists, and a surface reasoned from measurements where it does not.
+- Derive host-star luminosity from apparent magnitude, parallax distance and a bolometric correction; validate against published values for real stars.
+- Derive equilibrium temperature and bulk density from it, and classify each world by size, temperature and density; validate against the solar system's own bodies.
+- Paint the surface procedurally from that class, seeded per body so it is stable between visits, and apply it in both the body-detail view and the system-view markers.
+- State the derivation and its limits on screen, next to the measurements it rests on.

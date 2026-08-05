@@ -1,6 +1,9 @@
 import * as THREE from 'three/webgpu';
 
+import { appearanceForBody, appearanceForExoplanet } from '../../shared/astro/body-appearance';
 import { gmForParent } from '../../shared/astro/constants';
+import { PlanetAppearance } from '../../shared/astro/planet-appearance';
+import { MARKER_TEXTURE_HEIGHT, MARKER_TEXTURE_WIDTH, planetTexture } from '../../shared/rendering/procedural-planet-texture';
 import { isPropagatableOrbit, orbitEllipsePoints, propagateOrbit, resolveGravitationalParameter, resolveOrbitalElements } from '../../shared/astro/kepler';
 import { CartesianCoordinates, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
 import { BodyRecord, OrbitalElements } from '../../shared/models/body.model';
@@ -110,9 +113,19 @@ function buildOrbitLine(elements: OrbitalElements, kind: SystemMemberKind, frame
   return new THREE.Line(geometry, material);
 }
 
-function buildMarker(kind: SystemMemberKind, radiusKm: number | undefined, systemSpanAu: number): THREE.Mesh {
+/**
+ * A marker sphere, surfaced with the body's own derived appearance rather than a flat category
+ * colour — so a system reads as a set of distinct worlds at a glance, and the colour of each is
+ * a consequence of its measurements rather than of which list it came from.
+ *
+ * The texture is tiny (see `MARKER_TEXTURE_WIDTH`): a marker is a few pixels across, so what
+ * survives is essentially its average colour, and generating it costs well under a millisecond.
+ */
+function buildMarker(kind: SystemMemberKind, radiusKm: number | undefined, systemSpanAu: number, appearance: PlanetAppearance | undefined): THREE.Mesh {
   const geometry = new THREE.SphereGeometry(bodyMarkerRadiusAu(radiusKm, systemSpanAu), 16, 12);
-  const material = new THREE.MeshBasicMaterial({ color: colorForKind(kind) });
+  const material = appearance
+    ? new THREE.MeshBasicMaterial({ map: planetTexture(appearance, { width: MARKER_TEXTURE_WIDTH, height: MARKER_TEXTURE_HEIGHT }) })
+    : new THREE.MeshBasicMaterial({ color: colorForKind(kind) });
   return new THREE.Mesh(geometry, material);
 }
 
@@ -172,7 +185,13 @@ export class SystemOrbitsRenderer {
     bodies: readonly BodyRecord[],
     exoplanets: readonly ExoplanetRecord[],
     /** Direction from the Sun to this system's host star, equatorial — the exoplanet line of sight. */
-    hostStarDirection?: CartesianCoordinates
+    hostStarDirection?: CartesianCoordinates,
+    /**
+     * The host star's luminosity in solar units, which is what sets how hot each body in the
+     * system is and therefore what it looks like. Omitted for a host that is not in the star
+     * catalogue, leaving its bodies classified on size and density alone.
+     */
+    hostLuminositySolar?: number | null
   ) {
     const members: SystemMember[] = [];
     const topLevelBodiesById = new Map<string, BodyRecord>();
@@ -198,7 +217,7 @@ export class SystemOrbitsRenderer {
       }
       // A body reaches here only when it has no parentBodyId, so `kind` is 'planet' or 'dwarf'.
       const kind: SystemMemberKind = body.kind;
-      const tracked = this.addTopLevelBody(body.id, kind, body.orbit, gmForParent(undefined), body.radiusKm, ECLIPTIC_FRAME);
+      const tracked = this.addTopLevelBody(body.id, kind, body.orbit, gmForParent(undefined), body.radiusKm, ECLIPTIC_FRAME, appearanceForBody(body, bodies, hostLuminositySolar));
       members.push({ id: body.id, kind, marker: tracked.marker });
     }
 
@@ -211,7 +230,7 @@ export class SystemOrbitsRenderer {
       if (!parentTracked) {
         continue; // orphaned moon reference; skip rather than crash.
       }
-      const moon = this.addMoon(body.id, body.orbit, gmForParent(body.parentBodyId), body.radiusKm, parentTracked, ECLIPTIC_FRAME);
+      const moon = this.addMoon(body.id, body.orbit, gmForParent(body.parentBodyId), body.radiusKm, parentTracked, ECLIPTIC_FRAME, appearanceForBody(body, bodies, hostLuminositySolar));
       members.push({ id: body.id, kind: 'moon', marker: moon.marker });
     }
 
@@ -235,7 +254,7 @@ export class SystemOrbitsRenderer {
         periodDays: exoplanet.periodDays,
         hostStarMassSolar: exoplanet.hostStarMassSolar
       });
-      const tracked = this.addTopLevelBody(exoplanet.id, 'exoplanet', elements, gm, radiusKm, exoplanetFrame);
+      const tracked = this.addTopLevelBody(exoplanet.id, 'exoplanet', elements, gm, radiusKm, exoplanetFrame, appearanceForExoplanet(exoplanet, hostLuminositySolar));
       members.push({ id: exoplanet.id, kind: 'exoplanet', marker: tracked.marker });
     }
 
@@ -325,10 +344,11 @@ export class SystemOrbitsRenderer {
     elements: OrbitalElements,
     gmAu3PerDay2: number,
     radiusKm: number | undefined,
-    frame: THREE.Quaternion
+    frame: THREE.Quaternion,
+    appearance?: PlanetAppearance
   ): TrackedTopLevelBody {
     const orbitLine = buildOrbitLine(elements, kind, frame);
-    const marker = buildMarker(kind, radiusKm, this.maxTopLevelSemiMajorAxisAu);
+    const marker = buildMarker(kind, radiusKm, this.maxTopLevelSemiMajorAxisAu, appearance);
     this.object.add(orbitLine, marker);
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);
     this.trackDisposable(marker.geometry, marker.material as THREE.Material);
@@ -344,11 +364,12 @@ export class SystemOrbitsRenderer {
     gmAu3PerDay2: number,
     radiusKm: number | undefined,
     parent: TrackedTopLevelBody,
-    frame: THREE.Quaternion
+    frame: THREE.Quaternion,
+    appearance?: PlanetAppearance
   ): TrackedMoon {
     const pivot = new THREE.Group();
     const orbitLine = buildOrbitLine(elements, 'moon', frame);
-    const marker = buildMarker('moon', radiusKm, this.maxTopLevelSemiMajorAxisAu);
+    const marker = buildMarker('moon', radiusKm, this.maxTopLevelSemiMajorAxisAu, appearance);
     pivot.add(orbitLine, marker);
     this.object.add(pivot);
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);

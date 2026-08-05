@@ -2,9 +2,12 @@ import * as THREE from 'three/webgpu';
 
 /**
  * Real NASA/ESA/USGS photography baked into `src/assets/textures/bodies/` at build time,
- * keyed by the same ids used in `bodies.json`. Bodies without an entry here (most exoplanets,
- * a few moons whose photo wasn't sourced this round, and any future body) fall back to
- * `proceduralBodyTexture()` below rather than a flat color.
+ * keyed by the same ids used in `bodies.json`.
+ *
+ * This map is the whole of what has actually been photographed. Everything else — every
+ * exoplanet, since not one has ever been imaged, and the moons no probe returned a usable map
+ * of — falls through to `procedural-planet-texture.ts`, which derives a surface from the body's
+ * own measured size, mass, orbit and host star instead.
  *
  * Provenance (all public domain NASA/JPL or CC BY 4.0 Solar System Scope, via Wikimedia
  * Commons — see each file's Commons page for the original credit line):
@@ -78,63 +81,5 @@ export function loadCachedTexture(path: string): THREE.Texture {
   );
   texture.colorSpace = THREE.SRGBColorSpace;
   loadedTextures.set(path, texture);
-  return texture;
-}
-
-const proceduralTextureCache = new Map<string, THREE.CanvasTexture>();
-
-/**
- * Generates a simple procedural surface for bodies with no real photograph available — mainly
- * exoplanets, whose actual surfaces have never been directly imaged. This is an honest artistic
- * stand-in (mottled bands tinted by the body's classification color), not a fabricated "real"
- * texture, and is cached per color so repeated exoplanets of the same kind share one canvas.
- * Returns `undefined` if 2D canvas rendering isn't available (e.g. under a test/jsdom
- * environment with no canvas backend); callers should fall back to a flat material color.
- */
-export function proceduralBodyTexture(baseColor: THREE.ColorRepresentation): THREE.CanvasTexture | undefined {
-  const key = new THREE.Color(baseColor).getHexString();
-  const cached = proceduralTextureCache.get(key);
-  if (cached) {
-    return cached;
-  }
-
-  const size = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const context = canvas.getContext('2d');
-  if (!context) {
-    return undefined;
-  }
-
-  const base = new THREE.Color(baseColor);
-  const light = base.clone().offsetHSL(0, -0.15, 0.14);
-  const dark = base.clone().offsetHSL(0, 0.05, -0.16);
-
-  context.fillStyle = `#${base.getHexString()}`;
-  context.fillRect(0, 0, size, size);
-
-  // A handful of horizontal-ish noisy bands, reminiscent of banded gas giants / mottled rock,
-  // without claiming to depict any specific real surface feature.
-  let seed = key.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) || 1;
-  const random = () => {
-    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-    return seed / 0x7fffffff;
-  };
-
-  const bandCount = 10;
-  for (let i = 0; i < bandCount; i++) {
-    const y = (i / bandCount) * size + random() * (size / bandCount) * 0.4;
-    const height = size / bandCount * (0.5 + random() * 0.6);
-    context.fillStyle = `#${(random() > 0.5 ? light : dark).getHexString()}`;
-    context.globalAlpha = 0.35 + random() * 0.25;
-    context.fillRect(0, y, size, height);
-  }
-  context.globalAlpha = 1;
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = THREE.RepeatWrapping;
-  proceduralTextureCache.set(key, texture);
   return texture;
 }

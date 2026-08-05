@@ -49,7 +49,8 @@ drop line from each body, so eccentricity and inclination read against a circula
 instead of having to be inferred from a shape in space.
 
 **Body detail** — a dedicated close-up scene and info panel for one planet, moon or exoplanet,
-with real photography where NASA/ESA/USGS imagery exists.
+with real photography where NASA/ESA/USGS imagery exists, and a surface derived from the body's
+own measurements where it does not. See "On surfaces that were never photographed" below.
 
 **Search** — name search across stars, solar-system bodies and exoplanets, navigating to the
 same place an in-scene click would.
@@ -86,6 +87,48 @@ same place an in-scene click would.
   the next.
 - **No backend.** Every dataset is baked at build time into `src/assets/data/` and served as a
   static asset. Nothing queries an astronomy API at runtime.
+
+### On surfaces that were never photographed
+
+Fifteen bodies here have a real photograph. Everything else does not, and never will on current
+instruments: no exoplanet's surface has ever been imaged, and a few of the solar system's own
+moons have no usable map in this asset set either.
+
+Those bodies get a surface reasoned from what *has* been measured, in a chain that is worth
+following because every link is standard:
+
+1. The host star's **luminosity** comes from its catalogued apparent magnitude and its
+   parallax distance — that pair is exactly an absolute magnitude — plus a bolometric correction
+   for its spectral class. The correction is not optional: an M dwarf radiates most of its light
+   in the infrared, so its visual magnitude understates it by more than tenfold, and M dwarfs are
+   what most nearby planet hosts are. Good to about a factor of two, which matters less than it
+   sounds: temperature goes as the fourth root.
+2. Luminosity and the planet's semi-major axis give its **equilibrium temperature**, the standard
+   blackbody balance. Checked against the solar system it lands on Earth 255 K, Jupiter 112 K,
+   Neptune 46 K — all within a kelvin or two of published values — and puts 51 Pegasi b at
+   1227 K against a published 1200.
+3. Published mass and radius give **bulk density**, which is the difference between a ball of
+   iron, of rock, of water and of hydrogen.
+4. Size fixes the family, temperature the state within it, and density overrides both at the
+   extremes. That yields a class — molten, scorched, iron-rich, rocky, temperate, ice, sub-
+   Neptune, ice giant, gas giant, hot gas giant — each with a palette reasoned from its chemistry.
+   Methane absorbs red light, which is why the ice giants are blue; ammonia cloud tops are cream
+   and ochre; silicate cloud decks over a glowing interior are why hot Jupiters are drawn deep red.
+5. The surface is then painted from that class: **zonal bands** for a body with a fluid envelope,
+   because a rapidly rotating atmosphere organises into them, and fractal **terrain** for one
+   with a solid surface. Polar caps grow and shrink with the derived temperature.
+
+The generator samples three-dimensional noise along the sphere rather than a flat field, so
+there is no seam to stitch at the antimeridian and no pinching at the poles, and it writes into
+a plain byte array rather than a canvas — which makes it a pure function with no DOM to depend on.
+Each body's surface is seeded from its own id, so it looks the same on every visit.
+
+The limits are worth stating. Equilibrium temperature ignores greenhouse warming and internal
+heat, which is why Venus comes out at 300 K against a real surface of 737 K, and why Io — kept
+molten by tidal heating — classifies as ice. Luminosity classes are often missing from the star
+catalogue, so a red giant read as a dwarf will come out too bright. And the surfaces are
+illustrations throughout: the info panel says so on every body that has one, next to the
+measurements it was reasoned from.
 
 ### On the Galaxy model
 

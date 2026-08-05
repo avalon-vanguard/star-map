@@ -6,21 +6,18 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { EngineService } from '../../core/engine/engine.service';
+import { appearanceForBody, appearanceForExoplanet } from '../../shared/astro/body-appearance';
+import { EARTH_RADIUS_KM } from '../../shared/astro/planet-appearance';
+import { luminositySolar } from '../../shared/astro/stellar';
+import { planetTexture } from '../../shared/rendering/procedural-planet-texture';
 import { applyMilkyWaySkybox, createGlowSprite } from '../../shared/rendering/skybox';
-import { atmosphereColorFor, bodyTexturePath, loadCachedTexture, MILKY_WAY_SKYBOX_PATH, proceduralBodyTexture, SATURN_RING_TEXTURE_PATH } from '../../shared/rendering/texture-catalog';
+import { atmosphereColorFor, bodyTexturePath, loadCachedTexture, MILKY_WAY_SKYBOX_PATH, SATURN_RING_TEXTURE_PATH } from '../../shared/rendering/texture-catalog';
 import { BodyRecord } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
 import { NavigationStore } from '../../shared/state/navigation.store';
 import { BodyDetailViewModel } from './body-detail.model';
 import { InfoPanelComponent } from './info-panel.component';
-
-const KIND_COLORS: Record<BodyDetailViewModel['kind'], THREE.ColorRepresentation> = {
-  planet: 0x8cbfff,
-  moon: 0xbfbfbf,
-  dwarf: 0xccb28c,
-  exoplanet: 0xd966d9
-};
 
 /** Gas giants read as smoother/less rocky than terrestrial bodies under the same lighting rig. */
 const GAS_GIANT_IDS = new Set(['jupiter', 'saturn', 'uranus', 'neptune']);
@@ -131,19 +128,24 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
         kind: body.kind,
         hostStarName: hostStar?.name ?? 'Unknown star',
         radiusKm: body.radiusKm,
-        orbit: body.orbit
+        orbit: body.orbit,
+        appearance: appearanceForBody(body, this.bodies, this.luminosityOf(hostStar)),
+        hasPhotography: bodyTexturePath(body.id) !== undefined
       });
       this.navigationStore.selectStar(body.systemStarId);
     } else if (exoplanet) {
+      const hostStar = this.stars.find((star) => star.id === exoplanet.hostStarId);
       this.viewModel.set({
         id: exoplanet.id,
         name: exoplanet.name,
         kind: 'exoplanet',
         hostStarName: exoplanet.hostStarName,
-        radiusKm: exoplanet.radiusEarth ? exoplanet.radiusEarth * 6371 : undefined,
+        radiusKm: exoplanet.radiusEarth ? exoplanet.radiusEarth * EARTH_RADIUS_KM : undefined,
         massEarth: exoplanet.massEarth,
         discoveryYear: exoplanet.discoveryYear,
-        orbit: exoplanet.orbit
+        orbit: exoplanet.orbit,
+        appearance: appearanceForExoplanet(exoplanet, this.luminosityOf(hostStar)),
+        hasPhotography: bodyTexturePath(exoplanet.id) !== undefined
       });
       if (exoplanet.hostStarId !== null) {
         this.navigationStore.selectStar(exoplanet.hostStarId);
@@ -161,20 +163,33 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  /**
+   * The host star's luminosity in solar units, from its own catalogued magnitude and distance.
+   * `null` for an exoplanet whose host never cross-referenced to the star catalogue, which
+   * leaves its planets with no derived temperature rather than a guessed one.
+   */
+  private luminosityOf(star: StarRecord | undefined): number | null {
+    if (!star) {
+      return null;
+    }
+    return luminositySolar({ magnitude: star.magnitude, distancePc: Math.hypot(star.x, star.y, star.z), spectralType: star.spectralType });
+  }
+
   private applyViewModelToScene(): void {
     const viewModel = this.viewModel();
     if (!viewModel || !this.planetMaterial) {
       return;
     }
 
+    // Real photography wherever it exists, and a surface derived from the body's own measured
+    // properties wherever it does not — which is every exoplanet, since none has ever been
+    // imaged, and the handful of moons no probe returned a usable map of.
     const realTexturePath = bodyTexturePath(viewModel.id);
-    const texture = realTexturePath ? loadCachedTexture(realTexturePath) : proceduralBodyTexture(KIND_COLORS[viewModel.kind]);
-    this.planetMaterial.map = texture ?? null;
-    // A texture (real photo or procedural stand-in) supplies its own color; a plain white base
-    // keeps that color true instead of tinting it through `KIND_COLORS` a second time. If no
-    // texture is available at all (e.g. canvas rendering unsupported), fall back to the flat kind color.
-    this.planetMaterial.color.set(texture ? 0xffffff : KIND_COLORS[viewModel.kind]);
-    this.planetMaterial.roughness = GAS_GIANT_IDS.has(viewModel.id) ? 0.55 : 0.85;
+    this.planetMaterial.map = realTexturePath ? loadCachedTexture(realTexturePath) : planetTexture(viewModel.appearance);
+    // The texture supplies its own colour, so the base stays white rather than tinting it twice.
+    this.planetMaterial.color.set(0xffffff);
+    // A fluid envelope scatters light more evenly than a solid surface does.
+    this.planetMaterial.roughness = GAS_GIANT_IDS.has(viewModel.id) || viewModel.appearance.palette.structure === 'banded' ? 0.55 : 0.85;
     this.planetMaterial.needsUpdate = true;
 
     this.disposeRing();
@@ -275,7 +290,9 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     const geometry = new THREE.SphereGeometry(1, 64, 48);
     const viewModel = this.viewModel();
     this.planetMaterial = new THREE.MeshStandardMaterial({
-      color: viewModel ? KIND_COLORS[viewModel.kind] : 0xffffff,
+      // White, always: the map that arrives a moment later carries the colour, whether it is a
+      // photograph or a surface derived from the body's own measurements.
+      color: 0xffffff,
       roughness: 0.85,
       metalness: 0.05
     });

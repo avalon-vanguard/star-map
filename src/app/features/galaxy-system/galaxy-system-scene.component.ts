@@ -5,6 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { dateToJulianDate } from '../../shared/astro/constants';
 import { galacticCentrePositionPc, galacticToEquatorial, MILKY_WAY_ARMS, SUN_GALACTOCENTRIC_RADIUS_PC } from '../../shared/astro/galaxy';
+import { luminositySolar } from '../../shared/astro/stellar';
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { EngineService } from '../../core/engine/engine.service';
 import { BodyRecord } from '../../shared/models/body.model';
@@ -691,7 +692,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // The star's own position is the line of sight to it, which is the plane the archive
     // measures exoplanet inclinations against. The Sun sits at the origin and has no
     // exoplanets, so it has no meaningful direction and the renderer falls back.
-    this.systemRenderer = new SystemOrbitsRenderer(systemBodies, systemExoplanets, { x: star.x, y: star.y, z: star.z });
+    // The star's luminosity, derived from its own catalogued magnitude and distance, is what
+    // decides how hot each body in the system is — and so what each of them looks like.
+    const hostLuminosity = luminositySolar({ magnitude: star.magnitude, distancePc: Math.hypot(star.x, star.y, star.z), spectralType: star.spectralType });
+    this.systemRenderer = new SystemOrbitsRenderer(systemBodies, systemExoplanets, { x: star.x, y: star.y, z: star.z }, hostLuminosity);
     this.systemGroup.add(this.systemRenderer.object);
 
     // Sized against this system's innermost orbit, so the star never swallows its own planets.

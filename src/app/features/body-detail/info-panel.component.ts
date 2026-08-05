@@ -2,6 +2,7 @@ import { DecimalPipe } from '@angular/common';
 import { Component, input } from '@angular/core';
 import { Router } from '@angular/router';
 
+import { PLANET_CLASS_LABELS } from '../../shared/astro/planet-appearance';
 import { BodyDetailViewModel } from './body-detail.model';
 
 const KIND_LABELS: Record<BodyDetailViewModel['kind'], string> = {
@@ -60,6 +61,22 @@ const KIND_LABELS: Record<BodyDetailViewModel['kind'], string> = {
           <dd class="text-right text-text">{{ body().discoveryYear }}</dd>
         }
       </dl>
+
+      <p class="mt-4 mb-1.5 text-[10px] tracking-[0.18em] text-muted uppercase">Derived</p>
+      <dl class="grid grid-cols-[auto_1fr] gap-y-1.5 gap-x-3 text-sm">
+        <dt class="text-muted">Class</dt>
+        <dd class="text-right text-text">{{ classLabel() }}</dd>
+        @if (body().appearance.equilibriumTemperatureK !== null) {
+          <dt class="text-muted">Equilibrium temp.</dt>
+          <dd class="text-right text-text">{{ body().appearance.equilibriumTemperatureK | number: '1.0-0' }} K</dd>
+        }
+        @if (body().appearance.bulkDensityGramsPerCm3 !== null) {
+          <dt class="text-muted">Bulk density</dt>
+          <dd class="text-right text-text">{{ body().appearance.bulkDensityGramsPerCm3 | number: '1.0-2' }} g/cm³</dd>
+        }
+      </dl>
+
+      <p class="mt-3 border-t border-border/50 pt-2 text-[10px] leading-relaxed text-muted">{{ surfaceProvenance() }}</p>
     </div>
   `,
   imports: [DecimalPipe]
@@ -71,6 +88,25 @@ export class InfoPanelComponent {
 
   kindLabel(): string {
     return KIND_LABELS[this.body().kind];
+  }
+
+  classLabel(): string {
+    return PLANET_CLASS_LABELS[this.body().appearance.planetClass];
+  }
+
+  /**
+   * Says plainly which of the two the viewer is looking at. The derived surface is a reasoned
+   * illustration, and a panel of real measurements sitting next to it is exactly the context in
+   * which it could be mistaken for another one.
+   */
+  surfaceProvenance(): string {
+    if (this.body().hasPhotography) {
+      return 'Surface: NASA/ESA/USGS photography.';
+    }
+    const temperature = this.body().appearance.equilibriumTemperatureK;
+    return temperature === null
+      ? 'Surface illustrated from this body’s measured size and mass. Its host star is not in the catalogue, so no temperature could be derived. Not an observation — no image of this world exists.'
+      : 'Surface illustrated from the measurements above — size, density and the temperature derived from its star’s output and its orbit. Not an observation — no image of this world exists.';
   }
 
   goBack(): void {

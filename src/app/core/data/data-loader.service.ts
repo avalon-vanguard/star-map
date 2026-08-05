@@ -1,7 +1,9 @@
 import { Injectable } from '@angular/core';
 
 import { BodyRecord } from '../../shared/models/body.model';
+import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
+import { decodeStarCatalog, StarCatalogIndex } from '../../shared/models/star-catalog';
 import { StarRecord } from '../../shared/models/star.model';
 
 export interface StarField {
@@ -19,6 +21,7 @@ export class DataLoaderService {
   private starFieldPromise?: Promise<StarField>;
   private bodiesPromise?: Promise<BodyRecord[]>;
   private exoplanetsPromise?: Promise<ExoplanetRecord[]>;
+  private deepSkyPromise?: Promise<DeepSkyRecord[]>;
 
   loadStars(): Promise<StarField> {
     this.starFieldPromise ??= this.fetchStars();
@@ -35,13 +38,25 @@ export class DataLoaderService {
     return this.exoplanetsPromise;
   }
 
+  loadDeepSky(): Promise<DeepSkyRecord[]> {
+    this.deepSkyPromise ??= this.fetchJson<DeepSkyRecord[]>('assets/data/deepsky.json');
+    return this.deepSkyPromise;
+  }
+
+  /**
+   * Three assets rather than one, fetched in parallel: the strings as JSON, and the numbers as
+   * two binary column stores. See `star-catalog.ts` for why the catalogue is not a single array
+   * of JSON objects.
+   */
   private async fetchStars(): Promise<StarField> {
-    const [stars, buffer] = await Promise.all([
-      fetch('assets/data/stars-index.json').then((response) => response.json() as Promise<StarRecord[]>),
-      fetch('assets/data/stars.bin').then((response) => response.arrayBuffer())
+    const [index, positionBuffer, metaBuffer] = await Promise.all([
+      fetch('assets/data/stars-index.json').then((response) => response.json() as Promise<StarCatalogIndex>),
+      fetch('assets/data/stars.bin').then((response) => response.arrayBuffer()),
+      fetch('assets/data/stars-meta.bin').then((response) => response.arrayBuffer())
     ]);
 
-    return { stars, positions: new Float32Array(buffer) };
+    const positions = new Float32Array(positionBuffer);
+    return { stars: decodeStarCatalog(index, positions, metaBuffer), positions };
   }
 
   private fetchJson<T>(url: string): Promise<T> {

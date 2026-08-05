@@ -1,16 +1,37 @@
 import { writeFileSync } from 'node:fs';
 
 import { raDecDistanceToXyz } from '../../src/app/shared/astro/coordinates';
+import { mergeStarCatalogues } from '../../src/app/shared/astro/star-merge';
+import { encodeStarCatalog } from '../../src/app/shared/models/star-catalog';
 import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model';
-import { parseCsvObjects } from './lib/csv';
+import { positionalSources } from './sources/registry';
+import { PARALLAX_PRECISION_MAS } from './sources/star-sources';
+import { parseCsvObjects, parseOptionalNumber } from './lib/csv';
 import { fetchTextCached } from './lib/http';
 import { dataPath, ensureDataDir } from './lib/paths';
 
 const HYG_CSV_URL = 'https://raw.githubusercontent.com/astronexus/HYG-Database/main/hyg/CURRENT/hygdata_v41.csv';
 const HYG_UNKNOWN_DISTANCE_PC = 100000; // HYG's placeholder for unmeasured/unreliable parallax
 
-/** Stars within this distance (parsecs) of the Sun are kept for the galaxy view. */
-const DISTANCE_CUTOFF_PC = Number(process.env['ETL_STAR_DISTANCE_PC'] ?? 50);
+/**
+ * Stand-in magnitude for a star with no photometry. Faint rather than 0, because 0 would mean
+ * "as bright as Vega" and render it as one of the largest points on the map.
+ */
+const UNKNOWN_MAGNITUDE = 15;
+
+/**
+ * Stars within this distance (parsecs) of the Sun are kept for the galaxy view.
+ *
+ * Set at the range HYG's own measurements reach rather than at a round number. 98.6% of its
+ * rows carry a Hipparcos identifier, and Hipparcos parallaxes are good to roughly a
+ * milliarcsecond — so at 250 pc (4 mas) a star's distance is uncertain by some tens of per
+ * cent, and beyond it the catalogue is plotting noise. Note that only the *radial* placement
+ * blurs: a star's direction on the sky stays exact at any distance.
+ *
+ * The catalogue is also magnitude-limited, so this is not a volume-complete sample beyond about
+ * 50 pc: it thins to the intrinsically bright, which is the same selection the naked eye makes.
+ */
+const DISTANCE_CUTOFF_PC = Number(process.env['ETL_STAR_DISTANCE_PC'] ?? 250);
 
 function resolveName(row: Record<string, string>): string {
   if (row['proper']) {
@@ -26,7 +47,10 @@ function resolveName(row: Record<string, string>): string {
     return `HD ${row['hd']}`;
   }
   if (row['gl']) {
-    return `Gl ${row['gl']}`;
+    // Already a complete designation ("Gl 581", "GJ 3512"), unlike the bare numbers in `hd`
+    // and `hip` — prefixing it again produced 2331 stars named "Gl GJ 1076", which broke
+    // search, the on-screen labels, and exoplanet host-star name matching alike.
+    return row['gl'];
   }
   if (row['hip']) {
     return `HIP ${row['hip']}`;
@@ -51,7 +75,7 @@ export async function fetchStars(): Promise<StarRecord[]> {
     const distancePc = Number(row['dist']);
 
     if (id === SUN_STAR_ID) {
-      stars.push({ id, name: 'Sol', x: 0, y: 0, z: 0, magnitude: Number(row['mag']), spectralType: row['spect'] || 'G2V', colorIndex: Number(row['ci']) || 0 });
+      stars.push({ id, name: 'Sol', x: 0, y: 0, z: 0, magnitude: parseOptionalNumber(row['mag']) ?? UNKNOWN_MAGNITUDE, spectralType: row['spect'] || 'G2V', colorIndex: parseOptionalNumber(row['ci']) ?? null });
       continue;
     }
 
@@ -73,31 +97,69 @@ export async function fetchStars(): Promise<StarRecord[]> {
       x,
       y,
       z,
-      magnitude: Number(row['mag']) || 0,
+      magnitude: parseOptionalNumber(row['mag']) ?? UNKNOWN_MAGNITUDE,
       spectralType: row['spect'] || 'Unknown',
-      colorIndex: Number(row['ci']) || 0
+      colorIndex: parseOptionalNumber(row['ci']) ?? null
     });
   }
 
-  stars.sort((a, b) => a.id - b.id);
-  writeStarAssets(stars);
-
   console.log(`  kept ${stars.length} stars (of ${rows.length} in the catalog).`);
+
+  const merged = await mergeWithOtherSources(stars);
+  merged.sort((a, b) => a.id - b.id);
+  writeStarAssets(merged);
+  return merged;
+}
+
+/**
+ * Unions HYG with every other positional source that is wired in and reachable.
+ *
+ * A source that cannot be reached is reported and skipped rather than failing the run. That is
+ * not defensive padding: the archives this would draw on are frequently unavailable, and a build
+ * that produces a smaller catalogue is far better than one that produces none.
+ */
+async function mergeWithOtherSources(hygStars: StarRecord[]): Promise<StarRecord[]> {
+  const others = positionalSources().filter((source) => source.id !== 'hyg');
+  if (others.length === 0) {
+    return hygStars;
+  }
+
+  const candidates = [{ sourceId: 'hyg', parallaxPrecisionMas: PARALLAX_PRECISION_MAS['hyg'], stars: hygStars }];
+
+  for (const source of others) {
+    try {
+      candidates.push({
+        sourceId: source.id,
+        parallaxPrecisionMas: PARALLAX_PRECISION_MAS[source.id] ?? 1,
+        stars: await source.fetch!()
+      });
+    } catch (error) {
+      console.log(`  skipping ${source.name}: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+
+  if (candidates.length === 1) {
+    return hygStars;
+  }
+
+  const { stars, summary } = mergeStarCatalogues(candidates);
+  console.log(`  merged ${summary.total} stars from ${candidates.length} catalogues (${summary.duplicates} duplicates resolved to the better parallax):`);
+  for (const [sourceId, count] of Object.entries(summary.bySource)) {
+    console.log(`    ${sourceId}: ${count}`);
+  }
   return stars;
 }
 
 function writeStarAssets(stars: StarRecord[]): void {
   ensureDataDir();
 
-  const positions = new Float32Array(stars.length * 3);
-  stars.forEach((star, index) => {
-    positions[index * 3] = star.x;
-    positions[index * 3 + 1] = star.y;
-    positions[index * 3 + 2] = star.z;
-  });
+  // The layout lives in `star-catalog.ts`, which the app decodes with — one definition, so the
+  // writer and the reader cannot drift.
+  const { index, positions, meta } = encodeStarCatalog(stars);
 
   writeFileSync(dataPath('stars.bin'), Buffer.from(positions.buffer));
-  writeFileSync(dataPath('stars-index.json'), JSON.stringify(stars));
+  writeFileSync(dataPath('stars-meta.bin'), Buffer.from(meta));
+  writeFileSync(dataPath('stars-index.json'), JSON.stringify(index));
 }
 
 if (require.main === module) {

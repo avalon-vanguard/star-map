@@ -3,18 +3,7 @@ import { Router } from '@angular/router';
 
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { NavigationStore } from '../../shared/state/navigation.store';
-
-type SearchResultKind = 'star' | 'body' | 'exoplanet';
-
-interface SearchEntry {
-  kind: SearchResultKind;
-  name: string;
-  subtitle: string;
-  /** HYG star id, for `kind: 'star'` results. */
-  starId?: number;
-  /** `bodies.json`/`exoplanets.json` id, for `kind: 'body' | 'exoplanet'` results. */
-  bodyId?: string;
-}
+import { buildSearchIndex, IndexedSearchEntry, rankSearchResults, SearchEntry, SearchResultKind } from './search-ranking';
 
 const MAX_RESULTS = 8;
 const MIN_QUERY_LENGTH = 2;
@@ -70,23 +59,15 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
 })
 export class SearchComponent {
   readonly query = signal('');
-  private readonly index = signal<SearchEntry[]>([]);
+  /** Pre-normalised once on load; re-deriving it per keystroke would stutter the render loop. */
+  private readonly index = signal<IndexedSearchEntry[]>([]);
 
   readonly results = computed(() => {
-    const query = this.query().trim().toLowerCase();
+    const query = this.query().trim();
     if (query.length < MIN_QUERY_LENGTH) {
       return [];
     }
-    const matches: SearchEntry[] = [];
-    for (const entry of this.index()) {
-      if (entry.name.toLowerCase().includes(query)) {
-        matches.push(entry);
-        if (matches.length >= MAX_RESULTS) {
-          break;
-        }
-      }
-    }
-    return matches;
+    return rankSearchResults(this.index(), query, MAX_RESULTS);
   });
 
   constructor(
@@ -133,7 +114,7 @@ export class SearchComponent {
         ...exoplanets.map((exoplanet): SearchEntry => ({ kind: 'exoplanet', name: exoplanet.name, subtitle: exoplanet.hostStarName, bodyId: exoplanet.id }))
       ];
 
-      this.index.set(entries);
+      this.index.set(buildSearchIndex(entries));
     } catch (error) {
       console.error('Failed to build the search index.', error);
     }

@@ -25,6 +25,8 @@ server a developer might already have running there.
   exactly where the default galaxy-view camera looks. `camera-flight.spec.ts` relies on this to
   reliably click-select it by clicking the center of the canvas, without needing pixel-perfect
   knowledge of the star field's on-screen layout.
-- Data (bootstrap fetch of `stars.bin`/`stars-index.json`/`bodies.json`/`exoplanets.json`) loads
-  asynchronously after the page loads, so tests poll (re-click/re-check) rather than assume the
-  scene is interactive immediately after `page.goto()`.
+- Data (bootstrap fetch of `stars.bin`/`stars-index.json`/`bodies.json`/`exoplanets.json`/
+  `deepsky.json`) loads asynchronously after the page loads, so tests poll (re-click/re-check)
+  rather than assume the scene is interactive immediately after `page.goto()`.
+- `deepsky.json` is the one dataset the scene treats as optional: it only feeds the decorative
+  backdrop, so a failure to load it is logged and the star field comes up regardless.

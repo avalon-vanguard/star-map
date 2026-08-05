@@ -1,8 +1,8 @@
-import { DecimalPipe } from '@angular/common';
-import { Component, input } from '@angular/core';
+import { Component, computed, input } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { PLANET_CLASS_LABELS } from '../../shared/astro/planet-appearance';
+import { formatAu, formatDensity, formatMassEarth, formatPeriod, formatRadiusKm, formatTemperature } from '../../shared/format/quantity';
 import { BodyDetailViewModel } from './body-detail.model';
 
 const KIND_LABELS: Record<BodyDetailViewModel['kind'], string> = {
@@ -35,30 +35,35 @@ const KIND_LABELS: Record<BodyDetailViewModel['kind'], string> = {
       <h1 class="mb-0.5 font-display text-lg font-semibold tracking-wide text-text">{{ body().name }}</h1>
       <p class="mb-4 text-xs tracking-wide text-accent uppercase">{{ kindLabel() }} · {{ body().hostStarName }}</p>
 
+      <p class="mt-4 mb-1.5 text-[10px] tracking-[0.18em] text-muted uppercase">Measured</p>
       <dl class="grid grid-cols-[auto_1fr] gap-y-1.5 gap-x-3 text-sm">
         @if (body().radiusKm) {
           <dt class="text-muted">Radius</dt>
-          <dd class="text-right text-text">{{ body().radiusKm | number: '1.0-1' }} km</dd>
+          <dd class="text-right text-text tabular-nums">{{ radius() }}</dd>
         }
         @if (body().massEarth) {
           <dt class="text-muted">Mass</dt>
-          <dd class="text-right text-text">{{ body().massEarth | number: '1.0-2' }} Earth masses</dd>
+          <dd class="text-right text-text tabular-nums">{{ mass() }}</dd>
         }
         @if (body().orbit.semiMajorAxisAu) {
           <dt class="text-muted">Semi-major axis</dt>
-          <dd class="text-right text-text">{{ body().orbit.semiMajorAxisAu | number: '1.0-4' }} AU</dd>
+          <dd class="text-right text-text tabular-nums">{{ semiMajorAxis() }}</dd>
         }
         @if (body().orbit.eccentricity !== undefined) {
           <dt class="text-muted">Eccentricity</dt>
-          <dd class="text-right text-text">{{ body().orbit.eccentricity | number: '1.0-4' }}</dd>
+          <dd class="text-right text-text tabular-nums">{{ body().orbit.eccentricity!.toFixed(4) }}</dd>
         }
         @if (body().orbit.inclinationDeg !== undefined) {
           <dt class="text-muted">Inclination</dt>
-          <dd class="text-right text-text">{{ body().orbit.inclinationDeg | number: '1.0-2' }}°</dd>
+          <dd class="text-right text-text tabular-nums">{{ body().orbit.inclinationDeg!.toFixed(2) }}°</dd>
+        }
+        @if (measuredPeriod()) {
+          <dt class="text-muted">Period</dt>
+          <dd class="text-right text-text tabular-nums">{{ measuredPeriod() }}</dd>
         }
         @if (body().discoveryYear) {
           <dt class="text-muted">Discovered</dt>
-          <dd class="text-right text-text">{{ body().discoveryYear }}</dd>
+          <dd class="text-right text-text tabular-nums">{{ body().discoveryYear }}</dd>
         }
       </dl>
 
@@ -66,23 +71,40 @@ const KIND_LABELS: Record<BodyDetailViewModel['kind'], string> = {
       <dl class="grid grid-cols-[auto_1fr] gap-y-1.5 gap-x-3 text-sm">
         <dt class="text-muted">Class</dt>
         <dd class="text-right text-text">{{ classLabel() }}</dd>
+        @if (derivedPeriod()) {
+          <dt class="text-muted">Period</dt>
+          <dd class="text-right text-text tabular-nums">{{ derivedPeriod() }}</dd>
+        }
         @if (body().appearance.equilibriumTemperatureK !== null) {
           <dt class="text-muted">Equilibrium temp.</dt>
-          <dd class="text-right text-text">{{ body().appearance.equilibriumTemperatureK | number: '1.0-0' }} K</dd>
+          <dd class="text-right text-text tabular-nums">{{ temperature() }}</dd>
         }
         @if (body().appearance.bulkDensityGramsPerCm3 !== null) {
           <dt class="text-muted">Bulk density</dt>
-          <dd class="text-right text-text">{{ body().appearance.bulkDensityGramsPerCm3 | number: '1.0-2' }} g/cm³</dd>
+          <dd class="text-right text-text tabular-nums">{{ density() }}</dd>
         }
       </dl>
 
       <p class="mt-3 border-t border-border/50 pt-2 text-[10px] leading-relaxed text-muted">{{ surfaceProvenance() }}</p>
     </div>
-  `,
-  imports: [DecimalPipe]
+  `
 })
 export class InfoPanelComponent {
   readonly body = input.required<BodyDetailViewModel>();
+
+  readonly radius = computed(() => formatRadiusKm(this.body().radiusKm!));
+  readonly mass = computed(() => formatMassEarth(this.body().massEarth!));
+  readonly semiMajorAxis = computed(() => formatAu(this.body().orbit.semiMajorAxisAu!));
+  readonly temperature = computed(() => formatTemperature(this.body().appearance.equilibriumTemperatureK!));
+  readonly density = computed(() => formatDensity(this.body().appearance.bulkDensityGramsPerCm3!));
+  /** The period goes under whichever heading its provenance calls for, and nowhere otherwise. */
+  readonly measuredPeriod = computed(() => this.periodUnder('measured'));
+  readonly derivedPeriod = computed(() => this.periodUnder('derived'));
+
+  private periodUnder(source: 'measured' | 'derived'): string | null {
+    const body = this.body();
+    return body.orbitalPeriodDays !== undefined && body.orbitalPeriodSource === source ? formatPeriod(body.orbitalPeriodDays) : null;
+  }
 
   constructor(private readonly router: Router) {}
 

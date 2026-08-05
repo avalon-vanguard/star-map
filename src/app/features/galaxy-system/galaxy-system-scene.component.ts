@@ -5,7 +5,6 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { dateToJulianDate } from '../../shared/astro/constants';
 import { galacticCentrePositionPc, galacticToEquatorial, MILKY_WAY_ARMS, SUN_GALACTOCENTRIC_RADIUS_PC } from '../../shared/astro/galaxy';
-import { luminositySolar } from '../../shared/astro/stellar';
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { EngineService } from '../../core/engine/engine.service';
 import { BodyRecord } from '../../shared/models/body.model';
@@ -20,7 +19,11 @@ import { DeepSkyRenderer } from './deep-sky-renderer';
 import { galacticNormal, PolarGridPlane, TetherField } from './grid-plane';
 import { MilkyWayRenderer } from './milky-way-renderer';
 import { starGlowExtentAu, starMarkerRadiusAu, systemFrameRadiusAu, systemFramingDistanceAu, systemViewDirection } from './system-framing';
+import { formatAu, formatLuminosity, formatParsecs } from '../../shared/format/quantity';
+import { BodyDetailViewModel } from '../body-detail/body-detail.model';
+import { buildBodyViewModel, luminosityOf } from '../body-detail/body-view-model';
 import { HudReadout, StarmapHudComponent } from './starmap-hud.component';
+import { SystemObjectCardComponent } from './system-object-card.component';
 import { colorIndexToRgb, StarFieldRenderer, starRenderBudgetFromUrl } from './star-field-renderer';
 import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
@@ -126,13 +129,7 @@ const RETURN_DURATION_SECONDS = 1.1;
 const GALACTIC_FLIGHT_SECONDS = 2.4;
 
 /** Camera range for the readout panel, in the unit that suits the distance. */
-function formatParsecs(distancePc: number): string {
-  return distancePc >= 1000 ? `${(distancePc / 1000).toFixed(1)} kpc` : `${distancePc.toFixed(distancePc < 10 ? 2 : 0)} pc`;
-}
 
-function formatAu(distanceAu: number): string {
-  return distanceAu >= 100 ? `${distanceAu.toFixed(0)} AU` : `${distanceAu.toFixed(2)} AU`;
-}
 
 /**
  * Where the camera sits to hold the whole Galaxy: above the disc and back past the Sun, looking
@@ -157,7 +154,7 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
 @Component({
   selector: 'app-galaxy-system-scene',
   providers: [EngineService],
-  imports: [StarmapHudComponent],
+  imports: [StarmapHudComponent, SystemObjectCardComponent],
   template: `
     <div class="relative h-full w-full">
       <canvas #canvas data-testid="scene-canvas" class="block h-full w-full"></canvas>
@@ -172,6 +169,9 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
         [range]="hudRange()"
         (levelSelected)="goToLevel($event)"
       />
+      @if (objectCard(); as card) {
+        <app-system-object-card [body]="card" (dismissed)="dismissObjectCard()" (openRequested)="openObjectDetail(card.id)" />
+      }
     </div>
   `
 })
@@ -193,6 +193,14 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   readonly hudReadouts = signal<readonly HudReadout[]>([]);
   readonly hudNote = signal('');
   readonly hudRange = signal('');
+
+  /**
+   * The body whose card is showing: whichever is pinned by a click, else whatever the pointer is
+   * over. Undefined outside the system view, and cleared when the view leaves one.
+   */
+  readonly objectCard = signal<BodyDetailViewModel | undefined>(undefined);
+  private pinnedBodyId: string | null = null;
+  private hoveredBodyId: string | null = null;
 
   private controls?: OrbitControls;
   private rig?: CameraRigController;
@@ -251,6 +259,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.resizeObserver?.disconnect();
     this.canvasRef().nativeElement.removeEventListener('pointerdown', this.handlePointerDown);
     this.canvasRef().nativeElement.removeEventListener('click', this.handleClick);
+    this.canvasRef().nativeElement.removeEventListener('pointermove', this.handlePointerMove);
     this.controls?.dispose();
     this.starField?.dispose();
     this.deepSky?.dispose();
@@ -389,6 +398,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     canvas.addEventListener('pointerdown', this.handlePointerDown);
     canvas.addEventListener('click', this.handleClick);
+    canvas.addEventListener('pointermove', this.handlePointerMove);
     this.observeResize(canvas);
 
     this.unsubscribeTick = this.engine.onTick((deltaSeconds) => this.tick(camera, deltaSeconds));
@@ -628,13 +638,19 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     if (this.systemGroup.visible && star) {
       const planetCount = this.bodies.filter((body) => body.systemStarId === star.id && !body.parentBodyId).length + this.exoplanets.filter((exoplanet) => exoplanet.hostStarId === star.id).length;
+      const moonCount = this.bodies.filter((body) => body.systemStarId === star.id && body.parentBodyId).length;
+      const distancePc = Math.hypot(star.x, star.y, star.z);
+      const luminosity = luminosityOf(star);
       this.hudEyebrow.set('System');
       this.hudTitle.set(star.name);
       this.hudSubtitle.set(star.spectralType ? `Spectral type ${star.spectralType}` : '');
       this.hudReadouts.set([
-        { label: 'Bodies', value: `${planetCount}` },
-        { label: 'Distance', value: `${Math.hypot(star.x, star.y, star.z).toFixed(2)} pc` },
-        { label: 'Magnitude', value: star.magnitude.toFixed(2) }
+        { label: 'Bodies', value: moonCount > 0 ? `${planetCount} + ${moonCount} moons` : `${planetCount}` },
+        // Suppressed for the Sun rather than printed as `0.00 pc`, which is arithmetically right
+        // and reads as a bug: the distance from here to here is not a measurement.
+        ...(distancePc > 0 ? [{ label: 'Distance', value: formatParsecs(distancePc) }] : []),
+        { label: 'Magnitude', value: star.magnitude.toFixed(2) },
+        ...(luminosity !== null ? [{ label: 'Luminosity', value: formatLuminosity(luminosity), derived: true }] : [])
       ]);
       this.hudNote.set('Orbits propagated from published elements to the current date.');
       this.hudRange.set(formatAu(camera.position.distanceTo(this.controls?.target ?? GALAXY_OVERVIEW_TARGET)));
@@ -665,7 +681,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       // what it draws. See `STAR_RENDER_BUDGET`.
       { label: 'Stars', value: this.starField && this.starField.drawnCount < this.stars.length ? `${this.starField.drawnCount} / ${this.stars.length}` : `${this.stars.length}` },
       { label: 'Radius', value: `${LOCAL_GRID_RINGS_PC[LOCAL_GRID_RINGS_PC.length - 1]} pc` },
-      { label: 'Exoplanets', value: `${this.exoplanets.length}` }
+      { label: 'Exoplanets', value: `${this.exoplanets.length}` },
+      // The one thing the field itself cannot show: which of those points can be flown into.
+      { label: 'Systems', value: `${this.enterableSystemCount()}` }
     ]);
     this.hudNote.set('Positions from measured parallaxes. Grid marks the galactic plane through the Sun.');
   }
@@ -714,16 +732,98 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  /**
+   * Picks a body in the system view. Clicking one pins its card; clicking empty space unpins,
+   * which is also how the card is dismissed without aiming for its close control.
+   *
+   * This used to navigate straight to `/body/:id`. That tore down the system scene and the camera
+   * with it, so comparing two planets meant flying back into the system between each — the card
+   * shows the same numbers over the live view instead, and `Full view` still opens the route.
+   */
   private handleSystemClick(): void {
     if (!this.systemRenderer) {
       return;
     }
     const [hit] = this.raycaster.intersectObjects(this.systemRenderer.pickableObjects);
     const member = hit ? this.systemRenderer.memberForObject(hit.object) : undefined;
+
+    this.pinnedBodyId = member ? member.id : null;
     if (member) {
       this.navigationStore.selectBody(member.id);
-      void this.router.navigate(['/body', member.id]);
     }
+    this.refreshObjectCard();
+  }
+
+  /**
+   * Hover preview, so a body's figures can be read without committing a click.
+   *
+   * The raycast is against the system's own handful of pickable meshes rather than the star field,
+   * so it stays cheap even on a software rasterizer — it is the rendering that is slow in that
+   * environment, not the picking. Skipped outside the system view and during a camera flight.
+   */
+  private readonly handlePointerMove = (event: PointerEvent): void => {
+    if (!this.systemRenderer || !this.systemGroup.visible || this.rig?.isAnimating) {
+      return;
+    }
+    const canvas = this.canvasRef().nativeElement;
+    const rect = canvas.getBoundingClientRect();
+    const pointerNdc = new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+    this.raycaster.setFromCamera(pointerNdc, this.engine.getCamera());
+
+    const [hit] = this.raycaster.intersectObjects(this.systemRenderer.pickableObjects);
+    const hoveredId = (hit ? this.systemRenderer.memberForObject(hit.object) : undefined)?.id ?? null;
+    if (hoveredId === this.hoveredBodyId) {
+      return;
+    }
+    this.hoveredBodyId = hoveredId;
+    canvas.style.cursor = hoveredId ? 'pointer' : '';
+    this.refreshObjectCard();
+  };
+
+  /** A pinned body wins over a hovered one, so the card does not change under the pointer. */
+  private refreshObjectCard(): void {
+    const id = this.pinnedBodyId ?? this.hoveredBodyId;
+    this.objectCard.set(id === null ? undefined : buildBodyViewModel(id, { bodies: this.bodies, exoplanets: this.exoplanets, stars: this.stars }));
+  }
+
+  /** Clears the card and everything that would bring it straight back. */
+  private clearObjectCard(): void {
+    this.pinnedBodyId = null;
+    this.hoveredBodyId = null;
+    this.objectCard.set(undefined);
+    this.canvasRef().nativeElement.style.cursor = '';
+  }
+
+  dismissObjectCard(): void {
+    this.clearObjectCard();
+  }
+
+  /** The deliberate step out to the dedicated route, from the card's own control. */
+  openObjectDetail(id: string): void {
+    this.navigationStore.selectBody(id);
+    void this.router.navigate(['/body', id]);
+  }
+
+  /**
+   * How many stars can actually be entered: those with catalogued bodies of their own, plus the
+   * Sun. Computed once rather than on every HUD refresh.
+   */
+  private enterableSystems?: number;
+
+  private enterableSystemCount(): number {
+    if (this.enterableSystems === undefined) {
+      const hosts = new Set<number>();
+      for (const body of this.bodies) {
+        hosts.add(body.systemStarId);
+      }
+      for (const exoplanet of this.exoplanets) {
+        if (exoplanet.hostStarId !== null) {
+          hosts.add(exoplanet.hostStarId);
+        }
+      }
+      this.enterableSystems = hosts.size;
+    }
+    return this.enterableSystems;
   }
 
   /** Reacts to `NavigationStore.selectedStarId` changes coming from any source (click/search). */
@@ -797,7 +897,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // exoplanets, so it has no meaningful direction and the renderer falls back.
     // The star's luminosity, derived from its own catalogued magnitude and distance, is what
     // decides how hot each body in the system is — and so what each of them looks like.
-    const hostLuminosity = luminositySolar({ magnitude: star.magnitude, distancePc: Math.hypot(star.x, star.y, star.z), spectralType: star.spectralType });
+    const hostLuminosity = luminosityOf(star);
     this.systemRenderer = new SystemOrbitsRenderer(systemBodies, systemExoplanets, { x: star.x, y: star.y, z: star.z }, hostLuminosity);
     this.systemGroup.add(this.systemRenderer.object);
 
@@ -881,6 +981,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     this.systemGroup.visible = false;
     this.galaxyGroup.visible = true;
+    // The bodies it described are no longer on screen, and a stale pin would otherwise survive
+    // into the next system entered.
+    this.clearObjectCard();
 
     camera.near = GALAXY_NEAR_PC;
     camera.far = GALAXY_FAR_PC;

@@ -421,8 +421,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
-   * Blends between the two things that share parsec space: the catalogued 50 pc star field with
-   * its local grid, and the Milky Way model with its galactic one. Driven by how far the camera
+   * Blends between the two things that share parsec space: the catalogued star field with its
+   * local grid, and the Milky Way model with its galactic one. Driven by how far the camera
    * has pulled back from the Sun, so the scale ladder reports where the view already is instead
    * of switching it.
    */
@@ -572,7 +572,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         { label: 'Arms modelled', value: `${MILKY_WAY_ARMS.length}` },
         { label: 'Catalogued', value: `${this.stars.length} stars` }
       ]);
-      this.hudNote.set('Galactic structure is an illustrative model built on measured arm geometry — no catalogue holds the Galaxy’s stars. Everything inside 50 pc is real.');
+      // Quotes the catalogue's own reach rather than a figure that has already been raised once.
+      this.hudNote.set(`Galactic structure is an illustrative model built on measured arm geometry — no catalogue holds the Galaxy’s stars. The ${this.stars.length} catalogued stars within ${LOCAL_GRID_RINGS_PC[LOCAL_GRID_RINGS_PC.length - 1]} pc are real.`);
       return;
     }
 

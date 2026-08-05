@@ -7,6 +7,8 @@ NASA figures behind it.
 
 This repo also hosts a small Claude Code plugin marketplace — see [Plugins](#plugins) below.
 
+![The solar neighbourhood: 68 388 catalogued stars within 250 parsecs, on a polar grid lying in the galactic plane](docs/screenshots/galaxy-view.jpg)
+
 ## Running it
 
 ```bash
@@ -29,11 +31,13 @@ npm run e2e:typecheck
 
 **Galaxy view** — the HYG catalogue out to 250 parsecs, 68 388 stars, as instanced
 camera-facing billboards positioned from real RA/Dec/parallax, coloured by spectral index and
-sized by magnitude. The field draws a budget of the most visible of them rather than all — see
-"On how many stars" below. A polar grid in the galactic plane runs under them with a drop line
-from each of the brightest, and names label the most prominent stars near whatever the camera is
-looking at.
-Behind them sits a backdrop of notable deep-sky objects and a Milky Way panorama.
+sized by magnitude — all of them drawn, in one instanced call, with a budget in reserve for
+catalogues larger than a GPU should be asked to hold at once (see "On how many stars" below). A
+polar grid in the galactic plane runs under them with a drop line from each of the brightest,
+and names label the most prominent stars near whatever the camera is looking at. Behind them
+sits a backdrop of notable deep-sky objects and a Milky Way panorama.
+
+![The galactic scale: the Milky Way's bar, bulge and five spiral arms, with the Sun on the Orion Spur](docs/screenshots/galactic-view.jpg)
 
 **Galactic view** — keep pulling back and the neighbourhood becomes a point inside the Milky
 Way: the bar and bulge, five spiral arms, the disc and a thin halo, with the arms and the
@@ -41,6 +45,8 @@ galactic centre named. It is the same parsec-scale space as the galaxy view, cro
 camera distance rather than switched, so the Sun stays where it really is — 8.18 kpc out, on the
 Orion Spur, between the Sagittarius and Perseus arms. See "On the Galaxy model" below for what
 in it is measured and what is not.
+
+![The solar system: orbit ellipses over a dashed reference grid marking 5 AU rings out to 35 AU](docs/screenshots/system-view.jpg)
 
 **System view** — selecting a star flies the camera continuously into its system rather than
 cutting to a new scene. The Sun gets the real solar-system bodies from JPL Horizons; other
@@ -62,12 +68,18 @@ bright rather than that it is large. That floor is bounded from both sides — l
 the star reads at a glance, small enough that Venus's and Earth's orbits stay legible as rings
 around it. Mercury's, three pixels wide at that range, does not survive either way.
 
+![51 Pegasi b: a surface derived from its measured mass, orbit and host-star luminosity, beside the figures it was derived from](docs/screenshots/body-detail.jpg)
+
 **Body detail** — a dedicated close-up scene and info panel for one planet, moon or exoplanet,
 with real photography where NASA/ESA/USGS imagery exists, and a surface derived from the body's
 own measurements where it does not. See "On surfaces that were never photographed" below.
 
 **Search** — name search across stars, solar-system bodies and exoplanets, navigating to the
 same place an in-scene click would.
+
+Screenshots are captured from a real run of the app at `docs/screenshots/`, and are regenerated
+when the views they show change — the galactic one above records the catalogue size and reach in
+its own readout, so a stale image is visible as one.
 
 ### Architecture notes
 

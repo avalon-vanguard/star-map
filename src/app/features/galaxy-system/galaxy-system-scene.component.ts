@@ -19,7 +19,7 @@ import { CameraRigController } from './camera-rig-controller';
 import { DeepSkyRenderer } from './deep-sky-renderer';
 import { galacticNormal, PolarGridPlane, TetherField } from './grid-plane';
 import { MilkyWayRenderer } from './milky-way-renderer';
-import { starMarkerRadiusAu, systemFramingDistanceAu, systemViewDirection } from './system-framing';
+import { starGlowExtentAu, starMarkerRadiusAu, systemFrameRadiusAu, systemFramingDistanceAu, systemViewDirection } from './system-framing';
 import { HudReadout, StarmapHudComponent } from './starmap-hud.component';
 import { colorIndexToRgb, StarFieldRenderer } from './star-field-renderer';
 import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
@@ -27,7 +27,8 @@ import { SystemOrbitsRenderer } from './system-orbits-renderer';
 
 /** HYG catalog id for the Sun itself — the only star we have a real close-up photo of. */
 const SOL_STAR_ID = 0;
-const SUN_GLOW_SCALE = 3.2;
+/** Stars drawn from a colour rather than a photograph get a more restrained halo. */
+const DIM_STAR_GLOW_SCALE = 0.6;
 
 /** Stars closer than this to the camera get a name label (always includes the selection). */
 const LABEL_MAX_DISTANCE_PC = 20;
@@ -698,6 +699,14 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.systemRenderer = new SystemOrbitsRenderer(systemBodies, systemExoplanets, { x: star.x, y: star.y, z: star.z }, hostLuminosity);
     this.systemGroup.add(this.systemRenderer.object);
 
+    // Framed against the grid's outer ring rather than the outermost orbit — the ring is always
+    // the wider of the two — and against the camera this scene actually has, so the margin holds
+    // whatever the window shape. Computed before the star, because how far away the star will be
+    // seen from is what decides how big its halo has to be to stay visible.
+    const viewport = { fovDegrees: camera.fov, aspect: camera.aspect };
+    const framingDistance = systemFramingDistanceAu(this.systemRenderer.gridOuterRadiusAu, viewport);
+    const frameRadiusAu = systemFrameRadiusAu(framingDistance, viewport);
+
     // Sized against this system's innermost orbit, so the star never swallows its own planets.
     const starRadiusAu = starMarkerRadiusAu(this.systemRenderer.minTopLevelSemiMajorAxisAu);
     this.starMarkerGeometry?.dispose();
@@ -710,10 +719,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       // other point in the galaxy view is far too distant to be resolved as a disk.
       starMarkerMaterial.map = loadCachedTexture(SUN_TEXTURE_PATH);
       starMarkerMaterial.color.set(0xffffff);
-      this.starGlow = createGlowSprite(0xfff2c0, starRadiusAu, SUN_GLOW_SCALE);
+      this.starGlow = createGlowSprite(0xfff2c0, starGlowExtentAu(starRadiusAu, frameRadiusAu));
     } else {
       starMarkerMaterial.color.copy(starColor);
-      this.starGlow = createGlowSprite(starColor, starRadiusAu, SUN_GLOW_SCALE * 0.6);
+      this.starGlow = createGlowSprite(starColor, starGlowExtentAu(starRadiusAu, frameRadiusAu, DIM_STAR_GLOW_SCALE));
     }
     this.starMarker = new THREE.Mesh(this.starMarkerGeometry, starMarkerMaterial);
     this.systemGroup.add(this.starMarker, this.starGlow);
@@ -733,10 +742,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     this.rig!.setImmediate({ position: direction.clone().multiplyScalar(SYSTEM_ENTRY_DISTANCE_AU), target: new THREE.Vector3(0, 0, 0) });
 
-    // Framed against the grid's outer ring rather than the outermost orbit — the ring is always
-    // the wider of the two — and against the camera this scene actually has, so the margin holds
-    // whatever the window shape.
-    const framingDistance = systemFramingDistanceAu(this.systemRenderer.gridOuterRadiusAu, { fovDegrees: camera.fov, aspect: camera.aspect });
     // Arrives along whichever direction the approach came from, then swings round to look down
     // on this system's own orbital plane as it settles — so the swap stays continuous but the
     // system is not presented edge-on. See `systemViewDirection`.

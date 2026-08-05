@@ -5,6 +5,7 @@ import { eclipticToEquatorial, OBLIQUITY_J2000_DEG } from '../../shared/astro/co
 import {
   bodyMarkerRadiusAu,
   DEFAULT_STAR_MARKER_RADIUS_AU,
+  starGlowExtentAu,
   starMarkerRadiusAu,
   systemFrameRadiusAu,
   systemFramingDistanceAu,
@@ -108,6 +109,75 @@ describe('systemFramingDistanceAu', () => {
   it('uses a sensible default for a star with no known planets', () => {
     for (const radius of [0, -1, Number.NaN]) {
       expect(systemFramingDistanceAu(radius)).toBe(3);
+    }
+  });
+});
+
+describe('starGlowExtentAu', () => {
+  /** Apparent size on screen, as a fraction of the frame's half-height. */
+  function apparentFraction(innermostAu: number, outermostAu: number, glowScale = 1): number {
+    const rings = systemGridRingsAu(outermostAu);
+    const distance = systemFramingDistanceAu(rings[rings.length - 1]);
+    const frame = systemFrameRadiusAu(distance);
+    // The sprite's extent is its full width, so half of it is what reaches out from the star.
+    return starGlowExtentAu(starMarkerRadiusAu(innermostAu), frame, glowScale) / 2 / frame;
+  }
+
+  it('scales with the star for a compact system, where the star is already big enough', () => {
+    // A tight frame relative to the star, so the star's own multiple is what decides.
+    const marker = 0.02;
+    const tightFrame = 0.5;
+    expect(starGlowExtentAu(marker, tightFrame)).toBeCloseTo(marker * 3.2, 9);
+    expect(starGlowExtentAu(marker * 2, tightFrame)).toBeCloseTo(marker * 2 * 3.2, 9);
+  });
+
+  it('floors against the frame once the star would otherwise vanish into it', () => {
+    // A star sized against a close-in orbit, framed from far enough out to hold a wide system:
+    // the multiple of the star is nothing, so the frame decides instead.
+    const tinyStar = 0.001;
+    const wideFrame = 56;
+    expect(starGlowExtentAu(tinyStar, wideFrame)).toBeGreaterThan(tinyStar * 3.2 * 100);
+  });
+
+  it('keeps the Sun visible at the distance that frames the solar system', () => {
+    // The case that prompted this: the solar system spans a factor of a hundred from Mercury to
+    // Pluto, so a disc that stays clear of Mercury is about a pixel across once Pluto is in view.
+    expect(apparentFraction(0.387, 39.288)).toBeGreaterThan(0.015);
+  });
+
+  it('holds the floor across every system scale the datasets contain', () => {
+    // A compact system's star is genuinely large relative to its own system and keeps the bigger
+    // halo; the floor is not there to equalise them, only to stop the wide ones disappearing.
+    for (const [innermost, outermost] of [
+      [0.387, 39.288],
+      [0.035, 0.204],
+      [0.01154, 0.06189],
+      [1.2, 12.4]
+    ]) {
+      expect(apparentFraction(innermost, outermost)).toBeGreaterThan(0.015);
+    }
+  });
+
+  it('does not blot out the system it sits in', () => {
+    for (const [innermost, outermost] of [
+      [0.387, 39.288],
+      [0.035, 0.204],
+      [0.01154, 0.06189]
+    ]) {
+      expect(apparentFraction(innermost, outermost)).toBeLessThan(0.2);
+    }
+  });
+
+  it('dims for a star drawn from a colour rather than a photograph, but never below the floor', () => {
+    // Above the floor the multiplier applies...
+    expect(starGlowExtentAu(1, 10, 0.6)).toBeLessThan(starGlowExtentAu(1, 10, 1));
+    // ...and at the floor it cannot dim a star into invisibility.
+    expect(starGlowExtentAu(0.001, 56, 0.6)).toBe(starGlowExtentAu(0.001, 56, 1));
+  });
+
+  it('falls back to the star alone when there is no frame to measure against', () => {
+    for (const frame of [0, -1, Number.NaN]) {
+      expect(starGlowExtentAu(0.2, frame)).toBeCloseTo(0.2 * 3.2, 9);
     }
   });
 });

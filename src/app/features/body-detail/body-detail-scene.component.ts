@@ -21,6 +21,7 @@ import { InfoPanelComponent } from './info-panel.component';
 
 /** Gas giants read as smoother/less rocky than terrestrial bodies under the same lighting rig. */
 const GAS_GIANT_IDS = new Set(['jupiter', 'saturn', 'uranus', 'neptune']);
+/** The body is drawn at unit radius here, so the halo's extent is its multiple directly. */
 const GLOW_SCALE = 2.6;
 
 /**
@@ -201,7 +202,7 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
       }
       const atmosphereColor = atmosphereColorFor(viewModel.id);
       if (atmosphereColor !== undefined) {
-        this.glow = createGlowSprite(atmosphereColor, 1, GLOW_SCALE);
+        this.glow = createGlowSprite(atmosphereColor, GLOW_SCALE);
         this.scene.add(this.glow);
       }
     }

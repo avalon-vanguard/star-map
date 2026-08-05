@@ -88,12 +88,16 @@ export function createGlowTexture(color: THREE.ColorRepresentation, profile: Glo
 
 /**
  * Builds a soft additive-blended glow halo (used for planetary atmospheres and the Sun's
- * corona) sized relative to the given object radius. Cheap billboard-sprite approximation
- * rather than a view-angle-correct Fresnel shader, chosen to stay within built-in material
- * types the WebGPU backend renders natively (see plan risk on TSL/shader maturity). Falls back
- * to a flat-colored (gradient-less) sprite if canvas rendering is unavailable.
+ * corona), `extent` across in world units. Cheap billboard-sprite approximation rather than a
+ * view-angle-correct Fresnel shader, chosen to stay within built-in material types the WebGPU
+ * backend renders natively (see plan risk on TSL/shader maturity). Falls back to a
+ * flat-colored (gradient-less) sprite if canvas rendering is unavailable.
+ *
+ * Takes the finished extent rather than a radius and a multiplier: how big a star's halo should
+ * be is not a fixed multiple of the star, it depends on how the system is framed, and that
+ * decision belongs with the framing (see `starGlowExtentAu`).
  */
-export function createGlowSprite(color: THREE.ColorRepresentation, radius: number, scale: number): THREE.Sprite {
+export function createGlowSprite(color: THREE.ColorRepresentation, extent: number): THREE.Sprite {
   const material = new THREE.SpriteMaterial({
     map: createGlowTexture(color),
     color: color,
@@ -102,6 +106,6 @@ export function createGlowSprite(color: THREE.ColorRepresentation, radius: numbe
     blending: THREE.AdditiveBlending
   });
   const sprite = new THREE.Sprite(material);
-  sprite.scale.setScalar(radius * scale);
+  sprite.scale.setScalar(extent);
   return sprite;
 }

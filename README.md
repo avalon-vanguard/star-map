@@ -50,6 +50,14 @@ instead of having to be inferred from a shape in space. The camera frames that g
 the orbits, from the field of view it actually has, so the outermost ring sits inside the frame
 with room around it at any system scale and any window shape.
 
+The star at the centre is sized against the system's *innermost* orbit, so it can never swallow
+its closest planet, while the camera is placed to frame the *outermost* ring — and in the solar
+system those differ by a factor of a hundred. At the distance that fits Pluto in view, a disc
+that stays clear of Mercury is about a pixel across, and no radius satisfies both. So the disc
+stays honest to the orbits and the star's halo carries its visibility, floored against the framed
+radius: light is not a surface, and a glow reaching past the innermost orbit says the star is
+bright rather than that it is large.
+
 **Body detail** — a dedicated close-up scene and info panel for one planet, moon or exoplanet,
 with real photography where NASA/ESA/USGS imagery exists, and a surface derived from the body's
 own measurements where it does not. See "On surfaces that were never photographed" below.

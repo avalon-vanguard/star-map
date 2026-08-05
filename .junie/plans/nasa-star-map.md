@@ -311,3 +311,4 @@ Real photography where it exists, and a surface reasoned from measurements where
 - Replace the fixed distance-to-outermost-orbit multiple with a distance derived from the camera's vertical field of view and aspect, so what fits is a radius on screen rather than a guess.
 - Frame against the reference grid's outer ring, which is always wider than the outermost orbit, and leave an explicit margin around it.
 - Raise the framing ceiling far enough to hold the solar system out to Pluto in a portrait window; only companions hundreds of AU out reach it now.
+- Floor the star's halo against the framed radius, so a star sized against its innermost orbit still reads at the distance that frames its outermost one.

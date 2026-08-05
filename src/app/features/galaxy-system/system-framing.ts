@@ -25,7 +25,25 @@ export const DEFAULT_STAR_MARKER_RADIUS_AU = 0.2;
  * space between the star's limb and the closest orbit, rather than the orbit grazing or
  * disappearing inside it.
  */
-const STAR_RADIUS_TO_INNERMOST_ORBIT = 0.35;
+const STAR_RADIUS_TO_INNERMOST_ORBIT = 0.45;
+
+/**
+ * Halo extent as a multiple of the star's own radius, and the floor on that extent as a
+ * fraction of the framed radius.
+ *
+ * The floor is what keeps a star visible. A system's star is sized against its *innermost*
+ * orbit — it must never swallow its closest planet — while the camera is placed to frame the
+ * *outermost* ring, and those differ by a factor of a hundred in the solar system. At the
+ * distance that fits Pluto in view, a disc that stays clear of Mercury is about one pixel
+ * across; there is no radius that satisfies both, because the information genuinely does not
+ * fit on one screen at that zoom.
+ *
+ * The halo resolves it, because light is not a surface: a glow that reaches past the innermost
+ * orbit does not claim the star is that large, it claims the star is bright. So the disc stays
+ * honest to the orbits and the halo is floored against the frame.
+ */
+const STAR_GLOW_TO_MARKER = 3.2;
+const MIN_STAR_GLOW_TO_FRAME = 0.035;
 
 /**
  * Clear space left around the framed radius, as a fraction of it. The camera backs off this
@@ -123,6 +141,20 @@ export function starMarkerRadiusAu(innermostOrbitAu: number): number {
  */
 export function systemFrameRadiusAu(distanceAu: number, viewport: SystemViewport = DEFAULT_SYSTEM_VIEWPORT): number {
   return distanceAu * tightHalfExtent(viewport);
+}
+
+/**
+ * Extent (AU) of the star's glow sprite — how wide it is drawn, not its radius.
+ *
+ * Normally a multiple of the star's own radius, so a compact system keeps the corona it has.
+ * Floored against the framed radius, so a star framed from far enough out to hold its whole
+ * system still reads as a bright point rather than disappearing into it. `glowScale` lets a
+ * caller dim the halo for stars drawn without a real photograph.
+ */
+export function starGlowExtentAu(markerRadiusAu: number, frameRadiusAu: number, glowScale = 1): number {
+  const fromStar = markerRadiusAu * STAR_GLOW_TO_MARKER * glowScale;
+  const fromFrame = Number.isFinite(frameRadiusAu) && frameRadiusAu > 0 ? frameRadiusAu * MIN_STAR_GLOW_TO_FRAME : 0;
+  return Math.max(fromStar, fromFrame);
 }
 
 /**

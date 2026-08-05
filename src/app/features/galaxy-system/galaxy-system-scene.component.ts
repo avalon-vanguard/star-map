@@ -199,6 +199,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private starField?: StarFieldRenderer;
   private deepSky?: DeepSkyRenderer;
   private deepSkyLabels: readonly LabeledPoint[] = [];
+  /** Stars with at least one catalogued body, which are the ones the map can be flown into. */
+  private starIdsWithBodies = new Set<number>();
   private milkyWay?: MilkyWayRenderer;
   private galacticLabels: readonly LabeledPoint[] = [];
   private galacticGrid?: PolarGridPlane;
@@ -339,6 +341,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.starsById = new Map(stars.map((star) => [star.id, star]));
     this.bodies = bodies;
     this.exoplanets = exoplanets;
+    // Built once rather than per label refresh: it is a scan of every body and exoplanet, and the
+    // labels are recomputed whenever the camera moves.
+    this.starIdsWithBodies = new Set([...bodies.map((body) => body.systemStarId), ...exoplanets.map((exoplanet) => exoplanet.hostStarId)].filter(
+      (id): id is number => id !== null && id !== undefined
+    ));
 
     this.starField = new StarFieldRenderer(stars, positions, starRenderBudgetFromUrl(window.location.search));
     this.galaxyGroup.add(this.starField.object);
@@ -410,6 +417,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       this.labelUpdateAccumulator = 0;
       if (this.galaxyGroup.visible) {
         this.updateLabels(camera);
+      } else if (this.systemGroup.visible) {
+        this.updateSystemLabels(camera);
       }
       this.updateHud(camera);
     }
@@ -498,48 +507,119 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // Individual star names mean nothing once the whole Galaxy is in frame — at that range the
     // entire catalogue is inside one pixel — so the labels hand over to the structural ones.
     const isGalactic = this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD;
-    const starLabels = isGalactic ? [] : this.spreadLabels(candidates, camera, selectedId);
+    // "System" rather than "Star" for anything with catalogued bodies: it is the one distinction
+    // the second line can draw that the map cannot otherwise show, since it says which of these
+    // points is somewhere you can actually go.
+    const starLabels: LabeledPoint[] = isGalactic
+      ? []
+      : this.spreadLabels(
+          candidates.map(({ star }) => ({
+            id: star.id,
+            name: star.name,
+            kind: this.starIdsWithBodies.has(star.id) ? 'System' : 'Star',
+            x: star.x,
+            y: star.y,
+            z: star.z
+          })),
+          camera,
+          selectedId
+        );
     const backdropLabels = isGalactic ? this.galacticLabels : this.deepSkyLabels;
     this.labelOverlay?.update([...starLabels, ...backdropLabels]);
   }
 
   /**
-   * Takes the nearest stars in order and keeps only those that land clear of the labels already
-   * placed, dropping the rest.
+   * Takes candidate labels in priority order and keeps only those that land clear of the labels
+   * already placed, dropping the rest.
    *
-   * Nearest-first alone is not enough: the Sun's fifteen nearest neighbours are all inside four
-   * parsecs, so from anything but point-blank range their names print on top of each other in a
-   * single unreadable clump. Rejecting on screen separation instead of on distance means the set
-   * naturally opens up as the camera closes in, and stays legible when it pulls back.
+   * Priority alone is not enough at either scale. The Sun's fifteen nearest neighbours are all
+   * inside four parsecs, so from anything but point-blank range their names print on top of each
+   * other in a single unreadable clump; the inner four planets do exactly the same thing when a
+   * system is framed out to Pluto. Rejecting on screen separation rather than on distance means
+   * the set naturally opens up as the camera closes in, and stays legible when it pulls back.
+   *
+   * `keepId` is exempt from both tests — it is the selection, which is about to be flown to, and
+   * its label going missing mid-flight reads as the target having been lost.
    */
-  private spreadLabels(candidates: readonly { star: StarRecord }[], camera: THREE.PerspectiveCamera, selectedId: number | null): StarRecord[] {
+  private spreadLabels(candidates: readonly LabeledPoint[], camera: THREE.PerspectiveCamera, keepId: number | string | null): LabeledPoint[] {
     const placed: THREE.Vector2[] = [];
-    const chosen: StarRecord[] = [];
+    const chosen: LabeledPoint[] = [];
     const projected = new THREE.Vector3();
 
-    for (const { star } of candidates) {
+    for (const candidate of candidates) {
       if (chosen.length >= LABEL_MAX_COUNT) {
         break;
       }
 
-      projected.set(star.x, star.y, star.z).project(camera);
-      const isSelected = star.id === selectedId;
-      // Offscreen or behind the camera. The selection is exempt: it is about to be flown to, and
-      // its label going missing mid-flight reads as the target having been lost.
-      if (!isSelected && (projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1)) {
+      projected.set(candidate.x, candidate.y, candidate.z).project(camera);
+      const isKept = candidate.id === keepId;
+      // Offscreen or behind the camera.
+      if (!isKept && (projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1)) {
         continue;
       }
 
       const point = new THREE.Vector2(projected.x * camera.aspect, projected.y);
-      if (!isSelected && placed.some((other) => other.distanceTo(point) < LABEL_MIN_SEPARATION_NDC)) {
+      if (!isKept && placed.some((other) => other.distanceTo(point) < LABEL_MIN_SEPARATION_NDC)) {
         continue;
       }
 
       placed.push(point);
-      chosen.push(star);
+      chosen.push(candidate);
     }
 
     return chosen;
+  }
+
+  /**
+   * Names the bodies of the system the view is inside.
+   *
+   * Outermost first, because that is the order that survives the separation test usefully: with
+   * the whole system in frame the outer planets are the ones far enough apart to label, and the
+   * inner four are a single clump around the star. Closing in reverses it on its own — the outer
+   * orbits leave the frame and their labels drop out, freeing the space for the inner planets.
+   *
+   * Moons are left out entirely: they sit within a marker's width of their planet at system
+   * framing, so their labels could only ever print on top of it.
+   */
+  private updateSystemLabels(camera: THREE.PerspectiveCamera): void {
+    const renderer = this.systemRenderer;
+    if (!renderer) {
+      this.labelOverlay?.update([]);
+      return;
+    }
+
+    const records = new Map<string, { name: string; semiMajorAxisAu: number }>([
+      ...this.bodies.map((body): [string, { name: string; semiMajorAxisAu: number }] => [
+        body.id,
+        { name: body.name, semiMajorAxisAu: body.orbit.semiMajorAxisAu }
+      ]),
+      ...this.exoplanets.map((exoplanet): [string, { name: string; semiMajorAxisAu: number }] => [
+        exoplanet.id,
+        { name: exoplanet.name, semiMajorAxisAu: exoplanet.orbit?.semiMajorAxisAu ?? 0 }
+      ])
+    ]);
+    const position = new THREE.Vector3();
+
+    const points: Array<LabeledPoint & { semiMajorAxisAu: number }> = [];
+    for (const member of renderer.members) {
+      if (member.kind === 'moon') {
+        continue;
+      }
+      const record = records.get(member.id);
+      member.marker.getWorldPosition(position);
+      points.push({
+        id: member.id,
+        name: record?.name ?? member.id,
+        kind: member.kind === 'exoplanet' ? 'Exoplanet' : member.kind === 'dwarf' ? 'Dwarf Planet' : 'Planet',
+        semiMajorAxisAu: record?.semiMajorAxisAu ?? 0,
+        x: position.x,
+        y: position.y,
+        z: position.z
+      });
+    }
+
+    points.sort((a, b) => b.semiMajorAxisAu - a.semiMajorAxisAu);
+    this.labelOverlay?.update(this.spreadLabels(points, camera, null));
   }
 
   /** Refreshes the readout panel for whichever scale the view is currently at. */

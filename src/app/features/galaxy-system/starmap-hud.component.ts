@@ -45,48 +45,54 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
     <div class="hud-vignette absolute inset-0"></div>
 
     @if (showReticle()) {
-      <div class="absolute top-1/2 left-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2">
-        <span class="absolute top-0 left-0 h-3 w-3 border-t border-l border-accent/70"></span>
-        <span class="absolute top-0 right-0 h-3 w-3 border-t border-r border-accent/70"></span>
-        <span class="absolute bottom-0 left-0 h-3 w-3 border-b border-l border-accent/70"></span>
-        <span class="absolute right-0 bottom-0 h-3 w-3 border-r border-b border-accent/70"></span>
-        <span class="absolute top-1/2 left-1/2 h-px w-2 -translate-x-1/2 -translate-y-1/2 bg-accent/60"></span>
-        <span class="absolute top-1/2 left-1/2 h-2 w-px -translate-x-1/2 -translate-y-1/2 bg-accent/60"></span>
-      </div>
+      <!-- A hexagon rather than a square bracket: the shape reads as a sensor lock on a body,
+           and stays distinct from the rectangular panel chrome everywhere else on screen. -->
+      <svg class="absolute top-1/2 left-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 text-accent/70" viewBox="0 0 56 56" fill="none" aria-hidden="true">
+        <polygon points="28,4 48,16 48,40 28,52 8,40 8,16" stroke="currentColor" stroke-width="1" />
+        <path d="M28 22v-6M28 40v-6M22 28h-6M40 28h-6" stroke="currentColor" stroke-width="1" opacity="0.8" />
+      </svg>
     }
 
-    <nav aria-label="Map scale" class="pointer-events-auto absolute top-1/2 left-6 flex -translate-y-1/2 flex-col gap-5">
+    <!-- Top rail: which scale the view is at, and what it is holding. Both sit on one line
+         across the top of the display, clear of the search field above them. -->
+    <nav aria-label="Map scale" class="pointer-events-auto absolute top-16 left-6 flex items-stretch gap-px">
       @for (step of ladder(); track step.level) {
-        <div class="flex items-center gap-3">
+        @if (step.reachable) {
+          <button
+            type="button"
+            (click)="levelSelected.emit(step.level)"
+            class="hud-tab border-y border-border/70 bg-panel/70 px-4 py-1.5 font-display text-[10px] tracking-[0.22em] text-muted uppercase backdrop-blur-sm transition-colors hover:bg-accent/15 hover:text-accent focus:bg-accent/15 focus:text-accent focus:outline-none"
+          >
+            {{ step.label }}
+          </button>
+        } @else {
           <span
-            class="block h-2 w-2 rotate-45 border"
-            [class]="step.state === 'current' ? 'border-accent bg-accent shadow-[0_0_10px_var(--color-accent)]' : step.state === 'above' ? 'border-accent/60' : 'border-border/60'"
-          ></span>
-          @if (step.reachable) {
-            <button
-              type="button"
-              (click)="levelSelected.emit(step.level)"
-              class="font-display text-[10px] tracking-[0.22em] text-muted uppercase transition-colors hover:text-accent focus:text-accent focus:outline-none"
-            >
-              {{ step.label }}
-            </button>
-          } @else {
-            <span
-              [attr.aria-current]="step.state === 'current' ? 'step' : null"
-              [attr.data-testid]="step.state === 'current' ? 'hud-current-level' : null"
-              class="font-display text-[10px] tracking-[0.22em] uppercase"
-              [class]="step.state === 'current' ? 'text-accent' : 'text-border'"
-              >{{ step.label }}</span
-            >
-          }
-        </div>
+            [attr.aria-current]="step.state === 'current' ? 'step' : null"
+            [attr.data-testid]="step.state === 'current' ? 'hud-current-level' : null"
+            class="hud-tab border-y px-4 py-1.5 font-display text-[10px] tracking-[0.22em] uppercase backdrop-blur-sm"
+            [class]="step.state === 'current' ? 'border-accent/70 bg-accent/20 text-accent' : 'border-border/40 bg-panel/40 text-border'"
+            >{{ step.label }}</span
+          >
+        }
       }
     </nav>
+
+    @if (title()) {
+      <div class="absolute top-16 left-1/2 -translate-x-1/2">
+        <div class="hud-banner flex items-center gap-2.5 border-b border-accent/60 bg-panel/75 px-6 py-1.5 backdrop-blur-sm">
+          <svg class="h-3 w-3 shrink-0 text-accent" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+            <polygon points="6,1 10.5,3.5 10.5,8.5 6,11 1.5,8.5 1.5,3.5" stroke="currentColor" stroke-width="1" />
+            <circle cx="6" cy="6" r="1.4" fill="currentColor" />
+          </svg>
+          <span class="font-display text-[11px] tracking-[0.3em] text-accent uppercase">{{ title() }}</span>
+        </div>
+      </div>
+    }
 
     <div class="absolute right-6 bottom-6 left-6 flex flex-wrap items-end justify-between gap-4">
       <div class="hud-panel max-w-lg px-4 py-3">
         <p class="font-display text-[10px] tracking-[0.28em] text-muted uppercase">{{ eyebrow() }}</p>
-        <p class="mt-1 font-display text-xl tracking-[0.06em] text-text">{{ title() }}</p>
+        <p data-testid="hud-title" class="mt-1 font-display text-xl tracking-[0.06em] text-text">{{ title() }}</p>
         @if (subtitle()) {
           <p class="mt-0.5 text-xs text-muted">{{ subtitle() }}</p>
         }

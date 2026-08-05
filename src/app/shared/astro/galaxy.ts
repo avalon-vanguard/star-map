@@ -183,21 +183,30 @@ export function galacticCentrePositionPc(): CartesianCoordinates {
 export interface GalacticLandmark {
   readonly id: string;
   readonly name: string;
+  /** What the landmark is, printed under its name on the map. */
+  readonly kind: string;
   /** Galactocentric radius/azimuth, matching {@link galactocentricToHeliocentricGalactic}. */
   readonly radiusPc: number;
   readonly azimuthDeg: number;
 }
 
 export const GALACTIC_LANDMARKS: readonly GalacticLandmark[] = [
-  { id: 'sgr-a', name: 'Sagittarius A*', radiusPc: 0, azimuthDeg: 0 },
-  { id: 'sol', name: 'Sol', radiusPc: SUN_GALACTOCENTRIC_RADIUS_PC, azimuthDeg: 0 },
+  { id: 'sgr-a', name: 'Sagittarius A*', kind: 'Galactic Centre', radiusPc: 0, azimuthDeg: 0 },
+  { id: 'sol', name: 'Sol', kind: 'Star', radiusPc: SUN_GALACTOCENTRIC_RADIUS_PC, azimuthDeg: 0 },
   ...MILKY_WAY_ARMS.map((arm) => ({
     id: `arm-${arm.name.toLowerCase().replace(/[^a-z]+/g, '-')}`,
     name: `${arm.name} Arm`,
+    kind: 'Spiral Arm',
     radiusPc: armRadiusPc(arm, arm.labelAzimuthDeg),
     azimuthDeg: arm.labelAzimuthDeg
   })),
-  { id: 'arm-orion-spur', name: 'Orion Spur', radiusPc: armRadiusPc(ORION_SPUR, ORION_SPUR.labelAzimuthDeg), azimuthDeg: ORION_SPUR.labelAzimuthDeg }
+  {
+    id: 'arm-orion-spur',
+    name: 'Orion Spur',
+    kind: 'Spur',
+    radiusPc: armRadiusPc(ORION_SPUR, ORION_SPUR.labelAzimuthDeg),
+    azimuthDeg: ORION_SPUR.labelAzimuthDeg
+  }
 ];
 
 /** A landmark's position in the scene's equatorial frame, in parsecs from the Sun. */

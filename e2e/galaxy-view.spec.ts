@@ -12,7 +12,9 @@ test.describe('Galaxy view', () => {
     await expect(page.getByTestId('scene-canvas')).toBeVisible();
     await expect(page.getByPlaceholder('Search stars, planets, exoplanets…')).toBeVisible();
     await expect(backButtonLocator(page)).toHaveCount(0);
-    await expect(page.getByText('Local Stars')).toBeVisible();
+    // The readout panel's own title, not just the text anywhere on screen: the selected-object
+    // banner across the top names the same thing, so a bare text match is ambiguous.
+    await expect(page.getByTestId('hud-title')).toHaveText('Local Stars');
   });
 
   test('the scale ladder flies out to the whole Galaxy and back to the solar neighbourhood', async ({ page }) => {
@@ -32,6 +34,6 @@ test.describe('Galaxy view', () => {
     await expect(page.getByRole('button', { name: 'Milky Way' })).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Solar Neighbourhood' }).click();
-    await expect(page.getByText('Local Stars')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('hud-title')).toHaveText('Local Stars', { timeout: 15_000 });
   });
 });

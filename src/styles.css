@@ -76,6 +76,19 @@ body {
   background: radial-gradient(ellipse at center, transparent 45%, color-mix(in srgb, var(--color-void) 72%, transparent) 100%);
 }
 
+/* A chamfered tab: the angled-corner shape the scale ladder and the selection banner share.
+ * The cut is on the leading and trailing edges rather than the panel's diagonal corners, which
+ * is what makes a row of them read as tabs on a rail instead of a row of cards. */
+.hud-tab {
+  clip-path: polygon(9px 0, 100% 0, calc(100% - 9px) 100%, 0 100%);
+}
+
+/* The selected-object banner: symmetric, flaring outward toward its lit bottom edge, so it
+ * reads as a nameplate hanging off the top of the display rather than another tab. */
+.hud-banner {
+  clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 100%, 0 100%);
+}
+
 /* Star name labels rendered by CSS2DRenderer (see StarLabelOverlay). These live outside
  * Angular's view encapsulation as plain DOM nodes, so they're styled with Tailwind utility
  * classes assigned directly in TypeScript rather than a scoped component stylesheet. */
@@ -83,4 +96,27 @@ body {
   position: absolute;
   top: 0;
   left: 0;
+}
+
+/* Two-line map label: what the thing is called, then what it is. The type line is deliberately
+ * much quieter than the name — it should be readable when looked at and invisible when not,
+ * because on a crowded view it is printed as many times as there are labels. */
+.map-label {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+}
+
+.map-label-name {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--color-accent);
+}
+
+.map-label-kind {
+  font-size: 8px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-accent) 55%, transparent);
 }

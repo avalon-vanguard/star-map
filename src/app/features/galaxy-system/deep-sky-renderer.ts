@@ -87,7 +87,7 @@ export function deepSkyLabelPoints(
 ): LabeledPoint[] {
   return records.slice(0, limit).map((record) => {
     const position = backdropPosition(record, radiusPc);
-    return { id: record.id, name: record.name, x: position.x, y: position.y, z: position.z };
+    return { id: record.id, name: record.name, kind: record.kind.toUpperCase(), x: position.x, y: position.y, z: position.z };
   });
 }
 

@@ -99,7 +99,7 @@ export class MilkyWayRenderer {
   labelPoints(): readonly LabeledPoint[] {
     return GALACTIC_LANDMARKS.map((landmark) => {
       const position = landmarkPositionPc(landmark);
-      return { id: `galactic:${landmark.id}`, name: landmark.name, x: position.x, y: position.y, z: position.z };
+      return { id: `galactic:${landmark.id}`, name: landmark.name, kind: landmark.kind, x: position.x, y: position.y, z: position.z };
     });
   }
 

@@ -36,7 +36,7 @@ export function formatPeriod(days: number): string {
   return `${(days / 365.25).toFixed(days / 365.25 < 100 ? 1 : 0)} yr`;
 }
 
-/** Radius in kilometres, or Earth radii once the number stops being legible in km. */
+/** Radius in kilometres. */
 export function formatRadiusKm(radiusKm: number): string {
   // Grouped on both sides of the decimal threshold: 69,911 km beside a bare 6371 km reads as two
   // different conventions rather than one.

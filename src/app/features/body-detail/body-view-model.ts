@@ -41,17 +41,19 @@ export function buildBodyViewModel(id: string, catalogues: BodyCatalogues): Body
   const body = catalogues.bodies.find((candidate) => candidate.id === id);
   if (body) {
     const hostStar = catalogues.stars.find((star) => star.id === body.systemStarId);
+    const periodDays = heliocentricPeriodDays(body);
     return {
       id: body.id,
       name: body.name,
       kind: body.kind,
       hostStarName: hostStar?.name ?? 'Unknown star',
+      hostStarId: body.systemStarId,
       radiusKm: body.radiusKm,
       orbit: body.orbit,
       appearance: appearanceForBody(body, catalogues.bodies, luminosityOf(hostStar)),
       hasPhotography: bodyTexturePath(body.id) !== undefined,
-      orbitalPeriodDays: heliocentricPeriodDays(body),
-      orbitalPeriodSource: heliocentricPeriodDays(body) === undefined ? undefined : 'derived',
+      orbitalPeriodDays: periodDays,
+      orbitalPeriodSource: periodDays === undefined ? undefined : 'derived',
     };
   }
 
@@ -65,6 +67,7 @@ export function buildBodyViewModel(id: string, catalogues: BodyCatalogues): Body
     name: exoplanet.name,
     kind: 'exoplanet',
     hostStarName: exoplanet.hostStarName,
+    hostStarId: exoplanet.hostStarId ?? undefined,
     radiusKm: exoplanet.radiusEarth ? exoplanet.radiusEarth * EARTH_RADIUS_KM : undefined,
     massEarth: exoplanet.massEarth,
     discoveryYear: exoplanet.discoveryYear,

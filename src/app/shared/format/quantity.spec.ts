@@ -43,13 +43,15 @@ describe('formatPeriod', () => {
 });
 
 describe('formatRadiusKm', () => {
-  it('groups thousands for large bodies', () => {
+  it('groups thousands on both sides of the decimal threshold', () => {
+    // Not just above it: 69,911 km beside a bare 6371 km reads as two different conventions.
     expect(formatRadiusKm(69_911)).toBe('69,911 km');
+    expect(formatRadiusKm(6371)).toBe('6,371 km');
   });
 
-  it('keeps a decimal only for small ones', () => {
-    expect(formatRadiusKm(6371)).toBe('6371 km');
+  it('keeps a decimal only for small bodies', () => {
     expect(formatRadiusKm(11.3)).toBe('11.3 km');
+    expect(formatRadiusKm(1737)).toBe('1,737 km');
   });
 });
 

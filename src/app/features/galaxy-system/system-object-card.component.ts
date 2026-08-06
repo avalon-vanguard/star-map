@@ -1,20 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 
 import { BodyDetailViewModel } from '../body-detail/body-detail.model';
-import { PLANET_CLASS_LABELS } from '../../shared/astro/planet-appearance';
-import { formatAu, formatDensity, formatMassEarth, formatPeriod, formatRadiusKm, formatTemperature } from '../../shared/format/quantity';
-
-const KIND_LABELS: Record<BodyDetailViewModel['kind'], string> = {
-  planet: 'Planet',
-  moon: 'Moon',
-  dwarf: 'Dwarf planet',
-  exoplanet: 'Exoplanet',
-};
-
-interface CardRow {
-  readonly label: string;
-  readonly value: string;
-}
+import { bodyReadouts } from '../body-detail/body-readouts';
 
 /**
  * The card shown for a body picked in the system view, without leaving it.
@@ -24,9 +11,7 @@ interface CardRow {
  * shows the same numbers over the live view, and keeps the route as the deliberate step for the
  * full 3D inspection.
  *
- * Measured and derived quantities are kept in separate blocks, each labelled, because the
- * difference matters here more than it usually would: no exoplanet has been imaged and several
- * of these figures are reasoned rather than observed. Presentational only.
+ * The rows themselves come from `bodyReadouts`, shared with the detail page. Presentational only.
  */
 @Component({
   selector: 'app-system-object-card',
@@ -43,10 +28,8 @@ interface CardRow {
       <div data-testid="object-card" class="hud-panel px-4 py-3 font-body">
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <p class="truncate font-display text-lg tracking-[0.04em] text-text">
-              {{ body().name }}
-            </p>
-            <p class="mt-0.5 font-display text-[10px] tracking-[0.22em] text-accent uppercase">{{ kindLabel() }} · {{ body().hostStarName }}</p>
+            <p class="truncate font-display text-lg tracking-[0.04em] text-text">{{ body().name }}</p>
+            <p class="mt-0.5 font-display text-[10px] tracking-[0.22em] text-accent uppercase">{{ readouts().kindLabel }} · {{ body().hostStarName }}</p>
           </div>
           <button
             type="button"
@@ -60,10 +43,10 @@ interface CardRow {
           </button>
         </div>
 
-        @if (measured().length) {
+        @if (readouts().measured.length) {
           <p class="mt-3 text-[10px] tracking-[0.18em] text-muted uppercase">Measured</p>
           <dl class="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-            @for (row of measured(); track row.label) {
+            @for (row of readouts().measured; track row.label) {
               <dt class="text-muted">{{ row.label }}</dt>
               <dd class="text-right text-text tabular-nums">{{ row.value }}</dd>
             }
@@ -72,15 +55,13 @@ interface CardRow {
 
         <p class="mt-3 text-[10px] tracking-[0.18em] text-muted uppercase">Derived</p>
         <dl class="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-          @for (row of derived(); track row.label) {
+          @for (row of readouts().derived; track row.label) {
             <dt class="text-muted">{{ row.label }}</dt>
             <dd class="text-right text-text tabular-nums">{{ row.value }}</dd>
           }
         </dl>
 
-        <p class="mt-3 border-t border-border/50 pt-2 text-[10px] leading-relaxed text-muted">
-          {{ provenance() }}
-        </p>
+        <p class="mt-3 border-t border-border/50 pt-2 text-[10px] leading-relaxed text-muted">{{ readouts().provenance }}</p>
 
         <button
           type="button"
@@ -94,7 +75,7 @@ interface CardRow {
         </button>
       </div>
     </div>
-  `,
+  `
 })
 export class SystemObjectCardComponent {
   readonly body = input.required<BodyDetailViewModel>();
@@ -103,63 +84,5 @@ export class SystemObjectCardComponent {
   /** Request for the full `/body/:id` route. */
   readonly openRequested = output<void>();
 
-  readonly kindLabel = computed(() => KIND_LABELS[this.body().kind]);
-
-  /** Only what a catalogue actually published for this body. */
-  readonly measured = computed<readonly CardRow[]>(() => {
-    const body = this.body();
-    const rows: CardRow[] = [];
-    if (body.radiusKm !== undefined) {
-      rows.push({ label: 'Radius', value: formatRadiusKm(body.radiusKm) });
-    }
-    if (body.massEarth !== undefined) {
-      rows.push({ label: 'Mass', value: formatMassEarth(body.massEarth) });
-    }
-    if (body.orbit.semiMajorAxisAu !== undefined) {
-      rows.push({ label: 'Semi-major axis', value: formatAu(body.orbit.semiMajorAxisAu) });
-    }
-    if (body.orbit.eccentricity !== undefined) {
-      rows.push({ label: 'Eccentricity', value: body.orbit.eccentricity.toFixed(3) });
-    }
-    if (body.orbitalPeriodDays !== undefined && body.orbitalPeriodSource === 'measured') {
-      rows.push({ label: 'Period', value: formatPeriod(body.orbitalPeriodDays) });
-    }
-    if (body.discoveryYear !== undefined) {
-      rows.push({ label: 'Discovered', value: `${body.discoveryYear}` });
-    }
-    return rows;
-  });
-
-  /** Everything computed from the measurements above rather than observed directly. */
-  readonly derived = computed<readonly CardRow[]>(() => {
-    const body = this.body();
-    const rows: CardRow[] = [{ label: 'Class', value: PLANET_CLASS_LABELS[body.appearance.planetClass] }];
-    if (body.orbitalPeriodDays !== undefined && body.orbitalPeriodSource === 'derived') {
-      rows.push({ label: 'Period', value: formatPeriod(body.orbitalPeriodDays) });
-    }
-    if (body.appearance.equilibriumTemperatureK !== null) {
-      rows.push({
-        label: 'Equilibrium temp.',
-        value: formatTemperature(body.appearance.equilibriumTemperatureK),
-      });
-    }
-    if (body.appearance.bulkDensityGramsPerCm3 !== null) {
-      rows.push({
-        label: 'Bulk density',
-        value: formatDensity(body.appearance.bulkDensityGramsPerCm3),
-      });
-    }
-    return rows;
-  });
-
-  /** The same distinction the detail panel draws, stated briefly enough for a card. */
-  readonly provenance = computed(() => {
-    const body = this.body();
-    if (body.hasPhotography) {
-      return 'Surface: NASA/ESA/USGS photography.';
-    }
-    return body.appearance.equilibriumTemperatureK === null
-      ? 'Surface illustrated from measured size and mass. No host star in the catalogue, so no temperature could be derived.'
-      : 'Surface illustrated from the measurements above. Not an observation — no image of this world exists.';
-  });
+  readonly readouts = computed(() => bodyReadouts(this.body()));
 }

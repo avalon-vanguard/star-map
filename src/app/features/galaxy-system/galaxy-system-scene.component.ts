@@ -128,9 +128,6 @@ const EXIT_DURATION_SECONDS = 0.9;
 const RETURN_DURATION_SECONDS = 1.1;
 const GALACTIC_FLIGHT_SECONDS = 2.4;
 
-/** Camera range for the readout panel, in the unit that suits the distance. */
-
-
 /**
  * Where the camera sits to hold the whole Galaxy: above the disc and back past the Sun, looking
  * at the centre — near enough to the angle the Galaxy is usually drawn from, and it keeps the
@@ -199,6 +196,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * over. Undefined outside the system view, and cleared when the view leaves one.
    */
   readonly objectCard = signal<BodyDetailViewModel | undefined>(undefined);
+  private enterableSystems = 0;
   private pinnedBodyId: string | null = null;
   private hoveredBodyId: string | null = null;
 
@@ -350,6 +348,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.starsById = new Map(stars.map((star) => [star.id, star]));
     this.bodies = bodies;
     this.exoplanets = exoplanets;
+    // Which stars can be flown into: those with catalogued bodies of their own, plus the Sun.
+    this.enterableSystems = new Set<number>([...bodies.map((body) => body.systemStarId), ...exoplanets.map((exoplanet) => exoplanet.hostStarId)].filter((id) => id !== null)).size;
     // Built once rather than per label refresh: it is a scan of every body and exoplanet, and the
     // labels are recomputed whenever the camera moves.
     this.starIdsWithBodies = new Set([...bodies.map((body) => body.systemStarId), ...exoplanets.map((exoplanet) => exoplanet.hostStarId)].filter(
@@ -683,7 +683,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       { label: 'Radius', value: `${LOCAL_GRID_RINGS_PC[LOCAL_GRID_RINGS_PC.length - 1]} pc` },
       { label: 'Exoplanets', value: `${this.exoplanets.length}` },
       // The one thing the field itself cannot show: which of those points can be flown into.
-      { label: 'Systems', value: `${this.enterableSystemCount()}` }
+      { label: 'Systems', value: `${this.enterableSystems}` }
     ]);
     this.hudNote.set('Positions from measured parallaxes. Grid marks the galactic plane through the Sun.');
   }
@@ -802,28 +802,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   openObjectDetail(id: string): void {
     this.navigationStore.selectBody(id);
     void this.router.navigate(['/body', id]);
-  }
-
-  /**
-   * How many stars can actually be entered: those with catalogued bodies of their own, plus the
-   * Sun. Computed once rather than on every HUD refresh.
-   */
-  private enterableSystems?: number;
-
-  private enterableSystemCount(): number {
-    if (this.enterableSystems === undefined) {
-      const hosts = new Set<number>();
-      for (const body of this.bodies) {
-        hosts.add(body.systemStarId);
-      }
-      for (const exoplanet of this.exoplanets) {
-        if (exoplanet.hostStarId !== null) {
-          hosts.add(exoplanet.hostStarId);
-        }
-      }
-      this.enterableSystems = hosts.size;
-    }
-    return this.enterableSystems;
   }
 
   /** Reacts to `NavigationStore.selectedStarId` changes coming from any source (click/search). */

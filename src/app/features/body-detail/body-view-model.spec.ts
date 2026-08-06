@@ -118,8 +118,7 @@ describe('buildBodyViewModel', () => {
     expect(buildBodyViewModel('nowhere', catalogues)).toBeUndefined();
   });
 
-  it('reads the same body identically however it is reached', () => {
-    // The whole point of the shared builder: the card and the detail route must not drift.
-    expect(buildBodyViewModel('earth', catalogues)).toEqual(buildBodyViewModel('earth', catalogues));
+  it('carries the host star id, so callers need not rescan the catalogues for it', () => {
+    expect(buildBodyViewModel('earth', catalogues)?.hostStarId).toBe(SUN_STAR_ID);
   });
 });

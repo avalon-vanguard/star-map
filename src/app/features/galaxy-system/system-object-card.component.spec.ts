@@ -98,7 +98,7 @@ describe('SystemObjectCardComponent', () => {
       appearance: appearance({ equilibriumTemperatureK: null }),
     });
     expect(block(host, 'Derived')).not.toContain('Equilibrium temp.');
-    expect(host.textContent).toContain('No host star in the catalogue');
+    expect(host.textContent).toContain('host star is not in the catalogue');
   });
 
   it('emits rather than navigating, so the scene decides what selection means', () => {

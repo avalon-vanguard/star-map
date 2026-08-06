@@ -13,6 +13,12 @@ export interface BodyDetailViewModel {
   name: string;
   kind: BodyDetailKind;
   hostStarName: string;
+  /**
+   * The host star's catalogue id, so a caller that has the view model does not have to rescan the
+   * catalogues to find what building it already resolved. Undefined for an exoplanet whose host
+   * never cross-referenced to the star catalogue.
+   */
+  hostStarId?: number;
   radiusKm?: number;
   massEarth?: number;
   discoveryYear?: number;

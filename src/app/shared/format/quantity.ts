@@ -38,7 +38,10 @@ export function formatPeriod(days: number): string {
 
 /** Radius in kilometres, or Earth radii once the number stops being legible in km. */
 export function formatRadiusKm(radiusKm: number): string {
-  return radiusKm >= 10_000 ? `${Math.round(radiusKm).toLocaleString('en-GB')} km` : `${radiusKm.toFixed(radiusKm < 100 ? 1 : 0)} km`;
+  // Grouped on both sides of the decimal threshold: 69,911 km beside a bare 6371 km reads as two
+  // different conventions rather than one.
+  const digits = radiusKm < 100 ? 1 : 0;
+  return `${radiusKm.toLocaleString('en-GB', { minimumFractionDigits: digits, maximumFractionDigits: digits })} km`;
 }
 
 /** Mass in Earth masses. */
@@ -68,13 +71,6 @@ export function formatLuminosity(solar: number): string {
   return `${solar.toFixed(solar < 1 ? 3 : 2)} L☉`;
 }
 
-const SUPERSCRIPTS = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
-
 function superscript(value: number): string {
-  const digits = Math.abs(value)
-    .toString()
-    .split('')
-    .map((digit) => SUPERSCRIPTS[Number(digit)])
-    .join('');
-  return value < 0 ? `⁻${digits}` : digits;
+  return `${value}`.replace('-', '⁻').replace(/\d/g, (digit) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[Number(digit)]);
 }

@@ -125,14 +125,8 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     }
     this.viewModel.set(viewModel);
 
-    const body = this.bodies.find((candidate) => candidate.id === id);
-    if (body) {
-      this.navigationStore.selectStar(body.systemStarId);
-    } else {
-      const exoplanet = this.exoplanets.find((candidate) => candidate.id === id);
-      if (exoplanet?.hostStarId != null) {
-        this.navigationStore.selectStar(exoplanet.hostStarId);
-      }
+    if (viewModel.hostStarId !== undefined) {
+      this.navigationStore.selectStar(viewModel.hostStarId);
     }
 
     this.notFound.set(false);

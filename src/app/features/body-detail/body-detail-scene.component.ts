@@ -6,9 +6,6 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { EngineService } from '../../core/engine/engine.service';
-import { appearanceForBody, appearanceForExoplanet } from '../../shared/astro/body-appearance';
-import { EARTH_RADIUS_KM } from '../../shared/astro/planet-appearance';
-import { luminositySolar } from '../../shared/astro/stellar';
 import { planetTexture } from '../../shared/rendering/procedural-planet-texture';
 import { applyMilkyWaySkybox, createGlowSprite } from '../../shared/rendering/skybox';
 import { atmosphereColorFor, bodyTexturePath, loadCachedTexture, MILKY_WAY_SKYBOX_PATH, SATURN_RING_TEXTURE_PATH } from '../../shared/rendering/texture-catalog';
@@ -17,6 +14,7 @@ import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
 import { NavigationStore } from '../../shared/state/navigation.store';
 import { BodyDetailViewModel } from './body-detail.model';
+import { buildBodyViewModel } from './body-view-model';
 import { InfoPanelComponent } from './info-panel.component';
 
 /** Gas giants read as smoother/less rocky than terrestrial bodies under the same lighting rig. */
@@ -118,43 +116,17 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    const body = this.bodies.find((candidate) => candidate.id === id);
-    const exoplanet = this.exoplanets.find((candidate) => candidate.id === id);
-
-    if (body) {
-      const hostStar = this.stars.find((star) => star.id === body.systemStarId);
-      this.viewModel.set({
-        id: body.id,
-        name: body.name,
-        kind: body.kind,
-        hostStarName: hostStar?.name ?? 'Unknown star',
-        radiusKm: body.radiusKm,
-        orbit: body.orbit,
-        appearance: appearanceForBody(body, this.bodies, this.luminosityOf(hostStar)),
-        hasPhotography: bodyTexturePath(body.id) !== undefined
-      });
-      this.navigationStore.selectStar(body.systemStarId);
-    } else if (exoplanet) {
-      const hostStar = this.stars.find((star) => star.id === exoplanet.hostStarId);
-      this.viewModel.set({
-        id: exoplanet.id,
-        name: exoplanet.name,
-        kind: 'exoplanet',
-        hostStarName: exoplanet.hostStarName,
-        radiusKm: exoplanet.radiusEarth ? exoplanet.radiusEarth * EARTH_RADIUS_KM : undefined,
-        massEarth: exoplanet.massEarth,
-        discoveryYear: exoplanet.discoveryYear,
-        orbit: exoplanet.orbit,
-        appearance: appearanceForExoplanet(exoplanet, this.luminosityOf(hostStar)),
-        hasPhotography: bodyTexturePath(exoplanet.id) !== undefined
-      });
-      if (exoplanet.hostStarId !== null) {
-        this.navigationStore.selectStar(exoplanet.hostStarId);
-      }
-    } else {
+    // Shared with the system view's object card, so the same body cannot read differently there.
+    const viewModel = buildBodyViewModel(id, { bodies: this.bodies, exoplanets: this.exoplanets, stars: this.stars });
+    if (!viewModel) {
       this.viewModel.set(undefined);
       this.notFound.set(true);
       return;
+    }
+    this.viewModel.set(viewModel);
+
+    if (viewModel.hostStarId !== undefined) {
+      this.navigationStore.selectStar(viewModel.hostStarId);
     }
 
     this.notFound.set(false);
@@ -162,18 +134,6 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     if (this.sceneReady) {
       this.applyViewModelToScene();
     }
-  }
-
-  /**
-   * The host star's luminosity in solar units, from its own catalogued magnitude and distance.
-   * `null` for an exoplanet whose host never cross-referenced to the star catalogue, which
-   * leaves its planets with no derived temperature rather than a guessed one.
-   */
-  private luminosityOf(star: StarRecord | undefined): number | null {
-    if (!star) {
-      return null;
-    }
-    return luminositySolar({ magnitude: star.magnitude, distancePc: Math.hypot(star.x, star.y, star.z), spectralType: star.spectralType });
   }
 
   private applyViewModelToScene(): void {

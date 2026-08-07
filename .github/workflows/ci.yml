@@ -1,10 +1,12 @@
 name: CI
 
-# Runs on pull requests and on the branch they merge into, so a green tick means the code was
-# checked in the state it will actually land in.
+# Runs on pull requests and on the branches they merge into, so a green tick means the code was
+# checked in the state it will actually land in. `develop` is where work integrates and `main` is
+# what it is promoted to; a merge into either is a state nothing else would otherwise check,
+# since a pull request is checked before the merge rather than after it.
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
 
 # A second push to the same branch makes the first run's answer irrelevant.

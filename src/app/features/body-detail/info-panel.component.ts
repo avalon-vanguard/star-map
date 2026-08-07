@@ -19,45 +19,63 @@ const KIND_LABELS: Record<BodyDetailViewModel['kind'], string> = {
 @Component({
   selector: 'app-info-panel',
   template: `
-    <div class="absolute top-4 right-4 w-80 max-w-[calc(100%-2rem)] rounded-md border border-border bg-panel/80 p-5 font-body text-text backdrop-blur-md">
+    <!-- Sits below the search field on narrow viewports, beside it from sm up, so the two
+         top-anchored overlays never stack on top of each other on a phone. -->
+    <div class="hud-brackets hud-acquire absolute top-20 right-4 w-80 max-w-[calc(100%-2rem)] border border-border/60 bg-panel/92 font-body text-text backdrop-blur-md sm:top-4">
       <button
         type="button"
         (click)="goBack()"
-        class="mb-3 flex items-center gap-1.5 rounded-md border border-border bg-panel/60 px-3 py-1.5 text-xs tracking-wide text-muted uppercase transition-colors hover:border-accent hover:text-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
+        class="flex w-full items-center gap-2 border-b border-border/40 px-4 py-2 text-[10px] tracking-[0.16em] text-muted uppercase transition-colors hover:bg-accent/8 hover:text-accent focus-visible:bg-accent/12 focus-visible:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
       >
-        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M15 6l-6 6 6 6" />
         </svg>
         System
       </button>
 
-      <h1 class="mb-0.5 font-display text-lg font-semibold tracking-wide text-text">{{ body().name }}</h1>
-      <p class="mb-4 text-xs tracking-wide text-accent uppercase">{{ kindLabel() }} · {{ body().hostStarName }}</p>
+      <header class="px-4 pt-4 pb-3">
+        <h1 class="truncate text-lg leading-tight font-bold tracking-[0.04em] text-text uppercase">{{ body().name }}</h1>
+        <p class="mt-1 truncate text-[10px] tracking-[0.18em] text-accent uppercase">{{ kindLabel() }} · {{ body().hostStarName }}</p>
+      </header>
 
-      <dl class="grid grid-cols-[auto_1fr] gap-y-1.5 gap-x-3 text-sm">
+      <!-- Readout rows: label left, figure right, unit tinted back so the number is what the eye
+           lands on. Tabular figures keep the decimal points aligned down the column. -->
+      <dl class="divide-y divide-border/25 border-t border-border/40">
         @if (body().radiusKm) {
-          <dt class="text-muted">Radius</dt>
-          <dd class="text-right text-text">{{ body().radiusKm | number: '1.0-1' }} km</dd>
+          <div class="flex items-baseline justify-between gap-4 px-4 py-2">
+            <dt class="text-[10px] tracking-[0.16em] text-muted uppercase">Radius</dt>
+            <dd class="text-sm tabular-nums">{{ body().radiusKm | number: '1.0-1' }} <span class="text-muted">km</span></dd>
+          </div>
         }
         @if (body().massEarth) {
-          <dt class="text-muted">Mass</dt>
-          <dd class="text-right text-text">{{ body().massEarth | number: '1.0-2' }} Earth masses</dd>
+          <div class="flex items-baseline justify-between gap-4 px-4 py-2">
+            <dt class="text-[10px] tracking-[0.16em] text-muted uppercase">Mass</dt>
+            <dd class="text-sm tabular-nums">{{ body().massEarth | number: '1.0-2' }} <span class="text-muted">Earth masses</span></dd>
+          </div>
         }
         @if (body().orbit.semiMajorAxisAu) {
-          <dt class="text-muted">Semi-major axis</dt>
-          <dd class="text-right text-text">{{ body().orbit.semiMajorAxisAu | number: '1.0-4' }} AU</dd>
+          <div class="flex items-baseline justify-between gap-4 px-4 py-2">
+            <dt class="text-[10px] tracking-[0.16em] text-muted uppercase">Semi-major axis</dt>
+            <dd class="text-sm tabular-nums">{{ body().orbit.semiMajorAxisAu | number: '1.0-4' }} <span class="text-muted">AU</span></dd>
+          </div>
         }
         @if (body().orbit.eccentricity !== undefined) {
-          <dt class="text-muted">Eccentricity</dt>
-          <dd class="text-right text-text">{{ body().orbit.eccentricity | number: '1.0-4' }}</dd>
+          <div class="flex items-baseline justify-between gap-4 px-4 py-2">
+            <dt class="text-[10px] tracking-[0.16em] text-muted uppercase">Eccentricity</dt>
+            <dd class="text-sm tabular-nums">{{ body().orbit.eccentricity | number: '1.0-4' }}</dd>
+          </div>
         }
         @if (body().orbit.inclinationDeg !== undefined) {
-          <dt class="text-muted">Inclination</dt>
-          <dd class="text-right text-text">{{ body().orbit.inclinationDeg | number: '1.0-2' }}°</dd>
+          <div class="flex items-baseline justify-between gap-4 px-4 py-2">
+            <dt class="text-[10px] tracking-[0.16em] text-muted uppercase">Inclination</dt>
+            <dd class="text-sm tabular-nums">{{ body().orbit.inclinationDeg | number: '1.0-2' }}<span class="text-muted">°</span></dd>
+          </div>
         }
         @if (body().discoveryYear) {
-          <dt class="text-muted">Discovered</dt>
-          <dd class="text-right text-text">{{ body().discoveryYear }}</dd>
+          <div class="flex items-baseline justify-between gap-4 px-4 py-2">
+            <dt class="text-[10px] tracking-[0.16em] text-muted uppercase">Discovered</dt>
+            <dd class="text-sm tabular-nums">{{ body().discoveryYear }}</dd>
+          </div>
         }
       </dl>
     </div>

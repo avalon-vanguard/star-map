@@ -61,7 +61,13 @@ export class StarLabelOverlay {
     const element = document.createElement('div');
     // Tailwind utility classes assigned directly since this element lives outside Angular's
     // view encapsulation (see the class comment above) rather than through a component template.
-    element.className = 'translate-x-1.5 -translate-y-1.5 whitespace-nowrap font-body text-[11px] text-accent [text-shadow:0_0_4px_rgba(0,0,0,0.9)]';
+    //
+    // The offset is a margin rather than a `translate-*` utility because `CSS2DRenderer` writes
+    // its own `transform` to the inline style every frame, which would win over any class. The
+    // `::before` hairline is the leader line back to the star the name belongs to — without it a
+    // margin-shifted label just floats near a point instead of pointing at it.
+    element.className =
+      "relative ml-3 whitespace-nowrap font-body text-[11px] tracking-[0.08em] text-accent uppercase [text-shadow:0_0_6px_var(--color-void),0_0_3px_var(--color-void)] before:absolute before:top-1/2 before:-left-3 before:h-px before:w-2.5 before:bg-accent/60 before:content-['']";
     element.textContent = point.name;
 
     const object = new CSS2DObject(element);

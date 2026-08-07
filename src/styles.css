@@ -1,19 +1,20 @@
 /* You can add global styles to this file, and also import other style files */
 @import 'tailwindcss';
 
-/* Design tokens for the sci-fi "HUD" look shared across the app. `--color-*`/`--font-*` names
- * automatically become Tailwind utilities (e.g. `--color-accent` -> `bg-accent`/`text-accent`). */
+/* Design tokens for the "observatory instrument" HUD shared across the app. `--color-*`/`--font-*`
+ * names automatically become Tailwind utilities (e.g. `--color-accent` -> `bg-accent`/`text-accent`).
+ *
+ * One family only: every string in this UI is a measurement, an identifier, or a catalog label, so
+ * the readout face carries the whole hierarchy through weight, size, and tracking. */
 @theme {
-  --font-display: 'Orbitron', 'Segoe UI', sans-serif;
-  --font-body: 'JetBrains Mono', 'Segoe UI', monospace;
+  --font-body: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', monospace;
 
-  --color-void: #05070d;
-  --color-panel: #0b121f;
+  --color-void: #04060c;
+  --color-panel: #070d16;
   --color-accent: #4dd7ff;
-  --color-accent-dim: #1c4f66;
-  --color-text: #dbe6f3;
-  --color-muted: #7f93ab;
-  --color-border: #2a4a5c;
+  --color-text: #e3ecf7;
+  --color-muted: #90a6bd;
+  --color-border: #24455a;
 }
 
 html,
@@ -24,6 +25,62 @@ body {
   color: var(--color-text);
   overflow: hidden;
   font-family: var(--font-body);
+}
+
+/* The HUD's signature: four corner tick brackets cut into a panel's hairline frame. Drawn as
+ * eight background gradients so any panel (or the viewport frame) picks them up without the
+ * eight extra DOM nodes the same mark would otherwise cost. Override `--hud-tick` per element
+ * (e.g. `[--hud-tick:1.75rem]`) to scale the marks with the surface they frame. */
+@utility hud-brackets {
+  --hud-tick: 0.625rem;
+  --hud-mark: color-mix(in oklab, var(--color-accent) 65%, transparent);
+  background-image:
+    linear-gradient(var(--hud-mark) 0 0), linear-gradient(var(--hud-mark) 0 0),
+    linear-gradient(var(--hud-mark) 0 0), linear-gradient(var(--hud-mark) 0 0),
+    linear-gradient(var(--hud-mark) 0 0), linear-gradient(var(--hud-mark) 0 0),
+    linear-gradient(var(--hud-mark) 0 0), linear-gradient(var(--hud-mark) 0 0);
+  background-repeat: no-repeat;
+  background-size:
+    var(--hud-tick) 1px,
+    1px var(--hud-tick),
+    var(--hud-tick) 1px,
+    1px var(--hud-tick),
+    var(--hud-tick) 1px,
+    1px var(--hud-tick),
+    var(--hud-tick) 1px,
+    1px var(--hud-tick);
+  background-position:
+    left top,
+    left top,
+    right top,
+    right top,
+    left bottom,
+    left bottom,
+    right bottom,
+    right bottom;
+}
+
+/* The one authored moment: a panel doesn't fade in, it acquires — wiping down under an
+ * exponential ease-out the way a readout fills once an instrument locks onto a target. */
+@utility hud-acquire {
+  animation: hud-acquire 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes hud-acquire {
+  from {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-acquire {
+    animation-duration: 1ms;
+  }
 }
 
 /* Star name labels rendered by CSS2DRenderer (see StarLabelOverlay). These live outside

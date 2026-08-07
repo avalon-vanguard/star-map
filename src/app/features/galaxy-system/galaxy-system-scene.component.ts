@@ -75,9 +75,9 @@ const STAR_MARKER_RADIUS_AU = 0.2;
         <button
           type="button"
           (click)="exitSystem()"
-          class="absolute top-4 left-4 flex items-center gap-1.5 rounded-md border border-border bg-panel/70 px-3 py-1.5 font-body text-xs tracking-wide text-muted uppercase backdrop-blur-md transition-colors hover:border-accent hover:text-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
+          class="hud-brackets hud-acquire absolute top-20 left-4 flex items-center gap-2 border border-border/60 bg-panel/85 px-3 py-2 font-body text-[10px] tracking-[0.16em] text-muted uppercase backdrop-blur-md transition-colors hover:border-accent/70 hover:text-accent focus-visible:border-accent/70 focus-visible:text-accent focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-accent sm:top-4"
         >
-          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M15 6l-6 6 6 6" />
           </svg>
           Galaxy

@@ -47,9 +47,18 @@ const GLOW_SCALE = 2.6;
       @if (viewModel()) {
         <app-info-panel [body]="viewModel()!" />
       } @else if (notFound()) {
-        <div class="absolute top-4 right-4 rounded-md border border-border bg-panel/80 p-5 font-body text-text backdrop-blur-md">
-          <p class="mb-2 text-sm">Couldn't find that body.</p>
-          <a routerLink="/" class="text-sm text-accent hover:underline">Back to the galaxy</a>
+        <div class="hud-brackets hud-acquire absolute top-20 right-4 w-80 max-w-[calc(100%-2rem)] border border-border/60 bg-panel/92 p-4 font-body text-text backdrop-blur-md sm:top-4">
+          <p class="text-[10px] tracking-[0.18em] text-accent uppercase">No record</p>
+          <p class="mt-2 text-sm text-muted">That id isn't in the catalog — it may have been renamed or mistyped.</p>
+          <a
+            routerLink="/"
+            class="mt-4 inline-flex items-center gap-2 border border-border/60 px-3 py-1.5 text-[10px] tracking-[0.16em] text-muted uppercase transition-colors hover:border-accent/70 hover:text-accent focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M15 6l-6 6 6 6" />
+            </svg>
+            Back to the galaxy
+          </a>
         </div>
       }
     </div>

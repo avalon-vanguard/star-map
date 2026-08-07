@@ -11,12 +11,9 @@ Activate caveman mode. Stays active until explicit deactivation.
 
 ## Scope
 
-Installed via this repo's plugin marketplace, this command defaults to
-**user scope** — available in every project, not just the one it was
-installed from. Override with `--scope project` (shared with collaborators
-via `.claude/settings.json`) or `--scope local` (gitignored, this repo
-only) if you want it scoped down. See the [README](../../README.md) for
-install commands.
+Part of the caveman plugin, whose source lives here. This repo no longer
+publishes itself as a plugin marketplace, so the command is not installable
+from it as things stand. See the [README](../../README.md).
 
 ## Activation
 

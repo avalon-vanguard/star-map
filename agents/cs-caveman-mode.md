@@ -18,10 +18,9 @@ turns until explicit deactivation.
 
 ## Scope
 
-Ships as part of this repo's plugin marketplace. Installing it via
-`/plugin install caveman@star-map` defaults to **user scope**, so this
-agent is available in every project, not scoped to a single repo. See the
-[README](../README.md) for `--scope project` / `--scope local` overrides.
+Part of the caveman plugin, whose source lives here. This repo no longer
+publishes itself as a plugin marketplace, so the agent is not installable
+from it as things stand. See the [README](../README.md).
 
 ## Activation Triggers
 

@@ -5,7 +5,7 @@ real astronomical data instead of fictional systems. Browse the solar neighbourh
 star's system to see its planets on their real orbits, and drill into a single body for the
 NASA figures behind it.
 
-This repo also hosts a small Claude Code plugin marketplace — see [Plugins](#plugins) below.
+The source of a small Claude Code plugin also lives here — see [Plugins](#plugins) below.
 
 ![The solar neighbourhood: 68 388 catalogued stars within 250 parsecs, on a polar grid lying in the galactic plane](docs/screenshots/galaxy-view.jpg)
 
@@ -290,27 +290,10 @@ The design document behind all of this is `.junie/plans/nasa-star-map.md`.
 
 ## Plugins
 
-This repo doubles as a Claude Code plugin marketplace. Adding it and installing a plugin
-defaults to **user scope**, meaning the plugin becomes available in *every* project on your
-machine, not just the one you happen to be in:
-
-```bash
-/plugin marketplace add avalon-vanguard/star-map
-/plugin install caveman@star-map
-```
-
-Scope can be overridden at install time if you want it tied to a single repo instead:
-
-```bash
-# Shared with collaborators via that repo's .claude/settings.json
-/plugin install caveman@star-map --scope project
-
-# Just for you, in that one repo only (gitignored)
-/plugin install caveman@star-map --scope local
-```
-
-See [Claude Code plugin installation scopes](https://code.claude.com/docs/en/plugins-reference)
-for details on `user` / `project` / `local` scope.
+This repo carries the source of one Claude Code plugin, but no longer publishes itself as a
+marketplace — `.claude-plugin/marketplace.json` was removed, which is the file `/plugin
+marketplace add` reads. So there is currently no install path from here; the manifest and the
+plugin's own files are kept so it can be listed from a marketplace of its own later.
 
 - **caveman** — `/cs:caveman` ultra-compressed communication mode.
   - Command: [`commands/cs/caveman.md`](commands/cs/caveman.md)

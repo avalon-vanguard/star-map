@@ -31,14 +31,34 @@ jobs:
     if: >-
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository
+    env:
+      # Whether the key exists, resolved once here because `secrets` is not one of the contexts a
+      # step's `if` can read, while `env` is.
+      HAS_JUNIE_KEY: ${{ secrets.JUNIE_API_KEY != '' }}
     steps:
+      # Without the key the action exits on "Missing required input", which would mark every pull
+      # request failed for a reason that has nothing to do with its code. Say so in the run
+      # summary and stop instead — visible to anyone who looks, blocking nobody who doesn't.
+      - name: Explain the absent key
+        if: env.HAS_JUNIE_KEY != 'true'
+        run: |
+          echo "No \`JUNIE_API_KEY\` secret is set, so this pull request was not reviewed." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Generate a key at <https://junie.jetbrains.com/cli> and add it under" >> "$GITHUB_STEP_SUMMARY"
+          echo "Settings → Secrets and variables → Actions." >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/checkout@v5
+        if: env.HAS_JUNIE_KEY == 'true'
         with:
           # Junie reads the diff through the GitHub API, so the full history it would otherwise
           # clone is never used.
           fetch-depth: 1
 
       - uses: JetBrains/junie-github-action@v1
+        if: env.HAS_JUNIE_KEY == 'true'
+        # An opinion, not a gate. If Junie is down or rate-limited that is worth seeing in the
+        # log, but it is not a reason to hold a pull request whose tests pass.
+        continue-on-error: true
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           # The action's built-in review prompt. Replace with a prompt block to review against

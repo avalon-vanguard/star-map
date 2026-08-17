@@ -13,6 +13,7 @@ import { BodyRecord } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
 import { NavigationStore } from '../../shared/state/navigation.store';
+import { ChevronIconComponent } from '../../shared/ui/chevron-icon.component';
 import { BodyDetailViewModel } from './body-detail.model';
 import { buildBodyViewModel } from './body-view-model';
 import { InfoPanelComponent } from './info-panel.component';
@@ -36,16 +37,23 @@ const GLOW_SCALE = 2.6;
 @Component({
   selector: 'app-body-detail-scene',
   providers: [EngineService],
-  imports: [InfoPanelComponent, RouterLink],
+  imports: [ChevronIconComponent, InfoPanelComponent, RouterLink],
   template: `
     <div class="relative h-full w-full">
       <canvas #canvas data-testid="scene-canvas" class="block h-full w-full"></canvas>
       @if (viewModel()) {
         <app-info-panel [body]="viewModel()!" />
       } @else if (notFound()) {
-        <div class="absolute top-4 right-4 rounded-md border border-border bg-panel/80 p-5 font-body text-text backdrop-blur-md">
-          <p class="mb-2 text-sm">Couldn't find that body.</p>
-          <a routerLink="/" class="text-sm text-accent hover:underline">Back to the galaxy</a>
+        <div class="hud-brackets hud-acquire hud-surface absolute top-20 right-4 w-80 max-w-[calc(100%-2rem)] p-4 font-body text-text xl:top-4">
+          <p class="type-eyebrow text-accent">No record</p>
+          <p class="mt-2 text-sm text-muted">That id isn't in the catalog — it may have been renamed or mistyped.</p>
+          <a
+            routerLink="/"
+            class="type-label mt-4 inline-flex items-center gap-2 border border-border/60 px-3 py-1.5 text-muted transition-colors hover:border-accent/70 hover:text-accent focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <app-chevron-icon class="h-3 w-3" direction="left" />
+            Back to the galaxy
+          </a>
         </div>
       }
     </div>

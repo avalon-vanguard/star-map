@@ -1,54 +1,43 @@
 import { Component, computed, input } from '@angular/core';
 import { Router } from '@angular/router';
 
+import { ChevronIconComponent } from '../../shared/ui/chevron-icon.component';
 import { bodyReadouts } from './body-readouts';
 import { BodyDetailViewModel } from './body-detail.model';
+import { ReadoutSectionsComponent } from './readout-sections.component';
 
 /**
  * Displays the real NASA data for the currently selected body/exoplanet: kind, physical
  * size/mass, orbital elements, and (for exoplanets) discovery year. Presentational only —
  * `BodyDetailSceneComponent` supplies the view model and owns navigation state.
  *
- * The rows come from `bodyReadouts`, shared with the system view's object card so the same body
- * cannot read differently in the two places it can be inspected.
+ * The rows come from `bodyReadouts` via `ReadoutSectionsComponent`, both shared with the system
+ * view's object card so the same body cannot read differently in the two places it can be
+ * inspected.
  */
 @Component({
   selector: 'app-info-panel',
+  imports: [ChevronIconComponent, ReadoutSectionsComponent],
   template: `
-    <div class="absolute top-4 right-4 w-80 max-w-[calc(100%-2rem)] rounded-md border border-border bg-panel/80 p-5 font-body text-text backdrop-blur-md">
+    <!-- Sits below the search field until xl, beside it from there. The search field is 26rem
+         wide and centred, so this right-anchored 20rem panel only clears it once the viewport
+         passes ~1088px — at sm they still overlap and the search would cover the back button. -->
+    <div class="hud-brackets hud-acquire hud-surface absolute top-20 right-4 w-80 max-w-[calc(100%-2rem)] font-body text-text xl:top-4">
       <button
         type="button"
         (click)="goBack()"
-        class="mb-3 flex items-center gap-1.5 rounded-md border border-border bg-panel/60 px-3 py-1.5 text-xs tracking-wide text-muted uppercase transition-colors hover:border-accent hover:text-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
+        class="type-label flex w-full items-center gap-2 border-b border-border/40 px-4 py-2 text-muted transition-colors hover:bg-accent/8 hover:text-accent focus-visible:bg-accent/12 focus-visible:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
       >
-        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M15 6l-6 6 6 6" />
-        </svg>
+        <app-chevron-icon class="h-3 w-3" direction="left" />
         System
       </button>
 
-      <h1 class="mb-0.5 font-display text-lg font-semibold tracking-wide text-text">{{ body().name }}</h1>
-      <p class="mb-4 text-xs tracking-wide text-accent uppercase">{{ readouts().kindLabel }} · {{ body().hostStarName }}</p>
+      <header class="px-4 pt-4 pb-3">
+        <h1 class="truncate text-lg leading-tight font-bold tracking-[0.04em] text-text uppercase">{{ body().name }}</h1>
+        <p class="type-eyebrow mt-1 truncate text-accent">{{ readouts().kindLabel }} · {{ body().hostStarName }}</p>
+      </header>
 
-      @if (readouts().measured.length) {
-        <p class="mt-4 mb-1.5 text-[10px] tracking-[0.18em] text-muted uppercase">Measured</p>
-        <dl class="grid grid-cols-[auto_1fr] gap-y-1.5 gap-x-3 text-sm">
-          @for (row of readouts().measured; track row.label) {
-            <dt class="text-muted">{{ row.label }}</dt>
-            <dd class="text-right text-text tabular-nums">{{ row.value }}</dd>
-          }
-        </dl>
-      }
-
-      <p class="mt-4 mb-1.5 text-[10px] tracking-[0.18em] text-muted uppercase">Derived</p>
-      <dl class="grid grid-cols-[auto_1fr] gap-y-1.5 gap-x-3 text-sm">
-        @for (row of readouts().derived; track row.label) {
-          <dt class="text-muted">{{ row.label }}</dt>
-          <dd class="text-right text-text tabular-nums">{{ row.value }}</dd>
-        }
-      </dl>
-
-      <p class="mt-3 border-t border-border/50 pt-2 text-[10px] leading-relaxed text-muted">{{ readouts().provenance }}</p>
+      <app-readout-sections [readouts]="readouts()" />
     </div>
   `
 })

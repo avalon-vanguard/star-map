@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 
 import { ViewLevel } from '../../shared/state/navigation.store';
+import { ReticleIconComponent } from '../../shared/ui/reticle-icon.component';
 
 export interface HudReadout {
   readonly label: string;
@@ -45,29 +46,26 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
 @Component({
   selector: 'app-starmap-hud',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [ReticleIconComponent],
   host: { class: 'pointer-events-none absolute inset-0 block select-none' },
   template: `
-    <div class="hud-frame absolute inset-0"></div>
     <div class="hud-vignette absolute inset-0"></div>
 
     @if (showReticle()) {
-      <!-- A hexagon rather than a square bracket: the shape reads as a sensor lock on a body,
-           and stays distinct from the rectangular panel chrome everywhere else on screen. -->
-      <svg class="absolute top-1/2 left-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 text-accent/70" viewBox="0 0 56 56" fill="none" aria-hidden="true">
-        <polygon points="28,4 48,16 48,40 28,52 8,40 8,16" stroke="currentColor" stroke-width="1" />
-        <path d="M28 22v-6M28 40v-6M22 28h-6M40 28h-6" stroke="currentColor" stroke-width="1" opacity="0.8" />
-      </svg>
+      <!-- The same circle-and-ticks reticle the search field wears, scaled up: one lock mark
+           for the whole instrument, whether it is holding a query or a body. -->
+      <app-reticle-icon class="absolute top-1/2 left-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 text-accent/70" [strokeWidth]="1" />
     }
 
     <!-- Top rail: which scale the view is at, and what it is holding. Both sit on one line
          across the top of the display, clear of the search field above them. -->
-    <nav aria-label="Map scale" class="pointer-events-auto absolute top-16 left-6 flex items-stretch gap-px">
+    <nav aria-label="Map scale" class="hud-brackets hud-surface pointer-events-auto absolute top-16 left-6 flex items-stretch divide-x divide-border/40">
       @for (step of ladder(); track step.level) {
         @if (step.reachable) {
           <button
             type="button"
             (click)="levelSelected.emit(step.level)"
-            class="hud-tab border-y border-border/70 bg-panel/70 px-4 py-1.5 font-display text-[10px] tracking-[0.22em] text-muted uppercase backdrop-blur-sm transition-colors hover:bg-accent/15 hover:text-accent focus:bg-accent/15 focus:text-accent focus:outline-none"
+            class="type-eyebrow px-4 py-1.5 text-muted transition-colors hover:bg-accent/8 hover:text-accent focus-visible:bg-accent/12 focus-visible:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
           >
             {{ step.label }}
           </button>
@@ -75,8 +73,8 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
           <span
             [attr.aria-current]="step.state === 'current' ? 'step' : null"
             [attr.data-testid]="step.state === 'current' ? 'hud-current-level' : null"
-            class="hud-tab border-y px-4 py-1.5 font-display text-[10px] tracking-[0.22em] uppercase backdrop-blur-sm"
-            [class]="step.state === 'current' ? 'border-accent/70 bg-accent/20 text-accent' : 'border-border/40 bg-panel/40 text-border'"
+            class="type-eyebrow px-4 py-1.5"
+            [class]="step.state === 'current' ? 'bg-accent/15 text-accent' : 'text-muted/40'"
             >{{ step.label }}</span
           >
         }
@@ -84,21 +82,21 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
     </nav>
 
     @if (title()) {
-      <div class="absolute top-16 left-1/2 -translate-x-1/2">
-        <div class="hud-banner flex items-center gap-2.5 border-b border-accent/60 bg-panel/75 px-6 py-1.5 backdrop-blur-sm">
-          <svg class="h-3 w-3 shrink-0 text-accent" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-            <polygon points="6,1 10.5,3.5 10.5,8.5 6,11 1.5,8.5 1.5,3.5" stroke="currentColor" stroke-width="1" />
-            <circle cx="6" cy="6" r="1.4" fill="currentColor" />
-          </svg>
-          <span class="font-display text-[11px] tracking-[0.3em] text-accent uppercase">{{ title() }}</span>
+      <!-- Hidden below lg: the readout panel names the same thing, and at narrower widths a
+           long star name runs into the scale rail on its left and under the object card on its
+           right — all three share the top-16 line. -->
+      <div class="absolute top-16 left-1/2 hidden -translate-x-1/2 lg:block">
+        <div data-testid="hud-banner" class="hud-brackets hud-acquire hud-surface flex items-center gap-2.5 px-6 py-1.5">
+          <app-reticle-icon class="h-3 w-3 shrink-0 text-accent" />
+          <span class="text-[11px] tracking-[0.3em] text-accent uppercase">{{ title() }}</span>
         </div>
       </div>
     }
 
     <div class="absolute right-6 bottom-6 left-6 flex flex-wrap items-end justify-between gap-4">
-      <div class="hud-panel max-w-lg px-4 py-3">
-        <p class="font-display text-[10px] tracking-[0.28em] text-muted uppercase">{{ eyebrow() }}</p>
-        <p data-testid="hud-title" class="mt-1 font-display text-xl tracking-[0.06em] text-text">{{ title() }}</p>
+      <div class="hud-brackets hud-acquire hud-surface max-w-lg px-4 py-3">
+        <p class="type-label text-muted">{{ eyebrow() }}</p>
+        <p data-testid="hud-title" class="mt-1 text-lg font-bold tracking-[0.04em] text-text uppercase">{{ title() }}</p>
         @if (subtitle()) {
           <p class="mt-0.5 text-xs text-muted">{{ subtitle() }}</p>
         }
@@ -106,20 +104,20 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
           <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-1">
             @for (readout of readouts(); track readout.label) {
               <div>
-                <dt class="text-[10px] tracking-[0.18em] text-muted uppercase">{{ readout.label }}@if (readout.derived) {<span class="text-accent/80" aria-hidden="true">*</span>}</dt>
-                <dd class="text-sm text-text tabular-nums">{{ readout.value }}</dd>
+                <dt class="type-label text-muted">{{ readout.label }}@if (readout.derived) {<span class="text-accent/80" aria-hidden="true">*</span>}</dt>
+                <dd class="mt-0.5 text-sm text-text tabular-nums">{{ readout.value }}</dd>
               </div>
             }
           </dl>
         }
         @if (note() || hasDerived()) {
-          <p class="mt-3 border-t border-border/50 pt-2 text-[10px] leading-relaxed tracking-[0.08em] text-muted uppercase">@if (hasDerived()) {<span class="text-accent/80">*</span> Derived, not catalogued. }{{ note() }}</p>
+          <p class="mt-3 border-t border-border/40 pt-2 text-[10px] leading-relaxed text-muted">@if (hasDerived()) {<span class="text-accent/80">*</span> Derived, not catalogued. }{{ note() }}</p>
         }
       </div>
 
-      <div class="hud-panel px-4 py-3 text-right">
-        <p class="font-display text-[10px] tracking-[0.28em] text-muted uppercase">Range</p>
-        <p class="mt-1 font-display text-lg text-accent tabular-nums">{{ range() }}</p>
+      <div class="hud-brackets hud-acquire hud-surface px-4 py-3 text-right">
+        <p class="type-label text-muted">Range</p>
+        <p class="mt-1 text-lg text-accent tabular-nums">{{ range() }}</p>
       </div>
     </div>
   `

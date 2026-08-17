@@ -94,11 +94,11 @@ describe('StarmapHudComponent', () => {
     fixture.componentRef.setInput('title', 'Sol');
     fixture.detectChanges();
 
-    expect((fixture.nativeElement as HTMLElement).querySelector('.hud-banner')?.textContent?.trim()).toBe('Sol');
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="hud-banner"]')?.textContent?.trim()).toBe('Sol');
   });
 
   it('shows no banner when the view is holding nothing', () => {
     // An empty nameplate is worse than none: it reads as a selection that failed to resolve.
-    expect(render('galaxy').querySelector('.hud-banner')).toBeNull();
+    expect(render('galaxy').querySelector('[data-testid="hud-banner"]')).toBeNull();
   });
 });

@@ -79,9 +79,11 @@ export class StarLabelOverlay {
 
   private addLabel(point: LabeledPoint): void {
     const element = document.createElement('div');
-    // Tailwind utility classes assigned directly since this element lives outside Angular's
-    // view encapsulation (see the class comment above) rather than through a component template.
-    element.className = 'map-label translate-x-1.5 -translate-y-1.5 whitespace-nowrap font-body';
+    // Classes assigned directly since this element lives outside Angular's view encapsulation
+    // (see the class comment above). The offset and leader line live in `.map-label` itself:
+    // CSS2DRenderer rewrites this element's inline transform every frame, so a translate here
+    // would be overwritten — the margin is the offset it cannot touch.
+    element.className = 'map-label whitespace-nowrap font-body';
 
     const name = document.createElement('span');
     name.className = 'map-label-name';
@@ -96,6 +98,11 @@ export class StarLabelOverlay {
     }
 
     const object = new CSS2DObject(element);
+    // Anchor the label's left edge at the point, vertically centred. The default center of
+    // (0.5, 0.5) makes CSS2DRenderer emit translate(-50%,-50%), keeping the box centred on the
+    // star — under which `.map-label`'s margin offset only nudges the centred box sideways and
+    // the leader line points at empty space half the label's width from the star.
+    object.center.set(0, 0.5);
     object.position.set(point.x, point.y, point.z);
     this.scene.add(object);
     this.labelObjects.set(point.id, object);

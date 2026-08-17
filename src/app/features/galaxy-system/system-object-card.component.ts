@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 
 import { BodyDetailViewModel } from '../body-detail/body-detail.model';
 import { bodyReadouts } from '../body-detail/body-readouts';
+import { ReadoutSectionsComponent } from '../body-detail/readout-sections.component';
+import { ChevronIconComponent } from '../../shared/ui/chevron-icon.component';
 
 /**
  * The card shown for a body picked in the system view, without leaving it.
@@ -11,31 +13,34 @@ import { bodyReadouts } from '../body-detail/body-readouts';
  * shows the same numbers over the live view, and keeps the route as the deliberate step for the
  * full 3D inspection.
  *
- * The rows themselves come from `bodyReadouts`, shared with the detail page. Presentational only.
+ * The rows come from `bodyReadouts` via `ReadoutSectionsComponent`, both shared with the detail
+ * page. Presentational only.
  */
 @Component({
   selector: 'app-system-object-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [ChevronIconComponent, ReadoutSectionsComponent],
   // Positioned and full-bleed like the HUD's own host, so the panel inside it resolves against
   // the scene rather than against whatever box the inline default would have left it in — which
   // put the card off the bottom-left corner of the viewport entirely.
   host: { class: 'pointer-events-none absolute inset-0 block' },
   template: `
-    <!-- Positioning and panel styling stay on separate elements. The hud-panel rule sets
-         position: relative for its own inset border, which silently overrides an absolute on the
-         same element and turns top/right into offsets from wherever the box already sat. -->
+    <!-- Positioning and panel styling stay on separate elements, so the panel's own layout
+         never fights the absolute placement. Same organism as the detail page's info panel:
+         header, shared readout sections, and a route rail — there at the top, here at the
+         bottom, because here the route is the next step rather than the way back. -->
     <div class="pointer-events-auto absolute top-16 right-6 w-80 max-w-[calc(100%-3rem)]">
-      <div data-testid="object-card" class="hud-panel px-4 py-3 font-body">
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <p class="truncate font-display text-lg tracking-[0.04em] text-text">{{ body().name }}</p>
-            <p class="mt-0.5 font-display text-[10px] tracking-[0.22em] text-accent uppercase">{{ readouts().kindLabel }} · {{ body().hostStarName }}</p>
-          </div>
+      <div data-testid="object-card" class="hud-brackets hud-acquire hud-surface font-body text-text">
+        <div class="flex items-start justify-between gap-3 px-4 pt-4 pb-3">
+          <header class="min-w-0">
+            <p class="truncate text-lg leading-tight font-bold tracking-[0.04em] text-text uppercase">{{ body().name }}</p>
+            <p class="type-eyebrow mt-1 truncate text-accent">{{ readouts().kindLabel }} · {{ body().hostStarName }}</p>
+          </header>
           <button
             type="button"
             (click)="dismissed.emit()"
             aria-label="Close"
-            class="-mt-1 -mr-1 shrink-0 rounded-sm p-1 text-muted transition-colors hover:text-accent focus:text-accent focus:outline-none"
+            class="-mt-2 -mr-2 shrink-0 p-1 text-muted transition-colors hover:text-accent focus-visible:text-accent focus-visible:outline-1 focus-visible:outline-accent"
           >
             <svg class="h-3.5 w-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
               <path d="M3 3l8 8M11 3l-8 8" />
@@ -43,35 +48,15 @@ import { bodyReadouts } from '../body-detail/body-readouts';
           </button>
         </div>
 
-        @if (readouts().measured.length) {
-          <p class="mt-3 text-[10px] tracking-[0.18em] text-muted uppercase">Measured</p>
-          <dl class="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-            @for (row of readouts().measured; track row.label) {
-              <dt class="text-muted">{{ row.label }}</dt>
-              <dd class="text-right text-text tabular-nums">{{ row.value }}</dd>
-            }
-          </dl>
-        }
-
-        <p class="mt-3 text-[10px] tracking-[0.18em] text-muted uppercase">Derived</p>
-        <dl class="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-          @for (row of readouts().derived; track row.label) {
-            <dt class="text-muted">{{ row.label }}</dt>
-            <dd class="text-right text-text tabular-nums">{{ row.value }}</dd>
-          }
-        </dl>
-
-        <p class="mt-3 border-t border-border/50 pt-2 text-[10px] leading-relaxed text-muted">{{ readouts().provenance }}</p>
+        <app-readout-sections [readouts]="readouts()" />
 
         <button
           type="button"
           (click)="openRequested.emit()"
-          class="mt-3 flex w-full items-center justify-center gap-1.5 border border-border/70 bg-panel/60 px-3 py-1.5 font-display text-[10px] tracking-[0.22em] text-muted uppercase transition-colors hover:border-accent hover:text-accent focus:border-accent focus:text-accent focus:outline-none"
+          class="type-label flex w-full items-center justify-center gap-1.5 border-t border-border/40 px-3 py-2 text-muted transition-colors hover:bg-accent/8 hover:text-accent focus-visible:bg-accent/12 focus-visible:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
         >
           Full view
-          <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 6l6 6-6 6" />
-          </svg>
+          <app-chevron-icon class="h-3 w-3" direction="right" />
         </button>
       </div>
     </div>

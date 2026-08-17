@@ -1,19 +1,20 @@
 /* You can add global styles to this file, and also import other style files */
 @import 'tailwindcss';
 
-/* Design tokens for the sci-fi "HUD" look shared across the app. `--color-*`/`--font-*` names
- * automatically become Tailwind utilities (e.g. `--color-accent` -> `bg-accent`/`text-accent`). */
+/* Design tokens for the "observatory instrument" HUD shared across the app. `--color-*`/`--font-*`
+ * names automatically become Tailwind utilities (e.g. `--color-accent` -> `bg-accent`/`text-accent`).
+ *
+ * One family only: every string in this UI is a measurement, an identifier, or a catalog label, so
+ * the readout face carries the whole hierarchy through weight, size, and tracking. */
 @theme {
-  --font-display: 'Orbitron', 'Segoe UI', sans-serif;
-  --font-body: 'JetBrains Mono', 'Segoe UI', monospace;
+  --font-body: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', monospace;
 
-  --color-void: #05070d;
-  --color-panel: #0b121f;
+  --color-void: #04060c;
+  --color-panel: #070d16;
   --color-accent: #4dd7ff;
-  --color-accent-dim: #1c4f66;
-  --color-text: #dbe6f3;
-  --color-muted: #7f93ab;
-  --color-border: #2a4a5c;
+  --color-text: #e3ecf7;
+  --color-muted: #90a6bd;
+  --color-border: #24455a;
 }
 
 html,
@@ -26,48 +27,85 @@ body {
   font-family: var(--font-body);
 }
 
-/* --- HUD chrome ------------------------------------------------------------------------- */
-
-/* Angled top-left/bottom-right corners, a thin lit edge and a blurred dark fill: the panel
- * shape the whole heads-up display is built from. Written here rather than as utilities
- * because `clip-path` and the layered border need to travel together. */
-.hud-panel {
-  position: relative;
-  background: color-mix(in srgb, var(--color-panel) 78%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-border) 85%, transparent);
-  backdrop-filter: blur(8px);
-  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+/* The panel surface every HUD element shares: a hairline border over a near-opaque fill. One
+ * definition, because spelling the recipe out per call site is how it forked into /85 and /92
+ * variants within a single change. Deliberately no backdrop blur: the canvas underneath is
+ * redrawn every frame by the render loop, so a blur here is re-sampled continuously — a
+ * standing GPU cost for an effect a 92%-opaque fill mostly hides anyway. */
+@utility hud-surface {
+  border: 1px solid color-mix(in oklab, var(--color-border) 60%, transparent);
+  background-color: color-mix(in oklab, var(--color-panel) 92%, transparent);
 }
 
-/* The lit inner hairline that reads as a bevel on the two square corners. */
-.hud-panel::after {
-  content: '';
-  position: absolute;
-  inset: 3px;
-  border-top: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
-  pointer-events: none;
+/* The two label voices of the single-face type system, named so call sites cannot drift a few
+ * thousandths of an em apart. `type-label` is the working voice — section headings, readout
+ * labels, buttons; `type-eyebrow` is the wider-tracked identity line above a title. */
+@utility type-label {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
-/* Corner brackets around the whole viewport, drawn as four gradients so the element stays a
- * single node with no children. */
-.hud-frame {
-  pointer-events: none;
-  --bracket: color-mix(in srgb, var(--color-accent) 45%, transparent);
-  --arm-long: 76px;
-  --arm-thin: 1px;
+@utility type-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* The HUD's signature: four corner tick brackets cut into a panel's hairline frame. Drawn as
+ * eight background gradients so any panel (or the viewport frame) picks them up without the
+ * eight extra DOM nodes the same mark would otherwise cost. Override `--hud-tick` per element
+ * (e.g. `[--hud-tick:1.75rem]`) to scale the marks with the surface they frame. */
+@utility hud-brackets {
+  --hud-tick: 0.625rem;
+  --hud-mark: color-mix(in oklab, var(--color-accent) 65%, transparent);
   background-image:
-    linear-gradient(var(--bracket), var(--bracket)), linear-gradient(var(--bracket), var(--bracket)),
-    linear-gradient(var(--bracket), var(--bracket)), linear-gradient(var(--bracket), var(--bracket)),
-    linear-gradient(var(--bracket), var(--bracket)), linear-gradient(var(--bracket), var(--bracket)),
-    linear-gradient(var(--bracket), var(--bracket)), linear-gradient(var(--bracket), var(--bracket));
+    linear-gradient(var(--hud-mark) 0 0), linear-gradient(var(--hud-mark) 0 0),
+    linear-gradient(var(--hud-mark) 0 0), linear-gradient(var(--hud-mark) 0 0),
+    linear-gradient(var(--hud-mark) 0 0), linear-gradient(var(--hud-mark) 0 0),
+    linear-gradient(var(--hud-mark) 0 0), linear-gradient(var(--hud-mark) 0 0);
   background-repeat: no-repeat;
   background-size:
-    var(--arm-long) var(--arm-thin), var(--arm-thin) var(--arm-long), var(--arm-long) var(--arm-thin), var(--arm-thin) var(--arm-long),
-    var(--arm-long) var(--arm-thin), var(--arm-thin) var(--arm-long), var(--arm-long) var(--arm-thin), var(--arm-thin) var(--arm-long);
+    var(--hud-tick) 1px,
+    1px var(--hud-tick),
+    var(--hud-tick) 1px,
+    1px var(--hud-tick),
+    var(--hud-tick) 1px,
+    1px var(--hud-tick),
+    var(--hud-tick) 1px,
+    1px var(--hud-tick);
   background-position:
-    18px 18px, 18px 18px, right 18px top 18px, right 18px top 18px, 18px bottom 18px, 18px bottom 18px, right 18px bottom 18px,
-    right 18px bottom 18px;
+    left top,
+    left top,
+    right top,
+    right top,
+    left bottom,
+    left bottom,
+    right bottom,
+    right bottom;
+}
+
+/* The one authored moment: a panel doesn't fade in, it acquires — wiping down under an
+ * exponential ease-out the way a readout fills once an instrument locks onto a target. */
+@utility hud-acquire {
+  animation: hud-acquire 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes hud-acquire {
+  from {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-acquire {
+    animation-duration: 1ms;
+  }
 }
 
 /* Darkens the edges of the frame so the map reads as a lit display rather than a flat page. */
@@ -76,22 +114,9 @@ body {
   background: radial-gradient(ellipse at center, transparent 45%, color-mix(in srgb, var(--color-void) 72%, transparent) 100%);
 }
 
-/* A chamfered tab: the angled-corner shape the scale ladder and the selection banner share.
- * The cut is on the leading and trailing edges rather than the panel's diagonal corners, which
- * is what makes a row of them read as tabs on a rail instead of a row of cards. */
-.hud-tab {
-  clip-path: polygon(9px 0, 100% 0, calc(100% - 9px) 100%, 0 100%);
-}
-
-/* The selected-object banner: symmetric, flaring outward toward its lit bottom edge, so it
- * reads as a nameplate hanging off the top of the display rather than another tab. */
-.hud-banner {
-  clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 100%, 0 100%);
-}
-
 /* Star name labels rendered by CSS2DRenderer (see StarLabelOverlay). These live outside
- * Angular's view encapsulation as plain DOM nodes, so they're styled with Tailwind utility
- * classes assigned directly in TypeScript rather than a scoped component stylesheet. */
+ * Angular's view encapsulation as plain DOM nodes, so they're styled here rather than through
+ * a scoped component stylesheet. */
 .star-label-layer {
   position: absolute;
   top: 0;
@@ -100,17 +125,39 @@ body {
 
 /* Two-line map label: what the thing is called, then what it is. The type line is deliberately
  * much quieter than the name — it should be readable when looked at and invisible when not,
- * because on a crowded view it is printed as many times as there are labels. */
+ * because on a crowded view it is printed as many times as there are labels.
+ *
+ * Offset from the anchor with a margin, not a translate: `CSS2DRenderer` rewrites the inline
+ * `transform` every frame, and the margin is the one offset it can never overwrite. The
+ * hairline `::before` is the leader line back to the point the label names. */
 .map-label {
+  position: relative;
+  margin-left: 0.875rem;
   display: flex;
   flex-direction: column;
   line-height: 1.15;
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+  text-shadow:
+    0 0 6px var(--color-void),
+    0 0 3px var(--color-void);
+}
+
+/* Geometry assumes the label's left edge sits at the star — StarLabelOverlay sets the
+ * CSS2DObject's center to (0, 0.5) to make that true. Under the default (0.5, 0.5) the
+ * renderer keeps the box centred on the point and this line floats in empty space. */
+.map-label::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -0.75rem;
+  height: 1px;
+  width: 0.625rem;
+  background: color-mix(in oklab, var(--color-accent) 60%, transparent);
 }
 
 .map-label-name {
   font-size: 11px;
   letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--color-accent);
 }
 
@@ -118,5 +165,5 @@ body {
   font-size: 8px;
   letter-spacing: 0.3em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  color: color-mix(in oklab, var(--color-accent) 70%, transparent);
 }

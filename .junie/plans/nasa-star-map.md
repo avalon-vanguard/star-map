@@ -108,12 +108,23 @@ interface ExoplanetRecord {
   orbit: Partial<OrbitalElements>;
 }
 
+// Revised during implementation: OpenNGC publishes no distance column, and the redshift/
+// parallax fallbacks both fail for the best-known objects (M31/M33/M42 are Local Group
+// members with negative or absent redshift; a galaxy's catalog parallax comes from a
+// cross-matched foreground star). The line of sight is always known, so these are stored as
+// unit directions and drawn on a fixed backdrop shell, with distance as optional metadata.
+// See `shared/models/deepsky.model.ts`.
 interface DeepSkyRecord {
   id: string;
   name: string;
   kind: 'nebula' | 'galaxy' | 'cluster';
-  x: number; y: number; z: number; // parsecs
+  x: number; y: number; z: number; // unit vector on the celestial sphere, not a position
   angularSizeDeg: number;
+  magnitude: number | null;
+  distancePc: number | null;
+  distanceMethod: 'parallax' | 'redshift' | null;
+  constellation: string;
+  messier: string | null;
 }
 ```
 
@@ -124,8 +135,13 @@ interface DeepSkyRecord {
 - `SystemOrbitsRenderer` — draws orbit ellipses and planet/exoplanet markers for the currently focused star system, using the Kepler propagator.
 - `KeplerPropagator` (`shared/astro/kepler.ts`) — pure function(s) converting `OrbitalElements` + epoch → Cartesian position; independently unit-testable.
 - `BodyDetailSceneComponent` — separate route/component with its own dedicated scene for a close-up view of one selected body, plus an `InfoPanelComponent` showing its data.
+- `planet-appearance.ts` / `stellar.ts` (`shared/astro/`) — derives a host star's luminosity from its catalogued magnitude and distance, a planet's equilibrium temperature and bulk density from that, and a class of world from those.
+- `procedural-planet-texture.ts` (`shared/rendering/`) — paints an equirectangular surface from that derivation: zonal bands for a fluid envelope, fractal terrain for a solid one, polar caps sized by temperature. A pure function over a byte array, no canvas.
 - `SearchComponent` — text search across `stars-index.json`, `bodies.json`, `exoplanets.json`; on match, dispatches a navigation action.
-- `NavigationStore` (Angular signals-based) — holds `viewLevel: 'galaxy' | 'system'`, `selectedStarId`, `selectedBodyId`; consumed by scene components and routed body-detail view.
+- `NavigationStore` (Angular signals-based) — holds `viewLevel: 'galactic' | 'galaxy' | 'system'`, `selectedStarId`, `selectedBodyId`; consumed by scene components and routed body-detail view.
+- `MilkyWayRenderer` / `milky-way-model.ts` — the Galaxy itself as an instanced particle cloud scattered around the structural model in `shared/astro/galaxy.ts`, crossfaded against the catalogued star field by camera distance.
+- `PolarGridPlane` / `TetherField` (`grid-plane.ts`) — the reference plane a view is read against: rings and spokes lying in a given plane, plus drop lines onto it. Used at all three scales — the galactic plane, the Sun's plane, and each system's own orbital plane.
+- `StarmapHudComponent` — the heads-up display: scale ladder, readout panel, range, reticle and frame.
 
 ### File Structure
 ```
@@ -270,3 +286,41 @@ Users can search by name and jump directly to the matching star, system, or body
 - Implement `SearchComponent` querying `stars-index.json`, `bodies.json`, and `exoplanets.json` for name matches.
 - On selecting a search result, dispatch the appropriate `NavigationStore` update (galaxy star, system body, or exoplanet) and trigger the corresponding camera transition or route change.
 - Ensure consistent state across `GalaxySystemSceneComponent` and `BodyDetailSceneComponent` when navigation originates from search rather than in-scene clicks.
+
+### ✓ Step 7: Add the galactic scale and the heads-up display
+The map opens out from the catalogued neighbourhood to the whole Milky Way, in the visual language of the reference.
+- Add `shared/astro/galaxy.ts`: the galactic↔equatorial rotation, the Sun's galactocentric position, and logarithmic-spiral parameters per arm.
+- Add `MilkyWayRenderer`, crossfaded against the star field by camera distance so the two scales share one continuous parsec space rather than being separate scenes.
+- Add the galactic and local grid planes, star tethers, and the HUD (scale ladder, readout panel, range, reticle, frame).
+- Label the Galaxy model as a model wherever it is shown: its skeleton is measured, its particles are not.
+
+### ✓ Step 8: Put a reference grid under the system view
+The same plane-and-tether reading aid the outer scales got, applied to a single system.
+- Add `systemGridRingsAu`: ring radii snapped to a 1-2-5 ladder so a distance can be read off, at any of the four orders of magnitude real systems span.
+- Draw the grid and the body tethers in the system's own reference plane — the ecliptic for the solar system, the plane of the sky otherwise — dashed, so it is never mistaken for an orbit.
+- Frame the camera against that same plane, so an exoplanet system is presented face-on rather than edge-on.
+
+### ✓ Step 9: Give every body a surface
+Real photography where it exists, and a surface reasoned from measurements where it does not.
+- Derive host-star luminosity from apparent magnitude, parallax distance and a bolometric correction; validate against published values for real stars.
+- Derive equilibrium temperature and bulk density from it, and classify each world by size, temperature and density; validate against the solar system's own bodies.
+- Paint the surface procedurally from that class, seeded per body so it is stable between visits, and apply it in both the body-detail view and the system-view markers.
+- State the derivation and its limits on screen, next to the measurements it rests on.
+
+### ✓ Step 10: Frame the system view from the camera it actually has
+- Replace the fixed distance-to-outermost-orbit multiple with a distance derived from the camera's vertical field of view and aspect, so what fits is a radius on screen rather than a guess.
+- Frame against the reference grid's outer ring, which is always wider than the outermost orbit, and leave an explicit margin around it.
+- Raise the framing ceiling far enough to hold the solar system out to Pluto in a portrait window; only companions hundreds of AU out reach it now.
+- Floor the star's halo against the framed radius, so a star sized against its innermost orbit still reads at the distance that frames its outermost one.
+
+### ✓ Step 11: Widen the star catalogue, and separate what is drawn from what is known
+- Repack the catalogue as two binary column stores plus a string-only JSON index (`star-catalog.ts`, shared by the ETL and the app), so 7.8x the stars costs 1.7x the bytes instead of 12x.
+- Raise the distance cutoff from 50 pc to 250 pc — where Hipparcos parallaxes stop being trustworthy — taking the catalogue from 8750 stars to 68388.
+- Give the star field a render budget: every star inside 25 pc plus the brightest of the rest. Search, navigation and the cross-reference still see the whole catalogue.
+- Store each exoplanet's host coordinates and re-resolve the cross-reference against the current catalogue at build time, so widening the star list rescues systems without re-downloading the archive. Renderable systems: 371 to 609.
+
+### ✓ Step 12: Aggregate additional surveys, and draw the whole catalogue
+- Raise the render budget to the full catalogue, with a `?stars=` override for machines (and test runs) that cannot draw it.
+- Add a source registry with roles — positional, enrichment, backdrop — recording what each named survey can and cannot contribute, as data the ETL prints rather than as prose in a README.
+- Add a Gaia DR3 TAP fetcher and a catalogue merge that matches on direction rather than 3D proximity, prefers the better parallax, and records provenance per star.
+- Make names dense-with-holes and add a source dictionary, so a survey-scale catalogue with no proper names does not cost 25 MB per million stars to say what its id already says.

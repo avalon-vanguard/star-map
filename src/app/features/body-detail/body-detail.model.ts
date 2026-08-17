@@ -1,3 +1,4 @@
+import { PlanetAppearance } from '../../shared/astro/planet-appearance';
 import { OrbitalElements } from '../../shared/models/body.model';
 
 export type BodyDetailKind = 'planet' | 'moon' | 'dwarf' | 'exoplanet';
@@ -16,4 +17,13 @@ export interface BodyDetailViewModel {
   massEarth?: number;
   discoveryYear?: number;
   orbit: Partial<OrbitalElements>;
+  /**
+   * What this world is inferred to look like, and the quantities that inference rests on. Always
+   * present — every body has measurements enough to place it somewhere — but its individual
+   * fields are nullable, since a body whose host star is not in the catalogue has no derived
+   * temperature.
+   */
+  appearance: PlanetAppearance;
+  /** True when a real photograph is being shown rather than the derived surface. */
+  hasPhotography: boolean;
 }

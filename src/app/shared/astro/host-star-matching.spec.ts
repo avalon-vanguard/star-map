@@ -6,6 +6,8 @@ import { StarRecord } from '../models/star.model';
 // A small fixture standing in for a slice of the HYG star index, used to exercise the
 // exoplanet host-star cross-referencing logic without hitting any real API.
 const FIXTURE_STARS: StarRecord[] = [
+  // The Sun sits at the origin, exactly where a host with a missing distance lands.
+  { id: 0, name: 'Sol', x: 0, y: 0, z: 0, magnitude: -26.7, spectralType: 'G2V', colorIndex: 0.656 },
   { id: 1, name: 'Proxima Centauri', x: -0.472264, y: -0.361451, z: -1.151219, magnitude: 11.01, spectralType: 'M5Ve', colorIndex: 1.807 },
   { id: 2, name: 'Sirius', x: -0.494323, y: 2.476731, z: -0.758485, magnitude: -1.44, spectralType: 'A0m...', colorIndex: 0.009 },
   { id: 3, name: 'GJ 3512', x: 3.0, y: 4.0, z: 5.0, magnitude: 11.0, spectralType: 'M5.5', colorIndex: 1.6 }
@@ -60,5 +62,35 @@ describe('resolveHostStarId', () => {
     const id = resolveHostStarId({ hostname: 'Unmatched', raDeg: 0, decDeg: 0, distancePc: 0.2 }, stars, 0.5, nameIndex);
 
     expect(id).toBe(10);
+  });
+
+  describe('missing distance column', () => {
+    // The Exoplanet Archive leaves `sy_dist` blank for some systems. `Number('')` is `0` —
+    // finite, so it slips past a naive guard — which puts the host at the origin and matches
+    // the Sun at distance 0. That shipped 127 alien planets, all seven TRAPPIST-1 worlds among
+    // them, into our own solar system.
+    it('does not match a host with a zero distance to the Sun', () => {
+      const id = resolveHostStarId({ hostname: 'TRAPPIST-1', raDeg: 346.6, decDeg: -5.04, distancePc: 0 }, FIXTURE_STARS, 0.5);
+
+      expect(id).toBeNull();
+    });
+
+    it('rejects a negative distance too', () => {
+      const id = resolveHostStarId({ hostname: 'Nowhere', raDeg: 10, decDeg: 10, distancePc: -3 }, FIXTURE_STARS, 0.5);
+
+      expect(id).toBeNull();
+    });
+
+    it('still matches a real host at a genuinely small distance', () => {
+      const id = resolveHostStarId({ hostname: 'Unmatched', raDeg: 217.4, decDeg: -62.68, distancePc: 1.2959 }, FIXTURE_STARS, 0.5);
+
+      expect(id).toBe(1);
+    });
+
+    it('lets a named host resolve even with no usable distance', () => {
+      const id = resolveHostStarId({ hostname: 'Sirius', raDeg: 101.3, decDeg: -16.7, distancePc: 0 }, FIXTURE_STARS, 0.5);
+
+      expect(id).toBe(2);
+    });
   });
 });

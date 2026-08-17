@@ -2,6 +2,7 @@ import { DecimalPipe } from '@angular/common';
 import { Component, input } from '@angular/core';
 import { Router } from '@angular/router';
 
+import { PLANET_CLASS_LABELS } from '../../shared/astro/planet-appearance';
 import { BodyDetailViewModel } from './body-detail.model';
 
 const KIND_LABELS: Record<BodyDetailViewModel['kind'], string> = {
@@ -78,6 +79,28 @@ const KIND_LABELS: Record<BodyDetailViewModel['kind'], string> = {
           </div>
         }
       </dl>
+
+      <p class="border-t border-border/40 px-4 pt-3 pb-1 text-[10px] tracking-[0.16em] text-muted uppercase">Derived</p>
+      <dl class="divide-y divide-border/25">
+        <div class="flex items-baseline justify-between gap-4 px-4 py-2">
+          <dt class="text-[10px] tracking-[0.16em] text-muted uppercase">Class</dt>
+          <dd class="text-sm">{{ classLabel() }}</dd>
+        </div>
+        @if (body().appearance.equilibriumTemperatureK !== null) {
+          <div class="flex items-baseline justify-between gap-4 px-4 py-2">
+            <dt class="text-[10px] tracking-[0.16em] text-muted uppercase">Equilibrium temp.</dt>
+            <dd class="text-sm tabular-nums">{{ body().appearance.equilibriumTemperatureK | number: '1.0-0' }} <span class="text-muted">K</span></dd>
+          </div>
+        }
+        @if (body().appearance.bulkDensityGramsPerCm3 !== null) {
+          <div class="flex items-baseline justify-between gap-4 px-4 py-2">
+            <dt class="text-[10px] tracking-[0.16em] text-muted uppercase">Bulk density</dt>
+            <dd class="text-sm tabular-nums">{{ body().appearance.bulkDensityGramsPerCm3 | number: '1.0-2' }} <span class="text-muted">g/cm³</span></dd>
+          </div>
+        }
+      </dl>
+
+      <p class="border-t border-border/40 px-4 py-3 text-[10px] leading-relaxed text-muted">{{ surfaceProvenance() }}</p>
     </div>
   `,
   imports: [DecimalPipe]
@@ -89,6 +112,25 @@ export class InfoPanelComponent {
 
   kindLabel(): string {
     return KIND_LABELS[this.body().kind];
+  }
+
+  classLabel(): string {
+    return PLANET_CLASS_LABELS[this.body().appearance.planetClass];
+  }
+
+  /**
+   * Says plainly which of the two the viewer is looking at. The derived surface is a reasoned
+   * illustration, and a panel of real measurements sitting next to it is exactly the context in
+   * which it could be mistaken for another one.
+   */
+  surfaceProvenance(): string {
+    if (this.body().hasPhotography) {
+      return 'Surface: NASA/ESA/USGS photography.';
+    }
+    const temperature = this.body().appearance.equilibriumTemperatureK;
+    return temperature === null
+      ? 'Surface illustrated from this body’s measured size and mass. Its host star is not in the catalogue, so no temperature could be derived. Not an observation — no image of this world exists.'
+      : 'Surface illustrated from the measurements above — size, density and the temperature derived from its star’s output and its orbit. Not an observation — no image of this world exists.';
   }
 
   goBack(): void {

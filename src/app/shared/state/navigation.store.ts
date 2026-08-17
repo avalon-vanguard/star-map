@@ -1,6 +1,14 @@
 import { Injectable, signal } from '@angular/core';
 
-export type ViewLevel = 'galaxy' | 'system';
+/**
+ * The map's zoom levels, outermost first.
+ *
+ * `galactic` is the whole Milky Way; `galaxy` is the catalogued solar neighbourhood inside it
+ * (the level the app opens on); `system` is one star's planets. The first two share a coordinate
+ * space and are told apart by how far the camera has pulled back, so the scene reports which one
+ * it is in rather than being commanded into it.
+ */
+export type ViewLevel = 'galactic' | 'galaxy' | 'system';
 
 /**
  * App-wide navigation state: which zoom level is active and what's currently selected.

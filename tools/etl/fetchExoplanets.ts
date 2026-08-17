@@ -4,7 +4,7 @@ import { buildStarNameIndex, resolveHostStarId } from '../../src/app/shared/astr
 import { ExoplanetRecord } from '../../src/app/shared/models/exoplanet.model';
 import { StarRecord } from '../../src/app/shared/models/star.model';
 import { fetchStars } from './fetchStars';
-import { parseCsvObjects } from './lib/csv';
+import { parseCsvObjects, parseOptionalNumber } from './lib/csv';
 import { fetchTextCached } from './lib/http';
 import { dataPath, ensureDataDir } from './lib/paths';
 
@@ -22,6 +22,7 @@ const TAP_COLUMNS = [
   'pl_orbper',
   'pl_rade',
   'pl_bmasse',
+  'st_mass',
   'disc_year'
 ].join(',');
 const TAP_QUERY = `select+${TAP_COLUMNS}+from+ps+where+default_flag=1&format=csv`;
@@ -45,9 +46,11 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<ExoplanetRe
 
   let matched = 0;
   const exoplanets: ExoplanetRecord[] = rows.map((row, index) => {
-    const raDeg = Number(row['ra']);
-    const decDeg = Number(row['dec']);
-    const distancePc = Number(row['sy_dist']);
+    // `parseOptionalNumber`, not `Number`: a blank cell would otherwise become 0, which is a
+    // finite, plausible-looking coordinate rather than the "not measured" it actually means.
+    const raDeg = parseOptionalNumber(row['ra']) ?? Number.NaN;
+    const decDeg = parseOptionalNumber(row['dec']) ?? Number.NaN;
+    const distancePc = parseOptionalNumber(row['sy_dist']) ?? Number.NaN;
 
     const hostStarId = resolveHostStarId(
       { hostname: row['hostname'], raDeg, decDeg, distancePc },
@@ -67,6 +70,16 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<ExoplanetRe
       radiusEarth: parseOptionalNumber(row['pl_rade']),
       massEarth: parseOptionalNumber(row['pl_bmasse']),
       discoveryYear: parseOptionalNumber(row['disc_year']),
+      // The period was already being downloaded and thrown away. With the semi-major axis it
+      // determines the host's gravitational parameter, so keeping it is the difference between
+      // propagating a planet at its real rate and pretending every host is the Sun.
+      periodDays: parseOptionalNumber(row['pl_orbper']),
+      hostStarMassSolar: parseOptionalNumber(row['st_mass']),
+      // Kept so the cross-reference can be redone without the archive; see the record's own
+      // documentation. Undefined rather than NaN, which JSON cannot represent.
+      hostRaDeg: parseOptionalNumber(row['ra']),
+      hostDecDeg: parseOptionalNumber(row['dec']),
+      hostDistancePc: parseOptionalNumber(row['sy_dist']),
       orbit: {
         semiMajorAxisAu: parseOptionalNumber(row['pl_orbsmax']),
         eccentricity: parseOptionalNumber(row['pl_orbeccen']),
@@ -80,14 +93,6 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<ExoplanetRe
   writeFileSync(dataPath('exoplanets.json'), JSON.stringify(exoplanets));
   console.log(`  wrote ${exoplanets.length} exoplanets (${matched} cross-referenced to a HYG host star).`);
   return exoplanets;
-}
-
-function parseOptionalNumber(value: string | undefined): number | undefined {
-  if (!value) {
-    return undefined;
-  }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 if (require.main === module) {

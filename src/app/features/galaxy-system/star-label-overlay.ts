@@ -2,8 +2,19 @@ import * as THREE from 'three/webgpu';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 
 export interface LabeledPoint {
-  id: number;
+  /** Numeric for HYG stars, string for catalog designations such as deep-sky objects. */
+  id: number | string;
   name: string;
+  /**
+   * What sort of thing this is — `STAR`, `PLANET`, `NEBULA`, `ARM`. Printed under the name in
+   * smaller, dimmer, wider-tracked capitals.
+   *
+   * A name on its own is ambiguous in a map that mixes scales: "Orion" is an arm, a nebula and a
+   * constellation, and at a glance nothing distinguishes the label on one from the label on
+   * another. The second line is what makes a label say what it is pointing at, not just what it
+   * is called.
+   */
+  kind?: string;
   x: number;
   y: number;
   z: number;
@@ -19,7 +30,7 @@ export class StarLabelOverlay {
   readonly domElement: HTMLElement;
 
   private readonly cssRenderer = new CSS2DRenderer();
-  private readonly labelObjects = new Map<number, CSS2DObject>();
+  private readonly labelObjects = new Map<number | string, CSS2DObject>();
 
   constructor(private readonly scene: THREE.Scene) {
     this.cssRenderer.domElement.classList.add('star-label-layer');
@@ -30,7 +41,13 @@ export class StarLabelOverlay {
     this.cssRenderer.setSize(width, height);
   }
 
-  /** Shows exactly these labels, adding/removing DOM elements only for a changed set. */
+  /**
+   * Shows exactly these labels, adding/removing DOM elements only for a changed set.
+   *
+   * A label that is already up is repositioned rather than left where it was: stars never move,
+   * but planets do, and a system's labels would otherwise stay pinned to wherever each body
+   * happened to be when its label first appeared.
+   */
   update(points: readonly LabeledPoint[]): void {
     const idsToShow = new Set(points.map((point) => point.id));
 
@@ -41,7 +58,10 @@ export class StarLabelOverlay {
     }
 
     for (const point of points) {
-      if (!this.labelObjects.has(point.id)) {
+      const existing = this.labelObjects.get(point.id);
+      if (existing) {
+        existing.position.set(point.x, point.y, point.z);
+      } else {
         this.addLabel(point);
       }
     }
@@ -59,16 +79,23 @@ export class StarLabelOverlay {
 
   private addLabel(point: LabeledPoint): void {
     const element = document.createElement('div');
-    // Tailwind utility classes assigned directly since this element lives outside Angular's
-    // view encapsulation (see the class comment above) rather than through a component template.
-    //
-    // The offset is a margin rather than a `translate-*` utility because `CSS2DRenderer` writes
-    // its own `transform` to the inline style every frame, which would win over any class. The
-    // `::before` hairline is the leader line back to the star the name belongs to — without it a
-    // margin-shifted label just floats near a point instead of pointing at it.
-    element.className =
-      "relative ml-3 whitespace-nowrap font-body text-[11px] tracking-[0.08em] text-accent uppercase [text-shadow:0_0_6px_var(--color-void),0_0_3px_var(--color-void)] before:absolute before:top-1/2 before:-left-3 before:h-px before:w-2.5 before:bg-accent/60 before:content-['']";
-    element.textContent = point.name;
+    // Classes assigned directly since this element lives outside Angular's view encapsulation
+    // (see the class comment above). The offset and leader line live in `.map-label` itself:
+    // CSS2DRenderer rewrites this element's inline transform every frame, so a translate here
+    // would be overwritten — the margin is the offset it cannot touch.
+    element.className = 'map-label whitespace-nowrap font-body';
+
+    const name = document.createElement('span');
+    name.className = 'map-label-name';
+    name.textContent = point.name;
+    element.appendChild(name);
+
+    if (point.kind) {
+      const kind = document.createElement('span');
+      kind.className = 'map-label-kind';
+      kind.textContent = point.kind;
+      element.appendChild(kind);
+    }
 
     const object = new CSS2DObject(element);
     object.position.set(point.x, point.y, point.z);
@@ -76,7 +103,7 @@ export class StarLabelOverlay {
     this.labelObjects.set(point.id, object);
   }
 
-  private removeLabel(id: number, object: CSS2DObject): void {
+  private removeLabel(id: number | string, object: CSS2DObject): void {
     this.scene.remove(object);
     object.element.remove();
     this.labelObjects.delete(id);

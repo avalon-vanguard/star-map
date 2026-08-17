@@ -4,7 +4,7 @@ import { backButtonLocator } from './support/wait-for-back-button';
 
 test.describe('Search-driven navigation', () => {
   test('selecting a star result flies into that system and shows the back-to-galaxy control', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?stars=4000');
     const searchInput = page.getByPlaceholder('Search stars, planets, exoplanets…');
     await searchInput.fill('Proxima Centauri');
 
@@ -18,7 +18,7 @@ test.describe('Search-driven navigation', () => {
   });
 
   test('selecting a body result navigates straight to its detail route and shows real NASA data', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?stars=4000');
     const searchInput = page.getByPlaceholder('Search stars, planets, exoplanets…');
     await searchInput.fill('Earth');
 
@@ -35,7 +35,7 @@ test.describe('Search-driven navigation', () => {
   });
 
   test('typing fewer than two characters shows no results, and Escape clears the query', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?stars=4000');
     const searchInput = page.getByPlaceholder('Search stars, planets, exoplanets…');
 
     await searchInput.fill('E');

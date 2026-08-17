@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import { GM_SUN_AU3_PER_DAY2, DEFAULT_EPOCH_JD } from './constants';
 import {
+  gravitationalParameterFromPeriod,
+  isPropagatableOrbit,
   meanMotionRadPerDay,
   orbitEllipsePoints,
   orbitalPeriodDays,
   positionAtTrueAnomaly,
   propagateOrbit,
+  resolveGravitationalParameter,
   resolveOrbitalElements,
   solveEccentricAnomaly,
   trueAnomalyFromEccentricAnomaly
@@ -161,5 +164,147 @@ describe('resolveOrbitalElements', () => {
   it('preserves explicitly provided fields', () => {
     const resolved = resolveOrbitalElements({ semiMajorAxisAu: 1.5, eccentricity: 0.1, argumentOfPeriapsisDeg: 50 });
     expect(resolved.argumentOfPeriapsisDeg).toBe(50);
+  });
+});
+
+describe('gravitationalParameterFromPeriod', () => {
+  it('round-trips with orbitalPeriodDays', () => {
+    const derived = gravitationalParameterFromPeriod(1, 365.256);
+    expect(orbitalPeriodDays(1, derived)).toBeCloseTo(365.256, 9);
+  });
+
+  it('recovers the Sun from Earth\'s orbit', () => {
+    // 1 AU in one sidereal year is the definition of the solar gravitational parameter.
+    const derived = gravitationalParameterFromPeriod(1, 365.256363);
+    expect(derived / GM_SUN_AU3_PER_DAY2).toBeCloseTo(1, 4);
+  });
+
+  it('recovers a red dwarf from a real short-period orbit', () => {
+    // TRAPPIST-1 b: 0.01154 AU in 1.51088 days around a 0.0898 solar-mass star.
+    const derived = gravitationalParameterFromPeriod(0.01154, 1.51088);
+    expect(derived / GM_SUN_AU3_PER_DAY2).toBeCloseTo(0.09, 2);
+  });
+
+  it('scales as a^3 at fixed period', () => {
+    const single = gravitationalParameterFromPeriod(1, 100);
+    const doubled = gravitationalParameterFromPeriod(2, 100);
+    expect(doubled / single).toBeCloseTo(8, 9);
+  });
+});
+
+describe('resolveGravitationalParameter', () => {
+  it('prefers the measured period over everything else', () => {
+    // The period says 0.09 solar masses; the (deliberately wrong) host mass says 5.
+    const gm = resolveGravitationalParameter({ semiMajorAxisAu: 0.01154, periodDays: 1.51088, hostStarMassSolar: 5 });
+    expect(gm / GM_SUN_AU3_PER_DAY2).toBeCloseTo(0.09, 2);
+  });
+
+  it('corrects a red dwarf planet that the solar-mass assumption spun too fast', () => {
+    const withPeriod = resolveGravitationalParameter({ semiMajorAxisAu: 0.01154, periodDays: 1.51088 });
+    const assumingSolar = resolveGravitationalParameter({ semiMajorAxisAu: 0.01154 });
+
+    // A heavier central mass pulls harder, so it shortens the period: T scales as 1/sqrt(GM).
+    // Assuming the Sun for TRAPPIST-1's 0.09 solar masses therefore made its planets orbit
+    // sqrt(0.09) = 0.3x the true period — about 3.3x too fast, not too slow.
+    expect(orbitalPeriodDays(0.01154, withPeriod)).toBeCloseTo(1.51088, 4);
+    const ratio = orbitalPeriodDays(0.01154, assumingSolar) / orbitalPeriodDays(0.01154, withPeriod);
+    expect(ratio).toBeCloseTo(Math.sqrt(0.09), 2);
+  });
+
+  it('falls back to the host star mass when no period is published', () => {
+    const gm = resolveGravitationalParameter({ semiMajorAxisAu: 0.5, hostStarMassSolar: 0.31 });
+    expect(gm).toBeCloseTo(GM_SUN_AU3_PER_DAY2 * 0.31, 12);
+  });
+
+  it('falls back to one solar mass when nothing is known', () => {
+    expect(resolveGravitationalParameter({ semiMajorAxisAu: 1 })).toBe(GM_SUN_AU3_PER_DAY2);
+  });
+
+  it('ignores a period that is missing, zero, negative or not a number', () => {
+    for (const periodDays of [undefined, 0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(resolveGravitationalParameter({ semiMajorAxisAu: 1, periodDays })).toBe(GM_SUN_AU3_PER_DAY2);
+    }
+  });
+
+  it('ignores a host mass that is missing, zero or negative', () => {
+    for (const hostStarMassSolar of [undefined, 0, -1, Number.NaN]) {
+      expect(resolveGravitationalParameter({ semiMajorAxisAu: 1, hostStarMassSolar })).toBe(GM_SUN_AU3_PER_DAY2);
+    }
+  });
+
+  it('rejects a period implying something that cannot be a star, and falls through', () => {
+    // 1 AU in a single day implies thousands of solar masses.
+    const gm = resolveGravitationalParameter({ semiMajorAxisAu: 1, periodDays: 1, hostStarMassSolar: 0.5 });
+    expect(gm).toBeCloseTo(GM_SUN_AU3_PER_DAY2 * 0.5, 12);
+  });
+
+  it('rejects a period implying far too little mass', () => {
+    // 1 AU taking a million days implies a mass far below any star.
+    expect(resolveGravitationalParameter({ semiMajorAxisAu: 1, periodDays: 1e6 })).toBe(GM_SUN_AU3_PER_DAY2);
+  });
+
+  it('rejects an implausible host mass too', () => {
+    expect(resolveGravitationalParameter({ semiMajorAxisAu: 1, hostStarMassSolar: 5000 })).toBe(GM_SUN_AU3_PER_DAY2);
+  });
+
+  it('keeps a real short-period hot Jupiter around a sun-like star', () => {
+    // 51 Pegasi b: 0.0527 AU in 4.23 days around a ~1.1 solar-mass star.
+    const gm = resolveGravitationalParameter({ semiMajorAxisAu: 0.0527, periodDays: 4.230785 });
+    expect(gm / GM_SUN_AU3_PER_DAY2).toBeCloseTo(1.1, 1);
+  });
+});
+
+describe('isPropagatableOrbit', () => {
+  it('accepts an orbit with only a semi-major axis', () => {
+    // 1509 archive records publish an axis and no eccentricity; they are perfectly drawable.
+    expect(isPropagatableOrbit({ semiMajorAxisAu: 1 })).toBe(true);
+  });
+
+  it('accepts a fully specified elliptical orbit', () => {
+    expect(isPropagatableOrbit({ semiMajorAxisAu: 0.05, eccentricity: 0.62 })).toBe(true);
+  });
+
+  it('accepts the boundary eccentricities of an ellipse', () => {
+    expect(isPropagatableOrbit({ semiMajorAxisAu: 1, eccentricity: 0 })).toBe(true);
+    expect(isPropagatableOrbit({ semiMajorAxisAu: 1, eccentricity: 0.999 })).toBe(true);
+  });
+
+  it('rejects an orbit with no semi-major axis at all', () => {
+    expect(isPropagatableOrbit({})).toBe(false);
+    expect(isPropagatableOrbit({ eccentricity: 0.1 })).toBe(false);
+  });
+
+  it('rejects a non-positive or non-finite semi-major axis', () => {
+    // sqrt of a negative and division by zero both yield NaN rather than throwing.
+    for (const semiMajorAxisAu of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(isPropagatableOrbit({ semiMajorAxisAu })).toBe(false);
+    }
+  });
+
+  it('rejects an eccentricity that is not an ellipse', () => {
+    // e >= 1 is a parabolic or hyperbolic escape trajectory, which no ellipse describes.
+    for (const eccentricity of [1, 1.4, -0.2, Number.NaN]) {
+      expect(isPropagatableOrbit({ semiMajorAxisAu: 1, eccentricity })).toBe(false);
+    }
+  });
+});
+
+describe('resolveOrbitalElements eccentricity default', () => {
+  it('treats a missing eccentricity as a circle', () => {
+    expect(resolveOrbitalElements({ semiMajorAxisAu: 2 }).eccentricity).toBe(0);
+  });
+
+  it('keeps a published eccentricity, including exactly zero', () => {
+    expect(resolveOrbitalElements({ semiMajorAxisAu: 2, eccentricity: 0.35 }).eccentricity).toBe(0.35);
+    expect(resolveOrbitalElements({ semiMajorAxisAu: 2, eccentricity: 0 }).eccentricity).toBe(0);
+  });
+
+  it('produces a genuine circle, not a degenerate ellipse', () => {
+    const elements = resolveOrbitalElements({ semiMajorAxisAu: 2 });
+    const radii = orbitEllipsePoints(elements).map((point) => Math.hypot(point.x, point.y, point.z));
+
+    for (const radius of radii) {
+      expect(radius).toBeCloseTo(2, 9);
+    }
   });
 });

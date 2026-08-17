@@ -34,6 +34,83 @@ export function raDegDecDistanceToXyz(raDeg: number, decDeg: number, distancePc:
 }
 
 /**
+ * Obliquity of the ecliptic at J2000.0, in degrees — the tilt of Earth's orbital plane against
+ * its equator, and so the angle between this app's two source frames.
+ */
+export const OBLIQUITY_J2000_DEG = 23.4392911;
+
+/**
+ * Rotates a vector from the **ecliptic** frame into the **equatorial** frame, both J2000.
+ *
+ * The app has to span both because its two sources disagree. Star positions come from HYG as
+ * equatorial coordinates, which `raDecDistanceToXyz` produces and which the galaxy view renders
+ * directly. Orbital elements come from JPL Horizons, whose default reference plane for element
+ * output is the ecliptic — the ETL never overrides it. The two are tilted
+ * {@link OBLIQUITY_J2000_DEG} apart about the shared vernal-equinox axis, so orbits have to be
+ * rotated before they can share a scene with the stars.
+ */
+export function eclipticToEquatorial(position: CartesianCoordinates): CartesianCoordinates {
+  const obliquity = OBLIQUITY_J2000_DEG * DEG_TO_RAD;
+  const cos = Math.cos(obliquity);
+  const sin = Math.sin(obliquity);
+
+  // A rotation about +X, which both frames share: it points at the vernal equinox, where the
+  // ecliptic and the celestial equator cross.
+  return {
+    x: position.x,
+    y: position.y * cos - position.z * sin,
+    z: position.y * sin + position.z * cos
+  };
+}
+
+/** Inverse of {@link eclipticToEquatorial}. */
+export function equatorialToEcliptic(position: CartesianCoordinates): CartesianCoordinates {
+  const obliquity = OBLIQUITY_J2000_DEG * DEG_TO_RAD;
+  const cos = Math.cos(obliquity);
+  const sin = Math.sin(obliquity);
+
+  return {
+    x: position.x,
+    y: position.y * cos + position.z * sin,
+    z: -position.y * sin + position.z * cos
+  };
+}
+
+/**
+ * Direction to a point on the celestial sphere as a unit vector, in the same equatorial frame
+ * as {@link raDecDistanceToXyz}. Used for sources whose distance is unknown or irrelevant —
+ * e.g. deep-sky objects rendered as a backdrop, where only the line of sight matters.
+ */
+export function raDecToUnitVector(raHours: number, decDeg: number): CartesianCoordinates {
+  return raDecDistanceToXyz(raHours, decDeg, 1);
+}
+
+const SEXAGESIMAL_PATTERN = /^([+-])?(\d+):(\d+):(\d+(?:\.\d+)?)$/;
+
+/**
+ * Parses a sexagesimal angle ("HH:MM:SS.ss" or "+DD:MM:SS.s", as published by OpenNGC and
+ * most catalogs) into a decimal value carrying the unit of its first field — hours for right
+ * ascension, degrees for declination.
+ *
+ * The sign is read from the string rather than from the parsed degrees field: `Number('-00')`
+ * is `-0`, which compares equal to `0`, so a declination like "-00:24:54.8" would otherwise
+ * come out positive and place the object in the wrong hemisphere.
+ *
+ * Returns `null` for anything that isn't a well-formed sexagesimal triple, including the empty
+ * strings that catalogs use for missing values.
+ */
+export function parseSexagesimal(text: string | undefined | null): number | null {
+  const match = SEXAGESIMAL_PATTERN.exec((text ?? '').trim());
+  if (!match) {
+    return null;
+  }
+
+  const [, sign, degreesOrHours, minutes, seconds] = match;
+  const magnitude = Number(degreesOrHours) + Number(minutes) / 60 + Number(seconds) / 3600;
+  return sign === '-' ? -magnitude : magnitude;
+}
+
+/**
  * Converts a parallax (milliarcseconds) into a distance in parsecs.
  * Returns `Infinity` for non-positive parallax (unmeasured/negative parallax).
  */

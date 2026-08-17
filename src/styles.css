@@ -83,11 +83,59 @@ body {
   }
 }
 
+/* Darkens the edges of the frame so the map reads as a lit display rather than a flat page. */
+.hud-vignette {
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 45%, color-mix(in srgb, var(--color-void) 72%, transparent) 100%);
+}
+
 /* Star name labels rendered by CSS2DRenderer (see StarLabelOverlay). These live outside
- * Angular's view encapsulation as plain DOM nodes, so they're styled with Tailwind utility
- * classes assigned directly in TypeScript rather than a scoped component stylesheet. */
+ * Angular's view encapsulation as plain DOM nodes, so they're styled here rather than through
+ * a scoped component stylesheet. */
 .star-label-layer {
   position: absolute;
   top: 0;
   left: 0;
+}
+
+/* Two-line map label: what the thing is called, then what it is. The type line is deliberately
+ * much quieter than the name — it should be readable when looked at and invisible when not,
+ * because on a crowded view it is printed as many times as there are labels.
+ *
+ * Offset from the anchor with a margin, not a translate: `CSS2DRenderer` rewrites the inline
+ * `transform` every frame, and the margin is the one offset it can never overwrite. The
+ * hairline `::before` is the leader line back to the point the label names. */
+.map-label {
+  position: relative;
+  margin-left: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  text-shadow:
+    0 0 6px var(--color-void),
+    0 0 3px var(--color-void);
+}
+
+.map-label::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: -0.75rem;
+  height: 1px;
+  width: 0.625rem;
+  background: color-mix(in oklab, var(--color-accent) 60%, transparent);
+}
+
+.map-label-name {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.map-label-kind {
+  font-size: 8px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--color-accent) 70%, transparent);
 }

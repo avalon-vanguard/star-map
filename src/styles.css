@@ -27,6 +27,31 @@ body {
   font-family: var(--font-body);
 }
 
+/* The panel surface every HUD element shares: a hairline border over a near-opaque fill. One
+ * definition, because spelling the recipe out per call site is how it forked into /85 and /92
+ * variants within a single change. Deliberately no backdrop blur: the canvas underneath is
+ * redrawn every frame by the render loop, so a blur here is re-sampled continuously — a
+ * standing GPU cost for an effect a 92%-opaque fill mostly hides anyway. */
+@utility hud-surface {
+  border: 1px solid color-mix(in oklab, var(--color-border) 60%, transparent);
+  background-color: color-mix(in oklab, var(--color-panel) 92%, transparent);
+}
+
+/* The two label voices of the single-face type system, named so call sites cannot drift a few
+ * thousandths of an em apart. `type-label` is the working voice — section headings, readout
+ * labels, buttons; `type-eyebrow` is the wider-tracked identity line above a title. */
+@utility type-label {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+@utility type-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
 /* The HUD's signature: four corner tick brackets cut into a panel's hairline frame. Drawn as
  * eight background gradients so any panel (or the viewport frame) picks them up without the
  * eight extra DOM nodes the same mark would otherwise cost. Override `--hud-tick` per element
@@ -116,10 +141,13 @@ body {
     0 0 3px var(--color-void);
 }
 
+/* Geometry assumes the label's left edge sits at the star — StarLabelOverlay sets the
+ * CSS2DObject's center to (0, 0.5) to make that true. Under the default (0.5, 0.5) the
+ * renderer keeps the box centred on the point and this line floats in empty space. */
 .map-label::before {
   content: '';
   position: absolute;
-  top: 7px;
+  top: 50%;
   left: -0.75rem;
   height: 1px;
   width: 0.625rem;

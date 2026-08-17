@@ -98,6 +98,11 @@ export class StarLabelOverlay {
     }
 
     const object = new CSS2DObject(element);
+    // Anchor the label's left edge at the point, vertically centred. The default center of
+    // (0.5, 0.5) makes CSS2DRenderer emit translate(-50%,-50%), keeping the box centred on the
+    // star — under which `.map-label`'s margin offset only nudges the centred box sideways and
+    // the leader line points at empty space half the label's width from the star.
+    object.center.set(0, 0.5);
     object.position.set(point.x, point.y, point.z);
     this.scene.add(object);
     this.labelObjects.set(point.id, object);

@@ -25,7 +25,11 @@ const TAP_COLUMNS = [
   'st_mass',
   'disc_year'
 ].join(',');
-const TAP_QUERY = `select+${TAP_COLUMNS}+from+ps+where+default_flag=1&format=csv`;
+// Ordered explicitly: without it the archive is free to return rows in any order, and a
+// scheduled re-run of the ETL would then rewrite exoplanets.json — and commit a diff — when
+// nothing was actually published. pl_name is unique among default_flag=1 rows, so the order
+// is total and the output is a pure function of the archive's content.
+const TAP_QUERY = `select+${TAP_COLUMNS}+from+ps+where+default_flag=1+order+by+pl_name&format=csv`;
 const TAP_URL = `${TAP_BASE_URL}?query=${TAP_QUERY}`;
 
 // A host star match must be within this many parsecs of the catalog position to be

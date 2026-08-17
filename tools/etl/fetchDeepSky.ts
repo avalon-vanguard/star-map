@@ -126,7 +126,10 @@ export async function fetchDeepSky(): Promise<DeepSkyRecord[]> {
 
   // Brightest first, so a consumer taking a prefix gets the most prominent objects. Objects
   // with no measured magnitude sort last rather than being treated as infinitely bright.
-  records.sort((a, b) => (a.magnitude ?? Infinity) - (b.magnitude ?? Infinity) || a.id.localeCompare(b.id));
+  // The tie-break compares code points rather than localeCompare: locale collation depends on
+  // the ICU build of whichever Node runs the ETL, and a scheduled re-run must not reorder the
+  // file just because the runner's ICU disagrees with the machine that wrote it last.
+  records.sort((a, b) => (a.magnitude ?? Infinity) - (b.magnitude ?? Infinity) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
   ensureDataDir();
   writeFileSync(dataPath('deepsky.json'), JSON.stringify(records));

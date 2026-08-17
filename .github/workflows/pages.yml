@@ -1,0 +1,73 @@
+name: Pages
+
+# Publishes the built app to GitHub Pages. `main` only: `develop` is where work integrates and
+# this is what the world sees, so a deploy should follow a promotion rather than every merge.
+# `workflow_dispatch` covers the exception — dispatching from another ref publishes that ref.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One deployment at a time, and never cancel one in flight: a half-replaced site is worse than a
+# slightly stale one. Queued runs supersede each other, so the newest commit still wins.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  # `deploy-pages` authenticates to the Pages service with an OIDC token rather than a secret.
+  id-token: write
+
+jobs:
+  build:
+    name: Build the site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Verifies Pages is enabled and reports the URL the site will live at. It cannot *enable*
+      # Pages itself: the action's `enablement` input requires an admin-scoped token, which the
+      # workflow's GITHUB_TOKEN is not. If this step fails with "Get Pages site failed", the
+      # one-time fix is Settings → Pages → Source: GitHub Actions, then re-run.
+      - uses: actions/configure-pages@v6
+
+      # A project site is served from a subdirectory, so the app cannot assume it sits at the
+      # root. The base href is what makes the router's URLs and the relative `fetch` calls in
+      # `DataLoaderService` resolve — those are written relative, so they follow `<base>` rather
+      # than the current path, and a deep link still finds `assets/data/*`.
+      #
+      # Derived from the repository name rather than written out, so a rename cannot leave a
+      # stale path here. A user/organisation site or a custom domain would want `/` instead.
+      - name: Build
+        run: npm run build -- --base-href "/${GITHUB_REPOSITORY#*/}/"
+
+      # Pages serves a static tree with no rewrite rules, so `/body/mars` has no file behind it
+      # and comes back 404. Answering that 404 with the app itself lets the router take over and
+      # render the route, which is the standard way to host a history-API app here. The status
+      # stays 404 — search engines notice, humans do not.
+      - name: Serve deep links through the app
+        run: cp dist/star-map/browser/index.html dist/star-map/browser/404.html
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist/star-map/browser
+
+  deploy:
+    name: Deploy to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

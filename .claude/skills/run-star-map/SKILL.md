@@ -130,14 +130,37 @@ already-running server and leaves it alone on exit).
 ## Test
 
 ```bash
-PATH=/opt/node/bin:$PATH npm test                    # 496 tests, 28 files, ~5s
-PATH=/opt/node/bin:$PATH npm run build               # ~9s
+PATH=/opt/node/bin:$PATH npm test                    # 527 tests, 31 files, ~6s
+PATH=/opt/node/bin:$PATH npm run build               # ~12s
 PATH=/opt/node/bin:$PATH npm run etl:typecheck
 PATH=/opt/node/bin:$PATH npm run e2e:typecheck
-PATH=/opt/node/bin:$PATH npm run e2e -- --workers=1  # 6 tests, ~2.3m
+PATH=/opt/node/bin:$PATH npm run e2e -- --workers=1  # 6 tests, 3 files, ~2.3m
 ```
 
 `--workers=1` on the e2e suite is **not optional here** — see Gotchas.
+
+## Build for GitHub Pages
+
+`.github/workflows/pages.yml` publishes the app on a push to `main`. To reproduce what it builds:
+
+```bash
+export PATH=/opt/node/bin:$PATH
+npm run build -- --base-href "/star-map/"
+cp dist/star-map/browser/index.html dist/star-map/browser/404.html
+```
+
+Two things differ from a plain `npm run build`, and both exist because a project site is served
+from a subdirectory rather than a domain root:
+
+- **`--base-href`.** `DataLoaderService` fetches its catalogues with relative URLs
+  (`assets/data/stars.bin`), which resolve against `<base>` rather than the current path. Get it
+  wrong and a deep link asks for `/body/assets/data/stars.bin`. The workflow derives it from the
+  repository name so a rename cannot strand it.
+- **`404.html`.** Pages has no rewrite rules, so `/body/mars` has no file behind it. Serving the
+  app as the 404 body lets the router render the route. The response stays HTTP 404.
+
+The uploaded artifact is `dist/star-map/browser`, **not** `dist/star-map` — the parent also holds
+`3rdpartylicenses.txt` and `prerendered-routes.json`, which are not part of the site.
 
 ## Gotchas
 
@@ -172,6 +195,10 @@ PATH=/opt/node/bin:$PATH npm run e2e -- --workers=1  # 6 tests, ~2.3m
   view) to see Mercury/Venus/Earth/Mars labelled.
 - **Port 4300, not Angular's usual 4200** — the project's own convention, set in
   `playwright.config.ts` so it never collides with an unrelated `ng serve`.
+- **A Pages build looks broken if you serve it at the root.** `<base href="/star-map/">` makes
+  every asset resolve under that prefix, so opening `dist/star-map/browser` at `/` gets you a
+  blank page and a wall of 404s. Serve it under the same prefix as Pages does, with unknown paths
+  falling back to `404.html`, or the check tells you nothing.
 - **Don't write driver scripts in `.ts` outside the repo.** `tsx` compiles a bare `.ts` as CJS
   ("Top-level await is currently not supported with the cjs output format"), and a script outside
   the repo can't resolve `@playwright/test` at all. The driver is `.mjs` inside the repo for both

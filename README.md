@@ -5,7 +5,11 @@ real astronomical data instead of fictional systems. Browse the solar neighbourh
 star's system to see its planets on their real orbits, and drill into a single body for the
 NASA figures behind it.
 
-This repo also hosts a small Claude Code plugin marketplace — see [Plugins](#plugins) below.
+**Live at <https://avalon-vanguard.github.io/star-map/>**, published from `main` by
+[`.github/workflows/pages.yml`](.github/workflows/pages.yml). There is no backend — the whole
+thing is static files and a few megabytes of baked catalogue.
+
+The source of a small Claude Code plugin also lives here — see [Plugins](#plugins) below.
 
 ![The solar neighbourhood: 68 388 catalogued stars within 250 parsecs, on a polar grid lying in the galactic plane](docs/screenshots/galaxy-view.jpg)
 
@@ -73,6 +77,20 @@ around it. Mercury's, three pixels wide at that range, does not survive either w
 **Body detail** — a dedicated close-up scene and info panel for one planet, moon or exoplanet,
 with real photography where NASA/ESA/USGS imagery exists, and a surface derived from the body's
 own measurements where it does not. See "On surfaces that were never photographed" below.
+
+**Object card** — hovering a body in the system view raises its figures over the live scene and
+clicking pins them, so two planets can be compared without flying out and back; **Full view**
+opens the detail route when the close-up is wanted. The card and the detail panel are built from
+one shared view model and one shared set of readouts, which is what stops the same planet reading
+255 K in one and 254 K in the other.
+
+**Measured against derived** — every figure is filed under the heading it earns. A published
+radius is measured; an equilibrium temperature computed from the host star's luminosity is
+derived, and says so. Orbital period is shown where it can honestly be had: for a heliocentric
+orbit it follows exactly from the semi-major axis, because in these units the Sun's mass *is* the
+unit of mass — Mars comes back 687.0 d against a published 686.98. It is deliberately absent for
+moons, whose elements are relative to a parent planet the catalogue carries no mass for, and for
+exoplanets, where assuming a solar-mass host would mis-state every planet around an M dwarf.
 
 **Search** — name search across stars, solar-system bodies and exoplanets, navigating to the
 same place an in-scene click would.
@@ -281,36 +299,22 @@ src/app/
                         Milky Way structure
   shared/models/        record contracts shared by the app and the ETL
   shared/rendering/     skybox, glow sprites, texture catalog
+  shared/format/        one formatter per physical quantity, precision following magnitude
   shared/state/         navigation store (Angular signals)
 tools/etl/              build-time data pipeline
 e2e/                    Playwright end-to-end tests
+public/                 files served at the site root (favicon, link-preview image)
+.github/workflows/      CI, the Pages deploy, and an automated review pass
 ```
 
 The design document behind all of this is `.junie/plans/nasa-star-map.md`.
 
 ## Plugins
 
-This repo doubles as a Claude Code plugin marketplace. Adding it and installing a plugin
-defaults to **user scope**, meaning the plugin becomes available in *every* project on your
-machine, not just the one you happen to be in:
-
-```bash
-/plugin marketplace add avalon-vanguard/star-map
-/plugin install caveman@star-map
-```
-
-Scope can be overridden at install time if you want it tied to a single repo instead:
-
-```bash
-# Shared with collaborators via that repo's .claude/settings.json
-/plugin install caveman@star-map --scope project
-
-# Just for you, in that one repo only (gitignored)
-/plugin install caveman@star-map --scope local
-```
-
-See [Claude Code plugin installation scopes](https://code.claude.com/docs/en/plugins-reference)
-for details on `user` / `project` / `local` scope.
+This repo carries the source of one Claude Code plugin, but no longer publishes itself as a
+marketplace — `.claude-plugin/marketplace.json` was removed, which is the file `/plugin
+marketplace add` reads. So there is currently no install path from here; the manifest and the
+plugin's own files are kept so it can be listed from a marketplace of its own later.
 
 - **caveman** — `/cs:caveman` ultra-compressed communication mode.
   - Command: [`commands/cs/caveman.md`](commands/cs/caveman.md)

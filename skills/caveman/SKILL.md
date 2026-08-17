@@ -15,12 +15,10 @@ exactly as-is.
 
 ## Scope
 
-This skill ships via this repo's plugin marketplace
-(`.claude-plugin/marketplace.json`). Installing with
-`/plugin install caveman@star-map` defaults to **user scope** — global,
-available in every project — instead of being tied to just one repo. Use
-`--scope project` or `--scope local` to narrow it; see the
-[README](../../README.md).
+This repo no longer publishes itself as a plugin marketplace, so there is
+currently no install path for this skill from here. Listing it from a
+marketplace elsewhere is what would make `/plugin install` work again; see
+the [README](../../README.md).
 
 ## Persistence
 

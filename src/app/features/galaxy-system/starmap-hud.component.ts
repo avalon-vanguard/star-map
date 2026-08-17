@@ -5,6 +5,12 @@ import { ViewLevel } from '../../shared/state/navigation.store';
 export interface HudReadout {
   readonly label: string;
   readonly value: string;
+  /**
+   * True when the figure was computed from other measurements rather than catalogued directly.
+   * Marked in the panel and explained in its footnote, so a reasoned number is never mistaken for
+   * an observed one.
+   */
+  readonly derived?: boolean;
 }
 
 interface LadderStep {
@@ -101,14 +107,14 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
           <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-1">
             @for (readout of readouts(); track readout.label) {
               <div>
-                <dt class="text-[10px] tracking-[0.16em] text-muted uppercase">{{ readout.label }}</dt>
+                <dt class="text-[10px] tracking-[0.16em] text-muted uppercase">{{ readout.label }}@if (readout.derived) {<span class="text-accent/80" aria-hidden="true">*</span>}</dt>
                 <dd class="mt-0.5 text-sm text-text tabular-nums">{{ readout.value }}</dd>
               </div>
             }
           </dl>
         }
-        @if (note()) {
-          <p class="mt-3 border-t border-border/40 pt-2 text-[10px] leading-relaxed text-muted">{{ note() }}</p>
+        @if (note() || hasDerived()) {
+          <p class="mt-3 border-t border-border/40 pt-2 text-[10px] leading-relaxed text-muted">@if (hasDerived()) {<span class="text-accent/80">*</span> Derived, not catalogued. }{{ note() }}</p>
         }
       </div>
 
@@ -128,6 +134,9 @@ export class StarmapHudComponent {
   readonly readouts = input<readonly HudReadout[]>([]);
   /** Standing caveat for the current view, e.g. that galactic structure is a model. */
   readonly note = input('');
+  /** Whether any readout needs the derived-value footnote. */
+  readonly hasDerived = computed(() => this.readouts().some((readout) => readout.derived));
+
   /** Camera range, pre-formatted by the scene, which is the only thing that knows the units. */
   readonly range = input('');
   readonly showReticle = input(true);

@@ -2,10 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Star Map</title>
+  <title>Star Map — the real solar neighbourhood in 3D</title>
+  <!-- Overwritten at build time with the deploy's subpath (`ng build --base-href`). The app's
+       data fetches are relative, so this is what they resolve against. -->
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An interactive 3D star map built from real astronomical data: 68,388 catalogued stars out to 250 parsecs, planets on their measured orbits, and the NASA figures behind every body.">
+  <!-- Matches --color-void, so the browser chrome does not flash white around a black sky. -->
+  <meta name="theme-color" content="#05070d">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
+
+  <!-- Link previews. These URLs must be absolute — a scraper resolves them against nothing — so
+       unlike everything else here they do not follow <base> and name the deployment outright. -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://avalon-vanguard.github.io/star-map/">
+  <meta property="og:title" content="Star Map — the real solar neighbourhood in 3D">
+  <meta property="og:description" content="68,388 catalogued stars out to 250 parsecs, planets on their measured orbits, and the NASA figures behind every body.">
+  <meta property="og:image" content="https://avalon-vanguard.github.io/star-map/social-preview.jpg">
+  <meta property="og:image:alt" content="The Milky Way's bar, bulge and five spiral arms, with the Sun marked on the Orion Spur">
+  <meta name="twitter:card" content="summary_large_image">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">

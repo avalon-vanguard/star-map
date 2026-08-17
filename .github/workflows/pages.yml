@@ -34,7 +34,10 @@ jobs:
 
       - run: npm ci
 
-      # Enables Pages on first run if it is not on yet, and reports the URL the site will live at.
+      # Verifies Pages is enabled and reports the URL the site will live at. It cannot *enable*
+      # Pages itself: the action's `enablement` input requires an admin-scoped token, which the
+      # workflow's GITHUB_TOKEN is not. If this step fails with "Get Pages site failed", the
+      # one-time fix is Settings → Pages → Source: GitHub Actions, then re-run.
       - uses: actions/configure-pages@v6
 
       # A project site is served from a subdirectory, so the app cannot assume it sits at the

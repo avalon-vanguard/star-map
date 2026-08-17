@@ -8,6 +8,9 @@ on:
   push:
     branches: [main, develop]
   pull_request:
+  # For the data-refresh workflow: its bot push to main fires no `push` events (GitHub's
+  # recursion guard), so it dispatches CI here explicitly to put checks on the new commit.
+  workflow_dispatch:
 
 # A second push to the same branch makes the first run's answer irrelevant.
 concurrency:

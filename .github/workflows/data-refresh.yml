@@ -1,0 +1,89 @@
+name: Refresh the catalogues
+
+# Re-runs the ETL against the live archives on a schedule and republishes the site when the data
+# actually changed, so the catalogues track NASA without anyone touching the code. The archives
+# this reads — HYG, the Exoplanet Archive, JPL Horizons, OpenNGC, Gaia — are all anonymous
+# public endpoints; no keys are involved.
+on:
+  schedule:
+    # Mondays 05:23 UTC. An arbitrary minute rather than :00, which is the busiest minute on
+    # GitHub's cron fleet and the most likely to be delayed or dropped.
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+
+# Never two refreshes at once, and never cancel one mid-push.
+concurrency:
+  group: data-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: write # push the regenerated catalogues to main
+  actions: write # dispatch the deploy and CI afterwards — see the final step
+
+jobs:
+  refresh:
+    name: Fetch, gate, publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The data lives on main and the push below goes to main, whichever ref the workflow
+          # file itself ran from.
+          ref: main
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The ETL's cache directory is gitignored and this is a fresh runner, so every source is
+      # fetched live (~50-100 MB). A failed fetch fails the run by design — no refresh is
+      # better than a partial one — except Gaia, which the ETL itself treats as best-effort.
+      - name: Rebuild the datasets
+        run: npm run etl
+
+      - name: Detect a real change
+        id: diff
+        run: |
+          if git diff --quiet -- src/assets/data; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "The archives published nothing new — catalogues are byte-identical." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            { echo "Catalogue changes:"; echo '```'; git diff --stat -- src/assets/data; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # The same gates CI runs, run here instead: the push below is made with GITHUB_TOKEN, and
+      # GitHub deliberately fires no workflows for such pushes, so the data must be proven
+      # before it lands rather than checked after.
+      - name: Unit tests against the new data
+        if: steps.diff.outputs.changed == 'true'
+        run: npm test -- --no-watch
+
+      - name: Production build against the new data
+        if: steps.diff.outputs.changed == 'true'
+        run: npm run build
+
+      - name: Commit to main
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/assets/data
+          git commit -m "Refresh the astronomical catalogues" \
+            -m "Scheduled re-run of the ETL against the live archives. Gated on the unit suite and a production build in this same run, because a GITHUB_TOKEN push triggers no CI of its own."
+          git push origin HEAD:main
+
+      # The recursion guard that keeps the bot push from triggering `push` workflows also keeps
+      # it from deploying, so the deploy — and a visible CI record on the new commit — are
+      # dispatched explicitly. Dispatch does go through, unlike push events.
+      - name: Redeploy the site, and put checks on the commit
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run pages.yml --ref main
+          gh workflow run ci.yml --ref main

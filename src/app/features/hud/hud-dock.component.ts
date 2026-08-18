@@ -38,9 +38,11 @@ const TAB_LABELS: Record<DockTab, string> = { search: 'Search', readout: 'Readou
 
 /** Tailwind's `sm` breakpoint: below it the dock is a bare tab strip and its panel is a sheet. */
 const WIDE_VIEWPORT = '(min-width: 640px)';
+/** One live query, read on every pointer-down, rather than a new MediaQueryList per read. */
+const wideViewportQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(WIDE_VIEWPORT) : null;
 
 function isWideViewport(): boolean {
-  return typeof window === 'undefined' || typeof window.matchMedia !== 'function' ? true : window.matchMedia(WIDE_VIEWPORT).matches;
+  return wideViewportQuery?.matches ?? true;
 }
 
 /**

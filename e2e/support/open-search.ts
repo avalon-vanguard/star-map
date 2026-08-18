@@ -5,6 +5,10 @@ import { Locator, Page } from '@playwright/test';
  * type has to open it first — the way a user does, or with the `/` shortcut. Returns the field.
  */
 export async function openSearch(page: Page): Promise<Locator> {
-  await page.getByRole('tab', { name: 'Search' }).click();
+  // Clicking the active tab folds it closed, so only click when it is not already open.
+  const tab = page.getByRole('tab', { name: 'Search' });
+  if ((await tab.getAttribute('aria-selected')) !== 'true') {
+    await tab.click();
+  }
   return page.getByPlaceholder('Search stars, planets, exoplanets…');
 }

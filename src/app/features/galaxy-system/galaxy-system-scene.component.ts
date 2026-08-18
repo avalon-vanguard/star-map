@@ -648,14 +648,20 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   /** Refreshes the readout panel for whichever scale the view is currently at. */
   /**
    * Shows or hides the layers that hold still between frames: the label layer and the system
-   * view's orbits and grid. The galaxy grids, deep-sky shell and skybox are crossfaded every
-   * frame instead, so their toggles live in `updateGalacticCrossfade`.
+   * view's orbits and grid. The galaxy grids and deep-sky shell are crossfaded every frame
+   * instead, so their toggles live in `updateGalacticCrossfade`. The skybox is both: the
+   * crossfade rewrites its intensity while the galaxy is up, but the crossfade is parked in
+   * system view, where the sky is still on screen — so it is also set here, once, on toggle.
    */
   private applyDisplay(display: HudDisplay): void {
     if (this.labelOverlay) {
       this.labelOverlay.domElement.style.display = display.labels ? '' : 'none';
     }
     this.systemRenderer?.setLayerVisibility({ orbits: display.orbits, grid: display.grid });
+    // The effect that calls this fires once at construction, before the engine has a scene.
+    if (this.engine.isInitialized) {
+      this.engine.getScene().backgroundIntensity = display.sky ? 1 - this.galacticStrength : 0;
+    }
   }
 
   private updateHud(camera: THREE.PerspectiveCamera): void {

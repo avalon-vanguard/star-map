@@ -88,6 +88,9 @@ function colorForKind(kind: SystemMemberKind): THREE.Color {
   }
 }
 
+/** Marks orbit lines so the whole layer can be toggled without touching the bodies. */
+const ORBIT_LINE_NAME = 'orbit-line';
+
 function buildOrbitLine(elements: OrbitalElements, kind: SystemMemberKind, frame: THREE.Quaternion): THREE.Line {
   const points = orbitEllipsePoints(elements);
   const positions = new Float32Array(points.length * 3);
@@ -110,7 +113,9 @@ function buildOrbitLine(elements: OrbitalElements, kind: SystemMemberKind, frame
     opacity: ORBIT_LINE_OPACITY_BY_KIND[kind]
   });
 
-  return new THREE.Line(geometry, material);
+  const line = new THREE.Line(geometry, material);
+  line.name = ORBIT_LINE_NAME;
+  return line;
 }
 
 /**
@@ -327,6 +332,21 @@ export class SystemOrbitsRenderer {
   /** All marker objects, for raycasting. */
   get pickableObjects(): THREE.Object3D[] {
     return this.members.map((member) => member.marker);
+  }
+
+  /** Shows or hides the orbit lines and the reference grid, leaving the bodies themselves. */
+  setLayerVisibility(layers: { orbits: boolean; grid: boolean }): void {
+    this.object.traverse((child) => {
+      if (child.name === ORBIT_LINE_NAME) {
+        child.visible = layers.orbits;
+      }
+    });
+    if (this.grid) {
+      this.grid.object.visible = layers.grid;
+    }
+    if (this.tethers) {
+      this.tethers.object.visible = layers.grid;
+    }
   }
 
   dispose(): void {

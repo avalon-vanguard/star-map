@@ -19,10 +19,8 @@ import { ReadoutSectionsComponent } from './readout-sections.component';
   selector: 'app-info-panel',
   imports: [ChevronIconComponent, ReadoutSectionsComponent],
   template: `
-    <!-- Sits below the search field until xl, beside it from there. The search field is 26rem
-         wide and centred, so this right-anchored 20rem panel only clears it once the viewport
-         passes ~1088px — at sm they still overlap and the search would cover the back button. -->
-    <div class="hud-brackets hud-acquire hud-surface absolute top-20 right-4 w-80 max-w-[calc(100%-2rem)] font-body text-text xl:top-4">
+    <!-- Top-right, clear of the dock along the bottom; nothing else shares the top edge here. -->
+    <div class="hud-brackets hud-acquire hud-surface absolute top-4 right-4 w-80 max-w-[calc(100%-2rem)] font-body text-text">
       <button
         type="button"
         (click)="goBack()"

@@ -29,7 +29,7 @@ import { ChevronIconComponent } from '../../shared/ui/chevron-icon.component';
          never fights the absolute placement. Same organism as the detail page's info panel:
          header, shared readout sections, and a route rail — there at the top, here at the
          bottom, because here the route is the next step rather than the way back. -->
-    <div class="pointer-events-auto absolute top-16 right-6 w-80 max-w-[calc(100%-3rem)]">
+    <div class="pointer-events-auto absolute top-6 right-6 w-80 max-w-[calc(100%-3rem)]">
       <div data-testid="object-card" class="hud-brackets hud-acquire hud-surface font-body text-text">
         <div class="flex items-start justify-between gap-3 px-4 pt-4 pb-3">
           <header class="min-w-0">

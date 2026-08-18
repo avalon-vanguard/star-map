@@ -10,7 +10,8 @@ test.describe('Galaxy view', () => {
     await page.goto('/?stars=4000');
 
     await expect(page.getByTestId('scene-canvas')).toBeVisible();
-    await expect(page.getByPlaceholder('Search stars, planets, exoplanets…')).toBeVisible();
+    // The dock's tab strip is up before the scene finishes booting; the search is one tab in it.
+    await expect(page.getByRole('tab', { name: 'Search' })).toBeVisible();
     await expect(backButtonLocator(page)).toHaveCount(0);
     // The readout panel's own title, not just the text anywhere on screen: the selected-object
     // banner across the top names the same thing, so a bare text match is ambiguous.

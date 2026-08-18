@@ -22,7 +22,8 @@ import { starGlowExtentAu, starMarkerRadiusAu, systemFrameRadiusAu, systemFramin
 import { formatAu, formatLuminosity, formatParsecs } from '../../shared/format/quantity';
 import { BodyDetailViewModel } from '../body-detail/body-detail.model';
 import { buildBodyViewModel, luminosityOf } from '../body-detail/body-view-model';
-import { HudReadout, StarmapHudComponent } from './starmap-hud.component';
+import { DEFAULT_HUD_DISPLAY, HudDisplay, HudDockComponent, HudReadout } from '../hud/hud-dock.component';
+import { StarmapHudComponent } from './starmap-hud.component';
 import { SystemObjectCardComponent } from './system-object-card.component';
 import { colorIndexToRgb, StarFieldRenderer, starRenderBudgetFromUrl } from './star-field-renderer';
 import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
@@ -151,24 +152,28 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
 @Component({
   selector: 'app-galaxy-system-scene',
   providers: [EngineService],
-  imports: [StarmapHudComponent, SystemObjectCardComponent],
+  imports: [HudDockComponent, StarmapHudComponent, SystemObjectCardComponent],
   template: `
     <div class="relative h-full w-full">
       <canvas #canvas data-testid="scene-canvas" class="block h-full w-full"></canvas>
-      <div #labelHost class="absolute inset-0 overflow-hidden pointer-events-none"></div>
-      <app-starmap-hud
-        [level]="navigationStore.viewLevel()"
+      <!-- isolate: CSS2DRenderer gives every label its own z-index for depth ordering; without a
+           stacking context here those indices escape and the labels paint over the HUD. -->
+      <div #labelHost class="pointer-events-none absolute inset-0 isolate overflow-hidden"></div>
+      <app-starmap-hud [level]="navigationStore.viewLevel()" [title]="hudTitle()" (levelSelected)="goToLevel($event)" />
+      @if (objectCard(); as card) {
+        <app-system-object-card [body]="card" (dismissed)="dismissObjectCard()" (openRequested)="openObjectDetail(card.id)" />
+      }
+      <app-hud-dock
         [eyebrow]="hudEyebrow()"
         [title]="hudTitle()"
         [subtitle]="hudSubtitle()"
         [readouts]="hudReadouts()"
         [note]="hudNote()"
         [range]="hudRange()"
-        (levelSelected)="goToLevel($event)"
+        [display]="display()"
+        defaultTab="readout"
+        (displayChange)="display.set($event)"
       />
-      @if (objectCard(); as card) {
-        <app-system-object-card [body]="card" (dismissed)="dismissObjectCard()" (openRequested)="openObjectDetail(card.id)" />
-      }
     </div>
   `
 })
@@ -190,6 +195,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   readonly hudReadouts = signal<readonly HudReadout[]>([]);
   readonly hudNote = signal('');
   readonly hudRange = signal('');
+  /** Which layers are drawn, as toggled from the dock. Applied by `applyDisplay`. */
+  readonly display = signal<HudDisplay>(DEFAULT_HUD_DISPLAY);
 
   /**
    * The body whose card is showing: whichever is pinned by a click, else whatever the pointer is
@@ -246,6 +253,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         this.reconcileSelection(selectedStarId);
       }
     });
+    effect(() => this.applyDisplay(this.display()));
   }
 
   ngAfterViewInit(): void {
@@ -393,6 +401,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     this.labelOverlay = new StarLabelOverlay(scene);
     this.labelHostRef().nativeElement.appendChild(this.labelOverlay.domElement);
+    this.applyDisplay(this.display());
     const { width, height } = canvas.getBoundingClientRect();
     this.labelOverlay.setSize(width, height);
 
@@ -453,14 +462,18 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const distancePc = camera.position.length();
     this.galacticStrength = this.milkyWay.setViewerDistancePc(distancePc);
 
-    this.galacticGrid?.setStrength(this.galacticStrength);
-    this.localGrid?.setStrength(1 - this.galacticStrength);
-    this.tethers?.setStrength(1 - this.galacticStrength);
+    // Layer toggles from the dock fold in here rather than as a one-off `visible = false`:
+    // `setStrength` rewrites visibility every frame from the strength it is given, so a hidden
+    // layer has to be told a strength of zero every frame too.
+    const display = this.display();
+    this.galacticGrid?.setStrength(display.grid ? this.galacticStrength : 0);
+    this.localGrid?.setStrength(display.grid ? 1 - this.galacticStrength : 0);
+    this.tethers?.setStrength(display.grid ? 1 - this.galacticStrength : 0);
     // The backdrop shell is the sky as seen from here; from outside it, it is a wall.
-    this.deepSky?.setStrength(1 - this.galacticStrength);
+    this.deepSky?.setStrength(display.deepSky ? 1 - this.galacticStrength : 0);
     // Same argument for the skybox, and more sharply: it is a photograph of the Milky Way taken
     // from inside it, so it cannot also be the sky behind a view of the Galaxy from outside.
-    this.engine.getScene().backgroundIntensity = 1 - this.galacticStrength;
+    this.engine.getScene().backgroundIntensity = display.sky ? 1 - this.galacticStrength : 0;
 
     this.applyGalaxyDepthRange(camera, distancePc);
     const level: ViewLevel = this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD ? 'galactic' : 'galaxy';
@@ -633,6 +646,24 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   }
 
   /** Refreshes the readout panel for whichever scale the view is currently at. */
+  /**
+   * Shows or hides the layers that hold still between frames: the label layer and the system
+   * view's orbits and grid. The galaxy grids and deep-sky shell are crossfaded every frame
+   * instead, so their toggles live in `updateGalacticCrossfade`. The skybox is both: the
+   * crossfade rewrites its intensity while the galaxy is up, but the crossfade is parked in
+   * system view, where the sky is still on screen — so it is also set here, once, on toggle.
+   */
+  private applyDisplay(display: HudDisplay): void {
+    if (this.labelOverlay) {
+      this.labelOverlay.domElement.style.display = display.labels ? '' : 'none';
+    }
+    this.systemRenderer?.setLayerVisibility({ orbits: display.orbits, grid: display.grid });
+    // The effect that calls this fires once at construction, before the engine has a scene.
+    if (this.engine.isInitialized) {
+      this.engine.getScene().backgroundIntensity = display.sky ? 1 - this.galacticStrength : 0;
+    }
+  }
+
   private updateHud(camera: THREE.PerspectiveCamera): void {
     const star = this.currentStarId === null ? undefined : this.starsById.get(this.currentStarId);
 
@@ -878,6 +909,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const hostLuminosity = luminosityOf(star);
     this.systemRenderer = new SystemOrbitsRenderer(systemBodies, systemExoplanets, { x: star.x, y: star.y, z: star.z }, hostLuminosity);
     this.systemGroup.add(this.systemRenderer.object);
+    this.applyDisplay(this.display());
 
     // Framed against the grid's outer ring rather than the outermost orbit — the ring is always
     // the wider of the two — and against the camera this scene actually has, so the margin holds

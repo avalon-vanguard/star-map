@@ -3,17 +3,6 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { ViewLevel } from '../../shared/state/navigation.store';
 import { ReticleIconComponent } from '../../shared/ui/reticle-icon.component';
 
-export interface HudReadout {
-  readonly label: string;
-  readonly value: string;
-  /**
-   * True when the figure was computed from other measurements rather than catalogued directly.
-   * Marked in the panel and explained in its footnote, so a reasoned number is never mistaken for
-   * an observed one.
-   */
-  readonly derived?: boolean;
-}
-
 interface LadderStep {
   readonly level: ViewLevel;
   readonly label: string;
@@ -31,9 +20,9 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
 ];
 
 /**
- * The map's heads-up display: the scale ladder down the left, the readout panel across the
- * bottom, a centre reticle on whatever the camera is holding, and the frame brackets around
- * the whole viewport.
+ * The top of the map's heads-up display: the scale ladder on the left, the nameplate across
+ * the centre, and a centre reticle on whatever the camera is holding. Readouts and tools live
+ * in the dock along the bottom (`HudDockComponent`).
  *
  * Purely presentational — every value arrives as an input and the only thing it emits is a
  * request to move to another scale. The scene owns the camera and decides what that means.
@@ -58,8 +47,8 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
     }
 
     <!-- Top rail: which scale the view is at, and what it is holding. Both sit on one line
-         across the top of the display, clear of the search field above them. -->
-    <nav aria-label="Map scale" class="hud-brackets hud-surface pointer-events-auto absolute top-16 left-6 flex items-stretch divide-x divide-border/40">
+         across the top of the display; the search lives in the dock below, so nothing sits above. -->
+    <nav aria-label="Map scale" class="hud-brackets hud-surface pointer-events-auto absolute top-6 left-6 flex items-stretch divide-x divide-border/40">
       @for (step of ladder(); track step.level) {
         @if (step.reachable) {
           <button
@@ -84,58 +73,20 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
     @if (title()) {
       <!-- Hidden below lg: the readout panel names the same thing, and at narrower widths a
            long star name runs into the scale rail on its left and under the object card on its
-           right — all three share the top-16 line. -->
-      <div class="absolute top-16 left-1/2 hidden -translate-x-1/2 lg:block">
+           right — all three share the top-6 line. -->
+      <div class="absolute top-6 left-1/2 hidden -translate-x-1/2 lg:block">
         <div data-testid="hud-banner" class="hud-brackets hud-acquire hud-surface flex items-center gap-2.5 px-6 py-1.5">
           <app-reticle-icon class="h-3 w-3 shrink-0 text-accent" />
           <span class="text-[11px] tracking-[0.3em] text-accent uppercase">{{ title() }}</span>
         </div>
       </div>
     }
-
-    <div class="absolute right-6 bottom-6 left-6 flex flex-wrap items-end justify-between gap-4">
-      <div class="hud-brackets hud-acquire hud-surface max-w-lg px-4 py-3">
-        <p class="type-label text-muted">{{ eyebrow() }}</p>
-        <p data-testid="hud-title" class="mt-1 text-lg font-bold tracking-[0.04em] text-text uppercase">{{ title() }}</p>
-        @if (subtitle()) {
-          <p class="mt-0.5 text-xs text-muted">{{ subtitle() }}</p>
-        }
-        @if (readouts().length) {
-          <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-1">
-            @for (readout of readouts(); track readout.label) {
-              <div>
-                <dt class="type-label text-muted">{{ readout.label }}@if (readout.derived) {<span class="text-accent/80" aria-hidden="true">*</span>}</dt>
-                <dd class="mt-0.5 text-sm text-text tabular-nums">{{ readout.value }}</dd>
-              </div>
-            }
-          </dl>
-        }
-        @if (note() || hasDerived()) {
-          <p class="mt-3 border-t border-border/40 pt-2 text-[10px] leading-relaxed text-muted">@if (hasDerived()) {<span class="text-accent/80">*</span> Derived, not catalogued. }{{ note() }}</p>
-        }
-      </div>
-
-      <div class="hud-brackets hud-acquire hud-surface px-4 py-3 text-right">
-        <p class="type-label text-muted">Range</p>
-        <p class="mt-1 text-lg text-accent tabular-nums">{{ range() }}</p>
-      </div>
-    </div>
   `
 })
 export class StarmapHudComponent {
   readonly level = input.required<ViewLevel>();
-  /** Headline for the readout panel — the selected star, or the name of the current scale. */
+  /** What the view is holding, for the nameplate — the selected star, or nothing. */
   readonly title = input('');
-  readonly subtitle = input('');
-  readonly eyebrow = input('');
-  readonly readouts = input<readonly HudReadout[]>([]);
-  /** Standing caveat for the current view, e.g. that galactic structure is a model. */
-  readonly note = input('');
-  /** Whether any readout needs the derived-value footnote. */
-  readonly hasDerived = computed(() => this.readouts().some((readout) => readout.derived));
-
-  /** Camera range, pre-formatted by the scene, which is the only thing that knows the units. */
-  readonly range = input('');
   readonly showReticle = input(true);
 
   readonly levelSelected = output<ViewLevel>();

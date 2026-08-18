@@ -1,4 +1,4 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, ElementRef, output, signal, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { DataLoaderService } from '../../core/data/data-loader.service';
@@ -25,13 +25,17 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
   selector: 'app-search',
   imports: [ReticleIconComponent],
   template: `
-    <div class="fixed top-4 left-1/2 z-20 w-[26rem] max-w-[calc(100%-2rem)] -translate-x-1/2 font-body">
+    <!-- Sits on the dock's tab strip: the field is pinned to the bottom of the block and the
+         results grow upward above it, so typing never moves the thing being typed into. DOM
+         order stays field-then-results (flex-col-reverse), which is also the focus order. -->
+    <div class="flex flex-col-reverse font-body">
       <!-- The one genuinely translucent surface, so it alone carries a (small) backdrop blur.
            The ring is the keyboard-focus indicator: a border hue shift alone is invisible over
            the star field. -->
       <div class="hud-brackets hud-surface relative backdrop-blur-sm transition-colors focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/50">
         <app-reticle-icon class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-accent/70" />
         <input
+          #field
           type="text"
           placeholder="Search stars, planets, exoplanets…"
           [value]="query()"
@@ -42,11 +46,10 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
       </div>
 
       <!-- One panel for both outcomes, so crossing the match boundary while typing swaps only
-           the rows instead of remounting the panel and replaying its acquire wipe per
-           keystroke. Gated on the index being ready: "no matches" may only ever describe a
-           search that actually ran against the loaded catalogues. -->
+           the rows instead of remounting the panel. Gated on the index being ready: "no matches"
+           may only ever describe a search that actually ran against the loaded catalogues. -->
       @if (indexReady() && hasQuery()) {
-        <div class="hud-acquire hud-surface mt-2">
+        <div class="hud-surface mb-2">
           @if (results().length) {
             <p class="type-label border-b border-border/40 px-3 py-1.5 text-muted">
               Matches <span class="text-accent tabular-nums">{{ matchTotal() }}</span>
@@ -78,6 +81,11 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
 })
 export class SearchComponent {
   readonly query = signal('');
+  /** Fires once a result has been chosen and navigation kicked off — the dock uses it to hand
+   *  the view back to the readout, since the thing to look at is now the scene, not the box. */
+  readonly picked = output<void>();
+
+  private readonly field = viewChild.required<ElementRef<HTMLInputElement>>('field');
   /** Pre-normalised once on load; re-deriving it per keystroke would stutter the render loop. */
   private readonly index = signal<IndexedSearchEntry[]>([]);
   /** False until the catalogues have loaded — and forever if they fail, which beats a false
@@ -117,6 +125,10 @@ export class SearchComponent {
     this.query.set('');
   }
 
+  focus(): void {
+    this.field().nativeElement.focus();
+  }
+
   kindLabel(kind: SearchResultKind): string {
     return KIND_LABELS[kind];
   }
@@ -129,6 +141,7 @@ export class SearchComponent {
     } else if (result.bodyId) {
       void this.router.navigate(['/body', result.bodyId]);
     }
+    this.picked.emit();
   }
 
   private async buildIndex(): Promise<void> {

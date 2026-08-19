@@ -1,6 +1,8 @@
 import * as THREE from 'three/webgpu';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
 import { StarLabelOverlay } from './star-label-overlay';
 
 describe('StarLabelOverlay', () => {
@@ -75,6 +77,31 @@ describe('StarLabelOverlay', () => {
     overlay.update([]);
 
     expect(labels()).toHaveLength(0);
+  });
+
+  it('hangs a label on the side it is told to, and can move it across', () => {
+    overlay.update([{ id: 1, name: 'Sirius', kind: 'Star', x: 1, y: 0, z: 0, side: 'left' }]);
+    const object = scene.children[0] as CSS2DObject;
+    expect(labels()[0].classList.contains('map-label--left')).toBe(true);
+    expect(object.center.x).toBe(1);
+
+    overlay.update([{ id: 1, name: 'Sirius', kind: 'Star', x: 1, y: 0, z: 0, side: 'right' }]);
+    expect(labels()[0].classList.contains('map-label--left')).toBe(false);
+    expect(object.center.x).toBe(0);
+  });
+
+  it('brackets one selected point with the mark, moves it, and clears it', () => {
+    overlay.setSelection({ x: 1, y: 2, z: 3 });
+    overlay.setSelection({ x: 4, y: 5, z: 6 });
+    overlay.render(camera);
+    const marks = overlay.domElement.querySelectorAll('.map-select');
+    expect(marks).toHaveLength(1);
+    expect((scene.children[0] as THREE.Object3D).position.toArray()).toEqual([4, 5, 6]);
+
+    overlay.setSelection(null);
+    overlay.render(camera);
+    expect(overlay.domElement.querySelectorAll('.map-select')).toHaveLength(0);
+    expect(scene.children).toHaveLength(0);
   });
 
   it('leaves nothing behind when disposed', () => {

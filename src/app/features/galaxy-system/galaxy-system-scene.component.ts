@@ -26,7 +26,8 @@ import { DEFAULT_HUD_DISPLAY, HudDisplay, HudDockComponent, HudReadout } from '.
 import { StarmapHudComponent } from './starmap-hud.component';
 import { SystemObjectCardComponent } from './system-object-card.component';
 import { colorIndexToRgb, StarFieldRenderer, starRenderBudgetFromUrl } from './star-field-renderer';
-import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
+import { HostStarRings } from './host-star-rings';
+import { LabeledPoint, LabelSide, StarLabelOverlay } from './star-label-overlay';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
 
 /** HYG catalog id for the Sun itself — the only star we have a real close-up photo of. */
@@ -49,6 +50,13 @@ const LABEL_MAX_COUNT = 15;
  * Nearer stars win the space; see `spreadLabels`.
  */
 const LABEL_MIN_SEPARATION_NDC = 0.12;
+/** Beyond this the text of a right-hand label would run off the view: hang it on the left. */
+const LABEL_EDGE_NDC = 0.7;
+/** How far right of its point a label's text reaches, in aspect-scaled NDC (~135px at 1440). */
+const LABEL_REACH_NDC = 0.3;
+/** Radius of the selection arcs, in pixels — the leader line starts at their rim. */
+const SELECTION_RADIUS_PX = 14;
+const HUD_ACCENT = 0x4dd7ff;
 /**
  * How many deep-sky objects get a permanent label. These sit on a fixed backdrop shell rather
  * than near the camera, so proximity is meaningless for them — the brightest handful are simply
@@ -159,6 +167,11 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
       <!-- isolate: CSS2DRenderer gives every label its own z-index for depth ordering; without a
            stacking context here those indices escape and the labels paint over the HUD. -->
       <div #labelHost class="pointer-events-none absolute inset-0 isolate overflow-hidden"></div>
+      <!-- Leader from the selected body to its card, drawn in screen space and repositioned in
+           the render loop; visibility is toggled there too, so no change detection per frame. -->
+      <svg aria-hidden="true" class="pointer-events-none absolute inset-0 h-full w-full text-accent/60">
+        <line #leader x1="0" y1="0" x2="0" y2="0" stroke="currentColor" stroke-width="1" visibility="hidden" />
+      </svg>
       <app-starmap-hud [level]="navigationStore.viewLevel()" [title]="hudTitle()" (levelSelected)="goToLevel($event)" />
       @if (objectCard(); as card) {
         <app-system-object-card [body]="card" (dismissed)="dismissObjectCard()" (openRequested)="openObjectDetail(card.id)" />
@@ -180,6 +193,8 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
 export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private readonly canvasRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
   private readonly labelHostRef = viewChild.required<ElementRef<HTMLDivElement>>('labelHost');
+  private readonly leaderRef = viewChild.required<ElementRef<SVGLineElement>>('leader');
+  private readonly objectCardRef = viewChild<SystemObjectCardComponent, ElementRef<HTMLElement>>(SystemObjectCardComponent, { read: ElementRef });
 
   private readonly raycaster = new THREE.Raycaster();
   private readonly galaxyGroup = new THREE.Group();
@@ -206,10 +221,13 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private enterableSystems = 0;
   private pinnedBodyId: string | null = null;
   private hoveredBodyId: string | null = null;
+  /** The body the card is about — what the selection mark brackets and the leader line leaves. */
+  private cardBodyId: string | null = null;
 
   private controls?: OrbitControls;
   private rig?: CameraRigController;
   private starField?: StarFieldRenderer;
+  private hostRings?: HostStarRings;
   private deepSky?: DeepSkyRenderer;
   private deepSkyLabels: readonly LabeledPoint[] = [];
   /** Stars with at least one catalogued body, which are the ones the map can be flown into. */
@@ -268,6 +286,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.canvasRef().nativeElement.removeEventListener('pointermove', this.handlePointerMove);
     this.controls?.dispose();
     this.starField?.dispose();
+    this.hostRings?.dispose();
     this.deepSky?.dispose();
     this.milkyWay?.dispose();
     this.galacticGrid?.dispose();
@@ -366,6 +385,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     this.starField = new StarFieldRenderer(stars, positions, starRenderBudgetFromUrl(window.location.search));
     this.galaxyGroup.add(this.starField.object);
+    this.hostRings = new HostStarRings(stars.filter((star) => this.starIdsWithBodies.has(star.id)), HUD_ACCENT);
+    this.galaxyGroup.add(this.hostRings.object);
 
     this.milkyWay = new MilkyWayRenderer();
     this.galacticLabels = this.milkyWay.labelPoints();
@@ -445,6 +466,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     if (this.systemGroup.visible) {
       this.systemRenderer?.update(dateToJulianDate());
     }
+    this.updateSelectionMark(camera);
     this.labelOverlay?.render(camera);
   }
 
@@ -469,6 +491,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.galacticGrid?.setStrength(display.grid ? this.galacticStrength : 0);
     this.localGrid?.setStrength(display.grid ? 1 - this.galacticStrength : 0);
     this.tethers?.setStrength(display.grid ? 1 - this.galacticStrength : 0);
+    this.hostRings?.setStrength(display.systems ? 1 - this.galacticStrength : 0);
     // The backdrop shell is the sky as seen from here; from outside it, it is a wall.
     this.deepSky?.setStrength(display.deepSky ? 1 - this.galacticStrength : 0);
     // Same argument for the skybox, and more sharply: it is a photograph of the Milky Way taken
@@ -586,11 +609,69 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         continue;
       }
 
+      // Text hangs on the right unless it would run off the view there, or into the space a
+      // label already placed to the right is using; then it hangs on the left, unless *that*
+      // is off the view. A crowded centre still gets right-hand labels — the separation test
+      // above already keeps them apart.
+      const crowdedRight = placed.some(
+        (other) => other.x > point.x && other.x - point.x < LABEL_REACH_NDC && Math.abs(other.y - point.y) < LABEL_MIN_SEPARATION_NDC
+      );
+      // The body the card is about hangs its label on the left regardless: the leader line to
+      // the card leaves its right, and would otherwise run straight through the text.
+      const side: LabelSide =
+        candidate.id === this.cardBodyId || ((projected.x > LABEL_EDGE_NDC || crowdedRight) && projected.x > -LABEL_EDGE_NDC) ? 'left' : 'right';
+
       placed.push(point);
-      chosen.push(candidate);
+      chosen.push({ ...candidate, side });
     }
 
     return chosen;
+  }
+
+  /**
+   * Brackets the body the card is about with the selection arcs, and draws the leader from
+   * their rim to the card's near edge. Screen-space work done here, once per frame, because the
+   * body moves every frame and the card's height depends on its content.
+   */
+  private updateSelectionMark(camera: THREE.PerspectiveCamera): void {
+    const leader = this.leaderRef().nativeElement;
+    const member = this.systemGroup.visible && this.cardBodyId !== null ? this.systemRenderer?.members.find((candidate) => candidate.id === this.cardBodyId) : undefined;
+    if (!member) {
+      this.labelOverlay?.setSelection(null);
+      leader.setAttribute('visibility', 'hidden');
+      return;
+    }
+
+    const world = member.marker.getWorldPosition(new THREE.Vector3());
+    this.labelOverlay?.setSelection(world);
+
+    const card = this.objectCardRef()?.nativeElement.querySelector('[data-testid="object-card"]');
+    const canvas = this.canvasRef().nativeElement;
+    const projected = world.clone().project(camera);
+    if (!card || projected.z > 1) {
+      leader.setAttribute('visibility', 'hidden');
+      return;
+    }
+    const canvasRect = canvas.getBoundingClientRect();
+    const cardRect = card.getBoundingClientRect();
+    const fromX = ((projected.x + 1) / 2) * canvas.clientWidth;
+    const fromY = ((1 - projected.y) / 2) * canvas.clientHeight;
+    // The card is top-right: meet its left edge, at the body's height where the edge allows.
+    const toX = cardRect.left - canvasRect.left;
+    const toY = Math.min(Math.max(fromY, cardRect.top - canvasRect.top + 12), cardRect.bottom - canvasRect.top - 12);
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const length = Math.hypot(dx, dy);
+    if (length <= SELECTION_RADIUS_PX) {
+      leader.setAttribute('visibility', 'hidden');
+      return;
+    }
+    // Start on the arcs' rim, not the body's centre.
+    leader.setAttribute('x1', String(fromX + (dx / length) * SELECTION_RADIUS_PX));
+    leader.setAttribute('y1', String(fromY + (dy / length) * SELECTION_RADIUS_PX));
+    leader.setAttribute('x2', String(toX));
+    leader.setAttribute('y2', String(toY));
+    leader.setAttribute('visibility', 'visible');
   }
 
   /**
@@ -814,6 +895,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   /** A pinned body wins over a hovered one, so the card does not change under the pointer. */
   private refreshObjectCard(): void {
     const id = this.pinnedBodyId ?? this.hoveredBodyId;
+    this.cardBodyId = id;
     this.objectCard.set(id === null ? undefined : buildBodyViewModel(id, { bodies: this.bodies, exoplanets: this.exoplanets, stars: this.stars }));
   }
 
@@ -821,6 +903,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private clearObjectCard(): void {
     this.pinnedBodyId = null;
     this.hoveredBodyId = null;
+    this.cardBodyId = null;
     this.objectCard.set(undefined);
     this.canvasRef().nativeElement.style.cursor = '';
   }

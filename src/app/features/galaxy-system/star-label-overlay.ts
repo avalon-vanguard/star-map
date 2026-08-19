@@ -15,10 +15,26 @@ export interface LabeledPoint {
    * is called.
    */
   kind?: string;
+  /**
+   * Which side of the point the text hangs on. Right is the default; left is for a point close
+   * to the right edge of the view, or one whose right-hand text would run into a neighbour's.
+   */
+  side?: LabelSide;
   x: number;
   y: number;
   z: number;
 }
+
+export type LabelSide = 'left' | 'right';
+
+/** Where the selection mark sits, in the same scene units as the labels. */
+export interface SelectionPoint {
+  x: number;
+  y: number;
+  z: number;
+}
+
+const SIDE_CLASS: Record<LabelSide, string> = { right: 'map-label', left: 'map-label map-label--left' };
 
 /**
  * Renders DOM-based (CSS2D) name labels anchored to 3D star positions. Labels are added as
@@ -31,6 +47,7 @@ export class StarLabelOverlay {
 
   private readonly cssRenderer = new CSS2DRenderer();
   private readonly labelObjects = new Map<number | string, CSS2DObject>();
+  private selection?: CSS2DObject;
 
   constructor(private readonly scene: THREE.Scene) {
     this.cssRenderer.domElement.classList.add('star-label-layer');
@@ -61,10 +78,36 @@ export class StarLabelOverlay {
       const existing = this.labelObjects.get(point.id);
       if (existing) {
         existing.position.set(point.x, point.y, point.z);
+        this.applySide(existing, point.side ?? 'right');
       } else {
         this.addLabel(point);
       }
     }
+  }
+
+  /**
+   * Marks the selected object in the scene: two thin arcs bracketing the point, the one thing
+   * borrowed from the ARK's control disc. `null` clears it. Kept out of `update` because it is
+   * a different rhythm — labels change on their own cadence, the mark follows a moving body
+   * every frame.
+   */
+  setSelection(point: SelectionPoint | null): void {
+    if (!point) {
+      if (this.selection) {
+        this.scene.remove(this.selection);
+        this.selection.element.remove();
+        this.selection = undefined;
+      }
+      return;
+    }
+    if (!this.selection) {
+      const element = document.createElement('div');
+      element.className = 'map-select';
+      element.setAttribute('aria-hidden', 'true');
+      this.selection = new CSS2DObject(element);
+      this.scene.add(this.selection);
+    }
+    this.selection.position.set(point.x, point.y, point.z);
   }
 
   render(camera: THREE.Camera): void {
@@ -75,6 +118,7 @@ export class StarLabelOverlay {
     for (const [id, object] of this.labelObjects) {
       this.removeLabel(id, object);
     }
+    this.setSelection(null);
   }
 
   private addLabel(point: LabeledPoint): void {
@@ -83,7 +127,7 @@ export class StarLabelOverlay {
     // (see the class comment above). The offset and leader line live in `.map-label` itself:
     // CSS2DRenderer rewrites this element's inline transform every frame, so a translate here
     // would be overwritten — the margin is the offset it cannot touch.
-    element.className = 'map-label whitespace-nowrap font-body';
+    element.className = `${SIDE_CLASS[point.side ?? 'right']} whitespace-nowrap font-body`;
 
     const name = document.createElement('span');
     name.className = 'map-label-name';
@@ -98,14 +142,23 @@ export class StarLabelOverlay {
     }
 
     const object = new CSS2DObject(element);
-    // Anchor the label's left edge at the point, vertically centred. The default center of
+    // Anchor the label's near edge at the point, vertically centred. The default center of
     // (0.5, 0.5) makes CSS2DRenderer emit translate(-50%,-50%), keeping the box centred on the
     // star — under which `.map-label`'s margin offset only nudges the centred box sideways and
     // the leader line points at empty space half the label's width from the star.
-    object.center.set(0, 0.5);
+    this.applySide(object, point.side ?? 'right');
     object.position.set(point.x, point.y, point.z);
     this.scene.add(object);
     this.labelObjects.set(point.id, object);
+  }
+
+  /** Right-hand text hangs its left edge on the point; left-hand text hangs its right edge. */
+  private applySide(object: CSS2DObject, side: LabelSide): void {
+    object.center.set(side === 'left' ? 1 : 0, 0.5);
+    const wanted = `${SIDE_CLASS[side]} whitespace-nowrap font-body`;
+    if (object.element.className !== wanted) {
+      object.element.className = wanted;
+    }
   }
 
   private removeLabel(id: number | string, object: CSS2DObject): void {

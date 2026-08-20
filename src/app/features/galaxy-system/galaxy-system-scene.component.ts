@@ -13,7 +13,6 @@ import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { applyMilkyWaySkybox, createGlowSprite } from '../../shared/rendering/skybox';
 import { loadCachedTexture, MILKY_WAY_SKYBOX_PATH, SUN_TEXTURE_PATH } from '../../shared/rendering/texture-catalog';
 import { StarRecord } from '../../shared/models/star.model';
-import { Bookmark } from '../../shared/state/bookmarks.store';
 import { NavigationStore, ViewLevel } from '../../shared/state/navigation.store';
 import { CameraRigController } from './camera-rig-controller';
 import { DeepSkyRenderer } from './deep-sky-renderer';
@@ -226,14 +225,12 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
         [routeResult]="routeResult()"
         [routeOptions]="routeOptions()"
         [currentStar]="currentStarOption()"
-        [keepableStarId]="navigationStore.selectedStarId()"
         defaultTab="readout"
         (displayChange)="display.set($event)"
         (routeQuery)="onRouteQuery($event)"
         (routeRequested)="onRouteRequested($event)"
         (routeStarSelected)="navigationStore.selectStar($event)"
         (jumpRangeChange)="jumpRangePc.set($event)"
-        (bookmarkChosen)="goToBookmark($event)"
       />
     </div>
   `
@@ -1205,15 +1202,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
   dismissObjectCard(): void {
     this.clearObjectCard();
-  }
-
-  /** A kept place, revisited: a star is a system to fly into, a body is a page to open. */
-  goToBookmark(bookmark: Bookmark): void {
-    if (bookmark.kind === 'star') {
-      this.navigationStore.selectStar(Number(bookmark.id));
-    } else {
-      this.openObjectDetail(String(bookmark.id));
-    }
   }
 
   /** The deliberate step out to the dedicated route, from the card's own control. */

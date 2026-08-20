@@ -3,7 +3,6 @@ import { Router } from '@angular/router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DataLoaderService } from '../../core/data/data-loader.service';
-import { BookmarksStore } from '../../shared/state/bookmarks.store';
 import { DEFAULT_HUD_DISPLAY, HudDisplay, HudDockComponent } from './hud-dock.component';
 
 class EmptyDataLoaderService {
@@ -47,7 +46,6 @@ describe('HudDockComponent', () => {
   }
 
   beforeEach(async () => {
-    localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [HudDockComponent],
       providers: [
@@ -58,10 +56,9 @@ describe('HudDockComponent', () => {
     fixture = TestBed.createComponent(HudDockComponent);
   });
 
-  it('offers the search and what has been kept, when it has nothing else', () => {
-    // Bookmarks are always offered: it is the only place that says the map can keep anything.
+  it('offers only the search when it has nothing to read out and no layers', () => {
     fixture.detectChanges();
-    expect(tabNames()).toEqual(['Search', 'Bookmarks']);
+    expect(tabNames()).toEqual(['Search']);
     expect(host().querySelector('[role="tabpanel"]')).toBeNull();
   });
 
@@ -69,11 +66,11 @@ describe('HudDockComponent', () => {
     setReadout();
     fixture.componentRef.setInput('display', DEFAULT_HUD_DISPLAY);
     fixture.detectChanges();
-    expect(tabNames()).toEqual(['Search', 'Readout', 'Bookmarks', 'Display']);
+    expect(tabNames()).toEqual(['Search', 'Readout', 'Display']);
 
     fixture.componentRef.setInput('routing', true);
     fixture.detectChanges();
-    expect(tabNames()).toEqual(['Search', 'Readout', 'Routes', 'Bookmarks', 'Display']);
+    expect(tabNames()).toEqual(['Search', 'Readout', 'Routes', 'Display']);
   });
 
   it('opens the default tab on mount and renders the readout from its inputs', () => {
@@ -142,80 +139,6 @@ describe('HudDockComponent', () => {
     fixture.detectChanges();
     const pressed = [...host().querySelectorAll('[aria-pressed]')].map((b) => `${b.textContent?.trim()}=${b.getAttribute('aria-pressed')}`);
     expect(pressed).toEqual(['Labels=true', 'Orbits=true', 'Grid=false', 'Deep sky=true', 'Sky=true', 'Systems=true', 'Jump links=false']);
-  });
-
-  it('says how to keep a place, rather than showing an empty list', () => {
-    fixture.componentRef.setInput('defaultTab', 'bookmarks');
-    fixture.detectChanges();
-
-    expect(host().querySelector('#dock-panel-bookmarks ul')).toBeNull();
-    expect(host().textContent).toContain('Nothing kept yet');
-  });
-
-  it('lists what has been kept, newest first, and says which kind each is', () => {
-    const bookmarks = TestBed.inject(BookmarksStore);
-    bookmarks.toggle({ kind: 'star', id: 7, name: 'Sirius' });
-    bookmarks.toggle({ kind: 'body', id: 'earth', name: 'Earth' });
-    fixture.componentRef.setInput('defaultTab', 'bookmarks');
-    fixture.detectChanges();
-
-    const rows = [...host().querySelectorAll('#dock-panel-bookmarks li')].map((li) => li.textContent?.replace(/\s+/g, ' ').trim());
-    expect(rows[0]).toContain('Earth');
-    expect(rows[0]).toContain('Body');
-    expect(rows[1]).toContain('Sirius');
-    expect(rows[1]).toContain('System');
-  });
-
-  it('hands back the place that was chosen, whole', () => {
-    const bookmarks = TestBed.inject(BookmarksStore);
-    bookmarks.toggle({ kind: 'star', id: 7, name: 'Sirius' });
-    fixture.componentRef.setInput('defaultTab', 'bookmarks');
-    fixture.detectChanges();
-    const chosen: unknown[] = [];
-    fixture.componentInstance.bookmarkChosen.subscribe((bookmark) => chosen.push(bookmark));
-
-    host().querySelector<HTMLButtonElement>('#dock-panel-bookmarks li button')?.click();
-
-    expect(chosen).toEqual([{ kind: 'star', id: 7, name: 'Sirius' }]);
-  });
-
-  it('forgets one without disturbing the rest', () => {
-    const bookmarks = TestBed.inject(BookmarksStore);
-    bookmarks.toggle({ kind: 'star', id: 7, name: 'Sirius' });
-    bookmarks.toggle({ kind: 'body', id: 'earth', name: 'Earth' });
-    fixture.componentRef.setInput('defaultTab', 'bookmarks');
-    fixture.detectChanges();
-
-    host().querySelector<HTMLButtonElement>('[aria-label="Forget Earth"]')?.click();
-    fixture.detectChanges();
-
-    expect(bookmarks.bookmarks().map((bookmark) => bookmark.name)).toEqual(['Sirius']);
-    expect(host().textContent).not.toContain('Earth');
-  });
-
-  it('keeps the star the readout is about, and says so on the control', () => {
-    const bookmarks = TestBed.inject(BookmarksStore);
-    setReadout();
-    fixture.componentRef.setInput('title', 'Sirius');
-    fixture.componentRef.setInput('keepableStarId', 7);
-    fixture.componentRef.setInput('defaultTab', 'readout');
-    fixture.detectChanges();
-
-    const keep = host().querySelector<HTMLButtonElement>('[aria-label="Keep Sirius"]');
-    expect(keep?.getAttribute('aria-pressed')).toBe('false');
-    keep?.click();
-    fixture.detectChanges();
-
-    expect(bookmarks.has('star', 7)).toBe(true);
-    expect(host().querySelector('[aria-label="Forget Sirius"]')?.getAttribute('aria-pressed')).toBe('true');
-  });
-
-  it('offers nothing to keep where the readout is a scale rather than a place', () => {
-    setReadout();
-    fixture.componentRef.setInput('defaultTab', 'readout');
-    fixture.detectChanges();
-
-    expect(host().querySelector('[aria-label^="Keep"]')).toBeNull();
   });
 
   it('opens the search on "/" from anywhere but a text field', () => {

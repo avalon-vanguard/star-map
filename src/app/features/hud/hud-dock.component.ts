@@ -1,7 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, ElementRef, HostListener, inject, input, OnInit, output, signal, viewChild } from '@angular/core';
 
-import { Bookmark, BookmarksStore } from '../../shared/state/bookmarks.store';
-import { BookmarkIconComponent } from '../../shared/ui/bookmark-icon.component';
 import { SearchComponent } from '../search/search.component';
 import { RouteRequest, RouteResult, RoutesPanelComponent, RouteStarOption } from './routes-panel.component';
 
@@ -41,9 +39,9 @@ const DISPLAY_LAYERS: readonly { key: keyof HudDisplay; label: string }[] = [
   { key: 'jumpLinks', label: 'Jump links' }
 ];
 
-export type DockTab = 'search' | 'readout' | 'routes' | 'bookmarks' | 'display';
+export type DockTab = 'search' | 'readout' | 'routes' | 'display';
 
-const TAB_LABELS: Record<DockTab, string> = { search: 'Search', readout: 'Readout', routes: 'Routes', bookmarks: 'Bookmarks', display: 'Display' };
+const TAB_LABELS: Record<DockTab, string> = { search: 'Search', readout: 'Readout', routes: 'Routes', display: 'Display' };
 
 /** Tailwind's `sm` breakpoint: below it the dock is a bare tab strip and its panel is a sheet. */
 const WIDE_VIEWPORT = '(min-width: 640px)';
@@ -70,7 +68,7 @@ function isWideViewport(): boolean {
 @Component({
   selector: 'app-hud-dock',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BookmarkIconComponent, RoutesPanelComponent, SearchComponent],
+  imports: [RoutesPanelComponent, SearchComponent],
   host: { class: 'pointer-events-none fixed inset-x-2 bottom-2 z-20 block font-body sm:inset-x-6 sm:bottom-6' },
   template: `
     <!-- The column is transparent to the pointer and each surface in it opts back in: it is as
@@ -89,21 +87,7 @@ function isWideViewport(): boolean {
           @case ('readout') {
             <section id="dock-panel-readout" role="tabpanel" aria-labelledby="dock-tab-readout" class="hud-acquire hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-lg px-4 py-3">
               <p class="type-label text-muted">{{ eyebrow() }}</p>
-              <div class="mt-1 flex items-start gap-2">
-                <p data-testid="hud-title" class="min-w-0 flex-1 text-lg font-bold tracking-[0.04em] text-text uppercase">{{ title() }}</p>
-                @if (keepableStarId(); as starId) {
-                  <button
-          type="button"
-          [attr.aria-label]="(bookmarks.has('star', starId) ? 'Forget ' : 'Keep ') + title()"
-          [attr.aria-pressed]="bookmarks.has('star', starId)"
-          (click)="bookmarks.toggle({ kind: 'star', id: starId, name: title() })"
-          class="shrink-0 p-1 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
-          [class]="bookmarks.has('star', starId) ? 'text-accent' : 'text-muted hover:text-accent'"
-        >
-          <app-bookmark-icon class="h-3.5 w-3.5" [kept]="bookmarks.has('star', starId)" />
-        </button>
-                }
-              </div>
+              <p data-testid="hud-title" class="mt-1 text-lg font-bold tracking-[0.04em] text-text uppercase">{{ title() }}</p>
               @if (subtitle()) {
                 <p class="mt-0.5 text-xs text-muted">{{ subtitle() }}</p>
               }
@@ -133,40 +117,6 @@ function isWideViewport(): boolean {
                 (starSelected)="onRouteStarSelected($event)"
                 (rangeChange)="jumpRangeChange.emit($event)"
               />
-            </section>
-          }
-          @case ('bookmarks') {
-            <section id="dock-panel-bookmarks" role="tabpanel" aria-labelledby="dock-tab-bookmarks" class="hud-acquire hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-lg">
-              @if (bookmarks.bookmarks().length) {
-                <ul class="max-h-64 divide-y divide-border/25 overflow-y-auto">
-                  @for (bookmark of bookmarks.bookmarks(); track bookmark.kind + ':' + bookmark.id) {
-                    <li class="flex items-stretch">
-                      <button
-                        type="button"
-                        (click)="onBookmarkChosen(bookmark)"
-                        class="flex min-w-0 flex-1 items-baseline gap-3 px-3 py-2 text-left transition-colors hover:bg-accent/8 focus-visible:bg-accent/12 focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
-                      >
-                        <span class="min-w-0 flex-1 truncate text-sm text-text">{{ bookmark.name }}</span>
-                        <span class="type-label shrink-0 text-muted">{{ bookmark.kind === 'star' ? 'System' : 'Body' }}</span>
-                      </button>
-                      <button
-                        type="button"
-                        [attr.aria-label]="'Forget ' + bookmark.name"
-                        (click)="bookmarks.remove(bookmark.kind, bookmark.id)"
-                        class="shrink-0 border-l border-border/25 px-3 text-muted transition-colors hover:bg-accent/8 hover:text-accent focus-visible:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
-                      >
-                        <svg class="h-3 w-3" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
-                          <path d="M3 3l8 8M11 3l-8 8" />
-                        </svg>
-                      </button>
-                    </li>
-                  }
-                </ul>
-              } @else {
-                <p class="px-3 py-3 text-sm text-muted">
-                  Nothing kept yet. The <app-bookmark-icon class="inline-block h-3.5 w-3.5 -mb-0.5 text-accent" /> on a readout or a body keeps it here, in this browser.
-                </p>
-              }
             </section>
           }
           @case ('display') {
@@ -237,8 +187,6 @@ export class HudDockComponent implements OnInit {
   readonly routeResult = input<RouteResult | null>(null);
   readonly routeOptions = input<readonly RouteStarOption[]>([]);
   readonly currentStar = input<RouteStarOption | null>(null);
-  /** The star the readout is about, where there is one to keep — a scale is not a place. */
-  readonly keepableStarId = input<number | null>(null);
   /** Present makes the Routes tab available; absent means this surface cannot route. */
   readonly routing = input(false);
 
@@ -247,7 +195,6 @@ export class HudDockComponent implements OnInit {
   readonly routeRequested = output<RouteRequest>();
   readonly routeStarSelected = output<number>();
   readonly jumpRangeChange = output<number>();
-  readonly bookmarkChosen = output<Bookmark>();
 
   readonly layers = DISPLAY_LAYERS;
   readonly hasDerived = computed(() => this.readouts().some((readout) => readout.derived));
@@ -255,15 +202,10 @@ export class HudDockComponent implements OnInit {
     'search',
     ...(this.title() ? (['readout'] as const) : []),
     ...(this.routing() ? (['routes'] as const) : []),
-    // Always offered, even with nothing in it: it is the only place that says the map can keep
-    // anything at all, and a tab that appears once you already know is a tab that never taught.
-    'bookmarks',
     ...(this.display() ? (['display'] as const) : [])
   ]);
 
   readonly activeTab = signal<DockTab | null>(null);
-
-  readonly bookmarks = inject(BookmarksStore);
 
   private readonly search = viewChild(SearchComponent);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -294,13 +236,6 @@ export class HudDockComponent implements OnInit {
   /** A step on a plotted route was chosen: fly there, and leave the route up to walk it from. */
   onRouteStarSelected(starId: number): void {
     this.routeStarSelected.emit(starId);
-  }
-
-  /** Choosing a kept place is the same move as choosing a search result: the panel has done
-   *  its job and the thing to look at is now the scene. */
-  onBookmarkChosen(bookmark: Bookmark): void {
-    this.bookmarkChosen.emit(bookmark);
-    this.onPicked();
   }
 
   onPicked(): void {

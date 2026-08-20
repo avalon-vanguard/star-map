@@ -87,8 +87,13 @@ body {
 
 /* The one authored moment: a panel doesn't fade in, it acquires — wiping down under an
  * exponential ease-out the way a readout fills once an instrument locks onto a target. */
+/* `backwards`, not `both`: `both` leaves the final keyframe applied for good, and that keyframe
+ * carries a clip-path — which goes on clipping the panel's own box forever after, so anything
+ * that has to escape it (a dropdown opening upward, a tooltip) is cut away and cannot even be
+ * clicked. `backwards` holds the opening frame before the wipe and lets the element return to
+ * its own styles after it. */
 @utility hud-acquire {
-  animation: hud-acquire 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: hud-acquire 380ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 @keyframes hud-acquire {

@@ -67,6 +67,10 @@ describe('HudDockComponent', () => {
     fixture.componentRef.setInput('display', DEFAULT_HUD_DISPLAY);
     fixture.detectChanges();
     expect(tabNames()).toEqual(['Search', 'Readout', 'Display']);
+
+    fixture.componentRef.setInput('routing', true);
+    fixture.detectChanges();
+    expect(tabNames()).toEqual(['Search', 'Readout', 'Routes', 'Display']);
   });
 
   it('opens the default tab on mount and renders the readout from its inputs', () => {
@@ -134,7 +138,7 @@ describe('HudDockComponent', () => {
     fixture.componentRef.setInput('defaultTab', 'display');
     fixture.detectChanges();
     const pressed = [...host().querySelectorAll('[aria-pressed]')].map((b) => `${b.textContent?.trim()}=${b.getAttribute('aria-pressed')}`);
-    expect(pressed).toEqual(['Labels=true', 'Orbits=true', 'Grid=false', 'Deep sky=true', 'Sky=true', 'Systems=true']);
+    expect(pressed).toEqual(['Labels=true', 'Orbits=true', 'Grid=false', 'Deep sky=true', 'Sky=true', 'Systems=true', 'Jump links=false']);
   });
 
   it('opens the search on "/" from anywhere but a text field', () => {

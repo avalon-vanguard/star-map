@@ -1,6 +1,8 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { Router } from '@angular/router';
 
+import { BookmarksStore } from '../../shared/state/bookmarks.store';
+import { BookmarkIconComponent } from '../../shared/ui/bookmark-icon.component';
 import { ChevronIconComponent } from '../../shared/ui/chevron-icon.component';
 import { bodyReadouts } from './body-readouts';
 import { BodyDetailViewModel } from './body-detail.model';
@@ -17,7 +19,7 @@ import { ReadoutSectionsComponent } from './readout-sections.component';
  */
 @Component({
   selector: 'app-info-panel',
-  imports: [ChevronIconComponent, ReadoutSectionsComponent],
+  imports: [BookmarkIconComponent, ChevronIconComponent, ReadoutSectionsComponent],
   template: `
     <!-- Top-right, clear of the dock along the bottom; nothing else shares the top edge here. -->
     <div class="hud-brackets hud-acquire hud-surface absolute top-4 right-4 w-80 max-w-[calc(100%-2rem)] font-body text-text">
@@ -30,9 +32,21 @@ import { ReadoutSectionsComponent } from './readout-sections.component';
         System
       </button>
 
-      <header class="px-4 pt-4 pb-3">
-        <h1 class="truncate text-lg leading-tight font-bold tracking-[0.04em] text-text uppercase">{{ body().name }}</h1>
-        <p class="type-eyebrow mt-1 truncate text-accent">{{ readouts().kindLabel }} · {{ body().hostStarName }}</p>
+      <header class="flex items-start gap-2 px-4 pt-4 pb-3">
+        <div class="min-w-0 flex-1">
+          <h1 class="truncate text-lg leading-tight font-bold tracking-[0.04em] text-text uppercase">{{ body().name }}</h1>
+          <p class="type-eyebrow mt-1 truncate text-accent">{{ readouts().kindLabel }} · {{ body().hostStarName }}</p>
+        </div>
+        <button
+          type="button"
+          [attr.aria-label]="(bookmarks.has('body', body().id) ? 'Forget ' : 'Keep ') + body().name"
+          [attr.aria-pressed]="bookmarks.has('body', body().id)"
+          (click)="bookmarks.toggle({ kind: 'body', id: body().id, name: body().name })"
+          class="shrink-0 p-1 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+          [class]="bookmarks.has('body', body().id) ? 'text-accent' : 'text-muted hover:text-accent'"
+        >
+          <app-bookmark-icon class="h-3.5 w-3.5" [kept]="bookmarks.has('body', body().id)" />
+        </button>
       </header>
 
       <app-readout-sections [readouts]="readouts()" />
@@ -41,6 +55,8 @@ import { ReadoutSectionsComponent } from './readout-sections.component';
 })
 export class InfoPanelComponent {
   readonly body = input.required<BodyDetailViewModel>();
+
+  readonly bookmarks = inject(BookmarksStore);
 
   readonly readouts = computed(() => bodyReadouts(this.body()));
 

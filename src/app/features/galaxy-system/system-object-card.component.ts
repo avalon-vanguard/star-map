@@ -1,7 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 
 import { BodyDetailViewModel } from '../body-detail/body-detail.model';
 import { bodyReadouts } from '../body-detail/body-readouts';
+import { BookmarksStore } from '../../shared/state/bookmarks.store';
+import { BookmarkIconComponent } from '../../shared/ui/bookmark-icon.component';
 import { ReadoutSectionsComponent } from '../body-detail/readout-sections.component';
 import { ChevronIconComponent } from '../../shared/ui/chevron-icon.component';
 
@@ -19,7 +21,7 @@ import { ChevronIconComponent } from '../../shared/ui/chevron-icon.component';
 @Component({
   selector: 'app-system-object-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ChevronIconComponent, ReadoutSectionsComponent],
+  imports: [BookmarkIconComponent, ChevronIconComponent, ReadoutSectionsComponent],
   // Positioned and full-bleed like the HUD's own host, so the panel inside it resolves against
   // the scene rather than against whatever box the inline default would have left it in — which
   // put the card off the bottom-left corner of the viewport entirely.
@@ -36,6 +38,16 @@ import { ChevronIconComponent } from '../../shared/ui/chevron-icon.component';
             <p class="truncate text-lg leading-tight font-bold tracking-[0.04em] text-text uppercase">{{ body().name }}</p>
             <p class="type-eyebrow mt-1 truncate text-accent">{{ readouts().kindLabel }} · {{ body().hostStarName }}</p>
           </header>
+          <button
+            type="button"
+            [attr.aria-label]="(bookmarks.has('body', body().id) ? 'Forget ' : 'Keep ') + body().name"
+            [attr.aria-pressed]="bookmarks.has('body', body().id)"
+            (click)="bookmarks.toggle({ kind: 'body', id: body().id, name: body().name })"
+            class="shrink-0 p-1 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+            [class]="bookmarks.has('body', body().id) ? 'text-accent' : 'text-muted hover:text-accent'"
+          >
+            <app-bookmark-icon class="h-3.5 w-3.5" [kept]="bookmarks.has('body', body().id)" />
+          </button>
           <button
             type="button"
             (click)="dismissed.emit()"
@@ -68,6 +80,8 @@ export class SystemObjectCardComponent {
   readonly dismissed = output<void>();
   /** Request for the full `/body/:id` route. */
   readonly openRequested = output<void>();
+
+  readonly bookmarks = inject(BookmarksStore);
 
   readonly readouts = computed(() => bodyReadouts(this.body()));
 }

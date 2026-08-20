@@ -181,6 +181,10 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
   template: `
     <div class="relative h-full w-full">
       <canvas #canvas data-testid="scene-canvas" class="block h-full w-full"></canvas>
+      <!-- Between the canvas and the labels, not up in the HUD where it used to live: everything
+           in this stack paints in tree order, so from there a decorative gradient was laid over
+           the names near the edge of the frame — which is exactly where the neighbour ring is. -->
+      <div aria-hidden="true" class="hud-vignette pointer-events-none absolute inset-0"></div>
       <!-- isolate: CSS2DRenderer gives every label its own z-index for depth ordering; without a
            stacking context here those indices escape and the labels paint over the HUD. -->
       <div #labelHost class="pointer-events-none absolute inset-0 isolate overflow-hidden"></div>
@@ -709,31 +713,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     leader.setAttribute('visibility', 'visible');
   }
 
-  /**
-   * Names the bodies of the system the view is inside.
-   *
-   * Outermost first, because that is the order that survives the separation test usefully: with
-   * the whole system in frame the outer planets are the ones far enough apart to label, and the
-   * inner four are a single clump around the star. Closing in reverses it on its own — the outer
-   * orbits leave the frame and their labels drop out, freeing the space for the inner planets.
-   *
-   * Moons are left out entirely: they sit within a marker's width of their planet at system
-   * framing, so their labels could only ever print on top of it.
-   */
-  /**
-   * Names the stars nearest the one the camera is inside, each on the side of the view its own
-   * lies on. It is the one thing a system view cannot otherwise say: which way its neighbours
-   * are, and how far. Each is a button that flies there, so a chain of neighbours can be walked
-   * without pulling back out to the field between hops.
-   *
-   * These are bearings, not sky positions, and are drawn as such: a ring of names at a fixed
-   * radius from the centre of the frame, which reads as instrument rather than as scene. The
-   * true position cannot be drawn — the nearest star to the Sun is 268 000 AU away, thirteen
-   * times the far plane — and a true *direction* is worse than useless here: at this field of
-   * view, three neighbours in four fall outside the frame entirely, so the view would name
-   * whichever happened to be in front and stay silent about the rest. What survives the ring is
-   * the half of the direction that a viewer can act on: which way to turn to face it.
-   */
   /** Resolves the current system's neighbours once, on arrival. Cleared outside a system. */
   private resolveNeighbours(): void {
     const origin = this.currentStarId === null ? undefined : this.starsById.get(this.currentStarId);
@@ -742,7 +721,13 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.neighbours = this.neighbourhood
-      .nearest(origin.id, NEIGHBOUR_COUNT)
+      // Asked wide and cut back, because a catalogue holds binary companions as two rows at one
+      // position: a neighbour whose separation rounds to what no separation prints as is not a
+      // place to go, it is the same place. Compared through the formatter rather than against a
+      // hand-picked epsilon, so the rule stays "would print as zero" whatever the formatter does.
+      .nearest(origin.id, NEIGHBOUR_COUNT * 2)
+      .filter((neighbour) => formatParsecs(neighbour.distancePc) !== formatParsecs(0))
+      .slice(0, NEIGHBOUR_COUNT)
       .flatMap((neighbour) => {
         const star = this.starsById.get(neighbour.id);
         return star
@@ -848,6 +833,17 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  /**
+   * Names the bodies of the system the view is inside.
+   *
+   * Outermost first, because that is the order that survives the separation test usefully: with
+   * the whole system in frame the outer planets are the ones far enough apart to label, and the
+   * inner four are a single clump around the star. Closing in reverses it on its own — the outer
+   * orbits leave the frame and their labels drop out, freeing the space for the inner planets.
+   *
+   * Moons are left out entirely: they sit within a marker's width of their planet at system
+   * framing, so their labels could only ever print on top of it.
+   */
   private updateSystemLabels(camera: THREE.PerspectiveCamera): void {
     const renderer = this.systemRenderer;
     if (!renderer) {

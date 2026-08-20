@@ -152,13 +152,13 @@ describe('StarFieldRenderer', () => {
     it('finds the star under the pointer', () => {
       const renderer = new StarFieldRenderer(picked, packPositions(picked));
       // Both Near and Far project to the screen centre; either is a correct hit.
-      expect([1, 2]).toContain(renderer.pickAt(new THREE.Vector2(0, 0), camera));
+      expect([1, 2]).toContain(renderer.pickAt(new THREE.Vector2(0, 0), camera, camera.aspect));
       renderer.dispose();
     });
 
     it('returns undefined when the pointer is on empty sky', () => {
       const renderer = new StarFieldRenderer(picked, packPositions(picked));
-      expect(renderer.pickAt(new THREE.Vector2(-0.9, 0.9), camera)).toBeUndefined();
+      expect(renderer.pickAt(new THREE.Vector2(-0.9, 0.9), camera, camera.aspect)).toBeUndefined();
       renderer.dispose();
     });
 
@@ -168,7 +168,7 @@ describe('StarFieldRenderer', () => {
       const behind = [star({ id: 7, x: 0, y: 0, z: 10 })];
       const renderer = new StarFieldRenderer(behind, packPositions(behind));
 
-      expect(renderer.pickAt(new THREE.Vector2(0, 0), camera)).toBeUndefined();
+      expect(renderer.pickAt(new THREE.Vector2(0, 0), camera, camera.aspect)).toBeUndefined();
       renderer.dispose();
     });
 
@@ -182,7 +182,7 @@ describe('StarFieldRenderer', () => {
 
       // Aim at where star 2 projects, and confirm we get it rather than its neighbours.
       const target = new THREE.Vector3(0, 2, -10).project(camera);
-      expect(renderer.pickAt(new THREE.Vector2(target.x, target.y), camera)).toBe(2);
+      expect(renderer.pickAt(new THREE.Vector2(target.x, target.y), camera, camera.aspect)).toBe(2);
       renderer.dispose();
     });
 
@@ -195,7 +195,7 @@ describe('StarFieldRenderer', () => {
       // Walk outward from the centre until each stops being pickable.
       const reach = (renderer: StarFieldRenderer): number => {
         let offset = 0;
-        while (offset < 1 && renderer.pickAt(new THREE.Vector2(0, offset), camera) !== undefined) {
+        while (offset < 1 && renderer.pickAt(new THREE.Vector2(0, offset), camera, camera.aspect) !== undefined) {
           offset += 0.001;
         }
         return offset;
@@ -212,13 +212,13 @@ describe('StarFieldRenderer', () => {
       const faint = [star({ id: 5, x: 0, y: 0, z: -10, magnitude: 15 })];
       const renderer = new StarFieldRenderer(faint, packPositions(faint));
 
-      expect(renderer.pickAt(new THREE.Vector2(0, 0.005), camera)).toBe(5);
+      expect(renderer.pickAt(new THREE.Vector2(0, 0.005), camera, camera.aspect)).toBe(5);
       renderer.dispose();
     });
 
     it('finds nothing in an empty field', () => {
       const renderer = new StarFieldRenderer([], new Float32Array(0));
-      expect(renderer.pickAt(new THREE.Vector2(0, 0), camera)).toBeUndefined();
+      expect(renderer.pickAt(new THREE.Vector2(0, 0), camera, camera.aspect)).toBeUndefined();
       renderer.dispose();
     });
   });

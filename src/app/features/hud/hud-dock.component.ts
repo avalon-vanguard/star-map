@@ -27,9 +27,11 @@ export interface HudDisplay {
   readonly systems: boolean;
   /** The graph of crossings within the range the Routes panel is set to. */
   readonly jumpLinks: boolean;
+  /** Drawn flat: an orthographic projection, looking down on the plane. */
+  readonly plan: boolean;
 }
 
-export const DEFAULT_HUD_DISPLAY: HudDisplay = { labels: true, orbits: true, grid: true, deepSky: true, sky: true, systems: true, jumpLinks: false };
+export const DEFAULT_HUD_DISPLAY: HudDisplay = { labels: true, orbits: true, grid: true, deepSky: true, sky: true, systems: true, jumpLinks: false, plan: false };
 
 const DISPLAY_LAYERS: readonly { key: keyof HudDisplay; label: string }[] = [
   { key: 'labels', label: 'Labels' },
@@ -38,7 +40,8 @@ const DISPLAY_LAYERS: readonly { key: keyof HudDisplay; label: string }[] = [
   { key: 'deepSky', label: 'Deep sky' },
   { key: 'sky', label: 'Sky' },
   { key: 'systems', label: 'Systems' },
-  { key: 'jumpLinks', label: 'Jump links' }
+  { key: 'jumpLinks', label: 'Jump links' },
+  { key: 'plan', label: 'Plan view' }
 ];
 
 export type DockTab = 'search' | 'readout' | 'routes' | 'bookmarks' | 'display';

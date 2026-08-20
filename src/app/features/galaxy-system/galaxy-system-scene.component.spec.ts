@@ -64,7 +64,9 @@ const EARTH: BodyRecord = {
 class FakeEngineService {
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+  private readonly orthographic = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
   private readonly tickCallbacks = new Set<EngineTickCallback>();
+  projection: 'perspective' | 'orthographic' = 'perspective';
 
   get isInitialized(): boolean {
     return true;
@@ -78,8 +80,35 @@ class FakeEngineService {
     return this.scene;
   }
 
-  getCamera(): THREE.PerspectiveCamera {
+  getCamera(): THREE.PerspectiveCamera | THREE.OrthographicCamera {
+    return this.projection === 'orthographic' ? this.orthographic : this.camera;
+  }
+
+  getPerspectiveCamera(): THREE.PerspectiveCamera {
     return this.camera;
+  }
+
+  get currentProjection(): 'perspective' | 'orthographic' {
+    return this.projection;
+  }
+
+  setProjection(projection: 'perspective' | 'orthographic', distanceToTarget: number): void {
+    this.projection = projection;
+    const halfHeight = Math.max(distanceToTarget, 1e-6) * Math.tan((this.camera.fov * Math.PI) / 360);
+    this.orthographic.top = halfHeight;
+    this.orthographic.bottom = -halfHeight;
+    this.orthographic.left = -halfHeight * this.camera.aspect;
+    this.orthographic.right = halfHeight * this.camera.aspect;
+    this.orthographic.zoom = 1;
+    this.orthographic.position.copy(this.camera.position);
+    this.orthographic.quaternion.copy(this.camera.quaternion);
+    this.orthographic.updateProjectionMatrix();
+  }
+
+  visibleHalfHeight(distanceToTarget: number): number {
+    return this.projection === 'orthographic'
+      ? (this.orthographic.top - this.orthographic.bottom) / (2 * this.orthographic.zoom)
+      : distanceToTarget * Math.tan((this.camera.fov * Math.PI) / 360);
   }
 
   onTick(callback: EngineTickCallback): () => void {

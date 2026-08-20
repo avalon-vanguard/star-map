@@ -1,7 +1,8 @@
 import * as THREE from 'three/webgpu';
-import { instancedBufferAttribute, smoothstep, uv, vec2 } from 'three/tsl';
+import { float, instancedBufferAttribute, mix, modelViewMatrix, smoothstep, uniform, uv, vec2, vec4 } from 'three/tsl';
 
 import { spectralTypeToColorIndex } from '../../shared/astro/spectral';
+import { SceneCamera } from '../../core/engine/engine.service';
 import { StarRecord } from '../../shared/models/star.model';
 
 /** Apparent star diameters, in pixels at {@link REFERENCE_VIEWPORT_HEIGHT_PX}. */
@@ -169,6 +170,10 @@ export class StarFieldRenderer {
   /** How many of the catalogue's stars this field actually draws. */
   readonly drawnCount: number;
 
+  /** 1 under a perspective camera, 0 under an orthographic one. See `setProjection`. */
+  private readonly perspective = uniform(1);
+  private readonly orthographicScale = uniform(float(0));
+
   private readonly geometry: THREE.InstancedBufferGeometry;
   private readonly material: THREE.SpriteNodeMaterial;
   /** The subset of the catalogue that is drawn, and so the only set that can be clicked. */
@@ -209,10 +214,22 @@ export class StarFieldRenderer {
       depthWrite: false,
       blending: THREE.AdditiveBlending
     });
-    this.material.sizeAttenuation = false;
-    this.material.positionNode = instancedBufferAttribute(positionAttribute, 'vec3');
-    this.material.scaleNode = instancedBufferAttribute(sizeAttribute, 'float');
-    this.material.colorNode = instancedBufferAttribute(colorAttribute, 'vec3');
+    // The compensation that turns an angular size into a world size is done here rather than by
+    // `sizeAttenuation: false`, which three.js applies only when it is compiling against a
+    // perspective camera (SpriteNodeMaterial.js: `camera.isPerspectiveCamera && sizeAttenuation
+    // === false`). Under an orthographic one it is silently skipped and every star collapses to
+    // a thousandth of a parsec — invisible. Doing the same arithmetic in the node graph, behind
+    // a uniform, lets one material serve both cameras without being recompiled between them.
+    this.material.sizeAttenuation = true;
+    const position = instancedBufferAttribute<'vec3'>(positionAttribute, 'vec3');
+    const angularSize = instancedBufferAttribute<'float'>(sizeAttribute, 'float');
+    this.material.positionNode = position;
+    // Perspective: a star's world size is its angular size times how far away it is, which is
+    // exactly what the built-in does. Orthographic: distance does not set apparent size at all,
+    // the frustum does, so the same angular size is scaled by the frustum instead.
+    const viewDepth = modelViewMatrix.mul(vec4(position, 1)).z.negate();
+    this.material.scaleNode = angularSize.mul(mix(this.orthographicScale, viewDepth, this.perspective));
+    this.material.colorNode = instancedBufferAttribute<'vec3'>(colorAttribute, 'vec3');
     // Soft radial falloff so each star is a small bright core inside a halo, rather than a
     // hard-edged square. `uv` runs 0..1 across the quad, so 0.5 is its centre.
     const radius = uv().sub(vec2(0.5)).length();
@@ -222,6 +239,19 @@ export class StarFieldRenderer {
     // The quad's own bounds sit at the origin and say nothing about where the instances are,
     // so leaving culling on would drop the whole field whenever the origin left the frustum.
     this.object.frustumCulled = false;
+  }
+
+  /**
+   * Tells the field which projection it is being drawn under.
+   *
+   * `halfHeightWorld` is half the orthographic frustum's height in world units; `null` means a
+   * perspective camera, where a star's distance sets its apparent size on its own.
+   */
+  setProjection(halfHeightWorld: number | null): void {
+    this.perspective.value = halfHeightWorld === null ? 1 : 0;
+    // The world size that subtends the same share of the viewport an angular size would under
+    // the reference field of view: `angular * halfHeight / tan(fov/2)`.
+    this.orthographicScale.value = halfHeightWorld === null ? 0 : halfHeightWorld / Math.tan((REFERENCE_FOV_DEGREES * Math.PI) / 360);
   }
 
   /** Looks up the HYG star id for a given instance index. */
@@ -239,8 +269,14 @@ export class StarFieldRenderer {
    * what the user sees at every zoom level instead of being over-permissive up close and
    * sub-pixel at the far end of the camera's range.
    */
-  pickAt(pointerNdc: THREE.Vector2, camera: THREE.PerspectiveCamera): number | undefined {
-    const tanHalfFov = Math.tan((camera.fov * Math.PI) / 360);
+  pickAt(pointerNdc: THREE.Vector2, camera: SceneCamera, aspect: number): number | undefined {
+    // What a unit of angular size is worth on screen. Under perspective that is set by the
+    // field of view; under an orthographic camera the same size was already turned into a world
+    // size by `setProjection`, so it is the frustum that converts it back.
+    const perspective = (camera as THREE.PerspectiveCamera).isPerspectiveCamera;
+    const orthographic = camera as THREE.OrthographicCamera;
+    const halfHeightWorld = perspective ? 0 : (orthographic.top - orthographic.bottom) / (2 * orthographic.zoom);
+    const tanHalfFov = perspective ? Math.tan(((camera as THREE.PerspectiveCamera).fov * Math.PI) / 360) : 0;
     const projected = new THREE.Vector3();
 
     let bestIndex: number | undefined;
@@ -257,8 +293,12 @@ export class StarFieldRenderer {
 
       // A sprite square in view space projects to an ellipse in NDC: the same half-extent in y,
       // divided by the aspect ratio in x. Scaling dx by the aspect makes the comparison circular.
-      const ndcRadius = (0.5 * this.angularSizes[index]) / tanHalfFov + PICK_NDC_SLOP;
-      const dx = (projected.x - pointerNdc.x) * camera.aspect;
+      const ndcRadius =
+        (perspective
+          ? (0.5 * this.angularSizes[index]) / tanHalfFov
+          : // The world size the star is drawn at, as a fraction of the frustum's half-height.
+            (0.5 * this.angularSizes[index] * (halfHeightWorld / Math.tan((REFERENCE_FOV_DEGREES * Math.PI) / 360))) / halfHeightWorld) + PICK_NDC_SLOP;
+      const dx = (projected.x - pointerNdc.x) * aspect;
       const dy = projected.y - pointerNdc.y;
       const score = Math.hypot(dx, dy) / ndcRadius;
 

@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { color, float, instancedBufferAttribute, smoothstep, uniform, uv, vec2 } from 'three/tsl';
+import { color, float, instancedBufferAttribute, mix, modelViewMatrix, smoothstep, uniform, uv, vec2, vec4 } from 'three/tsl';
 
 import { StarRecord } from '../../shared/models/star.model';
 
@@ -40,6 +40,9 @@ export class HostStarRings {
   private readonly geometry: THREE.InstancedBufferGeometry;
   private readonly material: THREE.SpriteNodeMaterial;
   private readonly opacity = uniform(RING_PEAK_OPACITY);
+  /** 1 under a perspective camera, 0 under an orthographic one. See `setProjection`. */
+  private readonly perspective = uniform(1);
+  private readonly orthographicScale = uniform(float(0));
 
   constructor(hosts: readonly StarRecord[], accent: number) {
     const positions = new Float32Array(hosts.length * 3);
@@ -47,9 +50,13 @@ export class HostStarRings {
     this.geometry = createQuadGeometry(hosts.length);
 
     this.material = new THREE.SpriteNodeMaterial({ transparent: true, depthWrite: false });
-    this.material.sizeAttenuation = false;
-    this.material.positionNode = instancedBufferAttribute(new THREE.InstancedBufferAttribute(positions, 3), 'vec3');
-    this.material.scaleNode = float(RING_SIZE_PX * PIXELS_TO_ANGULAR_SIZE);
+    // As in the star field: the angular-to-world conversion is done here rather than by
+    // `sizeAttenuation: false`, which three.js applies only under a perspective camera.
+    this.material.sizeAttenuation = true;
+    const position = instancedBufferAttribute<'vec3'>(new THREE.InstancedBufferAttribute(positions, 3), 'vec3');
+    this.material.positionNode = position;
+    const viewDepth = modelViewMatrix.mul(vec4(position, 1)).z.negate();
+    this.material.scaleNode = float(RING_SIZE_PX * PIXELS_TO_ANGULAR_SIZE).mul(mix(this.orthographicScale, viewDepth, this.perspective));
     this.material.colorNode = color(accent);
     // Opaque on the ring's centreline, falling to nothing one stroke-width either side.
     const distanceFromRing = uv().sub(vec2(0.5)).length().sub(RING_RADIUS_UV).abs();
@@ -60,6 +67,12 @@ export class HostStarRings {
     // As for the star field: the quad's bounds say nothing about where the instances are.
     this.object.frustumCulled = false;
     this.count = hosts.length;
+  }
+
+  /** Which projection the rings are drawn under; see `StarFieldRenderer.setProjection`. */
+  setProjection(halfHeightWorld: number | null): void {
+    this.perspective.value = halfHeightWorld === null ? 1 : 0;
+    this.orthographicScale.value = halfHeightWorld === null ? 0 : halfHeightWorld / Math.tan((REFERENCE_FOV_DEGREES * Math.PI) / 360);
   }
 
   /** Crossfaded with the local grid: from outside the Galaxy the rings are noise. */

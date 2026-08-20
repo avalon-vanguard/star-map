@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { dateToJulianDate } from '../../shared/astro/constants';
 import { galacticCentrePositionPc, galacticToEquatorial, MILKY_WAY_ARMS, SUN_GALACTOCENTRIC_RADIUS_PC } from '../../shared/astro/galaxy';
 import { DataLoaderService } from '../../core/data/data-loader.service';
-import { EngineService } from '../../core/engine/engine.service';
+import { EngineService, SceneCamera } from '../../core/engine/engine.service';
 import { BodyRecord } from '../../shared/models/body.model';
 import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
@@ -63,6 +63,13 @@ const LABEL_EDGE_NDC = 0.7;
 const LABEL_REACH_NDC = 0.3;
 /** How long the range control has to be still before the graph is rebuilt at its value. */
 const JUMP_LINK_REBUILD_DELAY_MS = 250;
+
+/**
+ * How far in or out the plan view may be zoomed from the extent its distance frames. Under a
+ * parallel projection the wheel changes the frame rather than the distance, so the orbit limits
+ * stop applying and this is what stands in for them.
+ */
+const PLAN_ZOOM_SPAN = 64;
 
 /** How many matches each routing field offers, and how little may be typed to get any. */
 const ROUTE_OPTION_COUNT = 6;
@@ -362,6 +369,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       }
     });
     effect(() => this.applyDisplay(this.display()));
+    effect(() => this.applyProjection(this.display().plan));
     // Reads both signals, so flipping the layer on and dragging the range each land here. The
     // rebuild is a quarter-second of walking the catalogue, and the range control emits per
     // pixel dragged, so it waits for the hand to settle rather than running once per pixel.
@@ -540,15 +548,18 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     canvas.addEventListener('pointermove', this.handlePointerMove);
     this.observeResize(canvas);
 
-    this.unsubscribeTick = this.engine.onTick((deltaSeconds) => this.tick(camera, deltaSeconds));
+    // Asked for per frame rather than captured: the projection can be swapped underneath, and a
+    // frame computed against one camera and drawn through the other puts every label off its star.
+    this.unsubscribeTick = this.engine.onTick((deltaSeconds) => this.tick(this.engine.getCamera(), deltaSeconds));
     this.engine.start();
 
     this.ready = true;
     this.reconcileSelection(this.navigationStore.selectedStarId());
   }
 
-  private tick(camera: THREE.PerspectiveCamera, deltaSeconds: number): void {
+  private tick(camera: SceneCamera, deltaSeconds: number): void {
     this.rig?.update(deltaSeconds);
+    this.frameProjection(camera);
     this.controls?.update();
 
     // Gated on the galaxy group rather than on `currentStarId`, which is only assigned once the
@@ -586,12 +597,16 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * has pulled back from the Sun, so the scale ladder reports where the view already is instead
    * of switching it.
    */
-  private updateGalacticCrossfade(camera: THREE.PerspectiveCamera): void {
+  private updateGalacticCrossfade(camera: SceneCamera): void {
     if (!this.milkyWay) {
       return;
     }
 
-    const distancePc = camera.position.length();
+    // How much of the Galaxy is in frame, expressed as the distance a perspective camera would
+    // have to be at to show that much. Under a plan view the camera's own distance says nothing
+    // about the extent — the frustum does — so reading `position.length()` there would report a
+    // fixed scale however far the view was zoomed.
+    const distancePc = this.effectiveDistance(camera);
     this.galacticStrength = this.milkyWay.setViewerDistancePc(distancePc);
 
     // Layer toggles from the dock fold in here rather than as a one-off `visible = false`:
@@ -622,7 +637,25 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * and holding the Galaxy needs a far plane a hundred thousand parsecs out, and a projection
    * spanning both has no precision left to separate one spiral arm from the next.
    */
-  private applyGalaxyDepthRange(camera: THREE.PerspectiveCamera, distancePc: number): void {
+  /**
+   * What "how far back is the camera" means, in either projection. Under perspective it is the
+   * camera's own distance from the origin; under an orthographic one it is the distance a
+   * perspective camera would need to frame the same extent, so everything keyed on it — the
+   * crossfade, the depth range, the scale ladder — goes on meaning what it meant.
+   */
+  private effectiveDistance(camera: SceneCamera): number {
+    if (this.engine.currentProjection === 'perspective') {
+      return camera.position.length();
+    }
+    const halfHeight = this.engine.visibleHalfHeight(camera.position.distanceTo(this.controls?.target ?? GALAXY_OVERVIEW_TARGET));
+    return halfHeight / Math.tan((this.engine.getPerspectiveCamera().fov * Math.PI) / 360);
+  }
+
+  private applyGalaxyDepthRange(camera: SceneCamera, distancePc: number): void {
+    // The plan view sets its own depth range, symmetric about the camera; see `frameOrthographic`.
+    if (this.engine.currentProjection === 'orthographic') {
+      return;
+    }
     const near = THREE.MathUtils.clamp(distancePc / 2000, GALAXY_NEAR_PC, GALACTIC_NEAR_PC);
     const far = THREE.MathUtils.clamp(distancePc * 8, GALAXY_FAR_PC, GALACTIC_FAR_PC);
     // Only when it has drifted enough to matter, so a slow zoom isn't rebuilding the projection
@@ -634,14 +667,14 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  private updateLabels(camera: THREE.PerspectiveCamera): void {
+  private updateLabels(camera: SceneCamera): void {
     const selectedId = this.navigationStore.selectedStarId();
     // Measured from what the camera is looking at, not from where it is. Those differ by the
     // orbit distance, so a camera-relative rule names the stars closest to the near edge of the
     // view — a ring of labels around the outside of the thing the user is actually looking at.
     const target = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
     const { x: cx, y: cy, z: cz } = target;
-    const orbitDistance = (this.controls ? camera.position.distanceTo(target) : GALAXY_OVERVIEW_POSITION.length()) * LABEL_RADIUS_TO_ORBIT_DISTANCE;
+    const orbitDistance = (this.controls ? this.effectiveDistance(camera) : GALAXY_OVERVIEW_POSITION.length()) * LABEL_RADIUS_TO_ORBIT_DISTANCE;
     const labelRadius = THREE.MathUtils.clamp(orbitDistance, MIN_LABEL_RADIUS_PC, MAX_LABEL_RADIUS_PC);
     const maxDistanceSq = labelRadius * labelRadius;
 
@@ -698,7 +731,13 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * `keepId` is exempt from both tests — it is the selection, which is about to be flown to, and
    * its label going missing mid-flight reads as the target having been lost.
    */
-  private spreadLabels(candidates: readonly LabeledPoint[], camera: THREE.PerspectiveCamera, keepId: number | string | null): LabeledPoint[] {
+  /** The frame's shape, from the canvas rather than the camera: only one of the two has it. */
+  private viewportAspect(): number {
+    const canvas = this.canvasRef().nativeElement;
+    return canvas.clientHeight > 0 ? canvas.clientWidth / canvas.clientHeight : 1;
+  }
+
+  private spreadLabels(candidates: readonly LabeledPoint[], camera: SceneCamera, keepId: number | string | null): LabeledPoint[] {
     const placed: THREE.Vector2[] = [];
     const chosen: LabeledPoint[] = [];
     const projected = new THREE.Vector3();
@@ -715,7 +754,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         continue;
       }
 
-      const point = new THREE.Vector2(projected.x * camera.aspect, projected.y);
+      const point = new THREE.Vector2(projected.x * this.viewportAspect(), projected.y);
       if (!isKept && placed.some((other) => other.distanceTo(point) < LABEL_MIN_SEPARATION_NDC)) {
         continue;
       }
@@ -744,7 +783,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * their rim to the card's near edge. Screen-space work done here, once per frame, because the
    * body moves every frame and the card's height depends on its content.
    */
-  private updateSelectionMark(camera: THREE.PerspectiveCamera): void {
+  private updateSelectionMark(camera: SceneCamera): void {
     const leader = this.leaderRef().nativeElement;
     const member = this.systemGroup.visible && this.cardBodyId !== null ? this.systemRenderer?.members.find((candidate) => candidate.id === this.cardBodyId) : undefined;
     if (!member) {
@@ -759,7 +798,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const card = this.objectCardRef()?.nativeElement.querySelector('[data-testid="object-card"]');
     const canvas = this.canvasRef().nativeElement;
     const projected = world.clone().project(camera);
-    if (!card || projected.z > 1) {
+    if (!card || projected.z > 1 || projected.z < -1) {
       leader.setAttribute('visibility', 'hidden');
       return;
     }
@@ -838,7 +877,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * moved along the ring where a HUD panel already holds that place. `null` where the whole
    * neighbourhood of that bearing is covered.
    */
-  private neighbourRingPosition(camera: THREE.PerspectiveCamera, direction: THREE.Vector3): THREE.Vector3 | null {
+  private neighbourRingPosition(camera: SceneCamera, direction: THREE.Vector3): THREE.Vector3 | null {
     const bearing = this.ringBearing.copy(direction).applyQuaternion(this.ringInverse.copy(camera.quaternion).invert());
     // A neighbour behind the camera keeps the side it is on, which is still the way to turn to
     // bring it round.
@@ -866,7 +905,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * happened to be in front and stay silent about the rest. What survives is the half of the
    * direction a viewer can act on: which way to turn to face it.
    */
-  private neighbourLabels(camera: THREE.PerspectiveCamera): LabeledPoint[] {
+  private neighbourLabels(camera: SceneCamera): LabeledPoint[] {
     this.refreshReservedBoxes();
     return this.neighbours.flatMap(({ star, distancePc, direction }) => {
       const position = this.neighbourRingPosition(camera, direction);
@@ -893,7 +932,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * — five a second — any camera movement would drag them off the ring and snap them back. This
    * runs every frame and costs four vector operations.
    */
-  private updateNeighbourRing(camera: THREE.PerspectiveCamera): void {
+  private updateNeighbourRing(camera: SceneCamera): void {
     if (!this.systemGroup.visible || this.neighbours.length === 0) {
       return;
     }
@@ -916,7 +955,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * Moons are left out entirely: they sit within a marker's width of their planet at system
    * framing, so their labels could only ever print on top of it.
    */
-  private updateSystemLabels(camera: THREE.PerspectiveCamera): void {
+  private updateSystemLabels(camera: SceneCamera): void {
     const renderer = this.systemRenderer;
     if (!renderer) {
       this.labelOverlay?.update([]);
@@ -960,6 +999,84 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   }
 
   /** Refreshes the readout panel for whichever scale the view is currently at. */
+  /** A zoom carried from one unit space into the other would frame nothing recognisable. */
+  private resetZoom(): void {
+    const camera = this.engine.getCamera();
+    if ((camera as THREE.OrthographicCamera).isOrthographicCamera) {
+      (camera as THREE.OrthographicCamera).zoom = 1;
+    }
+  }
+
+  /**
+   * Keeps the plan view's frame, its zoom limits and its star sizes in step with the camera.
+   *
+   * All three are functions of how far the camera is orbiting from its target, which is the one
+   * thing the flights already animate — so a system entered, left or flown between reframes
+   * itself under this projection with the easing the perspective flights have, and no camera
+   * rig knows anything about it.
+   */
+  private frameProjection(camera: SceneCamera): void {
+    if (!this.controls) {
+      return;
+    }
+    if (this.engine.currentProjection !== 'orthographic') {
+      this.starField?.setProjection(null);
+      this.hostRings?.setProjection(null);
+      return;
+    }
+    const distance = camera.position.distanceTo(this.controls.target);
+    this.engine.frameOrthographic(distance);
+    // Zoom is what a wheel moves under this projection, so the orbit clamps have to be restated
+    // as the zoom levels that frame the same extents.
+    // A plain multiplier on the frame the distance already sets, bounded by a factor rather than
+    // by the orbit limits: those are in whichever unit space the view is in, and reading them on
+    // the frame the scene swaps from parsecs to astronomical units pins the zoom at the ratio
+    // between the two — which is how leaving a system used to land the view three kiloparsecs out.
+    this.controls.minZoom = 1 / PLAN_ZOOM_SPAN;
+    this.controls.maxZoom = PLAN_ZOOM_SPAN;
+    const halfHeight = this.engine.visibleHalfHeight(distance);
+    this.starField?.setProjection(halfHeight);
+    this.hostRings?.setProjection(halfHeight);
+  }
+
+  /**
+   * Switches between the perspective view and the plan: an orthographic projection looking down
+   * the plane the current scale is read against — the galactic plane out here, this system's own
+   * orbital plane inside one.
+   *
+   * Both halves matter and neither alone is "2D". The projection is what makes a circle a circle
+   * wherever it sits in the frame instead of an ellipse that leans away from the centre; the
+   * swing to face the plane is what makes that worth looking at. Orbiting still works afterwards,
+   * so the plan is where a plan view starts, not a cage.
+   */
+  private applyProjection(plan: boolean): void {
+    if (!this.controls || !this.rig || this.engine.currentProjection === (plan ? 'orthographic' : 'perspective')) {
+      return;
+    }
+    const camera = this.engine.getCamera();
+    const target = this.controls.target.clone();
+    const distance = camera.position.distanceTo(target);
+
+    this.engine.setProjection(plan ? 'orthographic' : 'perspective', distance);
+    const next = this.engine.getCamera();
+    // OrbitControls holds one camera for the lifetime of the gesture state it keeps; handing it
+    // the other one keeps the target, the damping and the pointer bindings it already has.
+    this.controls.object = next;
+    this.rig = new CameraRigController(next, this.controls);
+    next.position.copy(camera.position);
+    next.up.copy(camera.up);
+
+    if (plan) {
+      // Straight down the plane's normal, from where the camera already was.
+      const normal = this.systemGroup.visible && this.systemRenderer ? new THREE.Vector3(0, 0, 1).applyQuaternion(this.systemRenderer.referenceFrame) : new THREE.Vector3(0, 0, 1);
+      next.position.copy(target).add(normal.multiplyScalar(distance));
+      next.up.set(0, 1, 0).applyQuaternion(this.systemGroup.visible && this.systemRenderer ? this.systemRenderer.referenceFrame : new THREE.Quaternion());
+    }
+    next.lookAt(target);
+    this.controls.update();
+    this.applyDisplay(this.display());
+  }
+
   /**
    * Shows or hides the layers that hold still between frames: the label layer and the system
    * view's orbits and grid. The galaxy grids and deep-sky shell are crossfaded every frame
@@ -978,7 +1095,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  private updateHud(camera: THREE.PerspectiveCamera): void {
+  private updateHud(camera: SceneCamera): void {
     const star = this.currentStarId === null ? undefined : this.starsById.get(this.currentStarId);
 
     if (this.systemGroup.visible && star) {
@@ -998,11 +1115,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         ...(luminosity !== null ? [{ label: 'Luminosity', value: formatLuminosity(luminosity), derived: true }] : [])
       ]);
       this.hudNote.set('Orbits propagated from published elements to the current date.');
-      this.hudRange.set(formatAu(camera.position.distanceTo(this.controls?.target ?? GALAXY_OVERVIEW_TARGET)));
+      this.hudRange.set(formatAu(this.engine.visibleHalfHeight(camera.position.distanceTo(this.controls?.target ?? GALAXY_OVERVIEW_TARGET)) / Math.tan((this.engine.getPerspectiveCamera().fov * Math.PI) / 360)));
       return;
     }
 
-    this.hudRange.set(formatParsecs(camera.position.length()));
+    this.hudRange.set(formatParsecs(this.effectiveDistance(camera)));
 
     if (this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD) {
       this.hudEyebrow.set('Galactic Scale');
@@ -1065,13 +1182,13 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
   };
 
-  private handleGalaxyClick(pointerNdc: THREE.Vector2, camera: THREE.PerspectiveCamera): void {
+  private handleGalaxyClick(pointerNdc: THREE.Vector2, camera: SceneCamera): void {
     if (!this.starField) {
       return;
     }
     // Screen-space rather than a raycast: the star field billboards in the vertex shader, so
     // its CPU-side geometry is a single quad at the origin. See `StarFieldRenderer.pickAt`.
-    const starId = this.starField.pickAt(pointerNdc, camera);
+    const starId = this.starField.pickAt(pointerNdc, camera, this.viewportAspect());
     if (starId !== undefined) {
       this.navigationStore.selectStar(starId);
     }
@@ -1302,7 +1419,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // the wider of the two — and against the camera this scene actually has, so the margin holds
     // whatever the window shape. Computed before the star, because how far away the star will be
     // seen from is what decides how big its halo has to be to stay visible.
-    const viewport = { fovDegrees: camera.fov, aspect: camera.aspect };
+    // Framed against the perspective camera whichever is active: the framing distance is what
+    // the orthographic frustum is then sized from, so both projections show the same extent.
+    const framingCamera = this.engine.getPerspectiveCamera();
+    const viewport = { fovDegrees: framingCamera.fov, aspect: framingCamera.aspect };
     const framingDistance = systemFramingDistanceAu(this.systemRenderer.gridOuterRadiusAu, viewport);
     const frameRadiusAu = systemFrameRadiusAu(framingDistance, viewport);
 
@@ -1339,6 +1459,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.controls!.minDistance = SYSTEM_MIN_DISTANCE_AU;
     this.controls!.maxDistance = SYSTEM_MAX_DISTANCE_AU;
 
+    this.resetZoom();
     this.rig!.setImmediate({ position: direction.clone().multiplyScalar(SYSTEM_ENTRY_DISTANCE_AU), target: new THREE.Vector3(0, 0, 0) });
 
     // Arrives along whichever direction the approach came from, then swings round to look down
@@ -1389,6 +1510,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.controls!.minDistance = GALAXY_MIN_DISTANCE_PC;
     this.controls!.maxDistance = GALAXY_MAX_DISTANCE_PC;
 
+    this.resetZoom();
     this.rig!.setImmediate({ position: starPc.clone().add(direction.clone().multiplyScalar(GALAXY_APPROACH_DISTANCE_PC)), target: starPc });
 
     if (isSwitchingSystems) {

@@ -110,12 +110,17 @@ node .claude/skills/run-star-map/driver.mjs probe inner
     { "name": "Earth", "kind": "Planet" },
     { "name": "Mercury", "kind": "Planet" },
     { "name": "Venus", "kind": "Planet" }
+  ],
+  "neighbours": [
+    { "name": "Proxima Centauri", "distance": "1.30 pc" },
+    { "name": "Barnard's Star", "distance": "1.82 pc" }
   ]
 }
 ```
 
 `probe` accepts the same four view names. Labels are read from the CSS2D layer
-(`.map-label` > `.map-label-name` + `.map-label-kind`).
+(`.map-label` > `.map-label-name` + `.map-label-kind`). `neighbours` is the ring of nearby
+stars named from inside a system (`.map-label--ghost`); it is absent where there are none.
 
 ## Run (human path)
 

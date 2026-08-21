@@ -465,9 +465,13 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const scene = this.engine.getScene();
     const camera = this.engine.getCamera();
     camera.position.copy(GALAXY_OVERVIEW_POSITION);
-    camera.near = GALAXY_NEAR_PC;
-    camera.far = GALAXY_FAR_PC;
-    camera.updateProjectionMatrix();
+    // The perspective camera whichever one is live: it is where the depth range is reasoned,
+    // and the plan view re-derives its own from it every frame. Writing to the active camera
+    // put the astronomical-unit range on one that overwrites it, and the system clipped.
+    const depthCamera = this.engine.getPerspectiveCamera();
+    depthCamera.near = GALAXY_NEAR_PC;
+    depthCamera.far = GALAXY_FAR_PC;
+    depthCamera.updateProjectionMatrix();
 
     this.controls = new OrbitControls(camera, canvas);
     this.controls.enableDamping = true;
@@ -901,6 +905,13 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const placed = ringPlacement(angle, NEIGHBOUR_RING_NDC, { width: canvas.clientWidth, height: canvas.clientHeight }, this.reserved);
     if (!placed) {
       return null;
+    }
+    if (this.engine.currentProjection === 'orthographic') {
+      // A parallel projection has no vanishing point to walk towards: every ray through the
+      // frame is the view direction, so treating the unprojected offset as one and stepping
+      // along it throws the sideways part away and pulls the whole ring into the middle. The
+      // unprojected point is already where the name goes.
+      return this.ringPoint.set(placed.x, placed.y, 0).unproject(camera);
     }
     const along = this.ringPoint.set(placed.x, placed.y, 0.5).unproject(camera).sub(camera.position).normalize();
     return along.multiplyScalar(NEIGHBOUR_DEPTH_AU).add(camera.position);
@@ -1481,9 +1492,13 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // clumped over the system's star.
     this.labelOverlay?.update([]);
 
-    camera.near = SYSTEM_NEAR_AU;
-    camera.far = SYSTEM_FAR_AU;
-    camera.updateProjectionMatrix();
+    // The perspective camera whichever one is live: it is where the depth range is reasoned,
+    // and the plan view re-derives its own from it every frame. Writing to the active camera
+    // put the astronomical-unit range on one that overwrites it, and the system clipped.
+    const depthCamera = this.engine.getPerspectiveCamera();
+    depthCamera.near = SYSTEM_NEAR_AU;
+    depthCamera.far = SYSTEM_FAR_AU;
+    depthCamera.updateProjectionMatrix();
     this.controls!.minDistance = SYSTEM_MIN_DISTANCE_AU;
     this.controls!.maxDistance = SYSTEM_MAX_DISTANCE_AU;
 
@@ -1532,9 +1547,13 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // into the next system entered.
     this.clearObjectCard();
 
-    camera.near = GALAXY_NEAR_PC;
-    camera.far = GALAXY_FAR_PC;
-    camera.updateProjectionMatrix();
+    // The perspective camera whichever one is live: it is where the depth range is reasoned,
+    // and the plan view re-derives its own from it every frame. Writing to the active camera
+    // put the astronomical-unit range on one that overwrites it, and the system clipped.
+    const depthCamera = this.engine.getPerspectiveCamera();
+    depthCamera.near = GALAXY_NEAR_PC;
+    depthCamera.far = GALAXY_FAR_PC;
+    depthCamera.updateProjectionMatrix();
     this.controls!.minDistance = GALAXY_MIN_DISTANCE_PC;
     this.controls!.maxDistance = GALAXY_MAX_DISTANCE_PC;
 

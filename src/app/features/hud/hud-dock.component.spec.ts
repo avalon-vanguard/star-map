@@ -210,6 +210,21 @@ describe('HudDockComponent', () => {
     expect(host().querySelector('[aria-label="Forget Sirius"]')?.getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('keeps the one system whose catalogue id is zero, which truthiness would have lost', () => {
+    // The Sun is star 0. A `@if (id; as ...)` reads that as "no star" and hides the control.
+    const bookmarks = TestBed.inject(BookmarksStore);
+    setReadout();
+    fixture.componentRef.setInput('title', 'Sol');
+    fixture.componentRef.setInput('keepableStarId', 0);
+    fixture.componentRef.setInput('defaultTab', 'readout');
+    fixture.detectChanges();
+
+    host().querySelector<HTMLButtonElement>('[aria-label="Keep Sol"]')?.click();
+    fixture.detectChanges();
+
+    expect(bookmarks.has('star', 0)).toBe(true);
+  });
+
   it('offers nothing to keep where the readout is a scale rather than a place', () => {
     setReadout();
     fixture.componentRef.setInput('defaultTab', 'readout');

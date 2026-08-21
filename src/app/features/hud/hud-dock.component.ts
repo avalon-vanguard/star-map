@@ -91,16 +91,19 @@ function isWideViewport(): boolean {
               <p class="type-label text-muted">{{ eyebrow() }}</p>
               <div class="mt-1 flex items-start gap-2">
                 <p data-testid="hud-title" class="min-w-0 flex-1 text-lg font-bold tracking-[0.04em] text-text uppercase">{{ title() }}</p>
-                @if (keepableStarId(); as starId) {
+                <!-- Against null, not against falsiness: the Sun's catalogue id is 0, and a
+                     truthiness test is what would quietly make the Solar System the one
+                     system nobody could keep. -->
+                @if (keepableStarId() !== null) {
                   <button
           type="button"
-          [attr.aria-label]="(bookmarks.has('star', starId) ? 'Forget ' : 'Keep ') + title()"
-          [attr.aria-pressed]="bookmarks.has('star', starId)"
-          (click)="bookmarks.toggle({ kind: 'star', id: starId, name: title() })"
+          [attr.aria-label]="(bookmarks.has('star', keepableStarId()!) ? 'Forget ' : 'Keep ') + title()"
+          [attr.aria-pressed]="bookmarks.has('star', keepableStarId()!)"
+          (click)="bookmarks.toggle({ kind: 'star', id: keepableStarId()!, name: title() })"
           class="shrink-0 p-1 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
-          [class]="bookmarks.has('star', starId) ? 'text-accent' : 'text-muted hover:text-accent'"
+          [class]="bookmarks.has('star', keepableStarId()!) ? 'text-accent' : 'text-muted hover:text-accent'"
         >
-          <app-bookmark-icon class="h-3.5 w-3.5" [kept]="bookmarks.has('star', starId)" />
+          <app-bookmark-icon class="h-3.5 w-3.5" [kept]="bookmarks.has('star', keepableStarId()!)" />
         </button>
                 }
               </div>

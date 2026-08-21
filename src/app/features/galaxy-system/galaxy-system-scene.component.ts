@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, effect, ElementRef, OnDestroy, signal, viewChild } from '@angular/core';
+import { AfterViewInit, Component, computed, effect, ElementRef, OnDestroy, signal, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import * as THREE from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -195,6 +195,12 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private readonly labelHostRef = viewChild.required<ElementRef<HTMLDivElement>>('labelHost');
   private readonly leaderRef = viewChild.required<ElementRef<SVGLineElement>>('leader');
   private readonly objectCardRef = viewChild<SystemObjectCardComponent, ElementRef<HTMLElement>>(SystemObjectCardComponent, { read: ElementRef });
+  /**
+   * The card's own box, looked up when the card changes rather than in the render loop that
+   * draws the leader to it. The host element is a stable wrapper; the panel inside it is what
+   * moves, and it is only replaced when a different body is selected.
+   */
+  private readonly objectCardElement = computed(() => this.objectCardRef()?.nativeElement.querySelector('[data-testid="object-card"]') ?? null);
 
   private readonly raycaster = new THREE.Raycaster();
   private readonly galaxyGroup = new THREE.Group();
@@ -645,7 +651,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const world = member.marker.getWorldPosition(new THREE.Vector3());
     this.labelOverlay?.setSelection(world);
 
-    const card = this.objectCardRef()?.nativeElement.querySelector('[data-testid="object-card"]');
+    const card = this.objectCardElement();
     const canvas = this.canvasRef().nativeElement;
     const projected = world.clone().project(camera);
     if (!card || projected.z > 1) {

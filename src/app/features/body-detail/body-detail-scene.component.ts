@@ -1,5 +1,5 @@
 import { AfterViewInit, Component, ElementRef, OnDestroy, signal, viewChild } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import * as THREE from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -12,6 +12,7 @@ import { atmosphereColorFor, bodyTexturePath, loadCachedTexture, MILKY_WAY_SKYBO
 import { BodyRecord } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
+import { Bookmark } from '../../shared/state/bookmarks.store';
 import { NavigationStore } from '../../shared/state/navigation.store';
 import { ChevronIconComponent } from '../../shared/ui/chevron-icon.component';
 import { HudDockComponent } from '../hud/hud-dock.component';
@@ -57,12 +58,23 @@ const GLOW_SCALE = 2.6;
           </a>
         </div>
       }
-      <!-- Search only: there is no scene readout here, the info panel is the reading. -->
-      <app-hud-dock />
+      <!-- Search and what has been kept: there is no scene readout here, the info panel is
+           the reading, and the panel's own control is what keeps this body. -->
+      <app-hud-dock (bookmarkChosen)="goToBookmark($event)" />
     </div>
   `
 })
 export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
+  /** A kept place, revisited from this page: a star means leaving it for the map. */
+  goToBookmark(bookmark: Bookmark): void {
+    if (bookmark.kind === 'star') {
+      this.navigationStore.selectStar(Number(bookmark.id));
+      void this.router.navigate(['/']);
+    } else {
+      void this.router.navigate(['/body', String(bookmark.id)]);
+    }
+  }
+
   private readonly canvasRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
 
   private controls?: OrbitControls;
@@ -87,6 +99,7 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     private readonly engine: EngineService,
     private readonly dataLoader: DataLoaderService,
     private readonly route: ActivatedRoute,
+    private readonly router: Router,
     private readonly navigationStore: NavigationStore
   ) {}
 

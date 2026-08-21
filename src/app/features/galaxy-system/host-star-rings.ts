@@ -2,14 +2,11 @@ import * as THREE from 'three/webgpu';
 import { color, float, instancedBufferAttribute, smoothstep, uniform, uv, vec2 } from 'three/tsl';
 
 import { StarRecord } from '../../shared/models/star.model';
+import { PIXELS_TO_ANGULAR_SIZE } from './angular-size';
 
 /** Ring diameter in screen pixels at the reference viewport — angular, like the star points. */
 const RING_SIZE_PX = 12;
 const RING_PEAK_OPACITY = 0.35;
-/** Same reference as `StarFieldRenderer`, so a ring and its star agree on what a pixel is. */
-const REFERENCE_VIEWPORT_HEIGHT_PX = 900;
-const REFERENCE_FOV_DEGREES = 55;
-const PIXELS_TO_ANGULAR_SIZE = (2 * Math.tan((REFERENCE_FOV_DEGREES * Math.PI) / 180 / 2)) / REFERENCE_VIEWPORT_HEIGHT_PX;
 /** Ring radius and stroke half-width in quad-uv units (the quad runs 0..1, centre 0.5). */
 const RING_RADIUS_UV = 0.42;
 const RING_STROKE_UV = 0.06;

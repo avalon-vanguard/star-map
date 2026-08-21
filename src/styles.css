@@ -154,6 +154,19 @@ body {
   background: color-mix(in oklab, var(--color-accent) 60%, transparent);
 }
 
+/* The mirror: text hangs off the point's left, right-aligned, leader line on its right. */
+.map-label--left {
+  margin-left: 0;
+  margin-right: 0.875rem;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.map-label--left::before {
+  left: auto;
+  right: -0.75rem;
+}
+
 .map-label-name {
   font-size: 11px;
   letter-spacing: 0.08em;
@@ -166,4 +179,18 @@ body {
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: color-mix(in oklab, var(--color-accent) 70%, transparent);
+}
+
+/* The selection mark on a body in the scene: two hairline arcs bracketing the point — the one
+ * mark borrowed from the ARK's control disc, at hairline weight. Sized in pixels because it sits
+ * on the body's projected position and should read the same however far the camera is. Centred
+ * on the point by CSS2DRenderer's default (0.5, 0.5) anchor. */
+.map-select {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  border-left-color: var(--color-accent);
+  border-right-color: var(--color-accent);
+  pointer-events: none;
 }

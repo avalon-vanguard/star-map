@@ -134,7 +134,7 @@ describe('HudDockComponent', () => {
     fixture.componentRef.setInput('defaultTab', 'display');
     fixture.detectChanges();
     const pressed = [...host().querySelectorAll('[aria-pressed]')].map((b) => `${b.textContent?.trim()}=${b.getAttribute('aria-pressed')}`);
-    expect(pressed).toEqual(['Labels=true', 'Orbits=true', 'Grid=false', 'Deep sky=true', 'Sky=true']);
+    expect(pressed).toEqual(['Labels=true', 'Orbits=true', 'Grid=false', 'Deep sky=true', 'Sky=true', 'Systems=true']);
   });
 
   it('opens the search on "/" from anywhere but a text field', () => {

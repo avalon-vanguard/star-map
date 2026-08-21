@@ -4,21 +4,12 @@ import { float, instancedBufferAttribute, mix, modelViewMatrix, smoothstep, unif
 import { spectralTypeToColorIndex } from '../../shared/astro/spectral';
 import { SceneCamera } from '../../core/engine/engine.service';
 import { StarRecord } from '../../shared/models/star.model';
+import { PIXELS_TO_ANGULAR_SIZE, REFERENCE_FOV_DEGREES, REFERENCE_VIEWPORT_HEIGHT_PX } from './angular-size';
 
 /** Apparent star diameters, in pixels at {@link REFERENCE_VIEWPORT_HEIGHT_PX}. */
 const MIN_POINT_SIZE = 1.5;
 const MAX_POINT_SIZE = 6;
 
-/**
- * Star size is expressed in pixels for readability, but the material works in angular size, so
- * the two are related through the scene's vertical field of view and a reference viewport.
- * Because the size is angular, a star keeps the same share of the screen at any window size —
- * these pixel figures are exact only at this reference height.
- */
-const REFERENCE_VIEWPORT_HEIGHT_PX = 900;
-const REFERENCE_FOV_DEGREES = 55;
-const PIXELS_TO_ANGULAR_SIZE =
-  (2 * Math.tan((REFERENCE_FOV_DEGREES * Math.PI) / 180 / 2)) / REFERENCE_VIEWPORT_HEIGHT_PX;
 
 /**
  * Extra click forgiveness added to a star's drawn radius, in NDC — roughly 4 px on the
@@ -270,13 +261,13 @@ export class StarFieldRenderer {
    * sub-pixel at the far end of the camera's range.
    */
   pickAt(pointerNdc: THREE.Vector2, camera: SceneCamera, aspect: number): number | undefined {
-    // What a unit of angular size is worth on screen. Under perspective that is set by the
-    // field of view; under an orthographic camera the same size was already turned into a world
-    // size by `setProjection`, so it is the frustum that converts it back.
+    // What a unit of angular size is worth on screen. Under perspective the field of view sets
+    // it. Under an orthographic camera the frustum does — but `setProjection` sized the sprite
+    // as `angular * halfHeight / tan(REFERENCE_FOV/2)` in the first place, so dividing back out
+    // by that same half-height leaves the reference field of view and nothing else. Both cases
+    // are therefore one formula over a different angle.
     const perspective = (camera as THREE.PerspectiveCamera).isPerspectiveCamera;
-    const orthographic = camera as THREE.OrthographicCamera;
-    const halfHeightWorld = perspective ? 0 : (orthographic.top - orthographic.bottom) / (2 * orthographic.zoom);
-    const tanHalfFov = perspective ? Math.tan(((camera as THREE.PerspectiveCamera).fov * Math.PI) / 360) : 0;
+    const tanHalfFov = Math.tan(((perspective ? (camera as THREE.PerspectiveCamera).fov : REFERENCE_FOV_DEGREES) * Math.PI) / 360);
     const projected = new THREE.Vector3();
 
     let bestIndex: number | undefined;
@@ -293,11 +284,7 @@ export class StarFieldRenderer {
 
       // A sprite square in view space projects to an ellipse in NDC: the same half-extent in y,
       // divided by the aspect ratio in x. Scaling dx by the aspect makes the comparison circular.
-      const ndcRadius =
-        (perspective
-          ? (0.5 * this.angularSizes[index]) / tanHalfFov
-          : // The world size the star is drawn at, as a fraction of the frustum's half-height.
-            (0.5 * this.angularSizes[index] * (halfHeightWorld / Math.tan((REFERENCE_FOV_DEGREES * Math.PI) / 360))) / halfHeightWorld) + PICK_NDC_SLOP;
+      const ndcRadius = (0.5 * this.angularSizes[index]) / tanHalfFov + PICK_NDC_SLOP;
       const dx = (projected.x - pointerNdc.x) * aspect;
       const dy = projected.y - pointerNdc.y;
       const score = Math.hypot(dx, dy) / ndcRadius;

@@ -4,7 +4,10 @@ test.describe('Route plotting', () => {
   test('chains one star to another through the crossings a chosen range allows', async ({ page }) => {
     test.setTimeout(90_000);
     await page.goto('/?stars=4000');
-    await expect(page.getByTestId('scene-canvas')).toBeVisible();
+    // Generously timed on purpose: this suite shares one software rasterizer, and the boot
+    // it waits on is the slowest thing in it. The default five seconds is a coin toss
+    // under a full parallel run.
+    await expect(page.getByTestId('scene-canvas')).toBeVisible({ timeout: 30_000 });
 
     await page.getByRole('tab', { name: 'Routes' }).click();
 
@@ -32,7 +35,7 @@ test.describe('Route plotting', () => {
   test('says what range a crossing would need, rather than only that there is none', async ({ page }) => {
     test.setTimeout(90_000);
     await page.goto('/?stars=4000');
-    await expect(page.getByTestId('scene-canvas')).toBeVisible();
+    await expect(page.getByTestId('scene-canvas')).toBeVisible({ timeout: 30_000 });
 
     await page.getByRole('tab', { name: 'Routes' }).click();
     await page.locator('#route-from').fill('Sol');

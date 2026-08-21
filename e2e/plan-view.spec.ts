@@ -34,7 +34,10 @@ test.describe('Plan view', () => {
     await expect(plan).toHaveAttribute('aria-pressed', 'true');
 
     // The scene survives the swap: it is still this system, still labelled, still readable.
-    await expect(page.getByTestId('scene-canvas')).toBeVisible();
+    // Generously timed on purpose: this suite shares one software rasterizer, and the boot
+    // it waits on is the slowest thing in it. The default five seconds is a coin toss
+    // under a full parallel run.
+    await expect(page.getByTestId('scene-canvas')).toBeVisible({ timeout: 30_000 });
     await expect.poll(spread, { timeout: 30_000 }).toBeGreaterThan(2);
     await page.getByRole('tab', { name: 'Readout' }).click();
     await expect(page.getByTestId('hud-title')).toHaveText('Sol');
@@ -48,7 +51,7 @@ test.describe('Plan view', () => {
   test('keeps the scale ladder honest about how far out the view is', async ({ page }) => {
     test.setTimeout(90_000);
     await page.goto('/?stars=4000');
-    await expect(page.getByTestId('scene-canvas')).toBeVisible();
+    await expect(page.getByTestId('scene-canvas')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('hud-current-level')).toHaveText('Solar Neighbourhood', { timeout: 30_000 });
 
     await page.getByRole('tab', { name: 'Display' }).click();

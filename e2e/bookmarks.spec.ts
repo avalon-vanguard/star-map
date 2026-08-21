@@ -14,7 +14,10 @@ test.describe('Bookmarks', () => {
 
     // A later visit, on a different page: kept places outlive the one they were kept from.
     await page.goto('/');
-    await expect(page.getByTestId('scene-canvas')).toBeVisible();
+    // Generously timed on purpose: this suite shares one software rasterizer, and the boot
+    // it waits on is the slowest thing in it. The default five seconds is a coin toss
+    // under a full parallel run.
+    await expect(page.getByTestId('scene-canvas')).toBeVisible({ timeout: 30_000 });
     await page.getByRole('tab', { name: 'Bookmarks' }).click();
 
     const kept = page.locator('#dock-panel-bookmarks li').filter({ hasText: 'Earth' });

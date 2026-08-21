@@ -104,6 +104,41 @@ describe('StarLabelOverlay', () => {
     expect(scene.children).toHaveLength(0);
   });
 
+  it('says a neighbour more quietly than a body of this system', () => {
+    overlay.update([
+      { id: 'earth', name: 'Earth', kind: 'Planet', x: 1, y: 0, z: 0 },
+      { id: 'neighbour:1', name: 'Sirius', kind: '2.64 pc', tone: 'ghost', selectStarId: 1, x: 0, y: 1, z: 0 }
+    ]);
+
+    const [body, ghost] = labels();
+    expect(body.classList.contains('map-label--ghost')).toBe(false);
+    expect(ghost.classList.contains('map-label--ghost')).toBe(true);
+    expect(ghost.querySelector('.map-label-kind')?.textContent).toBe('2.64 pc');
+  });
+
+  it('makes a label that offers a star a button, and hands back the star it names', () => {
+    const chosen: number[] = [];
+    overlay = new StarLabelOverlay(scene, (starId) => chosen.push(starId));
+    overlay.setSize(800, 600);
+    overlay.update([{ id: 'neighbour:42', name: 'Sirius', kind: '2.64 pc', tone: 'ghost', selectStarId: 42, x: 1, y: 0, z: 0 }]);
+
+    const ghost = labels()[0];
+    expect(ghost.tagName).toBe('BUTTON');
+    // Its two lines are adjacent spans, so without this it is announced as "Sirius2.64 pc".
+    expect(ghost.getAttribute('aria-label')).toBe('Go to Sirius, 2.64 pc away');
+    ghost.click();
+
+    expect(chosen).toEqual([42]);
+  });
+
+  it('leaves a label that offers nothing untouchable, so the scene behind it stays clickable', () => {
+    overlay.update([{ id: 1, name: 'Sirius', kind: 'Star', x: 1, y: 0, z: 0 }]);
+
+    const label = labels()[0];
+    expect(label.tagName).toBe('DIV');
+    expect(label.classList.contains('map-label--select')).toBe(false);
+  });
+
   it('leaves nothing behind when disposed', () => {
     overlay.update([
       { id: 1, name: 'Sirius', kind: 'Star', x: 1, y: 0, z: 0 },

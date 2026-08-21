@@ -38,8 +38,6 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
   imports: [ReticleIconComponent],
   host: { class: 'pointer-events-none absolute inset-0 block select-none' },
   template: `
-    <div class="hud-vignette absolute inset-0"></div>
-
     @if (showReticle()) {
       <!-- The same circle-and-ticks reticle the search field wears, scaled up: one lock mark
            for the whole instrument, whether it is holding a query or a body. -->

@@ -211,21 +211,27 @@ async function probe(page, view) {
   await page.waitForTimeout(2000);
 
   // Labels are plain DOM in a CSS2D layer: .map-label > .map-label-name + .map-label-kind.
-  const labels = await page.locator('.map-label').evaluateAll((nodes) =>
+  // Neighbouring stars named from inside a system carry .map-label--ghost; they are reported
+  // apart from the system's own bodies, since they are not in the system being probed.
+  const all = await page.locator('.map-label').evaluateAll((nodes) =>
     nodes
       .filter((n) => n.offsetParent !== null)
       .map((n) => ({
         name: n.querySelector('.map-label-name')?.textContent?.trim() ?? '',
-        kind: n.querySelector('.map-label-kind')?.textContent?.trim() ?? null
+        kind: n.querySelector('.map-label-kind')?.textContent?.trim() ?? null,
+        ghost: n.classList.contains('map-label--ghost')
       }))
   );
+  const labels = all.filter((label) => !label.ghost).map(({ name, kind }) => ({ name, kind }));
+  const neighbours = all.filter((label) => label.ghost).map(({ name, kind }) => ({ name, distance: kind }));
   console.log(
     JSON.stringify(
       {
         title: (await title(page).textContent())?.trim(),
         level: (await level(page).textContent())?.trim(),
         labelCount: labels.length,
-        labels
+        labels,
+        ...(neighbours.length ? { neighbours } : {})
       },
       null,
       2

@@ -4,7 +4,13 @@ import * as THREE from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { dateToJulianDate } from '../../shared/astro/constants';
-import { galacticCentrePositionPc, galacticToEquatorial, MILKY_WAY_ARMS, SUN_GALACTOCENTRIC_RADIUS_PC } from '../../shared/astro/galaxy';
+import {
+  GALACTIC_BASIS_EQUATORIAL,
+  MILKY_WAY_ARMS,
+  SUN_GALACTOCENTRIC_RADIUS_PC,
+  galacticCentrePositionPc,
+  galacticToEquatorial
+} from '../../shared/astro/galaxy';
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { EngineService, SceneCamera } from '../../core/engine/engine.service';
 import { BodyRecord } from '../../shared/models/body.model';
@@ -630,7 +636,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // from inside it, so it cannot also be the sky behind a view of the Galaxy from outside.
     this.engine.getScene().backgroundIntensity = display.sky ? 1 - this.galacticStrength : 0;
 
-    this.applyGalaxyDepthRange(camera, distancePc);
+    this.applyGalaxyDepthRange(distancePc);
     const level: ViewLevel = this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD ? 'galactic' : 'galaxy';
     if (this.navigationStore.viewLevel() !== level && !this.systemGroup.visible) {
       this.navigationStore.setViewLevel(level);
@@ -657,19 +663,22 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     return halfHeight / Math.tan((this.engine.getPerspectiveCamera().fov * Math.PI) / 360);
   }
 
-  private applyGalaxyDepthRange(camera: SceneCamera, distancePc: number): void {
-    // The plan view sets its own depth range, symmetric about the camera; see `frameOrthographic`.
-    if (this.engine.currentProjection === 'orthographic') {
-      return;
-    }
+  private applyGalaxyDepthRange(distancePc: number): void {
     const near = THREE.MathUtils.clamp(distancePc / 2000, GALAXY_NEAR_PC, GALACTIC_NEAR_PC);
     const far = THREE.MathUtils.clamp(distancePc * 8, GALAXY_FAR_PC, GALACTIC_FAR_PC);
+    // Written to the perspective camera whichever one is live, because it is the one this range
+    // is reasoned in and the one `frameOrthographic` reads its own from. Skipping it under a plan
+    // view left the far plane wherever it was when the projection changed, so flying out to the
+    // Galaxy from there clipped away most of it.
+    const perspective = this.engine.getPerspectiveCamera();
     // Only when it has drifted enough to matter, so a slow zoom isn't rebuilding the projection
     // matrix on every frame of it.
-    if (Math.abs(near - camera.near) > camera.near * 0.05 || Math.abs(far - camera.far) > camera.far * 0.05) {
-      camera.near = near;
-      camera.far = far;
-      camera.updateProjectionMatrix();
+    if (Math.abs(near - perspective.near) > perspective.near * 0.05 || Math.abs(far - perspective.far) > perspective.far * 0.05) {
+      perspective.near = near;
+      perspective.far = far;
+      perspective.updateProjectionMatrix();
+      // The plan view's own range is symmetric about the camera and derived from this one; see
+      // `frameOrthographic`. It is re-derived every frame, so there is nothing to do here.
     }
   }
 
@@ -1074,9 +1083,22 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     if (plan) {
       // Straight down the plane's normal, from where the camera already was.
-      const normal = this.systemGroup.visible && this.systemRenderer ? new THREE.Vector3(0, 0, 1).applyQuaternion(this.systemRenderer.referenceFrame) : new THREE.Vector3(0, 0, 1);
+      // Down the normal of the plane this scale is actually read against. Inside a system that
+      // is the system's own orbital plane; outside it, the galactic plane — whose normal is the
+      // north galactic pole, not the celestial one. Defaulting to the scene's own z would have
+      // looked down the Earth's rotation axis and called it the plane of the Galaxy.
+      const galactic = GALACTIC_BASIS_EQUATORIAL;
+      const inSystem = this.systemGroup.visible && this.systemRenderer;
+      const normal = inSystem
+        ? new THREE.Vector3(0, 0, 1).applyQuaternion(this.systemRenderer!.referenceFrame)
+        : new THREE.Vector3(galactic.z.x, galactic.z.y, galactic.z.z);
       next.position.copy(target).add(normal.multiplyScalar(distance));
-      next.up.set(0, 1, 0).applyQuaternion(this.systemGroup.visible && this.systemRenderer ? this.systemRenderer.referenceFrame : new THREE.Quaternion());
+      if (inSystem) {
+        next.up.set(0, 1, 0).applyQuaternion(this.systemRenderer!.referenceFrame);
+      } else {
+        // Towards the galactic centre, so the plan is oriented the way the model is described.
+        next.up.set(galactic.x.x, galactic.x.y, galactic.x.z);
+      }
     }
     next.lookAt(target);
     this.controls.update();

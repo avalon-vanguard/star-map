@@ -141,7 +141,7 @@ describe('HudDockComponent', () => {
     fixture.componentRef.setInput('defaultTab', 'display');
     fixture.detectChanges();
     const pressed = [...host().querySelectorAll('[aria-pressed]')].map((b) => `${b.textContent?.trim()}=${b.getAttribute('aria-pressed')}`);
-    expect(pressed).toEqual(['Labels=true', 'Orbits=true', 'Grid=false', 'Deep sky=true', 'Sky=true', 'Systems=true', 'Jump links=false']);
+    expect(pressed).toEqual(['Labels=true', 'Orbits=true', 'Grid=false', 'Deep sky=true', 'Sky=true', 'Systems=true', 'Jump links=false', 'Plan view=false']);
   });
 
   it('says how to keep a place, rather than showing an empty list', () => {

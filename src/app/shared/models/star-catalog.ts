@@ -66,11 +66,14 @@ export interface StarCatalogIndex {
 }
 
 /**
- * How a source names a star that has no name of its own. `Gaia DR3 <id>` for Gaia; HYG's own
- * fallbacks already produce real designations, so it never needs this.
+ * How a source names a star that has no name of its own. `Gaia DR3 <id>` for Gaia; `HYG <id>`
+ * for HYG, whose ETL reaches for that only after a proper name, Bayer, Flamsteed, HD, Gliese and
+ * HIP have all come up empty (`tools/etl/fetchStars.ts`) — none in the current catalogue, but
+ * the path is there, and a name made that way is no more a name than Gaia's.
  */
 const DESIGNATION_PREFIXES: Readonly<Record<string, string>> = {
-  gaia: 'Gaia DR3'
+  gaia: 'Gaia DR3',
+  hyg: 'HYG'
 };
 
 interface StarMetaColumns {
@@ -168,7 +171,8 @@ function designationFor(prefix: string | undefined, id: number): string | undefi
  * round-trip through the id would call every one of those stars named.
  */
 export function isDesignation(star: StarRecord): boolean {
-  const prefix = star.source === undefined ? 'HYG' : (DESIGNATION_PREFIXES[star.source] ?? star.source);
+  // No source at all is a single-catalogue build, whose fallback is HYG's — see `decodeStarCatalog`.
+  const prefix = star.source === undefined ? DESIGNATION_PREFIXES['hyg'] : (DESIGNATION_PREFIXES[star.source] ?? star.source);
   return star.name.startsWith(`${prefix} `);
 }
 

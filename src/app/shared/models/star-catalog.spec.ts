@@ -139,5 +139,10 @@ describe('star catalogue provenance and derived names', () => {
     // 32-bit row id can equal — so it is the prefix that decides, not a round trip through the id.
     expect(isDesignation({ ...MIXED[1], name: 'Gaia DR3 5853498713190525696' })).toBe(true);
     expect(isDesignation({ ...MIXED[1], name: 'Proxima Centauri' })).toBe(false);
+    // HYG's own last resort, once every designation it knows has come up empty. Upper case,
+    // whatever case the source id is in.
+    expect(isDesignation({ ...MIXED[0], name: 'HYG 5' })).toBe(true);
+    expect(isDesignation({ ...MIXED[0], source: undefined, name: 'HYG 5' })).toBe(true);
+    expect(isDesignation({ ...MIXED[0], name: 'HD 48915' })).toBe(false);
   });
 });

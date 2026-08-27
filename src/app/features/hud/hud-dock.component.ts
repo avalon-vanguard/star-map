@@ -20,16 +20,19 @@ export interface HudDisplay {
   readonly grid: boolean;
   readonly deepSky: boolean;
   readonly sky: boolean;
+  /** The rings on stars known to host planets. */
+  readonly systems: boolean;
 }
 
-export const DEFAULT_HUD_DISPLAY: HudDisplay = { labels: true, orbits: true, grid: true, deepSky: true, sky: true };
+export const DEFAULT_HUD_DISPLAY: HudDisplay = { labels: true, orbits: true, grid: true, deepSky: true, sky: true, systems: true };
 
 const DISPLAY_LAYERS: readonly { key: keyof HudDisplay; label: string }[] = [
   { key: 'labels', label: 'Labels' },
   { key: 'orbits', label: 'Orbits' },
   { key: 'grid', label: 'Grid' },
   { key: 'deepSky', label: 'Deep sky' },
-  { key: 'sky', label: 'Sky' }
+  { key: 'sky', label: 'Sky' },
+  { key: 'systems', label: 'Systems' }
 ];
 
 export type DockTab = 'search' | 'readout' | 'display';

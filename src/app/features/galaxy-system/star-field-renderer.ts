@@ -2,22 +2,13 @@ import * as THREE from 'three/webgpu';
 import { instancedBufferAttribute, smoothstep, uv, vec2 } from 'three/tsl';
 
 import { spectralTypeToColorIndex } from '../../shared/astro/spectral';
+import { PIXELS_TO_ANGULAR_SIZE, REFERENCE_VIEWPORT_HEIGHT_PX } from './angular-size';
 import { StarRecord } from '../../shared/models/star.model';
 
 /** Apparent star diameters, in pixels at {@link REFERENCE_VIEWPORT_HEIGHT_PX}. */
 const MIN_POINT_SIZE = 1.5;
 const MAX_POINT_SIZE = 6;
 
-/**
- * Star size is expressed in pixels for readability, but the material works in angular size, so
- * the two are related through the scene's vertical field of view and a reference viewport.
- * Because the size is angular, a star keeps the same share of the screen at any window size —
- * these pixel figures are exact only at this reference height.
- */
-const REFERENCE_VIEWPORT_HEIGHT_PX = 900;
-const REFERENCE_FOV_DEGREES = 55;
-const PIXELS_TO_ANGULAR_SIZE =
-  (2 * Math.tan((REFERENCE_FOV_DEGREES * Math.PI) / 180 / 2)) / REFERENCE_VIEWPORT_HEIGHT_PX;
 
 /**
  * Extra click forgiveness added to a star's drawn radius, in NDC — roughly 4 px on the

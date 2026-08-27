@@ -3,6 +3,12 @@ import * as THREE from 'three/webgpu';
 
 export type EngineTickCallback = (deltaSeconds: number, elapsedSeconds: number) => void;
 
+/** Which projection the scene is drawn through. */
+export type Projection = 'perspective' | 'orthographic';
+
+/** Either camera, as everything downstream of the projection sees it. */
+export type SceneCamera = THREE.PerspectiveCamera | THREE.OrthographicCamera;
+
 /**
  * Owns the Three.js WebGPURenderer (with automatic WebGL2 fallback), the base scene/camera,
  * and the render loop. The loop always runs outside Angular's zone so per-frame work never
@@ -20,7 +26,14 @@ export class EngineService {
   private canvas?: HTMLCanvasElement;
   private renderer?: THREE.WebGPURenderer;
   private scene?: THREE.Scene;
-  private camera?: THREE.PerspectiveCamera;
+  private perspective?: THREE.PerspectiveCamera;
+  /**
+   * Built alongside the perspective one and kept in step with it, rather than made on demand:
+   * the two share a position, an orientation and a depth range, and a camera that only exists
+   * while it is being looked through is a camera whose state is always one swap out of date.
+   */
+  private orthographic?: THREE.OrthographicCamera;
+  private projection: Projection = 'perspective';
   private running = false;
 
   constructor(private readonly ngZone: NgZone) {}
@@ -33,8 +46,71 @@ export class EngineService {
     return this.requireInitialized(this.scene);
   }
 
-  getCamera(): THREE.PerspectiveCamera {
-    return this.requireInitialized(this.camera);
+  /** The camera the scene is currently drawn through. */
+  getCamera(): SceneCamera {
+    return this.projection === 'orthographic' ? this.requireInitialized(this.orthographic) : this.requireInitialized(this.perspective);
+  }
+
+  /**
+   * The perspective camera, whichever is active. For the handful of places that need a field of
+   * view to reason with — framing a system, sizing a star — and that go on meaning the same
+   * thing in either projection because the sizes were tuned against this one.
+   */
+  getPerspectiveCamera(): THREE.PerspectiveCamera {
+    return this.requireInitialized(this.perspective);
+  }
+
+  get currentProjection(): Projection {
+    return this.projection;
+  }
+
+  /**
+   * Switches projection, carrying the pose across. The orthographic frustum is sized to show
+   * the same extent at `distanceToTarget` that the perspective camera showed from there, so the
+   * swap changes how the scene is projected and not how much of it is in frame.
+   */
+  setProjection(projection: Projection, distanceToTarget: number): void {
+    const perspective = this.requireInitialized(this.perspective);
+    const orthographic = this.requireInitialized(this.orthographic);
+    this.projection = projection;
+
+    orthographic.zoom = 1;
+    orthographic.position.copy(perspective.position);
+    orthographic.quaternion.copy(perspective.quaternion);
+    this.frameOrthographic(distanceToTarget);
+  }
+
+  /**
+   * Sizes the orthographic frustum to show, at `distanceToTarget`, what the perspective camera
+   * would show from there. Called every frame while that projection is active, which is what
+   * makes the camera flights work through it: they move the camera, and the frame follows.
+   *
+   * The depth range is symmetric about the camera rather than starting in front of it. An
+   * orthographic camera does not pull back as its frame grows, so at galactic framing the
+   * backdrop shell and half the Milky Way lie behind its own plane and would be clipped away.
+   * A parallel projection has linear depth, so the precision argument that makes a perspective
+   * near plane worth guarding does not apply here.
+   */
+  frameOrthographic(distanceToTarget: number): void {
+    const perspective = this.requireInitialized(this.perspective);
+    const orthographic = this.requireInitialized(this.orthographic);
+    const halfHeight = Math.max(distanceToTarget, 1e-6) * Math.tan((perspective.fov * Math.PI) / 360);
+    orthographic.top = halfHeight;
+    orthographic.bottom = -halfHeight;
+    orthographic.left = -halfHeight * perspective.aspect;
+    orthographic.right = halfHeight * perspective.aspect;
+    orthographic.far = perspective.far;
+    orthographic.near = -perspective.far;
+    orthographic.updateProjectionMatrix();
+  }
+
+  /** Half the height of what is in frame at the target, in world units, under either camera. */
+  visibleHalfHeight(distanceToTarget: number): number {
+    if (this.projection === 'orthographic') {
+      const orthographic = this.requireInitialized(this.orthographic);
+      return (orthographic.top - orthographic.bottom) / (2 * orthographic.zoom);
+    }
+    return distanceToTarget * Math.tan((this.requireInitialized(this.perspective).fov * Math.PI) / 360);
   }
 
   getRenderer(): THREE.WebGPURenderer {
@@ -52,8 +128,10 @@ export class EngineService {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-    this.camera.position.set(0, 0, 5);
+    this.perspective = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+    this.perspective.position.set(0, 0, 5);
+    this.orthographic = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
+    this.orthographic.position.copy(this.perspective.position);
 
     const { width, height } = this.canvasSize();
     this.resize(width, height);
@@ -99,11 +177,18 @@ export class EngineService {
    * Updates the camera aspect ratio and renderer drawing buffer size.
    */
   resize(width: number, height: number): void {
-    if (!this.renderer || !this.camera || width <= 0 || height <= 0) {
+    if (!this.renderer || !this.perspective || !this.orthographic || width <= 0 || height <= 0) {
       return;
     }
-    this.camera.aspect = width / height;
-    this.camera.updateProjectionMatrix();
+    const aspect = width / height;
+    this.perspective.aspect = aspect;
+    this.perspective.updateProjectionMatrix();
+    // The orthographic frustum keeps its height and re-fits its width, so a window getting wider
+    // shows more to the sides rather than magnifying what was already there.
+    const halfHeight = (this.orthographic.top - this.orthographic.bottom) / 2;
+    this.orthographic.left = -halfHeight * aspect;
+    this.orthographic.right = halfHeight * aspect;
+    this.orthographic.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
   }
 
@@ -116,7 +201,8 @@ export class EngineService {
     this.renderer?.dispose();
     this.renderer = undefined;
     this.scene = undefined;
-    this.camera = undefined;
+    this.perspective = undefined;
+    this.orthographic = undefined;
     this.canvas = undefined;
   }
 
@@ -128,7 +214,7 @@ export class EngineService {
       callback(deltaSeconds, elapsedSeconds);
     }
 
-    this.requireInitialized(this.renderer).render(this.requireInitialized(this.scene), this.requireInitialized(this.camera));
+    this.requireInitialized(this.renderer).render(this.requireInitialized(this.scene), this.getCamera());
   }
 
   private canvasSize(): { width: number; height: number } {

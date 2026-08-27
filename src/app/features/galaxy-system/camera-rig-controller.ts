@@ -1,4 +1,6 @@
 import * as THREE from 'three/webgpu';
+
+import { SceneCamera } from '../../core/engine/engine.service';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 export interface CameraPose {
@@ -27,7 +29,7 @@ export class CameraRigController {
   };
 
   constructor(
-    private readonly camera: THREE.PerspectiveCamera,
+    private readonly camera: SceneCamera,
     private readonly controls: OrbitControls
   ) {}
 

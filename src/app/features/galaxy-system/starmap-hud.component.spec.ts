@@ -67,28 +67,6 @@ describe('StarmapHudComponent', () => {
     expect(emitted).toEqual(['galactic', 'galaxy']);
   });
 
-  it('renders the readout panel from its inputs', () => {
-    fixture.componentRef.setInput('level', 'galactic');
-    fixture.componentRef.setInput('eyebrow', 'Galactic Scale');
-    fixture.componentRef.setInput('title', 'Milky Way');
-    fixture.componentRef.setInput('subtitle', 'Barred spiral');
-    fixture.componentRef.setInput('readouts', [{ label: 'Arms', value: '5' }]);
-    fixture.componentRef.setInput('note', 'Illustrative model.');
-    fixture.componentRef.setInput('range', '21.5 kpc');
-    fixture.detectChanges();
-
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    for (const expected of ['Galactic Scale', 'Milky Way', 'Barred spiral', 'Arms', '5', 'Illustrative model.', '21.5 kpc']) {
-      expect(text).toContain(expected);
-    }
-  });
-
-  it('leaves out the optional lines it was given nothing for', () => {
-    const host = render('galaxy');
-    expect(host.querySelector('dl')).toBeNull();
-    expect(host.textContent).not.toContain('undefined');
-  });
-
   it('names what the view is holding on the banner across the top', () => {
     fixture.componentRef.setInput('level', 'system');
     fixture.componentRef.setInput('title', 'Sol');

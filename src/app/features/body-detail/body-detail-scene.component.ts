@@ -14,6 +14,7 @@ import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
 import { NavigationStore } from '../../shared/state/navigation.store';
 import { ChevronIconComponent } from '../../shared/ui/chevron-icon.component';
+import { HudDockComponent } from '../hud/hud-dock.component';
 import { BodyDetailViewModel } from './body-detail.model';
 import { buildBodyViewModel } from './body-view-model';
 import { InfoPanelComponent } from './info-panel.component';
@@ -37,14 +38,14 @@ const GLOW_SCALE = 2.6;
 @Component({
   selector: 'app-body-detail-scene',
   providers: [EngineService],
-  imports: [ChevronIconComponent, InfoPanelComponent, RouterLink],
+  imports: [ChevronIconComponent, HudDockComponent, InfoPanelComponent, RouterLink],
   template: `
     <div class="relative h-full w-full">
       <canvas #canvas data-testid="scene-canvas" class="block h-full w-full"></canvas>
       @if (viewModel()) {
         <app-info-panel [body]="viewModel()!" />
       } @else if (notFound()) {
-        <div class="hud-brackets hud-acquire hud-surface absolute top-20 right-4 w-80 max-w-[calc(100%-2rem)] p-4 font-body text-text xl:top-4">
+        <div class="hud-brackets hud-acquire hud-surface absolute top-4 right-4 w-80 max-w-[calc(100%-2rem)] p-4 font-body text-text">
           <p class="type-eyebrow text-accent">No record</p>
           <p class="mt-2 text-sm text-muted">That id isn't in the catalog — it may have been renamed or mistyped.</p>
           <a
@@ -56,6 +57,8 @@ const GLOW_SCALE = 2.6;
           </a>
         </div>
       }
+      <!-- Search only: there is no scene readout here, the info panel is the reading. -->
+      <app-hud-dock />
     </div>
   `
 })

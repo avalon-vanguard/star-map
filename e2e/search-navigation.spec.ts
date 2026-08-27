@@ -1,25 +1,28 @@
 import { expect, test } from '@playwright/test';
 
+import { openSearch } from './support/open-search';
 import { backButtonLocator } from './support/wait-for-back-button';
 
 test.describe('Search-driven navigation', () => {
   test('selecting a star result flies into that system and shows the back-to-galaxy control', async ({ page }) => {
     await page.goto('/?stars=4000');
-    const searchInput = page.getByPlaceholder('Search stars, planets, exoplanets…');
+    const searchInput = await openSearch(page);
     await searchInput.fill('Proxima Centauri');
 
     const result = page.getByRole('button', { name: /Proxima Centauri/ });
     await expect(result).toBeVisible();
     await result.click();
 
-    // Selecting a result clears the search query immediately (before the flight even starts).
-    await expect(searchInput).toHaveValue('');
+    // Selecting a result hands the dock straight back to the readout (before the flight even
+    // starts): the thing to look at is now the scene, and the search panel folds away with it.
+    await expect(page.getByRole('tab', { name: 'Readout' })).toHaveAttribute('aria-selected', 'true');
+    await expect(searchInput).toHaveCount(0);
     await expect(backButtonLocator(page)).toBeVisible({ timeout: 15_000 });
   });
 
   test('selecting a body result navigates straight to its detail route and shows real NASA data', async ({ page }) => {
     await page.goto('/?stars=4000');
-    const searchInput = page.getByPlaceholder('Search stars, planets, exoplanets…');
+    const searchInput = await openSearch(page);
     await searchInput.fill('Earth');
 
     const result = page.getByText('Earth', { exact: true });
@@ -36,7 +39,7 @@ test.describe('Search-driven navigation', () => {
 
   test('typing fewer than two characters shows no results, and Escape clears the query', async ({ page }) => {
     await page.goto('/?stars=4000');
-    const searchInput = page.getByPlaceholder('Search stars, planets, exoplanets…');
+    const searchInput = await openSearch(page);
 
     await searchInput.fill('E');
     await expect(page.getByTestId('search-results')).toHaveCount(0);

@@ -11,6 +11,12 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: 'html',
+  // Well above Playwright's 5 s, which was a fair ceiling when the star catalogue was 820 kB and
+  // is not now that the scheduled refresh has it at 5.4 MB and 447 410 rows: every one of these
+  // tests boots that catalogue, and the suite boots several at once on a software rasterizer.
+  // The heavy waits already carry their own longer timeouts; this is the same judgement applied
+  // to the assertions that were left on the default. A ceiling costs nothing when it is not hit.
+  expect: { timeout: 15_000 },
   use: {
     baseURL: 'http://localhost:4300',
     trace: 'on-first-retry'

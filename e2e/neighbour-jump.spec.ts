@@ -17,16 +17,23 @@ test.describe('Neighbour jump', () => {
     await expect(readout).toHaveText('Sol', { timeout: 30_000 });
 
     // Its nearest neighbours are named around the edge of the view; each is a button that flies
-    // there. Barnard's Star rather than the Alpha Centauri trio, whose three members share one
-    // bearing and so are decluttered down to whichever the label pass reaches first.
-    const neighbour = page.getByRole('button', { name: /Barnard's Star/ });
+    // there. Whichever one the ring names, not a star named here: the catalogue is refreshed on
+    // a schedule, and a refresh reorders which four are nearest — a hand-picked name made this a
+    // test of the catalogue's contents rather than of the ring. Which of them survives the
+    // declutter is a property of the view, so the first is as good as any.
+    const neighbour = page.getByRole('button', { name: /^Go to .+ pc away$/ }).first();
     await expect(neighbour).toBeVisible({ timeout: 30_000 });
-    await neighbour.click();
+    const label = (await neighbour.getAttribute('aria-label'))!;
+    const name = /^Go to (.+), [\d.]+ pc away$/.exec(label)![1];
 
-    await expect(readout).toHaveText("Barnard's Star", { timeout: 45_000 });
+    // Clicked by the name just read rather than through `neighbour`, which re-resolves `.first()`
+    // and could land on a different star if the label pass reorders the ring in between.
+    await page.getByRole('button', { name: label, exact: true }).click();
+
+    await expect(readout).toHaveText(name, { timeout: 45_000 });
     // And from there the walk goes on: the new system names its own neighbours. Which ones is
-    // not asserted — several of Barnard's nearest share a bearing, so which of them survives
-    // the declutter is a property of the view, not a fact about the catalogue.
+    // not asserted — neighbours sharing a bearing are decluttered, so which of them survives is
+    // a property of the view, not a fact about the catalogue.
     await expect(page.locator('.map-label--ghost')).not.toHaveCount(0, { timeout: 30_000 });
   });
 });

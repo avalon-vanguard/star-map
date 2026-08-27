@@ -20,12 +20,24 @@ export interface LabeledPoint {
    * to the right edge of the view, or one whose right-hand text would run into a neighbour's.
    */
   side?: LabelSide;
+  /**
+   * `ghost` is the quieter voice: a star outside the system the camera is in, named so its
+   * direction can be read without leaving. Dimmer, and it can be selected.
+   */
+  tone?: LabelTone;
+  /**
+   * The star this label offers to fly to. Present makes the label a real button — focusable,
+   * clickable, and the only labels the pointer can reach at all. Whether a given id is
+   * selectable never changes between updates, so the element it needs is settled at creation.
+   */
+  selectStarId?: number;
   x: number;
   y: number;
   z: number;
 }
 
 export type LabelSide = 'left' | 'right';
+export type LabelTone = 'normal' | 'ghost';
 
 /** Where the selection mark sits, in the same scene units as the labels. */
 export interface SelectionPoint {
@@ -34,7 +46,17 @@ export interface SelectionPoint {
   z: number;
 }
 
-const SIDE_CLASS: Record<LabelSide, string> = { right: 'map-label', left: 'map-label map-label--left' };
+function classesFor(point: Pick<LabeledPoint, 'side' | 'tone' | 'selectStarId'>): string {
+  return [
+    'map-label',
+    point.side === 'left' ? 'map-label--left' : '',
+    point.tone === 'ghost' ? 'map-label--ghost' : '',
+    point.selectStarId === undefined ? '' : 'map-label--select',
+    'whitespace-nowrap font-body'
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
 
 /**
  * Renders DOM-based (CSS2D) name labels anchored to 3D star positions. Labels are added as
@@ -49,7 +71,11 @@ export class StarLabelOverlay {
   private readonly labelObjects = new Map<number | string, CSS2DObject>();
   private selection?: CSS2DObject;
 
-  constructor(private readonly scene: THREE.Scene) {
+  constructor(
+    private readonly scene: THREE.Scene,
+    /** Called with the star a selectable label names, when it is clicked or keyed. */
+    private readonly onSelectStar?: (starId: number) => void
+  ) {
     this.cssRenderer.domElement.classList.add('star-label-layer');
     this.domElement = this.cssRenderer.domElement;
   }
@@ -78,11 +104,21 @@ export class StarLabelOverlay {
       const existing = this.labelObjects.get(point.id);
       if (existing) {
         existing.position.set(point.x, point.y, point.z);
-        this.applySide(existing, point.side ?? 'right');
+        this.applyPresentation(existing, point);
       } else {
         this.addLabel(point);
       }
     }
+  }
+
+  /**
+   * Moves one label that is already up, without going through `update`. For labels whose place
+   * is fixed relative to the camera rather than to anything in the scene: they have to be
+   * recomputed every frame, and rebuilding the whole label set at that rate would throw away
+   * the diffing that keeps the DOM still.
+   */
+  moveLabel(id: number | string, x: number, y: number, z: number): void {
+    this.labelObjects.get(id)?.position.set(x, y, z);
   }
 
   /**
@@ -122,12 +158,26 @@ export class StarLabelOverlay {
   }
 
   private addLabel(point: LabeledPoint): void {
-    const element = document.createElement('div');
+    // A selectable label is a real button, so it is reachable by keyboard and announced as an
+    // action rather than as text that happens to respond to a click.
+    const element = document.createElement(point.selectStarId === undefined ? 'div' : 'button');
+    if (point.selectStarId !== undefined) {
+      const starId = point.selectStarId;
+      (element as HTMLButtonElement).type = 'button';
+      // Read out as a sentence rather than as the two lines run together — the name and the
+      // distance are adjacent spans, so the default accessible name is "Sirius2.64 pc" — and
+      // said as the action it is, since nothing else on screen says these labels are doors.
+      element.setAttribute('aria-label', `Go to ${point.name}${point.kind ? `, ${point.kind} away` : ''}`);
+      element.addEventListener('click', (event) => {
+        event.stopPropagation();
+        this.onSelectStar?.(starId);
+      });
+    }
     // Classes assigned directly since this element lives outside Angular's view encapsulation
     // (see the class comment above). The offset and leader line live in `.map-label` itself:
     // CSS2DRenderer rewrites this element's inline transform every frame, so a translate here
     // would be overwritten — the margin is the offset it cannot touch.
-    element.className = `${SIDE_CLASS[point.side ?? 'right']} whitespace-nowrap font-body`;
+    element.className = classesFor(point);
 
     const name = document.createElement('span');
     name.className = 'map-label-name';
@@ -146,16 +196,16 @@ export class StarLabelOverlay {
     // (0.5, 0.5) makes CSS2DRenderer emit translate(-50%,-50%), keeping the box centred on the
     // star — under which `.map-label`'s margin offset only nudges the centred box sideways and
     // the leader line points at empty space half the label's width from the star.
-    this.applySide(object, point.side ?? 'right');
+    this.applyPresentation(object, point);
     object.position.set(point.x, point.y, point.z);
     this.scene.add(object);
     this.labelObjects.set(point.id, object);
   }
 
   /** Right-hand text hangs its left edge on the point; left-hand text hangs its right edge. */
-  private applySide(object: CSS2DObject, side: LabelSide): void {
-    object.center.set(side === 'left' ? 1 : 0, 0.5);
-    const wanted = `${SIDE_CLASS[side]} whitespace-nowrap font-body`;
+  private applyPresentation(object: CSS2DObject, point: LabeledPoint): void {
+    object.center.set(point.side === 'left' ? 1 : 0, 0.5);
+    const wanted = classesFor(point);
     if (object.element.className !== wanted) {
       object.element.className = wanted;
     }

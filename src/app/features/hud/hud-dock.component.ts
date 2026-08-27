@@ -67,18 +67,21 @@ function isWideViewport(): boolean {
   imports: [SearchComponent],
   host: { class: 'pointer-events-none fixed inset-x-2 bottom-2 z-20 block font-body sm:inset-x-6 sm:bottom-6' },
   template: `
-    <div class="pointer-events-auto flex flex-col items-start">
+    <!-- The column is transparent to the pointer and each surface in it opts back in: it is as
+         wide as the strip and as tall as the open panel, so a solid one would swallow every
+         click in the empty band beside the panel — where the scene, and its labels, are. -->
+    <div class="flex flex-col items-start">
       @if (activeTab(); as tab) {
         <!-- Switching tabs remounts the panel and replays its acquire wipe: a new readout
              locking on, once per switch, never per keystroke. -->
         @switch (tab) {
           @case ('search') {
-            <section id="dock-panel-search" role="tabpanel" aria-labelledby="dock-tab-search" class="hud-acquire mb-2 w-full max-w-xl">
+            <section id="dock-panel-search" role="tabpanel" aria-labelledby="dock-tab-search" class="hud-acquire pointer-events-auto mb-2 w-full max-w-xl">
               <app-search (picked)="onPicked()" />
             </section>
           }
           @case ('readout') {
-            <section id="dock-panel-readout" role="tabpanel" aria-labelledby="dock-tab-readout" class="hud-acquire hud-brackets hud-surface mb-2 w-full max-w-lg px-4 py-3">
+            <section id="dock-panel-readout" role="tabpanel" aria-labelledby="dock-tab-readout" class="hud-acquire hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-lg px-4 py-3">
               <p class="type-label text-muted">{{ eyebrow() }}</p>
               <p data-testid="hud-title" class="mt-1 text-lg font-bold tracking-[0.04em] text-text uppercase">{{ title() }}</p>
               @if (subtitle()) {
@@ -100,7 +103,7 @@ function isWideViewport(): boolean {
             </section>
           }
           @case ('display') {
-            <section id="dock-panel-display" role="tabpanel" aria-labelledby="dock-tab-display" class="hud-acquire hud-brackets hud-surface mb-2 w-full max-w-lg px-4 py-3">
+            <section id="dock-panel-display" role="tabpanel" aria-labelledby="dock-tab-display" class="hud-acquire hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-lg px-4 py-3">
               <p class="type-label text-muted">Layers</p>
               <div class="mt-2 flex flex-wrap gap-2">
                 @for (layer of layers; track layer.key) {
@@ -122,7 +125,7 @@ function isWideViewport(): boolean {
         }
       }
 
-      <div class="hud-brackets hud-surface flex w-full items-stretch">
+      <div class="hud-brackets hud-surface pointer-events-auto flex w-full items-stretch">
         <div role="tablist" aria-label="Dock" class="flex items-stretch divide-x divide-border/40">
           @for (tab of tabs(); track tab) {
             <button
@@ -204,8 +207,10 @@ export class HudDockComponent implements OnInit {
 
   onPicked(): void {
     // A result was chosen: the thing to look at is now the scene, so hand the panel back to the
-    // readout where there is one, and fold the sheet away where there is not.
-    this.activeTab.set(this.title() ? 'readout' : null);
+    // readout where there is one, and fold the sheet away where there is not. On a narrow
+    // viewport it always folds away — there the panel is a sheet over most of the scene, and
+    // reopening it onto whatever was just flown to is the opposite of what was asked for.
+    this.activeTab.set(isWideViewport() && this.title() ? 'readout' : null);
   }
 
   /** `/` opens the search from anywhere, unless something else is already taking text. */

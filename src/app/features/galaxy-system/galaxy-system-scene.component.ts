@@ -26,7 +26,9 @@ import { DEFAULT_HUD_DISPLAY, HudDisplay, HudDockComponent, HudReadout } from '.
 import { StarmapHudComponent } from './starmap-hud.component';
 import { SystemObjectCardComponent } from './system-object-card.component';
 import { colorIndexToRgb, StarFieldRenderer, starRenderBudgetFromUrl } from './star-field-renderer';
+import { StarNeighbourhood } from '../../shared/astro/star-neighbourhood';
 import { HostStarRings } from './host-star-rings';
+import { ReservedBox, ringPlacement } from './label-ring';
 import { LabeledPoint, LabelSide, StarLabelOverlay } from './star-label-overlay';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
 
@@ -54,6 +56,21 @@ const LABEL_MIN_SEPARATION_NDC = 0.12;
 const LABEL_EDGE_NDC = 0.7;
 /** How far right of its point a label's text reaches, in aspect-scaled NDC (~135px at 1440). */
 const LABEL_REACH_NDC = 0.3;
+/** How many neighbouring stars are named from inside a system. */
+const NEIGHBOUR_COUNT = 4;
+/**
+ * How far out from the centre of the view a neighbour's name sits, as a fraction of the frame's
+ * half-height. Clear of the scale rail at the top and the dock at the bottom.
+ */
+const NEIGHBOUR_RING_NDC = 0.74;
+/**
+ * How far in front of the camera a neighbour's name is planted, in AU. Any depth projects to
+ * the same place on the ring, but not to the same stability: unprojecting at the middle of the
+ * depth buffer lands ~0.008 AU from the eye, where a hundredth of a degree of camera drift
+ * swings the label across the screen. Out here the same drift moves it by a pixel.
+ */
+const NEIGHBOUR_DEPTH_AU = 500;
+
 /** Radius of the selection arcs, in pixels — the leader line starts at their rim. */
 const SELECTION_RADIUS_PX = 14;
 const HUD_ACCENT = 0x4dd7ff;
@@ -164,6 +181,10 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
   template: `
     <div class="relative h-full w-full">
       <canvas #canvas data-testid="scene-canvas" class="block h-full w-full"></canvas>
+      <!-- Between the canvas and the labels, not up in the HUD where it used to live: everything
+           in this stack paints in tree order, so from there a decorative gradient was laid over
+           the names near the edge of the frame — which is exactly where the neighbour ring is. -->
+      <div aria-hidden="true" class="hud-vignette pointer-events-none absolute inset-0"></div>
       <!-- isolate: CSS2DRenderer gives every label its own z-index for depth ordering; without a
            stacking context here those indices escape and the labels paint over the HUD. -->
       <div #labelHost class="pointer-events-none absolute inset-0 isolate overflow-hidden"></div>
@@ -195,6 +216,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private readonly labelHostRef = viewChild.required<ElementRef<HTMLDivElement>>('labelHost');
   private readonly leaderRef = viewChild.required<ElementRef<SVGLineElement>>('leader');
   private readonly objectCardRef = viewChild<SystemObjectCardComponent, ElementRef<HTMLElement>>(SystemObjectCardComponent, { read: ElementRef });
+  private readonly dockRef = viewChild<HudDockComponent, ElementRef<HTMLElement>>(HudDockComponent, { read: ElementRef });
   /**
    * The card's own box, looked up when the card changes rather than in the render loop that
    * draws the leader to it. The host element is a stable wrapper; the panel inside it is what
@@ -234,6 +256,19 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private rig?: CameraRigController;
   private starField?: StarFieldRenderer;
   private hostRings?: HostStarRings;
+  /** Proximity over the whole catalogue, built once; the neighbour labels are one query on it. */
+  private neighbourhood?: StarNeighbourhood;
+  /** The current system's neighbours, resolved on arrival: id, name, distance and bearing. */
+  private neighbours: readonly { star: StarRecord; distancePc: number; direction: THREE.Vector3 }[] = [];
+  /**
+   * The HUD boxes the ring prints around, read on the label pass rather than per frame: each
+   * read is a forced layout, and the panels move when a tab is switched, not between frames.
+   */
+  private reserved: readonly ReservedBox[] = [];
+  /** Scratch for the per-frame ring maths, so holding the ring still allocates nothing. */
+  private readonly ringBearing = new THREE.Vector3();
+  private readonly ringInverse = new THREE.Quaternion();
+  private readonly ringPoint = new THREE.Vector3();
   private deepSky?: DeepSkyRenderer;
   private deepSkyLabels: readonly LabeledPoint[] = [];
   /** Stars with at least one catalogued body, which are the ones the map can be flown into. */
@@ -379,6 +414,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     ]);
     this.stars = stars;
     this.starsById = new Map(stars.map((star) => [star.id, star]));
+    this.neighbourhood = new StarNeighbourhood(stars);
     this.bodies = bodies;
     this.exoplanets = exoplanets;
     // Which stars can be flown into: those with catalogued bodies of their own, plus the Sun.
@@ -426,7 +462,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       this.deepSkyLabels = this.deepSky.labelPoints(DEEP_SKY_LABEL_COUNT);
     }
 
-    this.labelOverlay = new StarLabelOverlay(scene);
+    // A neighbour's label offers to fly there, and goes through the store like every other way
+    // of choosing a star — so a label click, a search hit and an in-scene click are one path.
+    this.labelOverlay = new StarLabelOverlay(scene, (starId) => this.navigationStore.selectStar(starId));
     this.labelHostRef().nativeElement.appendChild(this.labelOverlay.domElement);
     this.applyDisplay(this.display());
     const { width, height } = canvas.getBoundingClientRect();
@@ -473,6 +511,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       this.systemRenderer?.update(dateToJulianDate());
     }
     this.updateSelectionMark(camera);
+    this.updateNeighbourRing(camera);
     this.labelOverlay?.render(camera);
   }
 
@@ -680,6 +719,126 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     leader.setAttribute('visibility', 'visible');
   }
 
+  /** Resolves the current system's neighbours once, on arrival. Cleared outside a system. */
+  private resolveNeighbours(): void {
+    const origin = this.currentStarId === null ? undefined : this.starsById.get(this.currentStarId);
+    if (!origin || !this.neighbourhood) {
+      this.neighbours = [];
+      return;
+    }
+    this.neighbours = this.neighbourhood
+      // Asked wide and cut back, because a catalogue holds binary companions as two rows at one
+      // position: a neighbour whose separation rounds to what no separation prints as is not a
+      // place to go, it is the same place. Compared through the formatter rather than against a
+      // hand-picked epsilon, so the rule stays "would print as zero" whatever the formatter does.
+      .nearest(origin.id, NEIGHBOUR_COUNT * 2)
+      .filter((neighbour) => formatParsecs(neighbour.distancePc) !== formatParsecs(0))
+      .slice(0, NEIGHBOUR_COUNT)
+      .flatMap((neighbour) => {
+        const star = this.starsById.get(neighbour.id);
+        return star
+          ? [
+              {
+                star,
+                distancePc: neighbour.distancePc,
+                // A unit vector in the catalogue's parsec frame, which is the same direction in
+                // the system's AU frame: only the scale between the two differs.
+                direction: new THREE.Vector3(star.x - origin.x, star.y - origin.y, star.z - origin.z).normalize()
+              }
+            ]
+          : [];
+      });
+  }
+
+  /** Re-reads the HUD surfaces the ring has to print around, as boxes relative to the canvas. */
+  private refreshReservedBoxes(): void {
+    const canvas = this.canvasRef().nativeElement.getBoundingClientRect();
+    const panels = [
+      this.dockRef()?.nativeElement.querySelector('[role="tabpanel"]'),
+      this.dockRef()?.nativeElement.querySelector('[role="tablist"]')?.parentElement,
+      this.objectCardRef()?.nativeElement.querySelector('[data-testid="object-card"]')
+    ];
+    this.reserved = panels.flatMap((panel) => {
+      if (!panel) {
+        return [];
+      }
+      const box = panel.getBoundingClientRect();
+      return [{ left: box.left - canvas.left, top: box.top - canvas.top, right: box.right - canvas.left, bottom: box.bottom - canvas.top }];
+    });
+  }
+
+  /**
+   * Where a neighbour's name sits: on the ring, at the bearing its own direction lands on —
+   * moved along the ring where a HUD panel already holds that place. `null` where the whole
+   * neighbourhood of that bearing is covered.
+   */
+  private neighbourRingPosition(camera: THREE.PerspectiveCamera, direction: THREE.Vector3): THREE.Vector3 | null {
+    const bearing = this.ringBearing.copy(direction).applyQuaternion(this.ringInverse.copy(camera.quaternion).invert());
+    // A neighbour behind the camera keeps the side it is on, which is still the way to turn to
+    // bring it round.
+    const angle = Math.atan2(bearing.y, bearing.x);
+    const canvas = this.canvasRef().nativeElement;
+    const placed = ringPlacement(angle, NEIGHBOUR_RING_NDC, { width: canvas.clientWidth, height: canvas.clientHeight }, this.reserved);
+    if (!placed) {
+      return null;
+    }
+    const along = this.ringPoint.set(placed.x, placed.y, 0.5).unproject(camera).sub(camera.position).normalize();
+    return along.multiplyScalar(NEIGHBOUR_DEPTH_AU).add(camera.position);
+  }
+
+  /**
+   * Names the stars nearest the one the camera is inside, each on the side of the view its own
+   * lies on. It is the one thing a system view cannot otherwise say: which way its neighbours
+   * are, and how far. Each is a button that flies there, so a chain of neighbours can be walked
+   * without pulling back out to the field between hops.
+   *
+   * These are bearings, not sky positions, and are drawn as such: a ring of names at a fixed
+   * radius from the centre of the frame, which reads as instrument rather than as scene. The
+   * true position cannot be drawn — the nearest star to the Sun is 268 000 AU away, thirteen
+   * times the far plane — and a true *direction* is worse than useless here: at this field of
+   * view three neighbours in four fall outside the frame, so the view would name whichever
+   * happened to be in front and stay silent about the rest. What survives is the half of the
+   * direction a viewer can act on: which way to turn to face it.
+   */
+  private neighbourLabels(camera: THREE.PerspectiveCamera): LabeledPoint[] {
+    this.refreshReservedBoxes();
+    return this.neighbours.flatMap(({ star, distancePc, direction }) => {
+      const position = this.neighbourRingPosition(camera, direction);
+      if (!position) {
+        return [];
+      }
+      return [{
+        // Namespaced, so a star's ghost and the same star's own label in the galaxy view are
+        // never the one DOM node being asked to be two different things.
+        id: `neighbour:${star.id}`,
+        name: star.name,
+        kind: formatParsecs(distancePc),
+        tone: 'ghost' as const,
+        selectStarId: star.id,
+        x: position.x,
+        y: position.y,
+        z: position.z
+      }];
+    });
+  }
+
+  /**
+   * Holds the ring still. The names are placed relative to the camera, so between label passes
+   * — five a second — any camera movement would drag them off the ring and snap them back. This
+   * runs every frame and costs four vector operations.
+   */
+  private updateNeighbourRing(camera: THREE.PerspectiveCamera): void {
+    if (!this.systemGroup.visible || this.neighbours.length === 0) {
+      return;
+    }
+    for (const { star, direction } of this.neighbours) {
+      const position = this.neighbourRingPosition(camera, direction);
+      if (position) {
+        this.labelOverlay?.moveLabel(`neighbour:${star.id}`, position.x, position.y, position.z);
+      }
+    }
+  }
+
   /**
    * Names the bodies of the system the view is inside.
    *
@@ -729,7 +888,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
 
     points.sort((a, b) => b.semiMajorAxisAu - a.semiMajorAxisAu);
-    this.labelOverlay?.update(this.spreadLabels(points, camera, null));
+    // Bodies first, so a neighbour's name never takes the space one of this system's own would
+    // have had: `spreadLabels` keeps whichever candidate it reaches first.
+    this.labelOverlay?.update(this.spreadLabels([...points, ...this.neighbourLabels(camera)], camera, null));
   }
 
   /** Refreshes the readout panel for whichever scale the view is currently at. */
@@ -1050,6 +1211,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     this.rig!.flyTo({ position: viewDirection.multiplyScalar(framingDistance), target: new THREE.Vector3(0, 0, 0) }, SETTLE_DURATION_SECONDS, () => {
       this.currentStarId = star.id;
+      this.resolveNeighbours();
       this.navigationStore.setViewLevel('system');
       onComplete();
     });
@@ -1094,12 +1256,14 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     if (isSwitchingSystems) {
       this.currentStarId = null;
+      this.resolveNeighbours();
       onComplete();
       return;
     }
 
     this.rig!.flyTo({ position: GALAXY_OVERVIEW_POSITION.clone(), target: GALAXY_OVERVIEW_TARGET.clone() }, RETURN_DURATION_SECONDS, () => {
       this.currentStarId = null;
+      this.resolveNeighbours();
       this.navigationStore.setViewLevel('galaxy');
       onComplete();
     });

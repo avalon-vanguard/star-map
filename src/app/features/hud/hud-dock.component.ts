@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, ElementRef, HostListener, inject, input, OnInit, output, signal, viewChild } from '@angular/core';
 
 import { SearchComponent } from '../search/search.component';
+import { RouteRequest, RouteResult, RoutesPanelComponent, RouteStarOption } from './routes-panel.component';
 
 export interface HudReadout {
   readonly label: string;
@@ -22,9 +23,11 @@ export interface HudDisplay {
   readonly sky: boolean;
   /** The rings on stars known to host planets. */
   readonly systems: boolean;
+  /** The graph of crossings within the range the Routes panel is set to. */
+  readonly jumpLinks: boolean;
 }
 
-export const DEFAULT_HUD_DISPLAY: HudDisplay = { labels: true, orbits: true, grid: true, deepSky: true, sky: true, systems: true };
+export const DEFAULT_HUD_DISPLAY: HudDisplay = { labels: true, orbits: true, grid: true, deepSky: true, sky: true, systems: true, jumpLinks: false };
 
 const DISPLAY_LAYERS: readonly { key: keyof HudDisplay; label: string }[] = [
   { key: 'labels', label: 'Labels' },
@@ -32,12 +35,13 @@ const DISPLAY_LAYERS: readonly { key: keyof HudDisplay; label: string }[] = [
   { key: 'grid', label: 'Grid' },
   { key: 'deepSky', label: 'Deep sky' },
   { key: 'sky', label: 'Sky' },
-  { key: 'systems', label: 'Systems' }
+  { key: 'systems', label: 'Systems' },
+  { key: 'jumpLinks', label: 'Jump links' }
 ];
 
-export type DockTab = 'search' | 'readout' | 'display';
+export type DockTab = 'search' | 'readout' | 'routes' | 'display';
 
-const TAB_LABELS: Record<DockTab, string> = { search: 'Search', readout: 'Readout', display: 'Display' };
+const TAB_LABELS: Record<DockTab, string> = { search: 'Search', readout: 'Readout', routes: 'Routes', display: 'Display' };
 
 /** Tailwind's `sm` breakpoint: below it the dock is a bare tab strip and its panel is a sheet. */
 const WIDE_VIEWPORT = '(min-width: 640px)';
@@ -64,7 +68,7 @@ function isWideViewport(): boolean {
 @Component({
   selector: 'app-hud-dock',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SearchComponent],
+  imports: [RoutesPanelComponent, SearchComponent],
   host: { class: 'pointer-events-none fixed inset-x-2 bottom-2 z-20 block font-body sm:inset-x-6 sm:bottom-6' },
   template: `
     <!-- The column is transparent to the pointer and each surface in it opts back in: it is as
@@ -100,6 +104,19 @@ function isWideViewport(): boolean {
               @if (note() || hasDerived()) {
                 <p class="mt-3 border-t border-border/40 pt-2 text-[10px] leading-relaxed text-muted">@if (hasDerived()) {<span class="text-accent/80">*</span> Derived, not catalogued. }{{ note() }}</p>
               }
+            </section>
+          }
+          @case ('routes') {
+            <section id="dock-panel-routes" role="tabpanel" aria-labelledby="dock-tab-routes" class="hud-acquire hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-xl px-4 py-3">
+              <app-routes-panel
+                [result]="routeResult()"
+                [options]="routeOptions()"
+                [currentStar]="currentStar()"
+                (queryChange)="routeQuery.emit($event)"
+                (routeRequested)="routeRequested.emit($event)"
+                (starSelected)="onRouteStarSelected($event)"
+                (rangeChange)="jumpRangeChange.emit($event)"
+              />
             </section>
           }
           @case ('display') {
@@ -166,14 +183,25 @@ export class HudDockComponent implements OnInit {
   readonly display = input<HudDisplay | null>(null);
   /** Which panel is open on a wide viewport when the dock mounts. */
   readonly defaultTab = input<DockTab | null>(null);
+  /** Routing: what the scene found, what it offers for the fields, and where the view is. */
+  readonly routeResult = input<RouteResult | null>(null);
+  readonly routeOptions = input<readonly RouteStarOption[]>([]);
+  readonly currentStar = input<RouteStarOption | null>(null);
+  /** Present makes the Routes tab available; absent means this surface cannot route. */
+  readonly routing = input(false);
 
   readonly displayChange = output<HudDisplay>();
+  readonly routeQuery = output<string>();
+  readonly routeRequested = output<RouteRequest>();
+  readonly routeStarSelected = output<number>();
+  readonly jumpRangeChange = output<number>();
 
   readonly layers = DISPLAY_LAYERS;
   readonly hasDerived = computed(() => this.readouts().some((readout) => readout.derived));
   readonly tabs = computed<readonly DockTab[]>(() => [
     'search',
     ...(this.title() ? (['readout'] as const) : []),
+    ...(this.routing() ? (['routes'] as const) : []),
     ...(this.display() ? (['display'] as const) : [])
   ]);
 
@@ -203,6 +231,11 @@ export class HudDockComponent implements OnInit {
     if (current) {
       this.displayChange.emit({ ...current, [key]: !current[key] });
     }
+  }
+
+  /** A step on a plotted route was chosen: fly there, and leave the route up to walk it from. */
+  onRouteStarSelected(starId: number): void {
+    this.routeStarSelected.emit(starId);
   }
 
   onPicked(): void {

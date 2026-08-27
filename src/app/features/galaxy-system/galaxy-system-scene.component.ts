@@ -22,12 +22,16 @@ import { starGlowExtentAu, starMarkerRadiusAu, systemFrameRadiusAu, systemFramin
 import { formatAu, formatLuminosity, formatParsecs } from '../../shared/format/quantity';
 import { BodyDetailViewModel } from '../body-detail/body-detail.model';
 import { buildBodyViewModel, luminosityOf } from '../body-detail/body-view-model';
-import { DEFAULT_HUD_DISPLAY, HudDisplay, HudDockComponent, HudReadout } from '../hud/hud-dock.component';
+import { DEFAULT_HUD_DISPLAY, HudDisplay, HudDockComponent, HudReadout  } from '../hud/hud-dock.component';
+import { RouteRequest, RouteResult, RouteStarOption } from '../hud/routes-panel.component';
+import { buildSearchIndex, IndexedSearchEntry, rankSearchResults } from '../search/search-ranking';
 import { StarmapHudComponent } from './starmap-hud.component';
 import { SystemObjectCardComponent } from './system-object-card.component';
 import { colorIndexToRgb, StarFieldRenderer, starRenderBudgetFromUrl } from './star-field-renderer';
+import { collectJumpLinks, minimumRangeBetween, routeBetween } from '../../shared/astro/jump-links';
 import { StarNeighbourhood } from '../../shared/astro/star-neighbourhood';
 import { HostStarRings } from './host-star-rings';
+import { JumpLinkRenderer } from './jump-link-renderer';
 import { ReservedBox, ringPlacement } from './label-ring';
 import { LabeledPoint, LabelSide, StarLabelOverlay } from './star-label-overlay';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
@@ -56,6 +60,18 @@ const LABEL_MIN_SEPARATION_NDC = 0.12;
 const LABEL_EDGE_NDC = 0.7;
 /** How far right of its point a label's text reaches, in aspect-scaled NDC (~135px at 1440). */
 const LABEL_REACH_NDC = 0.3;
+/** How long the range control has to be still before the graph is rebuilt at its value. */
+const JUMP_LINK_REBUILD_DELAY_MS = 250;
+
+/** How many matches each routing field offers, and how little may be typed to get any. */
+const ROUTE_OPTION_COUNT = 6;
+const MIN_ROUTE_QUERY_LENGTH = 2;
+/**
+ * The widest crossing `minimumRangeBetween` will consider when saying what a route would need.
+ * Beyond this the catalogue is one component and the answer stops being informative.
+ */
+const ROUTE_RANGE_CEILING_PC = 30;
+
 /** How many neighbouring stars are named from inside a system. */
 const NEIGHBOUR_COUNT = 4;
 /**
@@ -205,8 +221,16 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
         [note]="hudNote()"
         [range]="hudRange()"
         [display]="display()"
+        [routing]="true"
+        [routeResult]="routeResult()"
+        [routeOptions]="routeOptions()"
+        [currentStar]="currentStarOption()"
         defaultTab="readout"
         (displayChange)="display.set($event)"
+        (routeQuery)="onRouteQuery($event)"
+        (routeRequested)="onRouteRequested($event)"
+        (routeStarSelected)="navigationStore.selectStar($event)"
+        (jumpRangeChange)="jumpRangePc.set($event)"
       />
     </div>
   `
@@ -258,6 +282,32 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private hostRings?: HostStarRings;
   /** Proximity over the whole catalogue, built once; the neighbour labels are one query on it. */
   private neighbourhood?: StarNeighbourhood;
+  private jumpLinks?: JumpLinkRenderer;
+  /** How far a single crossing may be. Drives both the drawn graph and the route walked on it. */
+  readonly jumpRangePc = signal(3);
+  readonly routeResult = signal<RouteResult | null>(null);
+  /**
+   * Matches for whichever routing field is being typed into. Stars only: a route is a chain of
+   * stars, and offering a moon as a destination would be offering a place that leads nowhere.
+   *
+   * Derived rather than assigned, because the two things it needs arrive in either order — the
+   * catalogue is still loading when the dock is already up, and a query typed before it lands
+   * used to return nothing and stay nothing until the next keystroke.
+   */
+  readonly routeOptions = computed<readonly RouteStarOption[]>(() => {
+    const query = this.routeQuery().trim();
+    const index = this.starSearchIndex();
+    if (query.length < MIN_ROUTE_QUERY_LENGTH || index.length === 0) {
+      return [];
+    }
+    return rankSearchResults(index, query, ROUTE_OPTION_COUNT).flatMap((entry) =>
+      entry.starId === undefined ? [] : [{ id: entry.starId, name: entry.name, subtitle: entry.subtitle }]
+    );
+  });
+  private readonly routeQuery = signal('');
+  /** The range the drawn graph was last built at, so a redraw is skipped when nothing moved. */
+  private drawnJumpRangePc: number | null = null;
+  private jumpLinkRebuild?: ReturnType<typeof setTimeout>;
   /** The current system's neighbours, resolved on arrival: id, name, distance and bearing. */
   private neighbours: readonly { star: StarRecord; distancePc: number; direction: THREE.Vector3 }[] = [];
   /**
@@ -273,6 +323,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private deepSkyLabels: readonly LabeledPoint[] = [];
   /** Stars with at least one catalogued body, which are the ones the map can be flown into. */
   private starIdsWithBodies = new Set<number>();
+  /** Stars alone, normalised once, for the two routing fields. Empty until the catalogue lands. */
+  private readonly starSearchIndex = signal<IndexedSearchEntry[]>([]);
   private milkyWay?: MilkyWayRenderer;
   private galacticLabels: readonly LabeledPoint[] = [];
   private galacticGrid?: PolarGridPlane;
@@ -313,6 +365,15 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       }
     });
     effect(() => this.applyDisplay(this.display()));
+    // Reads both signals, so flipping the layer on and dragging the range each land here. The
+    // rebuild is a quarter-second of walking the catalogue, and the range control emits per
+    // pixel dragged, so it waits for the hand to settle rather than running once per pixel.
+    effect(() => {
+      this.jumpRangePc();
+      this.display().jumpLinks;
+      clearTimeout(this.jumpLinkRebuild);
+      this.jumpLinkRebuild = setTimeout(() => this.refreshJumpLinks(), JUMP_LINK_REBUILD_DELAY_MS);
+    });
   }
 
   ngAfterViewInit(): void {
@@ -328,6 +389,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.controls?.dispose();
     this.starField?.dispose();
     this.hostRings?.dispose();
+    this.jumpLinks?.dispose();
+    clearTimeout(this.jumpLinkRebuild);
     this.deepSky?.dispose();
     this.milkyWay?.dispose();
     this.galacticGrid?.dispose();
@@ -415,6 +478,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.stars = stars;
     this.starsById = new Map(stars.map((star) => [star.id, star]));
     this.neighbourhood = new StarNeighbourhood(stars);
+    this.starSearchIndex.set(
+      buildSearchIndex(stars.map((star) => ({ kind: 'star' as const, name: star.name, subtitle: star.spectralType, starId: star.id })))
+    );
     this.bodies = bodies;
     this.exoplanets = exoplanets;
     // Which stars can be flown into: those with catalogued bodies of their own, plus the Sun.
@@ -429,6 +495,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.galaxyGroup.add(this.starField.object);
     this.hostRings = new HostStarRings(stars.filter((star) => this.starIdsWithBodies.has(star.id)), HUD_ACCENT);
     this.galaxyGroup.add(this.hostRings.object);
+    this.jumpLinks = new JumpLinkRenderer(HUD_ACCENT);
+    this.galaxyGroup.add(this.jumpLinks.object);
 
     this.milkyWay = new MilkyWayRenderer();
     this.galacticLabels = this.milkyWay.labelPoints();
@@ -537,6 +605,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.localGrid?.setStrength(display.grid ? 1 - this.galacticStrength : 0);
     this.tethers?.setStrength(display.grid ? 1 - this.galacticStrength : 0);
     this.hostRings?.setStrength(display.systems ? 1 - this.galacticStrength : 0);
+    this.jumpLinks?.setStrength(display.jumpLinks ? 1 - this.galacticStrength : 0);
     // The backdrop shell is the sky as seen from here; from outside it, it is a wall.
     this.deepSky?.setStrength(display.deepSky ? 1 - this.galacticStrength : 0);
     // Same argument for the skybox, and more sharply: it is a photograph of the Milky Way taken
@@ -1058,6 +1127,68 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     canvas.style.cursor = hoveredId ? 'pointer' : '';
     this.refreshObjectCard();
   };
+
+  /** Offered as the departure without typing, since it is where the view already is. */
+  readonly currentStarOption = computed<RouteStarOption | null>(() => {
+    const starId = this.navigationStore.selectedStarId();
+    const star = starId === null ? undefined : this.starsById.get(starId);
+    return star ? { id: star.id, name: star.name, subtitle: star.spectralType } : null;
+  });
+
+  onRouteQuery(query: string): void {
+    this.routeQuery.set(query);
+  }
+
+  /**
+   * Walks the graph, and where it cannot, says what range would. The search is lazy — it asks
+   * the index for a star's neighbours as it reaches that star — so plotting one route never
+   * costs a pass over the catalogue.
+   */
+  onRouteRequested({ fromId, toId, rangePc }: RouteRequest): void {
+    if (!this.neighbourhood) {
+      return;
+    }
+    const route = routeBetween(this.neighbourhood, fromId, toId, rangePc);
+    if (route) {
+      this.routeResult.set({
+        stars: route.stars.map((id) => ({ id, name: this.starsById.get(id)?.name ?? `Star ${id}` })),
+        totalPc: route.totalPc,
+        neededRangePc: null
+      });
+      this.jumpLinks?.setRoute(route.stars, (id) => this.starsById.get(id));
+      return;
+    }
+    this.routeResult.set({
+      stars: [],
+      totalPc: 0,
+      neededRangePc: minimumRangeBetween(this.neighbourhood, fromId, toId, ROUTE_RANGE_CEILING_PC)
+    });
+    this.jumpLinks?.setRoute([], () => undefined);
+  }
+
+  /**
+   * Rebuilds the drawn graph, which is the expensive half: every star's neighbours, once. Only
+   * when the layer is on and the range has actually moved — the control emits per pixel dragged.
+   */
+  private refreshJumpLinks(): void {
+    if (!this.jumpLinks || !this.neighbourhood) {
+      return;
+    }
+    const rangePc = this.jumpRangePc();
+    if (!this.display().jumpLinks) {
+      if (this.drawnJumpRangePc !== null) {
+        this.jumpLinks.setLinks([], () => undefined);
+        this.drawnJumpRangePc = null;
+      }
+      return;
+    }
+    if (this.drawnJumpRangePc === rangePc) {
+      return;
+    }
+    this.drawnJumpRangePc = rangePc;
+    const links = collectJumpLinks(this.neighbourhood, rangePc);
+    this.jumpLinks.setLinks(links, (id) => this.starsById.get(id));
+  }
 
   /** A pinned body wins over a hovered one, so the card does not change under the pointer. */
   private refreshObjectCard(): void {

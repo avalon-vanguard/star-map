@@ -151,6 +151,55 @@ export class StarNeighbourhood {
     return found;
   }
 
+  /**
+   * Visits every pair of stars within `radiusPc` of each other, once per pair.
+   *
+   * The same question `within` answers, asked of the whole catalogue at once — and a different
+   * shape of answer, because asking it star by star is asking it twice per pair and paying for a
+   * sorted list of each star's neighbours that the caller then throws away. Sixty-eight thousand
+   * of those took eight seconds; walking the grid once takes a fraction of it.
+   *
+   * Each cell is paired with itself and with the half of its surrounding cells that lie after it
+   * in the scan, which is what makes each pair come up exactly once.
+   */
+  forEachPairWithin(radiusPc: number, visit: (a: StarPoint, b: StarPoint, distancePc: number) => void): void {
+    if (radiusPc <= 0) {
+      return;
+    }
+    const reach = Math.ceil(radiusPc / this.cellSizePc);
+    const radiusSq = radiusPc * radiusPc;
+
+    for (const [key, cell] of this.cells) {
+      const [ix, iy, iz] = key.split(',').map(Number);
+      for (let dx = 0; dx <= reach; dx++) {
+        for (let dy = dx === 0 ? 0 : -reach; dy <= reach; dy++) {
+          for (let dz = dx === 0 && dy === 0 ? 0 : -reach; dz <= reach; dz++) {
+            const other = dx === 0 && dy === 0 && dz === 0 ? cell : this.cells.get(cellKey(ix + dx, iy + dy, iz + dz));
+            if (!other) {
+              continue;
+            }
+            const sameCell = other === cell;
+            for (let i = 0; i < cell.length; i++) {
+              const a = this.points[cell[i]];
+              // Within one cell, only the pairs after this one; across two, all of them — the
+              // other cell is only ever visited from this side.
+              for (let j = sameCell ? i + 1 : 0; j < other.length; j++) {
+                const b = this.points[other[j]];
+                const dxp = b.x - a.x;
+                const dyp = b.y - a.y;
+                const dzp = b.z - a.z;
+                const distanceSq = dxp * dxp + dyp * dyp + dzp * dzp;
+                if (distanceSq <= radiusSq) {
+                  visit(a, b, Math.sqrt(distanceSq));
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   private keyFor(x: number, y: number, z: number): string {
     const [ix, iy, iz] = this.cellFor(x, y, z);
     return cellKey(ix, iy, iz);

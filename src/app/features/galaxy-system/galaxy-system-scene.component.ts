@@ -18,6 +18,7 @@ import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { applyMilkyWaySkybox, createGlowSprite } from '../../shared/rendering/skybox';
 import { loadCachedTexture, MILKY_WAY_SKYBOX_PATH, SUN_TEXTURE_PATH } from '../../shared/rendering/texture-catalog';
+import { isDesignation } from '../../shared/models/star-catalog';
 import { StarRecord } from '../../shared/models/star.model';
 import { Bookmark } from '../../shared/state/bookmarks.store';
 import { NavigationStore, ViewLevel } from '../../shared/state/navigation.store';
@@ -855,7 +856,14 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       // position: a neighbour whose separation rounds to what no separation prints as is not a
       // place to go, it is the same place. Compared through the formatter rather than against a
       // hand-picked epsilon, so the rule stays "would print as zero" whatever the formatter does.
-      .nearest(origin.id, NEIGHBOUR_COUNT * 2)
+      //
+      // Named stars first, survey designations only where fewer than that are in reach: a ring
+      // that exists to say where you are is not helped by "Gaia DR3 5853498713190525696" —
+      // least of all when that is the same star as the Proxima Centauri printed beside it.
+      .nearestPreferring(origin.id, NEIGHBOUR_COUNT * 2, (point) => {
+        const star = this.starsById.get(point.id);
+        return star !== undefined && !isDesignation(star);
+      })
       .filter((neighbour) => formatParsecs(neighbour.distancePc) !== formatParsecs(0))
       .slice(0, NEIGHBOUR_COUNT)
       .flatMap((neighbour) => {

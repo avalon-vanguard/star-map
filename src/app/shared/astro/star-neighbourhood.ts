@@ -71,6 +71,20 @@ export class StarNeighbourhood {
   }
 
   /**
+   * Like `nearest`, but the stars `prefer` accepts come first, and the rest only fill what is
+   * left. The preferred pass exhausts the search before the fill runs, so a preferred star is
+   * never outranked by an ordinary one that happens to be closer — that is the point of asking.
+   */
+  nearestPreferring(id: number, count: number, prefer: (point: StarPoint) => boolean): Neighbour[] {
+    const preferred = this.nearest(id, count, prefer);
+    if (preferred.length >= count) {
+      return preferred;
+    }
+    const taken = new Set(preferred.map((neighbour) => neighbour.id));
+    return preferred.concat(this.nearest(id, count - preferred.length, (point) => !taken.has(point.id)));
+  }
+
+  /**
    * The `count` stars nearest to `id`, nearest first, excluding the star itself.
    *
    * Searches outward a shell of cells at a time and stops only once the shell it just finished

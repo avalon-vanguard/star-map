@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { BYTES_PER_STAR_META, BYTES_PER_STAR_POSITION, decodeStarCatalog, encodeStarCatalog } from './star-catalog';
+import { BYTES_PER_STAR_META, BYTES_PER_STAR_POSITION, decodeStarCatalog, encodeStarCatalog, isDesignation } from './star-catalog';
 import { StarRecord } from './star.model';
 
 const STARS: StarRecord[] = [
@@ -130,5 +130,14 @@ describe('star catalogue provenance and derived names', () => {
     const named = encodeStarCatalog([{ ...MIXED[1], name: 'Some Proper Name' }]);
     expect(named.index.names).toEqual(['Some Proper Name']);
     expect(decodeStarCatalog(named.index, named.positions, named.meta)[0].name).toBe('Some Proper Name');
+  });
+
+  it('tells a name somebody gave from the designation a survey generates', () => {
+    expect(isDesignation(decoded[0])).toBe(false);
+    expect(isDesignation(decoded[1])).toBe(true);
+    // The real catalogue names Gaia stars by the survey's nineteen-digit source id, which no
+    // 32-bit row id can equal — so it is the prefix that decides, not a round trip through the id.
+    expect(isDesignation({ ...MIXED[1], name: 'Gaia DR3 5853498713190525696' })).toBe(true);
+    expect(isDesignation({ ...MIXED[1], name: 'Proxima Centauri' })).toBe(false);
   });
 });

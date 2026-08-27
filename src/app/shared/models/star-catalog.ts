@@ -161,6 +161,17 @@ function designationFor(prefix: string | undefined, id: number): string | undefi
   return prefix === undefined ? undefined : `${prefix} ${id}`;
 }
 
+/**
+ * Whether a star's name is only the designation its source generates, rather than anything
+ * somebody called it. Judged by the prefix alone: the number after it is the survey's own id —
+ * nineteen digits for Gaia — which the 32-bit row id `designationFor` prints cannot hold, so a
+ * round-trip through the id would call every one of those stars named.
+ */
+export function isDesignation(star: StarRecord): boolean {
+  const prefix = star.source === undefined ? 'HYG' : (DESIGNATION_PREFIXES[star.source] ?? star.source);
+  return star.name.startsWith(`${prefix} `);
+}
+
 /** Rebuilds the star records the app works with from the three loaded assets. */
 export function decodeStarCatalog(index: StarCatalogIndex, positions: Float32Array, meta: ArrayBuffer): StarRecord[] {
   const columns = metaColumns(meta, index.count);

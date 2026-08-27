@@ -1,6 +1,7 @@
-import { Component, computed, inject, input } from '@angular/core';
+import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
 
+import { Article, ArticleService } from '../../core/data/article.service';
 import { BookmarksStore } from '../../shared/state/bookmarks.store';
 import { BookmarkIconComponent } from '../../shared/ui/bookmark-icon.component';
 import { ChevronIconComponent } from '../../shared/ui/chevron-icon.component';
@@ -50,6 +51,47 @@ import { ReadoutSectionsComponent } from './readout-sections.component';
       </header>
 
       <app-readout-sections [readouts]="readouts()" />
+
+      <!-- Prose from elsewhere, and only when asked for. Everything above this line is a
+           measurement or something derived from one; this is a person's paragraph on another
+           site, so it says whose and links back to it. -->
+      @if (article(); as found) {
+        <!-- Capped and scrollable: a Wikipedia lead can run to a dozen lines, and this panel is
+             anchored to the top of a viewport that may be a good deal shorter than the prose. -->
+        <div class="max-h-56 overflow-y-auto border-t border-border/40 px-4 py-3">
+          <p class="text-[11px] leading-relaxed text-muted">{{ found.extract }}</p>
+          <a
+            [href]="found.url"
+            target="_blank"
+            rel="noopener"
+            class="type-label mt-2 inline-block text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent focus-visible:outline-1 focus-visible:outline-accent"
+            >Wikipedia · {{ found.language }}</a
+          >
+        </div>
+      } @else if (aboutState() !== 'idle') {
+        <p class="border-t border-border/40 px-4 py-3 text-[11px] leading-relaxed text-muted">
+          @switch (aboutState()) {
+            @case ('loading') {
+              Asking Wikipedia…
+            }
+            @case ('none') {
+              Wikipedia has no article on {{ body().name }}.
+            }
+            @case ('unavailable') {
+              Wikipedia could not be reached.
+              <button type="button" (click)="loadArticle()" class="text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent focus-visible:outline-1 focus-visible:outline-accent">Try again</button>
+            }
+          }
+        </p>
+      } @else {
+        <button
+          type="button"
+          (click)="loadArticle()"
+          class="type-label w-full border-t border-border/40 px-4 py-2 text-left text-muted transition-colors hover:bg-accent/8 hover:text-accent focus-visible:bg-accent/12 focus-visible:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+        >
+          About
+        </button>
+      }
     </div>
   `
 })
@@ -58,9 +100,38 @@ export class InfoPanelComponent {
 
   readonly bookmarks = inject(BookmarksStore);
 
-  readonly readouts = computed(() => bodyReadouts(this.body()));
+  private readonly articles = inject(ArticleService);
 
-  constructor(private readonly router: Router) {}
+  readonly article = signal<Article | null>(null);
+  readonly aboutState = signal<'idle' | 'loading' | 'none' | 'unavailable'>('idle');
+
+  constructor(private readonly router: Router) {
+    // The panel is reused as the route's parameter changes, so what was asked about one body
+    // must not still be showing under the next one's name.
+    effect(() => {
+      this.body();
+      this.article.set(null);
+      this.aboutState.set('idle');
+    });
+  }
+
+  /**
+   * Fetches the article, on the press and not before. The kind goes with the name because
+   * Wikipedia disambiguates by it — "Titan" alone is a list of everything called Titan.
+   */
+  async loadArticle(): Promise<void> {
+    this.aboutState.set('loading');
+    const result = await this.articles.lookup(this.body().name, this.readouts().kindLabel.toLowerCase());
+    if (result.status === 'found') {
+      this.article.set(result.article);
+      this.aboutState.set('idle');
+      return;
+    }
+    this.article.set(null);
+    this.aboutState.set(result.status);
+  }
+
+  readonly readouts = computed(() => bodyReadouts(this.body()));
 
   goBack(): void {
     void this.router.navigate(['/']);

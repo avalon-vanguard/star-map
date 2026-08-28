@@ -86,7 +86,9 @@ export async function fetchStars(): Promise<StarRecord[]> {
     // `raDecDistanceToXyz` and would be redundant if the two agreed. They do not, for the stars
     // that move: the right ascension was carried from the Hipparcos epoch to 2000.0 without the
     // cos δ its motion needs, which puts Proxima 17.9″ from where HYG's own x/y/z — and Gaia,
-    // once brought to the same epoch — have it. 1813 stars differ by over an arcsecond.
+    // once brought to the same epoch — have it. 1813 stars differ by over an arcsecond, and the
+    // Cartesian columns are the ones Gaia agrees with for 1155 of them against 156 (one of those,
+    // HIP 57146, has x/y/z 161″ from its own ra/dec and stays double).
     const x = Number(row['x']);
     const y = Number(row['y']);
     const z = Number(row['z']);

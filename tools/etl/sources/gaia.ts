@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { propagateProperMotion, raDegDecDistanceToXyz } from '../../../src/app/shared/astro/coordinates';
 import { StarRecord } from '../../../src/app/shared/models/star.model';
 import { parseCsvObjects, parseOptionalNumber } from '../lib/csv';
@@ -59,7 +61,9 @@ function buildQuery(): string {
     `where parallax > ${parallaxFloorMas(DISTANCE_CUTOFF_PC).toFixed(6)}`,
     `and parallax_over_error > ${(1 / MAX_PARALLAX_ERROR_RATIO).toFixed(1)}`,
     `and phot_g_mean_mag < ${MAGNITUDE_LIMIT}`,
-    'order by phot_g_mean_mag asc'
+    // source_id breaks the ties — 20 064 groups share a G at the published precision — so the
+    // row order, and with it the ids assigned below, is a pure function of the archive's content.
+    'order by phot_g_mean_mag asc, source_id asc'
   ].join(' ');
 }
 
@@ -79,12 +83,13 @@ const UNKNOWN_SPECTRAL_TYPE = 'Unknown';
 const GAIA_ID_BASE = 1_000_000_000;
 
 export async function fetchGaiaStars(): Promise<StarRecord[]> {
-  const url = `${GAIA_TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=${encodeURIComponent(buildQuery())}`;
+  const query = buildQuery();
+  const url = `${GAIA_TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=${encodeURIComponent(query)}`;
   console.log(`Fetching Gaia DR3 (within ${DISTANCE_CUTOFF_PC} pc, G < ${MAGNITUDE_LIMIT}, at most ${ROW_LIMIT} rows)...`);
 
-  // The cache key names the columns, so a response cached before proper motions were asked for
-  // cannot be mistaken for one that has them.
-  const csv = await fetchTextCached(url, 'gaia-dr3-pm.csv');
+  // Keyed by the query itself, so a response cached for other columns or another order can
+  // never be mistaken for this one.
+  const csv = await fetchTextCached(url, `gaia-dr3-${createHash('sha1').update(query).digest('hex').slice(0, 8)}.csv`);
   const rows = parseCsvObjects(csv);
   const stars: StarRecord[] = [];
 

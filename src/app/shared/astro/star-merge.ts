@@ -37,13 +37,28 @@ const DEG_TO_RAD = Math.PI / 180;
 export const MERGE_ANGULAR_TOLERANCE_DEG = 15 / 3600;
 
 /**
- * How far two catalogues may disagree about a star's brightness and still describe the same
- * star. Bands differ — HYG's V and Gaia's G are three magnitudes apart for the reddest dwarfs —
- * but five is not a band, it is a companion: Sirius B sits 6″ from Sirius and ten magnitudes
- * fainter, Polaris B 18″ and seven. Gaia saturates below G ≈ 3, so without this a bright primary
- * it does not carry is folded into its companion's entry, and the companion is gone.
+ * Angular separation, in degrees, under which the distances are not consulted. A coincidence of
+ * direction this close is never chance at this depth — the quarter-degree shift finds none under
+ * 3″ — so two entries this close are one star whatever their parallaxes say, and what they say
+ * is often a Hipparcos parallax off by half: 1 500 stars sat within this of their Gaia entry and
+ * were kept twice by the distance test, thirty of them at a false few parsecs from the Sun
+ * (HIP 82724 at 3.7 pc, where Gaia has it at 62.8). Brightness keeps its say at any separation,
+ * because a companion can sit this close: Ashlesha's is 2.7″ away and three magnitudes fainter.
  */
-export const MERGE_MAGNITUDE_TOLERANCE = 5;
+export const MERGE_CERTAIN_ANGULAR_TOLERANCE_DEG = 3 / 3600;
+
+/**
+ * How much fainter, and how much brighter, an entry may be than the one it is folded into and
+ * still be the same star. Bands differ, and not symmetrically: a red dwarf is three magnitudes
+ * fainter in HYG's V than in Gaia's G, so the folded entry may be up to five fainter. A star is
+ * never much brighter in V than in G, though, and an entry a magnitude brighter than what is
+ * already at that spot is a primary Gaia does not carry — it saturates below G ≈ 3 — sitting
+ * beside its companion: Sirius 6″ from Sirius B and ten magnitudes brighter, Almach 10″ from
+ * γ² And, Alfirk 13″ from β Cep B. Without this the primary's name lands on the companion's
+ * entry, and the companion is gone.
+ */
+export const MERGE_FAINTER_TOLERANCE = 5;
+export const MERGE_BRIGHTER_TOLERANCE = 1;
 
 /**
  * How far two distances may disagree, as a ratio, and still describe the same star. Generous on
@@ -85,8 +100,13 @@ function distanceOf(star: StarRecord): number {
  */
 const SKY_CELL_DEG = 0.5;
 
+const RA_CELLS = 360 / SKY_CELL_DEG;
+
 function cellKey(raDeg: number, decDeg: number): string {
-  return `${Math.floor(raDeg / SKY_CELL_DEG)}:${Math.floor(decDeg / SKY_CELL_DEG)}`;
+  // Right ascension wraps: the cell after 359.5° is 0°, so a pair straddling 0h shares a
+  // neighbourhood rather than sitting 719 cells apart.
+  const raCell = ((Math.floor(raDeg / SKY_CELL_DEG) % RA_CELLS) + RA_CELLS) % RA_CELLS;
+  return `${raCell}:${Math.floor(decDeg / SKY_CELL_DEG)}`;
 }
 
 function skyAngles(star: StarRecord): { raDeg: number; decDeg: number } {
@@ -112,15 +132,12 @@ export function directionCosine(a: StarRecord, b: StarRecord): number {
 }
 
 /**
- * Whether two entries describe the same star: same direction, and neither distance nor
- * brightness in conflict.
+ * Whether `entry` describes the star already `kept`: the same direction, the brightness not in
+ * conflict and — unless the directions agree closely enough to settle it — the distance not in
+ * conflict either.
  */
-export function isSameStar(a: StarRecord, b: StarRecord): boolean {
-  if (Math.abs(a.magnitude - b.magnitude) > MERGE_MAGNITUDE_TOLERANCE) {
-    return false;
-  }
-
-  const [near, far] = [distanceOf(a), distanceOf(b)].sort((p, q) => p - q);
+export function isSameStar(kept: StarRecord, entry: StarRecord): boolean {
+  const [near, far] = [distanceOf(kept), distanceOf(entry)].sort((p, q) => p - q);
 
   // The Sun sits at the origin of this coordinate system and so has no direction at all, which
   // the angular test below cannot speak about. Every catalogue contains it, so without this the
@@ -129,9 +146,17 @@ export function isSameStar(a: StarRecord, b: StarRecord): boolean {
     return far === 0;
   }
 
-  const separationDeg = Math.acos(directionCosine(a, b)) / DEG_TO_RAD;
+  const separationDeg = Math.acos(directionCosine(kept, entry)) / DEG_TO_RAD;
   if (separationDeg > MERGE_ANGULAR_TOLERANCE_DEG) {
     return false;
+  }
+  const fainterBy = entry.magnitude - kept.magnitude;
+  if (fainterBy < -MERGE_BRIGHTER_TOLERANCE || fainterBy > MERGE_FAINTER_TOLERANCE) {
+    return false;
+  }
+
+  if (separationDeg <= MERGE_CERTAIN_ANGULAR_TOLERANCE_DEG) {
+    return true;
   }
 
   return (far - near) / near <= MERGE_DISTANCE_RATIO_TOLERANCE;

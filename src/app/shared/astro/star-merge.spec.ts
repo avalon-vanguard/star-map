@@ -38,19 +38,45 @@ describe('isSameStar', () => {
   it('keeps a bright primary out of the entry of its faint companion', () => {
     // Gaia has no Sirius — it saturates — but has Sirius B, 6″ away at the same distance and ten
     // magnitudes fainter. Direction and distance say "same star"; the brightness says otherwise.
-    const sirius = at(32263, 101.2875, -16.7161, 2.637, { name: 'Sirius', magnitude: -1.44 });
-    const siriusB = at(1, 101.2875 + arcsecOfRa(6.1, -16.7161), -16.7161, 2.67, { name: 'Gaia DR3 2947050466531873024', magnitude: 8.5, source: 'gaia' });
-    expect(isSameStar(sirius, siriusB)).toBe(false);
-    expect(isSameStar(sirius, { ...siriusB, magnitude: -1.3 })).toBe(true);
+    const siriusB = at(1, 101.2875, -16.7161, 2.67, { name: 'Gaia DR3 2947050466531873024', magnitude: 8.5, source: 'gaia' });
+    const sirius = at(32263, 101.2875 + arcsecOfRa(6.1, -16.7161), -16.7161, 2.637, { name: 'Sirius', magnitude: -1.44 });
+    expect(isSameStar(siriusB, sirius)).toBe(false);
+    expect(isSameStar(siriusB, { ...sirius, magnitude: 8.6 })).toBe(true);
+  });
+
+  it('lets the folded entry be fainter, as a red star is in V, but not much brighter', () => {
+    // Wolf 359 is V 13.45 in HYG and G 11.0 in Gaia — the same star, 5″ apart on a Gliese
+    // position. Almach is V 2.1 and sits 10″ from γ² And, G 4.9: Gaia has no Almach, and its
+    // name must not land on the companion.
+    const wolf359 = at(1, 164.1, 7.0, 2.41, { name: 'Gaia DR3 3864972938605115520', magnitude: 11.0, source: 'gaia' });
+    expect(isSameStar(wolf359, at(118720, 164.1 + arcsecOfRa(5, 7), 7.0, 2.39, { name: 'Wolf 359', magnitude: 13.45 }))).toBe(true);
+    const gamma2And = at(2, 30.97, 42.33, 50, { name: 'Gaia DR3 346231302441905920', magnitude: 4.9, source: 'gaia' });
+    expect(isSameStar(gamma2And, at(9640, 30.97 + arcsecOfRa(9.9, 42.33), 42.33, 50, { name: 'Almach', magnitude: 2.1 }))).toBe(false);
   });
 
   it('does not match two different stars that happen to be at the same distance', () => {
     expect(isSameStar(at(1, 200, 10, 200), at(2, 200.5, 10, 200))).toBe(false);
   });
 
-  it('does not match along a line of sight when the distances genuinely conflict', () => {
-    // Same direction, one three times further away: a background star, not the same object.
-    expect(isSameStar(at(1, 200, 10, 100), at(2, 200, 10, 300))).toBe(false);
+  it('takes two entries within three arcseconds for one star, whatever their distances say', () => {
+    // HD 225021: 143.7 pc by its Hipparcos parallax, 239.4 by Gaia's, 0.01″ apart; HIP 82724:
+    // 3.7 pc by Hipparcos, 62.8 by Gaia, 2.3″ apart. A coincidence of direction that close is
+    // never chance at this depth; the parallax is what is wrong.
+    const gaia = at(1, 1.72, -8.9, 239.4, { name: 'Gaia DR3 395581679270412160', source: 'gaia' });
+    expect(isSameStar(gaia, at(213, 1.72 + arcsecOfRa(0.1, -8.9), -8.9, 143.7, { name: 'HD 225021' }))).toBe(true);
+    expect(isSameStar(at(2, 253.6, -38.1, 62.8, { source: 'gaia' }), at(82724, 253.6 + arcsecOfRa(2.3, -38.1), -38.1, 3.7))).toBe(true);
+  });
+
+  it('past those three arcseconds, does not match along a line of sight when the distances conflict', () => {
+    // Nearly the same direction, one three times further away: a background star, not the same object.
+    expect(isSameStar(at(1, 200, 10, 100), at(2, 200 + arcsecOfRa(5, 10), 10, 300))).toBe(false);
+  });
+
+  it('still hears the brightness inside those three arcseconds', () => {
+    // Ashlesha (ε Hya, V 3.38) has a companion 2.7″ away that Gaia does carry, three magnitudes
+    // fainter, while it does not carry Ashlesha. Direction alone would put the name on the companion.
+    const companion = at(1, 131.69, 6.42, 40, { name: 'Gaia DR3 1', magnitude: 6.7, source: 'gaia' });
+    expect(isSameStar(companion, at(43109, 131.69 + arcsecOfRa(2.7, 6.42), 6.42, 40, { name: 'Ashlesha', magnitude: 3.38 }))).toBe(false);
   });
 
   it('matches on direction rather than on 3D proximity', () => {
@@ -181,6 +207,13 @@ describe('mergeStarCatalogues', () => {
       ]);
       expect(stars).toHaveLength(1);
     }
+
+    // And the one edge the grid has to wrap: 3.6″ apart, either side of 0h.
+    const { stars } = mergeStarCatalogues([
+      { ...HIPPARCOS, stars: [at(1, 359.9995, 0, 100)] },
+      { ...GAIA, stars: [at(2, 0.0005, 0, 100)] }
+    ]);
+    expect(stars).toHaveLength(1);
   });
 
   it('handles a single catalogue as a plain pass-through', () => {

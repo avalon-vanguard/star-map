@@ -1,3 +1,4 @@
+import { isDesignation } from '../models/star-catalog';
 import { StarRecord } from '../models/star.model';
 
 /**
@@ -17,8 +18,32 @@ import { StarRecord } from '../models/star.model';
 
 const DEG_TO_RAD = Math.PI / 180;
 
-/** Angular separation, in degrees, below which two entries are taken to be the same star. */
-export const MERGE_ANGULAR_TOLERANCE_DEG = 1 / 3600;
+/**
+ * Angular separation, in degrees, below which two entries are taken to be the same star.
+ *
+ * Every source arrives here at epoch J2000.0 — HYG publishes it, Gaia is carried back to it with
+ * its own proper motions in `gaia.ts` — so what separates two entries of one star is measurement,
+ * not motion. Left at their own epochs, sixteen years of proper motion put Proxima's two entries
+ * 62″ apart and Barnard's 166″, and an arcsecond of tolerance kept every fast star twice while
+ * folding the slow ones.
+ *
+ * What measurement leaves is under an arcsecond for a Hipparcos position — 55 457 of the 56 000
+ * stars both catalogues hold — and up to tens of arcseconds for the Gliese-only entries HYG
+ * carries without Hipparcos astrometry: Wolf 359 sits 5″ from where Gaia has it, Ross 248 12″.
+ * Fifteen arcseconds takes those. The sky is sparse enough at this depth that shifting every
+ * entry a quarter of a degree finds only 16 chance neighbours within it, against 116 real ones
+ * between ten and fifteen; past twenty the two curves run together.
+ */
+export const MERGE_ANGULAR_TOLERANCE_DEG = 15 / 3600;
+
+/**
+ * How far two catalogues may disagree about a star's brightness and still describe the same
+ * star. Bands differ — HYG's V and Gaia's G are three magnitudes apart for the reddest dwarfs —
+ * but five is not a band, it is a companion: Sirius B sits 6″ from Sirius and ten magnitudes
+ * fainter, Polaris B 18″ and seven. Gaia saturates below G ≈ 3, so without this a bright primary
+ * it does not carry is folded into its companion's entry, and the companion is gone.
+ */
+export const MERGE_MAGNITUDE_TOLERANCE = 5;
 
 /**
  * How far two distances may disagree, as a ratio, and still describe the same star. Generous on
@@ -36,7 +61,7 @@ export interface MergeCandidate {
 
 export interface MergeSummary {
   readonly total: number;
-  /** Entries dropped because a better-measured catalogue already had that star. */
+  /** Entries folded into one a better-measured catalogue already had; see {@link combine}. */
   readonly duplicates: number;
   readonly bySource: Readonly<Record<string, number>>;
 }
@@ -86,8 +111,15 @@ export function directionCosine(a: StarRecord, b: StarRecord): number {
   return Math.max(-1, Math.min(1, ax * bx + ay * by + az * bz));
 }
 
-/** Whether two entries describe the same star: same direction, and distances not in conflict. */
+/**
+ * Whether two entries describe the same star: same direction, and neither distance nor
+ * brightness in conflict.
+ */
 export function isSameStar(a: StarRecord, b: StarRecord): boolean {
+  if (Math.abs(a.magnitude - b.magnitude) > MERGE_MAGNITUDE_TOLERANCE) {
+    return false;
+  }
+
   const [near, far] = [distanceOf(a), distanceOf(b)].sort((p, q) => p - q);
 
   // The Sun sits at the origin of this coordinate system and so has no direction at all, which
@@ -106,16 +138,36 @@ export function isSameStar(a: StarRecord, b: StarRecord): boolean {
 }
 
 /**
+ * One entry from two of the same star: the position of the better-measured one — inserted first,
+ * so it is the one already `kept` — and the description of whichever knows the star as more than
+ * a catalogue number. HYG's "Proxima Centauri", "M5Ve" and V magnitude over Gaia's
+ * "Gaia DR3 5853498713190525696", "Unknown" and G; keeping either row whole loses half of that,
+ * and keeping Gaia's whole once cost the map 102 proper names and 32 000 spectral types. The id
+ * travels with the description, so a star HYG knows keeps its HYG id from one refresh to the next;
+ * `source` stays with the position, since that is what it records.
+ */
+function combine(kept: StarRecord, other: StarRecord): StarRecord {
+  const described = isDesignation(kept) && !isDesignation(other) ? other : kept;
+  return { ...described, x: kept.x, y: kept.y, z: kept.z, source: kept.source };
+}
+
+/**
  * Unions the given catalogues, keeping one entry per star.
  *
- * Sources are taken in order of how precisely they measure parallax, best first, and a star is
- * only added if no better-measured catalogue already has it. So where Gaia and Hipparcos
- * overlap, the position is Gaia's; where only Hipparcos reaches, the star is still there.
+ * Sources are taken in order of how precisely they measure parallax, best first. An entry that a
+ * better-measured catalogue already has is folded into that entry — the nearest one within the
+ * tolerance, see {@link combine} for what each side keeps. Only entries from *other* sources
+ * count as already there: a catalogue does not list a star twice, so two of its own entries
+ * within the tolerance are two stars, typically a double that Gaia resolves and Hipparcos did
+ * not. Where only one source reaches, the star is still there.
  */
 export function mergeStarCatalogues(candidates: readonly MergeCandidate[]): { stars: StarRecord[]; summary: MergeSummary } {
   const ordered = [...candidates].sort((a, b) => a.parallaxPrecisionMas - b.parallaxPrecisionMas);
   const merged: StarRecord[] = [];
-  const grid = new Map<string, StarRecord[]>();
+  const grid = new Map<string, number[]>();
+  // Entries that already absorbed one from a source, as `${index}/${source}`: a double that
+  // Gliese lists as two entries at one position has to land on two Gaia entries, not on one.
+  const taken = new Set<string>();
   const bySource: Record<string, number> = {};
   let duplicates = 0;
 
@@ -123,24 +175,41 @@ export function mergeStarCatalogues(candidates: readonly MergeCandidate[]): { st
     bySource[candidate.sourceId] = 0;
 
     for (const star of candidate.stars) {
-      const { raDeg, decDeg } = skyAngles(star);
-      const alreadyPresent = neighbouringCells(raDeg, decDeg).some((key) => (grid.get(key) ?? []).some((existing) => isSameStar(existing, star)));
+      const entry: StarRecord = { ...star, source: star.source ?? candidate.sourceId };
+      const { raDeg, decDeg } = skyAngles(entry);
 
-      if (alreadyPresent) {
+      let match: number | null = null;
+      let matchCosine = -1;
+      for (const key of neighbouringCells(raDeg, decDeg)) {
+        for (const index of grid.get(key) ?? []) {
+          const existing = merged[index];
+          if (existing.source === entry.source || taken.has(`${index}/${entry.source}`) || !isSameStar(existing, entry)) {
+            continue;
+          }
+          const cosine = directionCosine(existing, entry);
+          if (cosine > matchCosine) {
+            match = index;
+            matchCosine = cosine;
+          }
+        }
+      }
+
+      if (match !== null) {
+        merged[match] = combine(merged[match], entry);
+        taken.add(`${match}/${entry.source}`);
         duplicates++;
         continue;
       }
 
-      const withSource: StarRecord = { ...star, source: star.source ?? candidate.sourceId };
-      merged.push(withSource);
+      const index = merged.push(entry) - 1;
       bySource[candidate.sourceId]++;
 
       const key = cellKey(raDeg, decDeg);
       const cell = grid.get(key);
       if (cell) {
-        cell.push(withSource);
+        cell.push(index);
       } else {
-        grid.set(key, [withSource]);
+        grid.set(key, [index]);
       }
     }
   }

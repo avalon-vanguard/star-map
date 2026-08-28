@@ -1,4 +1,4 @@
-import { raDegDecDistanceToXyz } from '../../../src/app/shared/astro/coordinates';
+import { propagateProperMotion, raDegDecDistanceToXyz } from '../../../src/app/shared/astro/coordinates';
 import { StarRecord } from '../../../src/app/shared/models/star.model';
 import { parseCsvObjects, parseOptionalNumber } from '../lib/csv';
 import { fetchTextCached } from '../lib/http';
@@ -11,13 +11,23 @@ import { fetchTextCached } from '../lib/http';
  * Galaxy — no catalogue is close to the rest — but within a few hundred parsecs it is complete
  * in a way Hipparcos never was, and its parallaxes are fifty times more precise.
  *
- * **This has never been run.** Every ESA, NOIRLab, SDSS and Euclid endpoint is unreachable from
- * the environment this was written in, so the query below is written against the published DR3
- * schema and has not been executed against it. Treat the column names as the first thing to
- * check if a real run misbehaves.
+ * Written blind against the published DR3 schema, since no ESA endpoint was reachable from the
+ * environment it was written in; first run for real by the scheduled refresh of 2026-08-24, which
+ * fetched 412 765 rows.
  */
 
 const GAIA_TAP_URL = 'https://gea.esac.esa.int/tap-server/tap/sync';
+
+/**
+ * Gaia DR3 gives positions for J2016.0; HYG for J2000.0, which is the epoch this map keeps.
+ * Sixteen years of proper motion is over an arcsecond for anything faster than ~62 mas/yr —
+ * which is most of the nearest stars: 62″ for Proxima, 166″ for Barnard's — so as published, the
+ * two catalogues never agree on where those stars are, and a merge that matched them on the sky
+ * kept every one of them twice. Each position is therefore carried back to J2000.0 with Gaia's
+ * own proper motion before it leaves here.
+ */
+const GAIA_DR3_EPOCH = 2016.0;
+const CATALOGUE_EPOCH = 2000.0;
 
 /**
  * How far out to take Gaia, in parsecs, and the faintest star to keep.
@@ -44,7 +54,7 @@ function parallaxFloorMas(distancePc: number): number {
 function buildQuery(): string {
   return [
     `select top ${ROW_LIMIT}`,
-    'source_id, ra, dec, parallax, parallax_error, phot_g_mean_mag, bp_rp',
+    'source_id, ra, dec, pmra, pmdec, parallax, parallax_error, phot_g_mean_mag, bp_rp',
     'from gaiadr3.gaia_source',
     `where parallax > ${parallaxFloorMas(DISTANCE_CUTOFF_PC).toFixed(6)}`,
     `and parallax_over_error > ${(1 / MAX_PARALLAX_ERROR_RATIO).toFixed(1)}`,
@@ -72,7 +82,9 @@ export async function fetchGaiaStars(): Promise<StarRecord[]> {
   const url = `${GAIA_TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=${encodeURIComponent(buildQuery())}`;
   console.log(`Fetching Gaia DR3 (within ${DISTANCE_CUTOFF_PC} pc, G < ${MAGNITUDE_LIMIT}, at most ${ROW_LIMIT} rows)...`);
 
-  const csv = await fetchTextCached(url, 'gaia-dr3.csv');
+  // The cache key names the columns, so a response cached before proper motions were asked for
+  // cannot be mistaken for one that has them.
+  const csv = await fetchTextCached(url, 'gaia-dr3-pm.csv');
   const rows = parseCsvObjects(csv);
   const stars: StarRecord[] = [];
 
@@ -89,7 +101,8 @@ export async function fetchGaiaStars(): Promise<StarRecord[]> {
       return;
     }
 
-    const { x, y, z } = raDegDecDistanceToXyz(raDeg, decDeg, distancePc);
+    const j2000 = propagateProperMotion(raDeg, decDeg, parseOptionalNumber(row['pmra']) ?? 0, parseOptionalNumber(row['pmdec']) ?? 0, CATALOGUE_EPOCH - GAIA_DR3_EPOCH);
+    const { x, y, z } = raDegDecDistanceToXyz(j2000.raDeg, j2000.decDeg, distancePc);
     stars.push({
       id: GAIA_ID_BASE + index,
       name: `Gaia DR3 ${row['source_id']}`,

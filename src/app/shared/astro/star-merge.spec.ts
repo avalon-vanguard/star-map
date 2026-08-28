@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { raDegDecDistanceToXyz } from './coordinates';
 import { StarRecord } from '../models/star.model';
-import { directionCosine, isSameStar, mergeStarCatalogues } from './star-merge';
+import { directionCosine, isSameStar, MERGE_ANGULAR_TOLERANCE_DEG, mergeStarCatalogues } from './star-merge';
 
 /** A star at a given sky position and distance, which is how catalogues actually report them. */
 function at(id: number, raDeg: number, decDeg: number, distancePc: number, overrides: Partial<StarRecord> = {}): StarRecord {
@@ -13,15 +13,35 @@ function at(id: number, raDeg: number, decDeg: number, distancePc: number, overr
 const HIPPARCOS = { sourceId: 'hyg', parallaxPrecisionMas: 1 };
 const GAIA = { sourceId: 'gaia', parallaxPrecisionMas: 0.02 };
 
+/** Degrees of right ascension that span `arcsec` on the sky at declination `decDeg`. */
+function arcsecOfRa(arcsec: number, decDeg: number): number {
+  return arcsec / 3600 / Math.cos((decDeg * Math.PI) / 180);
+}
+
 describe('isSameStar', () => {
   it('matches two catalogues reporting the same star', () => {
     expect(isSameStar(at(1, 101.28, -16.71, 2.64), at(2, 101.28, -16.71, 2.63))).toBe(true);
+  });
+
+  it('matches within the angular tolerance and not beyond it', () => {
+    const toleranceArcsec = MERGE_ANGULAR_TOLERANCE_DEG * 3600;
+    expect(isSameStar(at(1, 200, 10, 100), at(2, 200 + arcsecOfRa(0.9 * toleranceArcsec, 10), 10, 100))).toBe(true);
+    expect(isSameStar(at(1, 200, 10, 100), at(2, 200 + arcsecOfRa(1.1 * toleranceArcsec, 10), 10, 100))).toBe(false);
   });
 
   it('tolerates the distance disagreement two parallaxes actually have', () => {
     // Hipparcos and Gaia routinely differ by tens of per cent at a few hundred parsecs. That
     // disagreement is the reason to prefer one of them, not evidence they are different stars.
     expect(isSameStar(at(1, 200, 10, 200), at(2, 200, 10, 260))).toBe(true);
+  });
+
+  it('keeps a bright primary out of the entry of its faint companion', () => {
+    // Gaia has no Sirius — it saturates — but has Sirius B, 6″ away at the same distance and ten
+    // magnitudes fainter. Direction and distance say "same star"; the brightness says otherwise.
+    const sirius = at(32263, 101.2875, -16.7161, 2.637, { name: 'Sirius', magnitude: -1.44 });
+    const siriusB = at(1, 101.2875 + arcsecOfRa(6.1, -16.7161), -16.7161, 2.67, { name: 'Gaia DR3 2947050466531873024', magnitude: 8.5, source: 'gaia' });
+    expect(isSameStar(sirius, siriusB)).toBe(false);
+    expect(isSameStar(sirius, { ...siriusB, magnitude: -1.3 })).toBe(true);
   });
 
   it('does not match two different stars that happen to be at the same distance', () => {
@@ -70,6 +90,44 @@ describe('mergeStarCatalogues', () => {
     expect(stars[0].id).toBe(2);
     expect(stars[0].source).toBe('gaia');
     expect(summary.duplicates).toBe(1);
+  });
+
+  it('gives a matched star the better position and the name somebody gave it', () => {
+    // What a merge is for: Gaia knows where Proxima is to a fraction of a milliarcsecond and
+    // calls it by a nineteen-digit number; HYG knows its name, its spectral type and its V
+    // magnitude. Keeping one row whole loses half of that either way. The id follows the
+    // description, so a star HYG knows keeps its HYG id from one refresh to the next.
+    const hyg = at(70666, 217.4289, -62.6795, 1.2959, { name: 'Proxima Centauri', spectralType: 'M5Ve', magnitude: 11.01, colorIndex: 1.807 });
+    const gaia = at(1000064182, 217.4289, -62.6795, 1.302, { name: 'Gaia DR3 5853498713190525696', spectralType: 'Unknown', magnitude: 8.985, colorIndex: 3.805, source: 'gaia' });
+    const { stars, summary } = mergeStarCatalogues([{ ...HIPPARCOS, stars: [hyg] }, { ...GAIA, stars: [gaia] }]);
+
+    expect(stars).toEqual([{ ...hyg, x: gaia.x, y: gaia.y, z: gaia.z, source: 'gaia' }]);
+    expect(summary.duplicates).toBe(1);
+  });
+
+  it('keeps two entries of one source apart, however close they are', () => {
+    // Gaia resolves doubles Hipparcos saw as one star: two source ids 0.8″ apart are two stars,
+    // and only *another* catalogue can claim to have already listed either of them.
+    const { stars, summary } = mergeStarCatalogues([{ ...GAIA, stars: [at(1, 10, 10, 100), at(2, 10 + arcsecOfRa(0.8, 10), 10, 100)] }]);
+    expect(stars).toHaveLength(2);
+    expect(summary.duplicates).toBe(0);
+  });
+
+  it('folds an entry into the nearest match, and into each match once', () => {
+    // Gliese lists both components of a double; Gaia resolves them 0.8″ apart. Each HYG
+    // component must land on its own Gaia counterpart — not both on whichever the grid yields
+    // first, and not both on the same one.
+    const gaiaA = at(1, 10, 10, 2.68, { name: 'Gaia DR3 1', source: 'gaia' });
+    const gaiaB = at(2, 10 + arcsecOfRa(0.8, 10), 10, 2.68, { name: 'Gaia DR3 2', source: 'gaia' });
+    const a = at(118079, 10, 10, 2.63, { name: 'Gl 65A' });
+    const b = at(118080, 10 + arcsecOfRa(0.8, 10), 10, 2.63, { name: 'Gl 65B' });
+    const position = (star: StarRecord) => [star.x, star.y, star.z];
+
+    const nearest = mergeStarCatalogues([{ ...HIPPARCOS, stars: [b, a] }, { ...GAIA, stars: [gaiaA, gaiaB] }]);
+    expect(nearest.stars.map((star) => [star.name, ...position(star)])).toEqual([['Gl 65A', ...position(gaiaA)], ['Gl 65B', ...position(gaiaB)]]);
+
+    const onePlace = mergeStarCatalogues([{ ...HIPPARCOS, stars: [a, { ...b, x: a.x, y: a.y, z: a.z }] }, { ...GAIA, stars: [gaiaA, gaiaB] }]);
+    expect(onePlace.stars.map((star) => [star.name, ...position(star)])).toEqual([['Gl 65A', ...position(gaiaA)], ['Gl 65B', ...position(gaiaB)]]);
   });
 
   it('keeps a star the better catalogue does not reach', () => {

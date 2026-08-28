@@ -1,6 +1,5 @@
 import { writeFileSync } from 'node:fs';
 
-import { raDecDistanceToXyz } from '../../src/app/shared/astro/coordinates';
 import { mergeStarCatalogues } from '../../src/app/shared/astro/star-merge';
 import { encodeStarCatalog } from '../../src/app/shared/models/star-catalog';
 import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model';
@@ -59,9 +58,9 @@ function resolveName(row: Record<string, string>): string {
 }
 
 /**
- * Downloads the HYG (Hipparcos/Yale/Gliese) stellar database, converts each star's
- * RA/Dec/distance into galaxy-scale Cartesian coordinates (parsecs), filters by distance,
- * and writes `stars.bin` (packed positions) + `stars-index.json` (everything else).
+ * Downloads the HYG (Hipparcos/Yale/Gliese) stellar database, takes each star's equatorial
+ * Cartesian position (parsecs, epoch J2000.0), filters by distance, unions the other positional
+ * sources, and writes `stars.bin` (packed positions) + `stars-index.json` (everything else).
  */
 export async function fetchStars(): Promise<StarRecord[]> {
   console.log(`Fetching HYG star catalog (distance cutoff: ${DISTANCE_CUTOFF_PC} pc)...`);
@@ -83,13 +82,17 @@ export async function fetchStars(): Promise<StarRecord[]> {
       continue;
     }
 
-    const raHours = Number(row['ra']);
-    const decDeg = Number(row['dec']);
-    if (!Number.isFinite(raHours) || !Number.isFinite(decDeg)) {
+    // HYG's own Cartesian columns rather than its `ra`/`dec`, which are in the same frame as
+    // `raDecDistanceToXyz` and would be redundant if the two agreed. They do not, for the stars
+    // that move: the right ascension was carried from the Hipparcos epoch to 2000.0 without the
+    // cos δ its motion needs, which puts Proxima 17.9″ from where HYG's own x/y/z — and Gaia,
+    // once brought to the same epoch — have it. 1813 stars differ by over an arcsecond.
+    const x = Number(row['x']);
+    const y = Number(row['y']);
+    const z = Number(row['z']);
+    if (![x, y, z].every(Number.isFinite)) {
       continue;
     }
-
-    const { x, y, z } = raDecDistanceToXyz(raHours, decDeg, distancePc);
 
     stars.push({
       id,
@@ -143,7 +146,7 @@ async function mergeWithOtherSources(hygStars: StarRecord[]): Promise<StarRecord
   }
 
   const { stars, summary } = mergeStarCatalogues(candidates);
-  console.log(`  merged ${summary.total} stars from ${candidates.length} catalogues (${summary.duplicates} duplicates resolved to the better parallax):`);
+  console.log(`  merged ${summary.total} stars from ${candidates.length} catalogues (${summary.duplicates} entries folded into a better-measured one):`);
   for (const [sourceId, count] of Object.entries(summary.bySource)) {
     console.log(`    ${sourceId}: ${count}`);
   }

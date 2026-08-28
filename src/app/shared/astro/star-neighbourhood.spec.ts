@@ -74,6 +74,16 @@ describe('StarNeighbourhood', () => {
     expect(ids(index.nearest(4, 2, (point) => point.id % 2 === 0))).toEqual([2, 6]);
   });
 
+  it('puts the stars it is told to prefer first, and fills with the rest only when short', () => {
+    const index = new StarNeighbourhood(line(10));
+    const even = (point: StarPoint) => point.id % 2 === 0;
+
+    // Enough even stars: the odd ones next door, though nearer, do not get a look in.
+    expect(ids(index.nearestPreferring(4, 2, even))).toEqual([2, 6]);
+    // Not enough: every even star in reach, then the nearest of the others.
+    expect(ids(index.nearestPreferring(4, 6, even))).toEqual([2, 6, 0, 8, 3, 5]);
+  });
+
   it('answers nothing for a star it has never heard of', () => {
     const index = new StarNeighbourhood(line(3));
 

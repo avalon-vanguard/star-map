@@ -7,6 +7,7 @@ import {
   OBLIQUITY_J2000_DEG,
   parallaxMasToParsecs,
   parseSexagesimal,
+  propagateProperMotion,
   raDecDistanceToXyz,
   raDecToUnitVector,
   raDegDecDistanceToXyz
@@ -56,6 +57,27 @@ describe('raDegDecDistanceToXyz', () => {
     expect(fromDegrees.x).toBeCloseTo(fromHours.x, 9);
     expect(fromDegrees.y).toBeCloseTo(fromHours.y, 9);
     expect(fromDegrees.z).toBeCloseTo(fromHours.z, 9);
+  });
+});
+
+describe('propagateProperMotion', () => {
+  it("carries Barnard's Star from Gaia's epoch back to HYG's", () => {
+    // Gaia DR3 4472832130942575872 as published for J2016.0, moved back sixteen years with its
+    // own proper motion, lands on the J2000.0 position SIMBAD lists to a milliarcsecond — and
+    // 0.08″ from where HYG has Barnard's Star, instead of the 166″ the two epochs put between them.
+    const j2000 = propagateProperMotion(269.44850252543836, 4.739420051112412, -801.550978, 10362.394207, -16);
+    expect(j2000.raDeg).toBeCloseTo(269.4520772, 6);
+    expect(j2000.decDeg).toBeCloseTo(4.693365, 6);
+  });
+
+  it('divides the right-ascension motion by cos δ, since pmra is published on the sky', () => {
+    // 3600 mas/yr for one year is 3.6″ on the sky; at Dec 60° that is 7.2″ of right ascension.
+    expect(propagateProperMotion(0, 60, 3600, 0, 1).raDeg).toBeCloseTo(7.2 / 3600, 9);
+    expect(propagateProperMotion(0, 60, 0, 3600, 1).decDeg).toBeCloseTo(60 + 3.6 / 3600, 9);
+  });
+
+  it('leaves a star with no proper motion where it is', () => {
+    expect(propagateProperMotion(100, -20, 0, 0, 16)).toEqual({ raDeg: 100, decDeg: -20 });
   });
 });
 

@@ -200,6 +200,17 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(navigationStore.viewLevel()).toBe('galaxy');
   });
 
+  it('clears a selection the catalogue no longer holds instead of chasing it', async () => {
+    // A bookmark saved against a Gaia row id that the next refresh renumbered. Before the guard,
+    // entering the missing system completed at once, completion re-read the same id, and the
+    // two recursed until the stack overflowed.
+    navigationStore.selectStar(987654321);
+    await flushAsync();
+
+    expect(navigationStore.selectedStarId()).toBeNull();
+    expect(navigationStore.viewLevel()).toBe('galaxy');
+  });
+
   it('flies the camera into a selected star system: hides the galaxy group, shows the system group, and switches to AU-scale near/far planes', async () => {
     navigationStore.selectStar(SUN.id);
     await flushAsync();

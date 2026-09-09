@@ -33,6 +33,21 @@ export function raDegDecDistanceToXyz(raDeg: number, decDeg: number, distancePc:
   return raDecDistanceToXyz(raDeg / HOURS_TO_DEG, decDeg, distancePc);
 }
 
+const MAS_TO_DEG = 1 / 3_600_000;
+
+/**
+ * Moves a sky position along its proper motion by `years` — negative to go back in time — so
+ * catalogues that observed at different epochs can be compared at one. `pmRaMasPerYear` is
+ * μα cos δ, the on-sky rate Hipparcos and Gaia both publish, hence the division by cos δ to turn
+ * it back into right ascension.
+ */
+export function propagateProperMotion(raDeg: number, decDeg: number, pmRaMasPerYear: number, pmDecMasPerYear: number, years: number): { raDeg: number; decDeg: number } {
+  return {
+    raDeg: raDeg + (years * pmRaMasPerYear * MAS_TO_DEG) / Math.cos(decDeg * DEG_TO_RAD),
+    decDeg: decDeg + years * pmDecMasPerYear * MAS_TO_DEG
+  };
+}
+
 /**
  * Obliquity of the ecliptic at J2000.0, in degrees — the tilt of Earth's orbital plane against
  * its equator, and so the angle between this app's two source frames.

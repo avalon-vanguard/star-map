@@ -17,9 +17,29 @@ export interface HostStarQuery {
   pmDecMasPerYear?: number;
 }
 
-/** Builds a lookup of normalized star name -> star, for fast repeated name matching. */
+/**
+ * Builds a lookup of normalized star name -> star, for fast repeated name matching.
+ *
+ * A name two stars answer to names neither: normalizing strips the dot, so `Gl 55.2` and
+ * `Gl 552` — 135° apart, and 64 such groups exist in the catalogue — collide on `gl552`, and a
+ * map would silently keep whichever came last. Ambiguous keys are dropped instead, which sends
+ * the query to the sky, where direction settles it.
+ */
 export function buildStarNameIndex(stars: readonly StarRecord[]): Map<string, StarRecord> {
-  return new Map(stars.map((star) => [normalizeStarName(star.name), star]));
+  const index = new Map<string, StarRecord>();
+  const ambiguous = new Set<string>();
+  for (const star of stars) {
+    const key = normalizeStarName(star.name);
+    if (index.has(key)) {
+      ambiguous.add(key);
+    } else {
+      index.set(key, star);
+    }
+  }
+  for (const key of ambiguous) {
+    index.delete(key);
+  }
+  return index;
 }
 
 /**
@@ -54,6 +74,10 @@ export const HOST_TRANSVERSE_TOLERANCE_PC = 0.01;
  */
 const CATALOGUE_EPOCH = 2000.0;
 const ARCHIVE_LATEST_EPOCH = 2016.0;
+
+function knownMotion(masPerYear: number | undefined): number {
+  return Number.isFinite(masPerYear) ? (masPerYear as number) : 0;
+}
 
 /**
  * Cross-references an exoplanet host star to the star catalogue: first by (normalized) name,
@@ -96,8 +120,11 @@ export function resolveHostStarId(
   const carriedBack = propagateProperMotion(
     query.raDeg,
     query.decDeg,
-    query.pmRaMasPerYear ?? 0,
-    query.pmDecMasPerYear ?? 0,
+    // A proper motion that is not a number must read as "stands still", not poison the
+    // comparison: one NaN makes every star's cosine NaN, and `NaN < min` is false, so every
+    // star would pass the direction test and the last one in array order would win.
+    knownMotion(query.pmRaMasPerYear),
+    knownMotion(query.pmDecMasPerYear),
     CATALOGUE_EPOCH - ARCHIVE_LATEST_EPOCH
   );
   const carried = raDegDecDistanceToXyz(carriedBack.raDeg, carriedBack.decDeg, 1);

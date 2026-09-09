@@ -35,10 +35,11 @@ const TAP_COLUMNS = [
 const TAP_QUERY = `select+${TAP_COLUMNS}+from+ps+where+default_flag=1+order+by+pl_name&format=csv`;
 const TAP_URL = `${TAP_BASE_URL}?query=${TAP_QUERY}`;
 
-// The cache is keyed by the query it answers: a response cached before a column was added
-// would otherwise keep serving rows without it, and a missing proper-motion cell reads as
-// "does not move" — silently wrong, not visibly broken.
-const CACHE_FILE = `exoplanet-archive-ps-${createHash('sha1').update(TAP_QUERY).digest('hex').slice(0, 8)}.csv`;
+// The cache is keyed by the request it answers — endpoint included, since the cache records
+// only that some response arrived: one cached before a column was added would otherwise keep
+// serving rows without it, and a missing proper-motion cell reads as "does not move",
+// silently wrong rather than visibly broken.
+const CACHE_FILE = `exoplanet-archive-ps-${createHash('sha1').update(TAP_URL).digest('hex').slice(0, 8)}.csv`;
 
 /**
  * Downloads confirmed exoplanets from the NASA Exoplanet Archive (`Planetary Systems` TAP

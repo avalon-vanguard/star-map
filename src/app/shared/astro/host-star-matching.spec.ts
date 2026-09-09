@@ -47,14 +47,18 @@ describe('resolveHostStarId', () => {
   describe('matching on the sky', () => {
     // GJ 887's archive row: position at Gaia's epoch, carried by 6.9″/yr of proper motion —
     // 110″ from where the catalogue has the star at J2000. The matcher must carry the query
-    // back those sixteen years itself.
-    it('matches a host published at the Gaia epoch to its star at J2000', () => {
+    // back those sixteen years itself, and judge each star on the better of the two epochs: the
+    // decoy standing halfway along the star's own track is nearer than Lacaille 9352 at the
+    // published point *and* nearer at the worse of the two epochs, so it wins unless the
+    // carried-back position is tried and the best epoch — not the worst — decides.
+    it('matches a host published at the Gaia epoch to its star at J2000, past a decoy on its track', () => {
       const lacaille9352 = star(70, 'Lacaille 9352', 346.46683, -35.85306, 3.29);
       const archive = propagateProperMotion(346.46683, -35.85306, 6768.2, 1327.52, 16);
+      const decoy = star(71, 'Decoy', (346.46683 + archive.raDeg) / 2, (-35.85306 + archive.decDeg) / 2, 3.29);
 
       const id = resolveHostStarId(
         { hostname: 'GJ 887', raDeg: archive.raDeg, decDeg: archive.decDeg, distancePc: 3.28679, pmRaMasPerYear: 6768.2, pmDecMasPerYear: 1327.52 },
-        [lacaille9352]
+        [decoy, lacaille9352]
       );
 
       expect(id).toBe(70);
@@ -119,6 +123,45 @@ describe('resolveHostStarId', () => {
 
       expect(at200).toBeNull();
       expect(at50).toBe(111);
+    });
+
+    // A star whose distance disqualifies it is not merely rejected — it must not become the
+    // best-so-far either, or an unmerged twin with a bad parallax, sitting nearer on the sky
+    // than the true host, silently unhosts the planet by outranking a star that is never
+    // allowed to win.
+    it('does not let a star its distance disqualifies shadow the true host behind it', () => {
+      const badParallaxTwin = star(120, 'Gaia DR3 twin', 40, 12 + 1 / 3600, 480);
+      const host = star(121, 'True host', 40, 12 + 3 / 3600, 100);
+
+      const id = resolveHostStarId({ hostname: 'Unmatched', raDeg: 40, decDeg: 12, distancePc: 100 }, [badParallaxTwin, host]);
+
+      expect(id).toBe(121);
+    });
+
+    // A proper motion that is not a number must not poison the comparison: NaN loses every
+    // `<` it appears in, so an unguarded one lets each star past the direction test and hands
+    // the planet to whichever happens to be last in the catalogue.
+    it('treats an unusable proper motion as no motion rather than matching by array order', () => {
+      const pointedAt = star(130, 'Pointed at', 10, 10, 5);
+      const acrossTheSky = star(131, 'Across the sky', 190, -10, 5);
+
+      const id = resolveHostStarId(
+        { hostname: 'Unmatched', raDeg: 10, decDeg: 10, distancePc: 5, pmRaMasPerYear: NaN, pmDecMasPerYear: 0 },
+        [pointedAt, acrossTheSky]
+      );
+
+      expect(id).toBe(130);
+    });
+
+    // Normalizing strips the dot, so `Gl 55.2` and `Gl 552` — two stars 135° apart — answer to
+    // one key. A name that names both names neither: the sky has to settle it.
+    it('sends a name two stars answer to back to the sky', () => {
+      const gl552 = star(140, 'Gl 552', 217.0, 15.0, 14.2);
+      const gl55dot2 = star(141, 'Gl 55.2', 30.0, -20.0, 23.9);
+
+      const id = resolveHostStarId({ hostname: 'Gl 552', raDeg: 217.0, decDeg: 15.0, distancePc: 14.2 }, [gl552, gl55dot2]);
+
+      expect(id).toBe(140);
     });
 
     it('reuses a prebuilt name index when given one', () => {

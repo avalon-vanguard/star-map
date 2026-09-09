@@ -10,7 +10,6 @@ import { fetchSolarSystem } from './fetchSolarSystem';
 import { BYTES_PER_STAR_META, BYTES_PER_STAR_POSITION, decodeStarCatalog, encodeStarCatalog } from '../../src/app/shared/models/star-catalog';
 import { fetchStars } from './fetchStars';
 import { describeSources } from './sources/registry';
-import { rematchHostStars } from '../../src/app/shared/astro/host-star-matching';
 import { dataPath } from './lib/paths';
 
 class ValidationError extends Error {}
@@ -159,18 +158,6 @@ async function build(): Promise<void> {
   const exoplanets = await fetchExoplanets(stars);
   console.log();
   const deepSky = await fetchDeepSky();
-  console.log();
-
-  // The cross-reference depends on the star catalogue as much as on the archive, so it is
-  // resolved again here against whatever catalogue this run produced. A no-op when the two were
-  // fetched together, and the whole point when only one of them was.
-  const rematch = rematchHostStars(exoplanets, stars);
-  console.log(
-    `Cross-referencing exoplanet hosts against ${stars.length} stars...\n` +
-      `  ${rematch.matched}/${rematch.total} matched` +
-      (rematch.resolvable < rematch.total ? ` (${rematch.total - rematch.resolvable} records predate stored host coordinates and kept their existing match)` : '') +
-      (rematch.gained || rematch.lost ? `; ${rematch.gained} gained, ${rematch.lost} lost` : '')
-  );
   console.log();
 
   console.log('Validating output...');

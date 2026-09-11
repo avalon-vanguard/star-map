@@ -74,6 +74,12 @@ const MAX_HYG_SURVIVORS = 15_000;
 const TWIN_TOLERANCE_RAD = (1 / 3600) * (Math.PI / 180);
 
 function validateMerge(stars: StarRecord[]): void {
+  // Checked first and on its own: an unreachable Gaia is skipped rather than thrown, and would
+  // otherwise surface below as "68 000 HYG stars found no counterpart" — true, and no help.
+  assertCondition(
+    stars.some((star) => star.source === 'gaia'),
+    'Gaia DR3 contributed no stars — the archive was unreachable or returned nothing, and a catalogue without it is not one to publish.'
+  );
   const survivors = stars.filter((star) => star.source === 'hyg').length;
   assertCondition(
     survivors <= MAX_HYG_SURVIVORS,

@@ -41,7 +41,8 @@ jobs:
 
       # The ETL's cache directory is gitignored and this is a fresh runner, so every source is
       # fetched live (~50-100 MB). A failed fetch fails the run by design — no refresh is
-      # better than a partial one — except Gaia, which the ETL itself treats as best-effort.
+      # better than a partial one. That includes Gaia: the ETL skips it when unreachable, and
+      # the merge gate in build.ts then refuses a catalogue it contributed nothing to.
       - name: Rebuild the datasets
         run: npm run etl
 

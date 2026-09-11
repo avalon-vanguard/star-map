@@ -14,7 +14,8 @@ export const STAR_SOURCES: readonly StarSource[] = [
     name: 'HYG database (Hipparcos, Yale Bright Star, Gliese)',
     role: 'positional',
     endpoint: 'https://raw.githubusercontent.com/astronexus/HYG-Database',
-    contributes: 'A complete, named, spectrally classified bright-star catalogue with parallaxes — 68388 stars within 250 pc.',
+    contributes:
+      'A complete, named, spectrally classified bright-star catalogue. Its Hipparcos parallaxes give way to Gaia’s wherever Gaia has a usable one, so its stars sit where the better measurement puts them.',
     unimplementedBecause: null
   },
   {

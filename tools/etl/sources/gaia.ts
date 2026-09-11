@@ -125,3 +125,52 @@ export async function fetchGaiaStars(): Promise<StarRecord[]> {
   console.log(`  kept ${stars.length} Gaia stars (of ${rows.length} rows).`);
   return stars;
 }
+
+/**
+ * DR3's Hipparcos cross-match is a fixed table of 99 525 rows, 97 751 of them with a usable
+ * parallax. Far fewer means the answer was an error page served with a 200, or was cut short,
+ * and either would pass for "Gaia does not know these stars" and put every one of them back at
+ * its Hipparcos distance.
+ */
+const MIN_USABLE_HIP_DISTANCES = 90_000;
+
+/**
+ * Gaia's distance for every Hipparcos star it has a usable parallax for, keyed by HIP number.
+ *
+ * Taken from the archive's own cross-match (`hipparcos2_best_neighbour`) rather than from
+ * matching positions here, since Gaia's team made that identification star by star with the
+ * proper motions and photometry in hand. It is deliberately not bounded by distance: the stars
+ * it exists for are the ones Hipparcos put inside the map and Gaia puts outside, which the main
+ * query above never fetches.
+ *
+ * Required rather than best effort. Without it every HYG star falls back to its Hipparcos
+ * distance, the 6 833 that Gaia puts past 250 pc move back inside, and the published map would
+ * flip between the two with the archive's availability.
+ */
+export async function fetchGaiaDistancesByHip(): Promise<Map<number, number>> {
+  const query = [
+    'select top 200000 b.original_ext_source_id as hip, g.parallax, g.parallax_over_error',
+    'from gaiadr3.hipparcos2_best_neighbour b join gaiadr3.gaia_source g on g.source_id = b.source_id'
+  ].join(' ');
+  const url = `${GAIA_TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=${encodeURIComponent(query)}`;
+  console.log('Fetching Gaia DR3 distances for Hipparcos stars (archive cross-match)...');
+  const rows = parseCsvObjects(await fetchTextCached(url, `gaia-dr3-hip-${createHash('sha1').update(url).digest('hex').slice(0, 8)}.csv`));
+
+  const distances = new Map<number, number>();
+  for (const row of rows) {
+    const hip = parseOptionalNumber(row['hip']);
+    const parallaxMas = parseOptionalNumber(row['parallax']);
+    const overError = parseOptionalNumber(row['parallax_over_error']);
+    if (hip !== undefined && parallaxMas !== undefined && parallaxMas > 0 && overError !== undefined && overError > 1 / MAX_PARALLAX_ERROR_RATIO) {
+      distances.set(hip, 1000 / parallaxMas);
+    }
+  }
+  if (distances.size < MIN_USABLE_HIP_DISTANCES) {
+    throw new Error(
+      `the Hipparcos cross-match gave ${distances.size} usable distances (of ${rows.length} rows), not the ~97 751 it holds; ` +
+        'delete tools/etl/.cache/gaia-dr3-hip-*.csv once the archive answers properly'
+    );
+  }
+  console.log(`  ${distances.size} Hipparcos stars have a Gaia distance (of ${rows.length} cross-matched).`);
+  return distances;
+}

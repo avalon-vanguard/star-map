@@ -39,10 +39,19 @@ jobs:
 
       - run: npm ci
 
-      # The ETL's cache directory is gitignored and this is a fresh runner, so every source is
-      # fetched live (~50-100 MB). A failed fetch fails the run by design — no refresh is
-      # better than a partial one. That includes Gaia: the ETL skips it when unreachable, and
-      # the merge gate in build.ts then refuses a catalogue it contributed nothing to.
+      # Gaia DR3 is a frozen release: the same query returns the same bytes (a live re-fetch has
+      # reproduced stars.bin exactly), so its responses are carried from one run to the next
+      # rather than re-downloaded every week from an archive that times out under load. The key
+      # follows gaia.ts, where the queries are written, so a changed query is fetched afresh.
+      - uses: actions/cache@v4
+        with:
+          path: tools/etl/.cache/gaia-dr3-*.csv
+          key: gaia-dr3-${{ hashFiles('tools/etl/sources/gaia.ts') }}
+
+      # Every other source is fetched live on this fresh runner. A failed fetch fails the run by
+      # design — no refresh is better than a partial one. That includes Gaia on a cold cache:
+      # the ETL skips it when unreachable, and the merge gate in build.ts then refuses a
+      # catalogue it contributed nothing to.
       - name: Rebuild the datasets
         run: npm run etl
 

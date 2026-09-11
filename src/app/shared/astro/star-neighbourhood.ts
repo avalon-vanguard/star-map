@@ -38,12 +38,27 @@ const DEFAULT_CELL_SIZE_PC = 5;
 /** Grows the search a shell of cells at a time; the cap stops a query in empty space forever. */
 const MAX_RING = 12;
 
-function cellKey(ix: number, iy: number, iz: number): string {
-  return `${ix},${iy},${iz}`;
+/**
+ * Cells are keyed by one number packed from their three indices rather than by a string. A route
+ * search visits up to 125 cells for every star it expands, and building `"ix,iy,iz"` for each
+ * was half of what a route cost. Room for 65 536 cells either side of the Sun on every axis,
+ * 330 kpc at the default cell size, and the packed key stays inside a double's exact integers.
+ */
+const CELL_OFFSET = 65_536;
+const CELL_SPAN = 131_072;
+
+function cellKey(ix: number, iy: number, iz: number): number {
+  return ((ix + CELL_OFFSET) * CELL_SPAN + (iy + CELL_OFFSET)) * CELL_SPAN + (iz + CELL_OFFSET);
+}
+
+function cellIndices(key: number): [number, number, number] {
+  const iz = (key % CELL_SPAN) - CELL_OFFSET;
+  const rest = Math.floor(key / CELL_SPAN);
+  return [Math.floor(rest / CELL_SPAN) - CELL_OFFSET, (rest % CELL_SPAN) - CELL_OFFSET, iz];
 }
 
 export class StarNeighbourhood {
-  private readonly cells = new Map<string, number[]>();
+  private readonly cells = new Map<number, number[]>();
   private readonly points: readonly StarPoint[];
   private readonly indexById = new Map<number, number>();
   private readonly cellSizePc: number;
@@ -135,34 +150,52 @@ export class StarNeighbourhood {
    * a jump-link graph is built from: one call per node gives that node's edges.
    */
   within(id: number, radiusPc: number): Neighbour[] {
+    const found: Neighbour[] = [];
+    this.forEachWithin(id, radiusPc, (neighbour, distancePc) => found.push({ id: neighbour.id, distancePc }));
+    found.sort((a, b) => a.distancePc - b.distancePc);
+    return found;
+  }
+
+  /**
+   * The same stars as `within`, handed over one at a time in no particular order. What a search
+   * that expands thousands of stars wants: it has no use for each star's neighbours sorted and
+   * collected into a list, which was the other half of what a route cost.
+   *
+   * A distance is compared as a distance, not as its square, here and in the pair walk: squaring
+   * a range can round it just under the square of the very hop it was read from, and then a
+   * range set to a reported distance would not admit that hop again.
+   */
+  forEachWithin(id: number, radiusPc: number, visit: (neighbour: StarPoint, distancePc: number) => void): void {
     const origin = this.point(id);
     if (!origin || radiusPc <= 0) {
-      return [];
+      return;
     }
-
-    const found: Neighbour[] = [];
     const [ox, oy, oz] = this.cellFor(origin.x, origin.y, origin.z);
     const reach = Math.ceil(radiusPc / this.cellSizePc);
 
     for (let ix = ox - reach; ix <= ox + reach; ix++) {
       for (let iy = oy - reach; iy <= oy + reach; iy++) {
         for (let iz = oz - reach; iz <= oz + reach; iz++) {
-          for (const index of this.cells.get(cellKey(ix, iy, iz)) ?? []) {
+          const cell = this.cells.get(cellKey(ix, iy, iz));
+          if (!cell) {
+            continue;
+          }
+          for (const index of cell) {
             const candidate = this.points[index];
             if (candidate.id === id) {
               continue;
             }
-            const distancePc = Math.hypot(candidate.x - origin.x, candidate.y - origin.y, candidate.z - origin.z);
+            const dx = candidate.x - origin.x;
+            const dy = candidate.y - origin.y;
+            const dz = candidate.z - origin.z;
+            const distancePc = Math.sqrt(dx * dx + dy * dy + dz * dz);
             if (distancePc <= radiusPc) {
-              found.push({ id: candidate.id, distancePc });
+              visit(candidate, distancePc);
             }
           }
         }
       }
     }
-
-    found.sort((a, b) => a.distancePc - b.distancePc);
-    return found;
   }
 
   /**
@@ -181,10 +214,9 @@ export class StarNeighbourhood {
       return;
     }
     const reach = Math.ceil(radiusPc / this.cellSizePc);
-    const radiusSq = radiusPc * radiusPc;
 
     for (const [key, cell] of this.cells) {
-      const [ix, iy, iz] = key.split(',').map(Number);
+      const [ix, iy, iz] = cellIndices(key);
       for (let dx = 0; dx <= reach; dx++) {
         for (let dy = dx === 0 ? 0 : -reach; dy <= reach; dy++) {
           for (let dz = dx === 0 && dy === 0 ? 0 : -reach; dz <= reach; dz++) {
@@ -202,9 +234,9 @@ export class StarNeighbourhood {
                 const dxp = b.x - a.x;
                 const dyp = b.y - a.y;
                 const dzp = b.z - a.z;
-                const distanceSq = dxp * dxp + dyp * dyp + dzp * dzp;
-                if (distanceSq <= radiusSq) {
-                  visit(a, b, Math.sqrt(distanceSq));
+                const distancePc = Math.sqrt(dxp * dxp + dyp * dyp + dzp * dzp);
+                if (distancePc <= radiusPc) {
+                  visit(a, b, distancePc);
                 }
               }
             }
@@ -214,7 +246,7 @@ export class StarNeighbourhood {
     }
   }
 
-  private keyFor(x: number, y: number, z: number): string {
+  private keyFor(x: number, y: number, z: number): number {
     const [ix, iy, iz] = this.cellFor(x, y, z);
     return cellKey(ix, iy, iz);
   }

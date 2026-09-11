@@ -2,6 +2,12 @@ import { ChangeDetectionStrategy, Component, computed, input, output, signal } f
 
 import { formatParsecs } from '../../shared/format/quantity';
 
+/**
+ * The widest jump the Routes panel offers. Past it the drawn graph is a solid sheet of lines, and
+ * a route search through the dense core around the Sun walks thousands of stars at every step.
+ */
+export const MAX_JUMP_RANGE_PC = 8;
+
 /** A star offered for one of the two fields, as the panel needs to show it. */
 export interface RouteStarOption {
   readonly id: number;
@@ -117,7 +123,7 @@ type Field = 'from' | 'to';
                   {{ format(plotted.neededRangePc) }} would reach.
                 </button>
               } @else {
-                Nothing in the catalogue bridges the gap.
+                No chain of jumps up to {{ format(maxRangePc) }} reaches it.
               }
             </p>
           }
@@ -160,8 +166,7 @@ export class RoutesPanelComponent {
   readonly fields: readonly Field[] = ['from', 'to'];
   /** A tenth of a parsec is finer than the catalogue's own distances are known to. */
   readonly minRangePc = 0.5;
-  /** Beyond this the graph is a solid sheet of lines and every pair of stars is connected. */
-  readonly maxRangePc = 8;
+  readonly maxRangePc = MAX_JUMP_RANGE_PC;
 
   readonly rangePc = signal(3);
   readonly open = signal<Field | null>(null);

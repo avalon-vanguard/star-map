@@ -40,4 +40,23 @@ test.describe('Galaxy view', () => {
     await page.getByRole('button', { name: 'Solar Neighbourhood' }).click();
     await expect(page.getByTestId('hud-title')).toHaveText('Local Stars', { timeout: 15_000 });
   });
+
+  test('a scale bar and labelled rings say how far things are, and follow the zoom', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.goto('/?stars=4000');
+    await expect(page.getByTestId('scene-canvas')).toBeVisible({ timeout: 30_000 });
+
+    // The rings are distances from the Sun, the survey's own edge called out among them.
+    await expect(page.getByText('Survey edge')).toBeVisible({ timeout: 30_000 });
+    const scale = page.getByTestId('hud-scale');
+    await expect(scale).toHaveAttribute('aria-label', /^Scale: [\d.]+ k?pc$/);
+    const opening = await scale.getAttribute('aria-label');
+
+    // Zooming in shortens the round length the bar stands for.
+    await page.getByTestId('scene-canvas').hover();
+    for (let notch = 0; notch < 10; notch++) {
+      await page.mouse.wheel(0, -400);
+    }
+    await expect(scale).not.toHaveAttribute('aria-label', opening ?? '', { timeout: 15_000 });
+  });
 });

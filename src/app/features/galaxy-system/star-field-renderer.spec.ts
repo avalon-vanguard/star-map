@@ -260,11 +260,6 @@ describe('selectDrawnStars', () => {
     expect(drawn).toEqual([0, 2, 3]);
   });
 
-  it('returns catalogue indices in order, so positions can be subset alongside', () => {
-    const catalogue = Array.from({ length: 100 }, (_, i) => catalogueStar(i, 150, 100 - i));
-    const drawn = Array.from(selectDrawnStars(catalogue, 10));
-    expect(drawn).toEqual([...drawn].sort((a, b) => a - b));
-  });
 });
 
 describe('StarFieldRenderer render budget', () => {
@@ -288,6 +283,116 @@ describe('StarFieldRenderer render budget', () => {
     expect(renderer.drawnCount).toBe(2);
     expect(renderer.starIdAt(0)).toBe(0);
     expect(renderer.starIdAt(1)).toBe(1);
+    renderer.dispose();
+  });
+});
+
+describe('selectDrawnStars around the view', () => {
+  /** 200 bright stars 240 pc out, enough to spend any small budget on their own. */
+  const brightFar = (from: number) => Array.from({ length: 200 }, (_, i) => catalogueStar(from + i, 240, 2));
+
+  it('draws a faint star near where the view is centred, however far that is from the Sun', () => {
+    const faint = catalogueStar(0, 150, 12);
+    const catalogue = [faint, ...brightFar(1)];
+
+    expect(Array.from(selectDrawnStars(catalogue, 20))).not.toContain(0);
+    expect(Array.from(selectDrawnStars(catalogue, 20, { centre: { x: 150, y: 0, z: 0 } }))).toContain(0);
+  });
+
+  it("keeps the Sun's neighbourhood drawn while the view looks elsewhere", () => {
+    const catalogue = [catalogueStar(0, 1.3, 11), catalogueStar(1, 150, 13), ...brightFar(2)];
+
+    expect(Array.from(selectDrawnStars(catalogue, 20, { centre: { x: 150, y: 0, z: 0 } })).slice(0, 2)).toEqual([1, 0]);
+  });
+
+  it('draws a pinned star wherever it is and however faint', () => {
+    const catalogue = [catalogueStar(0, 240, 14), ...brightFar(1)];
+
+    expect(Array.from(selectDrawnStars(catalogue, 20))).not.toContain(0);
+    expect(Array.from(selectDrawnStars(catalogue, 20, { pinned: [0] }))).toContain(0);
+  });
+
+  it('spends a budget too small for everything on the pinned stars, then the view, then the Sun, then the brightest', () => {
+    const catalogue = [catalogueStar(0, 1, 12), catalogueStar(1, 150, 13), catalogueStar(2, 240, 14), ...brightFar(3)];
+    const focus = { centre: { x: 150, y: 0, z: 0 }, pinned: [2] };
+
+    expect(Array.from(selectDrawnStars(catalogue, 4, focus))).toEqual([2, 1, 0, 3]);
+    expect(Array.from(selectDrawnStars(catalogue, 2, focus))).toEqual([2, 1]);
+  });
+
+  it('keeps the brightest part of a neighbourhood the budget cannot hold whole', () => {
+    const catalogue = [catalogueStar(0, 150, 9), catalogueStar(1, 151, 4), catalogueStar(2, 152, 11), catalogueStar(3, 153, 6), ...brightFar(4)];
+
+    expect(Array.from(selectDrawnStars(catalogue, 2, { centre: { x: 150, y: 0, z: 0 } }))).toEqual([1, 3]);
+  });
+
+  it('draws nothing twice when the view is centred on the Sun or pins a star already near it', () => {
+    const catalogue = [catalogueStar(0, 1, 12), catalogueStar(1, 2, 13), ...brightFar(2)];
+    const drawn = Array.from(selectDrawnStars(catalogue, 10, { centre: { x: 0, y: 0, z: 0 }, pinned: [0, 0, 1] }));
+
+    expect(new Set(drawn).size).toBe(drawn.length);
+    expect(drawn).toHaveLength(10);
+  });
+});
+
+describe('StarFieldRenderer refocus', () => {
+  const camera = testCamera();
+  /** A faint star straight ahead, 150 pc out, among bright ones well off to the side. */
+  const faintAhead = star({ id: 77, x: 0, y: 0, z: -150, magnitude: 13, colorIndex: 1.9 });
+  const catalogue = [faintAhead, ...Array.from({ length: 50 }, (_, i) => star({ id: 100 + i, x: 60, y: i, z: -40, magnitude: 1, colorIndex: -0.3 + i * 0.04 }))];
+  const positions = packPositions(catalogue);
+
+  it('draws and picks a faint star once the view is centred near it', () => {
+    const renderer = new StarFieldRenderer(catalogue, positions, 10);
+    expect(renderer.pickAt(new THREE.Vector2(0, 0), camera, camera.aspect)).toBeUndefined();
+
+    renderer.refocus({ centre: { x: 0, y: 0, z: -140 } });
+
+    expect(renderer.pickAt(new THREE.Vector2(0, 0), camera, camera.aspect)).toBe(77);
+    expect((renderer.object.geometry as THREE.InstancedBufferGeometry).instanceCount).toBe(renderer.drawnCount);
+    renderer.dispose();
+  });
+
+  it('draws a star pinned by id, and passes over ids the catalogue does not hold', () => {
+    const renderer = new StarFieldRenderer(catalogue, positions, 10);
+
+    renderer.refocus({ pinnedIds: [123456, 77] });
+
+    const drawnIds = Array.from({ length: renderer.drawnCount }, (_, i) => renderer.starIdAt(i));
+    expect(drawnIds).toContain(77);
+    expect(renderer.drawnCount).toBe(10);
+    renderer.dispose();
+  });
+
+  it('gives each drawn star its own colour and size, wherever the refocus put it', () => {
+    const renderer = new StarFieldRenderer(catalogue, positions, 10);
+    renderer.refocus({ centre: { x: 0, y: 0, z: -140 }, pinnedIds: [120] });
+    const { colorAttribute, sizeAttribute } = renderer as unknown as { colorAttribute: THREE.InstancedBufferAttribute; sizeAttribute: THREE.InstancedBufferAttribute };
+
+    for (let instance = 0; instance < renderer.drawnCount; instance++) {
+      const drawnStar = catalogue.find((candidate) => candidate.id === renderer.starIdAt(instance))!;
+      const expected = colorIndexToRgb(drawnStar.colorIndex, drawnStar.spectralType);
+      expect(colorAttribute.getX(instance)).toBeCloseTo(expected.r, 5);
+      expect(colorAttribute.getZ(instance)).toBeCloseTo(expected.b, 5);
+      expect(sizeAttribute.getX(instance)).toBeGreaterThan(0);
+    }
+    const faintSlot = Array.from({ length: renderer.drawnCount }, (_, i) => renderer.starIdAt(i)).indexOf(77);
+    const brightSlot = Array.from({ length: renderer.drawnCount }, (_, i) => renderer.starIdAt(i)).indexOf(120);
+    expect(sizeAttribute.getX(brightSlot)).toBeGreaterThan(sizeAttribute.getX(faintSlot));
+    renderer.dispose();
+  });
+
+  it('drops a star from the drawn set, and from picking, once the view has moved away from it', () => {
+    // The subtle failure this guards: buffers rewritten for a new selection while picking still
+    // reads the old one would leave clickable ghosts where nothing is drawn.
+    const renderer = new StarFieldRenderer(catalogue, positions, 10);
+    renderer.refocus({ centre: { x: 0, y: 0, z: -140 } });
+    expect(renderer.pickAt(new THREE.Vector2(0, 0), camera, camera.aspect)).toBe(77);
+
+    renderer.refocus({ centre: { x: 0, y: 0, z: 0 } });
+
+    expect(renderer.pickAt(new THREE.Vector2(0, 0), camera, camera.aspect)).toBeUndefined();
+    expect(Array.from({ length: renderer.drawnCount }, (_, i) => renderer.starIdAt(i))).not.toContain(77);
     renderer.dispose();
   });
 });

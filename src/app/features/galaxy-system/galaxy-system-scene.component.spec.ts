@@ -11,6 +11,7 @@ import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
 import { NavigationStore } from '../../shared/state/navigation.store';
 import { GalaxySystemSceneComponent } from './galaxy-system-scene.component';
+import { StarFieldRenderer } from './star-field-renderer';
 
 // jsdom does not implement ResizeObserver; the component only uses it to react to real
 // layout changes, which never happen in this headless test.
@@ -209,6 +210,33 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
     expect(navigationStore.selectedStarId()).toBeNull();
     expect(navigationStore.viewLevel()).toBe('galaxy');
+  });
+
+  it('chooses the drawn stars again once the view centre has moved, and not for a small drift', async () => {
+    const component = fixture.componentInstance as unknown as { controls: { target: THREE.Vector3 } };
+    const refocus = vi.spyOn(StarFieldRenderer.prototype, 'refocus');
+
+    component.controls.target.set(40, 0, 0);
+    await advanceFrames(engine, 0.3);
+    expect(refocus).toHaveBeenCalledTimes(1);
+    expect(refocus.mock.calls[0][0].centre).toMatchObject({ x: 40, y: 0, z: 0 });
+
+    component.controls.target.set(42, 0, 0);
+    await advanceFrames(engine, 0.3);
+    expect(refocus).toHaveBeenCalledTimes(1);
+    refocus.mockRestore();
+  });
+
+  it('keeps the stars of a plotted route drawn, and the selected star', async () => {
+    const component = fixture.componentInstance as unknown as { routeResult: { set(value: unknown): void } };
+    const refocus = vi.spyOn(StarFieldRenderer.prototype, 'refocus');
+    await advanceFrames(engine, 0.3);
+
+    component.routeResult.set({ stars: [{ id: SUN.id, name: 'Sol' }, { id: PROXIMA.id, name: 'Proxima Centauri' }], totalPc: 1.3, neededRangePc: null });
+    await advanceFrames(engine, 0.3);
+
+    expect(refocus.mock.calls.at(-1)![0].pinnedIds).toEqual([SUN.id, PROXIMA.id]);
+    refocus.mockRestore();
   });
 
   it('flies the camera into a selected star system: hides the galaxy group, shows the system group, and switches to AU-scale near/far planes', async () => {

@@ -38,6 +38,7 @@ import { StarmapHudComponent } from './starmap-hud.component';
 import { SystemObjectCardComponent } from './system-object-card.component';
 import { colorIndexToRgb, StarFieldRenderer, starRenderBudgetFromUrl } from './star-field-renderer';
 import { collectJumpLinks, minimumRangeBetween, routeBetween } from '../../shared/astro/jump-links';
+import { brightestWithin, brightnessOrder } from '../../shared/astro/brightest';
 import { StarNeighbourhood } from '../../shared/astro/star-neighbourhood';
 import { MAX_JUMP_RANGE_PC } from '../hud/routes-panel.component';
 import { HostStarRings } from './host-star-rings';
@@ -356,6 +357,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private deepSkyLabels: readonly LabeledPoint[] = [];
   /** Stars with at least one catalogued body, which are the ones the map can be flown into. */
   private starIdsWithBodies = new Set<number>();
+  /** Catalogue indices, brightest first, for the labels to walk rather than sort. See `brightestWithin`. */
+  private starsByBrightness: Uint32Array = new Uint32Array(0);
   /** Stars alone, normalised once, for the two routing fields. Empty until the catalogue lands. */
   private readonly starSearchIndex = signal<IndexedSearchEntry[]>([]);
   private milkyWay?: MilkyWayRenderer;
@@ -518,6 +521,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.stars = stars;
     this.starsById = new Map(stars.map((star) => [star.id, star]));
     this.neighbourhood = new StarNeighbourhood(stars);
+    this.starsByBrightness = brightnessOrder(stars);
     this.starSearchIndex.set(
       buildSearchIndex(stars.map((star) => ({ kind: 'star' as const, name: star.name, subtitle: star.spectralType, starId: star.id })))
     );
@@ -766,47 +770,27 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // orbit distance, so a camera-relative rule names the stars closest to the near edge of the
     // view — a ring of labels around the outside of the thing the user is actually looking at.
     const target = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
-    const { x: cx, y: cy, z: cz } = target;
     const orbitDistance = (this.controls ? this.effectiveDistance(camera) : GALAXY_OVERVIEW_POSITION.length()) * LABEL_RADIUS_TO_ORBIT_DISTANCE;
     const labelRadius = THREE.MathUtils.clamp(orbitDistance, MIN_LABEL_RADIUS_PC, MAX_LABEL_RADIUS_PC);
-    const maxDistanceSq = labelRadius * labelRadius;
 
-    const candidates: Array<{ star: StarRecord; distanceSq: number }> = [];
-    for (const star of this.stars) {
-      const dx = star.x - cx;
-      const dy = star.y - cy;
-      const dz = star.z - cz;
-      const distanceSq = dx * dx + dy * dy + dz * dz;
-      if (distanceSq <= maxDistanceSq || star.id === selectedId) {
-        candidates.push({ star, distanceSq });
-      }
-    }
-
+    // Individual star names mean nothing once the whole Galaxy is in frame — at that range the
+    // entire catalogue is inside one pixel — so the labels hand over to the structural ones.
+    const isGalactic = this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD;
     // Brightest first, not nearest first. Proximity was the right ranking when the catalogue was
     // a 50 pc bubble and everything in it was equally worth naming; across 250 pc it labels a
     // clump of whatever happens to be closest to the middle of the screen and never names the
     // stars that are actually prominent. Brightness is what makes a star worth a name.
-    candidates.sort((a, b) => a.star.magnitude - b.star.magnitude);
-    // Individual star names mean nothing once the whole Galaxy is in frame — at that range the
-    // entire catalogue is inside one pixel — so the labels hand over to the structural ones.
-    const isGalactic = this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD;
-    // "System" rather than "Star" for anything with catalogued bodies: it is the one distinction
-    // the second line can draw that the map cannot otherwise show, since it says which of these
-    // points is somewhere you can actually go.
-    const starLabels: LabeledPoint[] = isGalactic
-      ? []
-      : this.spreadLabels(
-          candidates.map(({ star }) => ({
-            id: star.id,
-            name: star.name,
-            kind: this.starIdsWithBodies.has(star.id) ? 'System' : 'Star',
-            x: star.x,
-            y: star.y,
-            z: star.z
-          })),
-          camera,
-          selectedId
-        );
+    //
+    // Walked lazily, and only as far as it takes to place the labels. "System" rather than "Star"
+    // for anything with catalogued bodies: it is the one distinction the second line can draw that
+    // the map cannot otherwise show, since it says which of these points is somewhere you can go.
+    const starIdsWithBodies = this.starIdsWithBodies;
+    const candidates = function* (stars: readonly StarRecord[], order: Uint32Array): Generator<LabeledPoint> {
+      for (const star of brightestWithin(stars, order, target, labelRadius, selectedId)) {
+        yield { id: star.id, name: star.name, kind: starIdsWithBodies.has(star.id) ? 'System' : 'Star', x: star.x, y: star.y, z: star.z };
+      }
+    };
+    const starLabels: LabeledPoint[] = isGalactic ? [] : this.spreadLabels(candidates(this.stars, this.starsByBrightness), camera, selectedId);
     const backdropLabels = isGalactic ? this.galacticLabels : this.deepSkyLabels;
     const ringLabels = isGalactic || !this.display().grid ? [] : this.ringLabels(camera);
     this.labelOverlay?.update([...starLabels, ...ringLabels, ...backdropLabels]);
@@ -831,7 +815,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     return canvas.clientHeight > 0 ? canvas.clientWidth / canvas.clientHeight : 1;
   }
 
-  private spreadLabels(candidates: readonly LabeledPoint[], camera: SceneCamera, keepId: number | string | null): LabeledPoint[] {
+  private spreadLabels(candidates: Iterable<LabeledPoint>, camera: SceneCamera, keepId: number | string | null): LabeledPoint[] {
     const placed: THREE.Vector2[] = [];
     const chosen: LabeledPoint[] = [];
     const projected = new THREE.Vector3();

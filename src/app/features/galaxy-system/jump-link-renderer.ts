@@ -1,7 +1,5 @@
 import * as THREE from 'three/webgpu';
 
-import { JumpLink } from '../../shared/astro/jump-links';
-
 /** Faint, because there are tens of thousands of them and none is worth reading on its own. */
 const LINK_OPACITY = 0.16;
 /** The one route is the figure; the graph it is drawn on is the ground. */
@@ -48,23 +46,13 @@ export class JumpLinkRenderer {
     this.links.frustumCulled = false;
     this.route.frustumCulled = false;
     this.object.add(this.links, this.route);
-    this.setLinks([], () => undefined);
+    this.setSegments(new Float32Array(0));
     this.setRoute([], () => undefined);
   }
 
-  setLinks(links: readonly JumpLink[], positionOf: (starId: number) => LinkPoint | undefined): void {
-    const vertices = new Float32Array(links.length * 6);
-    let at = 0;
-    for (const link of links) {
-      const from = positionOf(link.from);
-      const to = positionOf(link.to);
-      if (!from || !to) {
-        continue;
-      }
-      vertices.set([from.x, from.y, from.z, to.x, to.y, to.z], at);
-      at += 6;
-    }
-    this.replaceGeometry(this.links, at === vertices.length ? vertices : vertices.subarray(0, at));
+  /** The graph, as vertex pairs: six floats a link, one end then the other. See `jumpLinkSegments`. */
+  setSegments(vertices: Float32Array): void {
+    this.replaceGeometry(this.links, vertices);
   }
 
   /** The chain to draw over the graph, departure first. Fewer than two stars draws nothing. */

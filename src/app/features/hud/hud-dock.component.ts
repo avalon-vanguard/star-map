@@ -132,6 +132,7 @@ function isWideViewport(): boolean {
             <section id="dock-panel-routes" role="tabpanel" aria-labelledby="dock-tab-routes" class="hud-acquire hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-xl px-4 py-3">
               <app-routes-panel
                 [result]="routeResult()"
+                [pending]="routePending()"
                 [options]="routeOptions()"
                 [currentStar]="currentStar()"
                 (queryChange)="routeQuery.emit($event)"
@@ -241,6 +242,7 @@ export class HudDockComponent implements OnInit {
   readonly defaultTab = input<DockTab | null>(null);
   /** Routing: what the scene found, what it offers for the fields, and where the view is. */
   readonly routeResult = input<RouteResult | null>(null);
+  readonly routePending = input(false);
   readonly routeOptions = input<readonly RouteStarOption[]>([]);
   readonly currentStar = input<RouteStarOption | null>(null);
   /** The star the readout is about, where there is one to keep — a scale is not a place. */

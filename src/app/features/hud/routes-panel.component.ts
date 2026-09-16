@@ -100,11 +100,11 @@ type Field = 'from' | 'to';
       <div class="flex items-center gap-3">
         <button
           type="button"
-          [disabled]="!canPlot()"
+          [disabled]="!canPlot() || pending()"
           (click)="plot()"
           class="type-label border border-border/60 px-3 py-1.5 text-muted transition-colors enabled:hover:border-accent/70 enabled:hover:text-accent disabled:opacity-40 focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
         >
-          Plot route
+          {{ pending() ? 'Plotting…' : 'Plot route' }}
         </button>
         @if (result(); as plotted) {
           @if (plotted.stars.length) {
@@ -154,6 +154,8 @@ export class RoutesPanelComponent {
   readonly result = input<RouteResult | null>(null);
   /** Matches for the field currently being typed into, ranked by the scene. */
   readonly options = input<readonly RouteStarOption[]>([]);
+  /** The scene is still working the last request out; asking again would only queue behind it. */
+  readonly pending = input(false);
   /** The star the view is currently inside, offered as the departure without typing. */
   readonly currentStar = input<RouteStarOption | null>(null);
 

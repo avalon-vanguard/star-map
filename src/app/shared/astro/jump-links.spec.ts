@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { collectJumpLinks, minimumRangeBetween, routeBetween } from './jump-links';
+import { jumpLinkSegments, minimumRangeBetween, routeBetween } from './jump-links';
 import { StarNeighbourhood, StarPoint } from './star-neighbourhood';
 
 /** Stars a parsec apart along x, so a chain's length is the number of hops it takes. */
@@ -153,25 +153,58 @@ describe('minimumRangeBetween', () => {
   });
 });
 
-describe('collectJumpLinks', () => {
-  it('reports each pair once, not once from either end', () => {
-    const links = collectJumpLinks(chain(4), 1.5);
+/**
+ * The links a segment buffer draws, as unordered pairs of star ids, read back from where each end
+ * sits. Positions are compared as the float32 the buffer holds.
+ */
+function linksDrawn(segments: Float32Array, points: readonly StarPoint[]): string[] {
+  const idAt = new Map(points.map((point) => [[point.x, point.y, point.z].map(Math.fround).join(), point.id]));
+  const links: string[] = [];
+  for (let at = 0; at < segments.length; at += 6) {
+    const a = idAt.get(Array.from(segments.subarray(at, at + 3)).join())!;
+    const b = idAt.get(Array.from(segments.subarray(at + 3, at + 6)).join())!;
+    links.push(a < b ? `${a}-${b}` : `${b}-${a}`);
+  }
+  return links;
+}
 
-    expect(links.map((link) => [link.from, link.to])).toEqual([
-      [0, 1],
-      [1, 2],
-      [2, 3]
-    ]);
+/** Stars a parsec apart along x, as points, for reading a segment buffer back. */
+function chainPoints(count: number): StarPoint[] {
+  return Array.from({ length: count }, (_, i) => ({ id: i, x: i, y: 0, z: 0 }));
+}
+
+describe('jumpLinkSegments', () => {
+  it('draws each pair once, not once from either end', () => {
+    const segments = jumpLinkSegments(chain(4), 1.5);
+
+    expect(linksDrawn(segments, chainPoints(4)).sort()).toEqual(['0-1', '1-2', '2-3']);
   });
 
-  it('measures every link it reports', () => {
-    const links = collectJumpLinks(chain(3), 2.5);
+  it('puts both ends of every link where its stars are', () => {
+    const segments = jumpLinkSegments(chain(3), 2.5);
 
-    expect(links.find((link) => link.from === 0 && link.to === 2)?.distancePc).toBeCloseTo(2);
+    expect(segments).toHaveLength(3 * 6);
+    expect(linksDrawn(segments, chainPoints(3)).sort()).toEqual(['0-1', '0-2', '1-2']);
   });
 
   it('draws nothing at no range', () => {
-    expect(collectJumpLinks(chain(4), 0)).toEqual([]);
+    expect(jumpLinkSegments(chain(4), 0)).toHaveLength(0);
+  });
+
+  it('grows past its first buffer without losing a link', () => {
+    // 5 000 stars a tenth of a parsec apart, ten neighbours each way in range: some 50 000 links, far past
+    // the 4 096 the buffer starts with, so it has to grow several times.
+    const count = 5000;
+    const line = new StarNeighbourhood(Array.from({ length: count }, (_, i) => ({ id: i, x: i / 10, y: 0, z: 0 })));
+    // 1.05 rather than 1: the tenth neighbour sits at 1.0, which float steps of a tenth put either side of it.
+    const segments = jumpLinkSegments(line, 1.05);
+
+    let expected = 0;
+    for (let i = 0; i < count; i++) {
+      expected += Math.min(10, count - 1 - i);
+    }
+    expect(segments.length / 6).toBe(expected);
+    expect(segments.buffer.byteLength).toBe(segments.byteLength);
   });
 
   it('agrees with every route it makes possible', () => {
@@ -185,8 +218,7 @@ describe('collectJumpLinks', () => {
     // earlier version of this test hid by only checking the route it happened to find.
     const range = 9;
 
-    const links = collectJumpLinks(cloud, range);
-    const drawn = new Set(links.map((link) => `${link.from}-${link.to}`));
+    const drawn = new Set(linksDrawn(jumpLinkSegments(cloud, range), points));
 
     const route = routeBetween(cloud, 0, 119, range);
     // Asserted, not guarded: a skipped body would let the two disagree unnoticed.
@@ -196,6 +228,6 @@ describe('collectJumpLinks', () => {
       const [a, b] = [route!.stars[i - 1], route!.stars[i]].sort((x, y) => x - y);
       expect(drawn.has(`${a}-${b}`)).toBe(true);
     }
-    expect(links.length).toBeGreaterThan(0);
+    expect(drawn.size).toBeGreaterThan(0);
   });
 });

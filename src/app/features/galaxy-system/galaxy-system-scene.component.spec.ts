@@ -239,6 +239,34 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     refocus.mockRestore();
   });
 
+  it('shows the answer to the latest route asked for, whatever order the answers arrive in', async () => {
+    type Answer = { route: { stars: number[]; totalPc: number; longestHopPc: number } | null; neededRangePc: number | null };
+    const answers: Array<(answer: Answer) => void> = [];
+    const component = fixture.componentInstance as unknown as {
+      routing: { route(): Promise<Answer>; links(): Promise<Float32Array>; dispose(): void };
+      routePending(): boolean;
+      routeResult(): { stars: { id: number }[] } | null;
+      onRouteRequested(request: { fromId: number; toId: number; rangePc: number }): void;
+    };
+    component.routing = {
+      route: () => new Promise<Answer>((resolve) => answers.push(resolve)),
+      links: () => Promise.resolve(new Float32Array(0)),
+      dispose: () => undefined
+    };
+
+    component.onRouteRequested({ fromId: SUN.id, toId: ALPHA_CENTAURI.id, rangePc: 2 });
+    component.onRouteRequested({ fromId: SUN.id, toId: PROXIMA.id, rangePc: 2 });
+    expect(component.routePending()).toBe(true);
+
+    answers[1]({ route: { stars: [SUN.id, PROXIMA.id], totalPc: 1.3, longestHopPc: 1.3 }, neededRangePc: null });
+    await flushAsync();
+    answers[0]({ route: { stars: [SUN.id, ALPHA_CENTAURI.id], totalPc: 1.34, longestHopPc: 1.34 }, neededRangePc: null });
+    await flushAsync();
+
+    expect(component.routeResult()?.stars.map((star) => star.id)).toEqual([SUN.id, PROXIMA.id]);
+    expect(component.routePending()).toBe(false);
+  });
+
   it('flies the camera into a selected star system: hides the galaxy group, shows the system group, and switches to AU-scale near/far planes', async () => {
     navigationStore.selectStar(SUN.id);
     await flushAsync();

@@ -36,8 +36,8 @@ import { RouteRequest, RouteResult, RouteStarOption } from '../hud/routes-panel.
 import { buildSearchIndex, IndexedSearchEntry, rankSearchResults } from '../search/search-ranking';
 import { StarmapHudComponent } from './starmap-hud.component';
 import { SystemObjectCardComponent } from './system-object-card.component';
+import { RoutingClient } from './routing-client';
 import { colorIndexToRgb, FOCUS_RADIUS_PC, StarFieldRenderer, starRenderBudgetFromUrl } from './star-field-renderer';
-import { collectJumpLinks, minimumRangeBetween, routeBetween } from '../../shared/astro/jump-links';
 import { brightestWithin, brightnessOrder } from '../../shared/astro/brightest';
 import { StarNeighbourhood } from '../../shared/astro/star-neighbourhood';
 import { MAX_JUMP_RANGE_PC } from '../hud/routes-panel.component';
@@ -260,6 +260,7 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
         [display]="display()"
         [routing]="true"
         [routeResult]="routeResult()"
+        [routePending]="routePending()"
         [routeOptions]="routeOptions()"
         [currentStar]="currentStarOption()"
         [keepableStarId]="navigationStore.selectedStarId()"
@@ -325,10 +326,16 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private hostRings?: HostStarRings;
   /** Proximity over the whole catalogue, built once; the neighbour labels are one query on it. */
   private neighbourhood?: StarNeighbourhood;
+  /** Routes and the jump-link graph, worked out off the main thread. See `RoutingClient`. */
+  private routing?: RoutingClient;
+  /** Which route request is the latest, so an answer to an earlier one is not shown over it. */
+  private routeRequest = 0;
   private jumpLinks?: JumpLinkRenderer;
   /** How far a single crossing may be. Drives both the drawn graph and the route walked on it. */
   readonly jumpRangePc = signal(3);
   readonly routeResult = signal<RouteResult | null>(null);
+  /** A route has been asked for and not yet answered. */
+  readonly routePending = signal(false);
   /**
    * Matches for whichever routing field is being typed into. Stars only: a route is a chain of
    * stars, and offering a moon as a destination would be offering a place that leads nowhere.
@@ -438,6 +445,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.starField?.dispose();
     this.hostRings?.dispose();
     this.jumpLinks?.dispose();
+    this.routing?.dispose();
     clearTimeout(this.jumpLinkRebuild);
     this.deepSky?.dispose();
     this.milkyWay?.dispose();
@@ -530,6 +538,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.stars = stars;
     this.starsById = new Map(stars.map((star) => [star.id, star]));
     this.neighbourhood = new StarNeighbourhood(stars);
+    this.routing = new RoutingClient(stars, positions, this.neighbourhood);
     this.starsByBrightness = brightnessOrder(stars);
     this.starSearchIndex.set(
       buildSearchIndex(stars.map((star) => ({ kind: 'star' as const, name: star.name, subtitle: star.spectralType, starId: star.id })))
@@ -1395,44 +1404,45 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
-   * Walks the graph, and where it cannot, says what range would. The search is lazy — it asks
-   * the index for a star's neighbours as it reaches that star — so plotting one route never
-   * costs a pass over the catalogue.
+   * Walks the graph, and where it cannot, says what range would. Both run in a worker: a route
+   * to a star 236 pc away, or the range one would need, can take seconds, and on this thread the
+   * map would stop for as long. Only the latest request is shown; an earlier one still running
+   * when a new one is made is answered into the void.
    */
   onRouteRequested({ fromId, toId, rangePc }: RouteRequest): void {
-    if (!this.neighbourhood) {
+    if (!this.routing) {
       return;
     }
-    const route = routeBetween(this.neighbourhood, fromId, toId, rangePc);
-    if (route) {
+    const request = ++this.routeRequest;
+    this.routePending.set(true);
+    void this.routing.route(fromId, toId, rangePc, ROUTE_RANGE_CEILING_PC).then(({ route, neededRangePc }) => {
+      if (request !== this.routeRequest) {
+        return;
+      }
+      this.routePending.set(false);
       this.routeResult.set({
-        stars: route.stars.map((id) => ({ id, name: this.starsById.get(id)?.name ?? `Star ${id}` })),
-        totalPc: route.totalPc,
-        neededRangePc: null
+        stars: route ? route.stars.map((id) => ({ id, name: this.starsById.get(id)?.name ?? `Star ${id}` })) : [],
+        totalPc: route?.totalPc ?? 0,
+        neededRangePc
       });
-      this.jumpLinks?.setRoute(route.stars, (id) => this.starsById.get(id));
-      return;
-    }
-    this.routeResult.set({
-      stars: [],
-      totalPc: 0,
-      neededRangePc: minimumRangeBetween(this.neighbourhood, fromId, toId, ROUTE_RANGE_CEILING_PC)
+      this.jumpLinks?.setRoute(route?.stars ?? [], (id) => this.starsById.get(id));
     });
-    this.jumpLinks?.setRoute([], () => undefined);
   }
 
   /**
-   * Rebuilds the drawn graph, which is the expensive half: every star's neighbours, once. Only
-   * when the layer is on and the range has actually moved — the control emits per pixel dragged.
+   * Rebuilds the drawn graph, which is the expensive half: every star's neighbours, once, and 3.7
+   * million links at 8 pc, so it is built in the worker. Only when the layer is on and the range
+   * has actually moved — the control emits per pixel dragged — and only the graph for the range
+   * last asked for is drawn, in whatever order the answers arrive.
    */
   private refreshJumpLinks(): void {
-    if (!this.jumpLinks || !this.neighbourhood) {
+    if (!this.jumpLinks || !this.routing) {
       return;
     }
     const rangePc = this.jumpRangePc();
     if (!this.display().jumpLinks) {
       if (this.drawnJumpRangePc !== null) {
-        this.jumpLinks.setLinks([], () => undefined);
+        this.jumpLinks.setSegments(new Float32Array(0));
         this.drawnJumpRangePc = null;
       }
       return;
@@ -1441,8 +1451,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.drawnJumpRangePc = rangePc;
-    const links = collectJumpLinks(this.neighbourhood, rangePc);
-    this.jumpLinks.setLinks(links, (id) => this.starsById.get(id));
+    void this.routing.links(rangePc).then((segments) => {
+      if (this.drawnJumpRangePc === rangePc) {
+        this.jumpLinks?.setSegments(segments);
+      }
+    });
   }
 
   /** A pinned body wins over a hovered one, so the card does not change under the pointer. */

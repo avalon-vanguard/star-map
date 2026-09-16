@@ -353,10 +353,10 @@ describe('StarFieldRenderer refocus', () => {
     renderer.dispose();
   });
 
-  it('draws a star pinned by id, and passes over ids the catalogue does not hold', () => {
+  it('draws a pinned star, and passes over an index past the end of the catalogue', () => {
     const renderer = new StarFieldRenderer(catalogue, positions, 10);
 
-    renderer.refocus({ pinnedIds: [123456, 77] });
+    renderer.refocus({ pinned: [123456, 0] });
 
     const drawnIds = Array.from({ length: renderer.drawnCount }, (_, i) => renderer.starIdAt(i));
     expect(drawnIds).toContain(77);
@@ -366,7 +366,7 @@ describe('StarFieldRenderer refocus', () => {
 
   it('gives each drawn star its own colour and size, wherever the refocus put it', () => {
     const renderer = new StarFieldRenderer(catalogue, positions, 10);
-    renderer.refocus({ centre: { x: 0, y: 0, z: -140 }, pinnedIds: [120] });
+    renderer.refocus({ centre: { x: 0, y: 0, z: -140 }, pinned: [21] });
     const { colorAttribute, sizeAttribute } = renderer as unknown as { colorAttribute: THREE.InstancedBufferAttribute; sizeAttribute: THREE.InstancedBufferAttribute };
 
     for (let instance = 0; instance < renderer.drawnCount; instance++) {
@@ -379,6 +379,19 @@ describe('StarFieldRenderer refocus', () => {
     const faintSlot = Array.from({ length: renderer.drawnCount }, (_, i) => renderer.starIdAt(i)).indexOf(77);
     const brightSlot = Array.from({ length: renderer.drawnCount }, (_, i) => renderer.starIdAt(i)).indexOf(120);
     expect(sizeAttribute.getX(brightSlot)).toBeGreaterThan(sizeAttribute.getX(faintSlot));
+    renderer.dispose();
+  });
+
+  it('leaves the buffers alone when the drawn set has not changed, and rewrites them when it has', () => {
+    const renderer = new StarFieldRenderer(catalogue, positions, 10);
+    const { positionAttribute } = renderer as unknown as { positionAttribute: THREE.InstancedBufferAttribute };
+    const version = positionAttribute.version;
+
+    renderer.refocus({ centre: { x: 0, y: 0, z: 0 } });
+    expect(positionAttribute.version).toBe(version);
+
+    renderer.refocus({ centre: { x: 0, y: 0, z: -140 } });
+    expect(positionAttribute.version).toBeGreaterThan(version);
     renderer.dispose();
   });
 

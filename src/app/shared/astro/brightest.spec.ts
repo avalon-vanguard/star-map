@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { brightestWithin, brightnessOrder } from './brightest';
+import { brightestWithin, brightnessIndex, brightnessOrder } from './brightest';
 
 interface TestStar {
   id: number;
@@ -46,11 +46,11 @@ describe('brightestWithin', () => {
 
   it('yields exactly what filtering and then sorting the catalogue did, in the same order', () => {
     const stars = cloud(3000);
-    const order = brightnessOrder(stars);
+    const index = brightnessIndex(stars);
     const centre = { x: 12, y: -30, z: 5 };
 
     for (const [radius, alwaysId] of [[40, null], [15, 7 * 2999], [0, 7 * 11], [500, null]] as const) {
-      const lazy = Array.from(brightestWithin(stars, order, centre, radius, alwaysId), (star) => star.id);
+      const lazy = Array.from(brightestWithin(stars, index, centre, radius, alwaysId), (star) => star.id);
       expect(lazy).toEqual(filterThenSort(stars, centre, radius, alwaysId));
     }
   });
@@ -61,7 +61,7 @@ describe('brightestWithin', () => {
       { id: 2, x: 3, y: 4.001, z: 0, magnitude: 0 }
     ];
 
-    expect(Array.from(brightestWithin(stars, brightnessOrder(stars), { x: 0, y: 0, z: 0 }, 5, null), (star) => star.id)).toEqual([1]);
+    expect(Array.from(brightestWithin(stars, brightnessIndex(stars), { x: 0, y: 0, z: 0 }, 5, null), (star) => star.id)).toEqual([1]);
   });
 
   it('reads no further than the caller takes', () => {
@@ -77,7 +77,7 @@ describe('brightestWithin', () => {
     });
 
     const taken: number[] = [];
-    for (const star of brightestWithin(counted, brightnessOrder(stars), { x: 0, y: 0, z: 0 }, 1000, null)) {
+    for (const star of brightestWithin(counted, brightnessIndex(stars), { x: 0, y: 0, z: 0 }, 1000, null)) {
       taken.push(star.id);
       if (taken.length === 15) {
         break;

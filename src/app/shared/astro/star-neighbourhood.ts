@@ -80,6 +80,11 @@ export class StarNeighbourhood {
   }
 
   /** The star this id names, or `undefined` — the caller's id may not be in the catalogue. */
+  /** Where the star this id names sits in the list the index was built from, or `undefined`. */
+  indexOf(id: number): number | undefined {
+    return this.indexById.get(id);
+  }
+
   point(id: number): StarPoint | undefined {
     const index = this.indexById.get(id);
     return index === undefined ? undefined : this.points[index];

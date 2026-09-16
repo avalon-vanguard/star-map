@@ -228,8 +228,6 @@ export class StarFieldRenderer {
   private readonly material: THREE.SpriteNodeMaterial;
   private readonly budget: number;
   private readonly order: Uint32Array;
-  /** Built the first time a star is pinned by id, since nothing else needs it. */
-  private indexById?: Map<number, number>;
   /**
    * Colour and angular size of every star in the catalogue, worked out once: a refocus then only
    * copies them into the instances, 0.7 ms for the budget rather than 5.6 ms computing them again.
@@ -312,13 +310,14 @@ export class StarFieldRenderer {
    * Chooses the drawn stars again for where the view now is, and rewrites the instance buffers
    * with them. See {@link selectDrawnStars}.
    */
-  refocus(focus: { centre?: Positioned; pinnedIds?: readonly number[] }): void {
-    let pinned: number[] = [];
-    if (focus.pinnedIds?.length) {
-      this.indexById ??= new Map(this.catalogue.map((star, index) => [star.id, index]));
-      pinned = focus.pinnedIds.map((id) => this.indexById!.get(id)).filter((index): index is number => index !== undefined);
+  refocus(focus: DrawFocus): void {
+    const drawn = selectDrawnStars(this.catalogue, this.budget, focus, this.order);
+    // The same stars in the same instances: the buffers already hold them, and a rewrite would
+    // upload 2 MB to the GPU for nothing — which a pan across empty space would do every pass.
+    if (drawn.length === this.drawn.length && drawn.every((index, instance) => index === this.drawn[instance])) {
+      return;
     }
-    this.drawn = selectDrawnStars(this.catalogue, this.budget, { centre: focus.centre, pinned }, this.order);
+    this.drawn = drawn;
 
     const positions = this.positionAttribute.array as Float32Array;
     const colors = this.colorAttribute.array as Float32Array;

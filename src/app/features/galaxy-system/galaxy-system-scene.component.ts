@@ -545,6 +545,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     ));
 
     this.starField = new StarFieldRenderer(stars, positions, starRenderBudgetFromUrl(window.location.search), this.starsByBrightness.order);
+    // It has just chosen around the Sun, which is where the view opens: the first label pass need not choose again.
+    this.starFieldFocus = GALAXY_OVERVIEW_TARGET.clone();
     this.galaxyGroup.add(this.starField.object);
     this.hostRings = new HostStarRings(stars.filter((star) => this.starIdsWithBodies.has(star.id)), HUD_ACCENT);
     this.galaxyGroup.add(this.hostRings.object);
@@ -777,7 +779,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * of it is always drawn, however faint.
    */
   private refocusStarField(): void {
-    if (!this.starField) {
+    // At galactic scale the whole catalogue is a smudge a few pixels across, and the view's centre
+    // sweeps hundreds of parsecs a pass across empty space: nothing to choose, and nothing to see.
+    if (!this.starField || !this.neighbourhood || this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD) {
       return;
     }
     const centre = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
@@ -787,7 +791,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     if (this.starFieldFocus && this.starFieldFocus.distanceTo(centre) <= STAR_FIELD_REFOCUS_PC && pins === this.starFieldPins) {
       return;
     }
-    this.starField.refocus({ centre, pinnedIds });
+    // By catalogue index, through the lookup the neighbourhood already holds: building a second
+    // one of 423 651 entries on the first pin stalled the first flight of a session for 50-140 ms.
+    const neighbourhood = this.neighbourhood;
+    const pinned = pinnedIds.map((id) => neighbourhood.indexOf(id)).filter((index): index is number => index !== undefined);
+    this.starField.refocus({ centre, pinned });
     this.starFieldFocus = centre.clone();
     this.starFieldPins = pins;
   }

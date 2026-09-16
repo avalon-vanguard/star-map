@@ -23,7 +23,8 @@ import { StarFieldRenderer } from './star-field-renderer';
 
 const SUN: StarRecord = { id: 0, name: 'Sol', x: 0, y: 0, z: 0, magnitude: -26.7, spectralType: 'G2V', colorIndex: 0.656 };
 const ALPHA_CENTAURI: StarRecord = { id: 1, name: 'Alpha Centauri', x: 1.34, y: 0, z: 0, magnitude: 4.4, spectralType: 'G2V', colorIndex: 0.7 };
-const PROXIMA: StarRecord = { id: 2, name: 'Proxima Centauri', x: 0, y: 1.3, z: 0, magnitude: 11.1, spectralType: 'M5V', colorIndex: 1.8 };
+// Its id deliberately differs from its place in STARS, so a lookup by id cannot pass for one by index.
+const PROXIMA: StarRecord = { id: 42, name: 'Proxima Centauri', x: 0, y: 1.3, z: 0, magnitude: 11.1, spectralType: 'M5V', colorIndex: 1.8 };
 
 const STARS: StarRecord[] = [SUN, ALPHA_CENTAURI, PROXIMA];
 const STAR_POSITIONS = new Float32Array(STARS.flatMap((star) => [star.x, star.y, star.z]));
@@ -227,6 +228,31 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     refocus.mockRestore();
   });
 
+  it('does not choose the drawn stars again at load, where the renderer has just chosen them', async () => {
+    const refocus = vi.spyOn(StarFieldRenderer.prototype, 'refocus');
+
+    await advanceFrames(engine, 0.6);
+
+    expect(refocus).not.toHaveBeenCalled();
+    refocus.mockRestore();
+  });
+
+  it('leaves the drawn stars alone at galactic scale, however far the view centre sweeps', async () => {
+    const component = fixture.componentInstance as unknown as { controls: { target: THREE.Vector3 } };
+    const camera = engine.getCamera();
+    camera.position.set(0, 0, 30000);
+    await advanceFrames(engine, 0.3);
+    const refocus = vi.spyOn(StarFieldRenderer.prototype, 'refocus');
+
+    component.controls.target.set(500, 0, 0);
+    await advanceFrames(engine, 0.3);
+    component.controls.target.set(1500, 0, 0);
+    await advanceFrames(engine, 0.3);
+
+    expect(refocus).not.toHaveBeenCalled();
+    refocus.mockRestore();
+  });
+
   it('keeps the stars of a plotted route drawn, and the selected star', async () => {
     const component = fixture.componentInstance as unknown as { routeResult: { set(value: unknown): void } };
     const refocus = vi.spyOn(StarFieldRenderer.prototype, 'refocus');
@@ -235,7 +261,8 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     component.routeResult.set({ stars: [{ id: SUN.id, name: 'Sol' }, { id: PROXIMA.id, name: 'Proxima Centauri' }], totalPc: 1.3, neededRangePc: null });
     await advanceFrames(engine, 0.3);
 
-    expect(refocus.mock.calls.at(-1)![0].pinnedIds).toEqual([SUN.id, PROXIMA.id]);
+    // As catalogue indices: the Sun is the first entry of STARS, Proxima the third.
+    expect(refocus.mock.calls.at(-1)![0].pinned).toEqual([0, 2]);
     refocus.mockRestore();
   });
 

@@ -239,6 +239,30 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     refocus.mockRestore();
   });
 
+  it('asks for no more label candidates once the last label it will show is placed', () => {
+    // Near the Sun a label candidate past the fifteenth can sit at the far end of the catalogue's
+    // brightness order, so asking for one more than is used can cost a walk of the whole order.
+    const component = fixture.componentInstance as unknown as {
+      spreadLabels(candidates: Iterable<{ id: number; name: string; x: number; y: number; z: number }>, camera: THREE.Camera, keepId: null): unknown[];
+    };
+    const camera = engine.getCamera();
+    camera.updateMatrixWorld(true);
+    camera.updateProjectionMatrix();
+    let pulled = 0;
+    const grid = function* () {
+      for (let row = 0; row < 5; row++) {
+        for (let column = 0; column < 5; column++) {
+          pulled++;
+          const point = new THREE.Vector3(-0.8 + column * 0.4, -0.8 + row * 0.4, 0.5).unproject(camera);
+          yield { id: row * 5 + column, name: `label-${pulled}`, x: point.x, y: point.y, z: point.z };
+        }
+      }
+    };
+
+    expect(component.spreadLabels(grid(), camera, null)).toHaveLength(15);
+    expect(pulled).toBe(15);
+  });
+
   it('flies the camera into a selected star system: hides the galaxy group, shows the system group, and switches to AU-scale near/far planes', async () => {
     navigationStore.selectStar(SUN.id);
     await flushAsync();

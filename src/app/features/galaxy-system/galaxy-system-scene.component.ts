@@ -38,7 +38,7 @@ import { StarmapHudComponent } from './starmap-hud.component';
 import { SystemObjectCardComponent } from './system-object-card.component';
 import { colorIndexToRgb, FOCUS_RADIUS_PC, StarFieldRenderer, starRenderBudgetFromUrl } from './star-field-renderer';
 import { collectJumpLinks, minimumRangeBetween, routeBetween } from '../../shared/astro/jump-links';
-import { brightestWithin, brightnessOrder } from '../../shared/astro/brightest';
+import { BrightnessIndex, brightestWithin, brightnessIndex } from '../../shared/astro/brightest';
 import { StarNeighbourhood } from '../../shared/astro/star-neighbourhood';
 import { MAX_JUMP_RANGE_PC } from '../hud/routes-panel.component';
 import { HostStarRings } from './host-star-rings';
@@ -367,7 +367,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   /** Stars with at least one catalogued body, which are the ones the map can be flown into. */
   private starIdsWithBodies = new Set<number>();
   /** Catalogue indices, brightest first, for the labels to walk rather than sort. See `brightestWithin`. */
-  private starsByBrightness: Uint32Array = new Uint32Array(0);
+  private starsByBrightness: BrightnessIndex = brightnessIndex([]);
   /** Stars alone, normalised once, for the two routing fields. Empty until the catalogue lands. */
   private readonly starSearchIndex = signal<IndexedSearchEntry[]>([]);
   private milkyWay?: MilkyWayRenderer;
@@ -530,7 +530,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.stars = stars;
     this.starsById = new Map(stars.map((star) => [star.id, star]));
     this.neighbourhood = new StarNeighbourhood(stars);
-    this.starsByBrightness = brightnessOrder(stars);
+    this.starsByBrightness = brightnessIndex(stars);
     this.starSearchIndex.set(
       buildSearchIndex(stars.map((star) => ({ kind: 'star' as const, name: star.name, subtitle: star.spectralType, starId: star.id })))
     );
@@ -544,7 +544,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       (id): id is number => id !== null && id !== undefined
     ));
 
-    this.starField = new StarFieldRenderer(stars, positions, starRenderBudgetFromUrl(window.location.search), this.starsByBrightness);
+    this.starField = new StarFieldRenderer(stars, positions, starRenderBudgetFromUrl(window.location.search), this.starsByBrightness.order);
     this.galaxyGroup.add(this.starField.object);
     this.hostRings = new HostStarRings(stars.filter((star) => this.starIdsWithBodies.has(star.id)), HUD_ACCENT);
     this.galaxyGroup.add(this.hostRings.object);
@@ -817,8 +817,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // for anything with catalogued bodies: it is the one distinction the second line can draw that
     // the map cannot otherwise show, since it says which of these points is somewhere you can go.
     const starIdsWithBodies = this.starIdsWithBodies;
-    const candidates = function* (stars: readonly StarRecord[], order: Uint32Array): Generator<LabeledPoint> {
-      for (const star of brightestWithin(stars, order, target, labelRadius, selectedId)) {
+    const candidates = function* (stars: readonly StarRecord[], index: BrightnessIndex): Generator<LabeledPoint> {
+      for (const star of brightestWithin(stars, index, target, labelRadius, selectedId)) {
         yield { id: star.id, name: star.name, kind: starIdsWithBodies.has(star.id) ? 'System' : 'Star', x: star.x, y: star.y, z: star.z };
       }
     };
@@ -853,10 +853,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const projected = new THREE.Vector3();
 
     for (const candidate of candidates) {
-      if (chosen.length >= LABEL_MAX_COUNT) {
-        break;
-      }
-
       projected.set(candidate.x, candidate.y, candidate.z).project(camera);
       const isKept = candidate.id === keepId;
       // Offscreen or behind the camera.
@@ -883,6 +879,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
       placed.push(point);
       chosen.push({ ...candidate, side });
+      // Here rather than at the top of the loop: there, taking the fifteenth label asked the
+      // candidates for a sixteenth first, and near the Sun finding one walks most of the catalogue.
+      if (chosen.length >= LABEL_MAX_COUNT) {
+        break;
+      }
     }
 
     return chosen;

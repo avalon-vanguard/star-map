@@ -23,7 +23,9 @@ export type RoutingRequest =
 
 export type RoutingResponse =
   | { readonly kind: 'route'; readonly requestId: number; readonly route: Route | null; readonly neededRangePc: number | null }
-  | { readonly kind: 'links'; readonly requestId: number; readonly segments: Float32Array };
+  | { readonly kind: 'links'; readonly requestId: number; readonly segments: Float32Array }
+  /** The question threw in the worker. Sent back so the request settles instead of waiting for good. */
+  | { readonly kind: 'failed'; readonly requestId: number; readonly message: string };
 
 /** A spatial index over a catalogue sent as a {@link RoutingCatalogue}. */
 export function indexCatalogue({ ids, positions }: RoutingCatalogue): StarNeighbourhood {

@@ -1424,18 +1424,29 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
     const request = ++this.routeRequest;
     this.routePending.set(true);
-    void this.routing.route(fromId, toId, rangePc, ROUTE_RANGE_CEILING_PC).then(({ route, neededRangePc }) => {
-      if (request !== this.routeRequest) {
-        return;
+    void this.routing.route(fromId, toId, rangePc, ROUTE_RANGE_CEILING_PC).then(
+      ({ route, neededRangePc }) => {
+        if (request !== this.routeRequest) {
+          return;
+        }
+        this.routePending.set(false);
+        this.routeResult.set({
+          stars: route ? route.stars.map((id) => ({ id, name: this.starsById.get(id)?.name ?? `Star ${id}` })) : [],
+          totalPc: route?.totalPc ?? 0,
+          neededRangePc
+        });
+        this.jumpLinks?.setRoute(route?.stars ?? [], (id) => this.starsById.get(id));
+      },
+      (error: unknown) => {
+        // A request replaced by a newer one is settled this way too; only the latest matters.
+        if (request !== this.routeRequest) {
+          return;
+        }
+        // Released rather than left saying "Plotting…" with the button held, so it can be tried again.
+        this.routePending.set(false);
+        console.error('Route could not be plotted.', error);
       }
-      this.routePending.set(false);
-      this.routeResult.set({
-        stars: route ? route.stars.map((id) => ({ id, name: this.starsById.get(id)?.name ?? `Star ${id}` })) : [],
-        totalPc: route?.totalPc ?? 0,
-        neededRangePc
-      });
-      this.jumpLinks?.setRoute(route?.stars ?? [], (id) => this.starsById.get(id));
-    });
+    );
   }
 
   /**
@@ -1460,11 +1471,20 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.drawnJumpRangePc = rangePc;
-    void this.routing.links(rangePc).then((segments) => {
-      if (this.drawnJumpRangePc === rangePc) {
-        this.jumpLinks?.setSegments(segments);
+    void this.routing.links(rangePc).then(
+      (segments) => {
+        if (this.drawnJumpRangePc === rangePc) {
+          this.jumpLinks?.setSegments(segments);
+        }
+      },
+      () => {
+        // Replaced by a newer range, or failed. Either way this range is not drawn, and must not be
+        // remembered as if it were, or asking for it again would be skipped.
+        if (this.drawnJumpRangePc === rangePc) {
+          this.drawnJumpRangePc = null;
+        }
       }
-    });
+    );
   }
 
   /** A pinned body wins over a hovered one, so the card does not change under the pointer. */

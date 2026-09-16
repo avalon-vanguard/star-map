@@ -16,6 +16,10 @@ addEventListener('message', ({ data }: MessageEvent<RoutingCatalogue | RoutingRe
     return;
   }
   // The catalogue is always the first message, and a worker's messages arrive in order.
-  const response = answerRouting(index!, data);
-  postMessage(response, response.kind === 'links' ? [response.segments.buffer] : []);
+  try {
+    const response = answerRouting(index!, data);
+    postMessage(response, response.kind === 'links' ? [response.segments.buffer] : []);
+  } catch (error) {
+    postMessage({ kind: 'failed', requestId: data.requestId, message: error instanceof Error ? error.message : String(error) });
+  }
 });

@@ -294,6 +294,23 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(component.routePending()).toBe(false);
   });
 
+  it('releases the routes panel when a route cannot be worked out, so it can be tried again', async () => {
+    const component = fixture.componentInstance as unknown as {
+      routing: { route(): Promise<never>; links(): Promise<Float32Array>; dispose(): void };
+      routePending(): boolean;
+      onRouteRequested(request: { fromId: number; toId: number; rangePc: number }): void;
+    };
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    component.routing = { route: () => Promise.reject(new Error('worker gone')), links: () => Promise.resolve(new Float32Array(0)), dispose: () => undefined };
+
+    component.onRouteRequested({ fromId: SUN.id, toId: PROXIMA.id, rangePc: 2 });
+    await flushAsync();
+
+    expect(component.routePending()).toBe(false);
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
   it('asks for no more label candidates once the last label it will show is placed', () => {
     // Near the Sun a label candidate past the fifteenth can sit at the far end of the catalogue's
     // brightness order, so asking for one more than is used can cost a walk of the whole order.

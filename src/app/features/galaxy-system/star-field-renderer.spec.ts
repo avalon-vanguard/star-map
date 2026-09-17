@@ -335,6 +335,76 @@ describe('selectDrawnStars around the view', () => {
   });
 });
 
+describe('selectDrawnStars in view', () => {
+  /** A star anywhere, with a given apparent magnitude. */
+  const at = (id: number, x: number, y: number, z: number, magnitude: number) => star({ id, x, y, z, magnitude });
+  /** What the camera shows, as the scene hands it over. */
+  const viewOf = (camera: THREE.Camera) => new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+  /** Bright stars far in front of `testCamera`, spread across its frame. */
+  const brightAhead = (from: number, count = 30) => Array.from({ length: count }, (_, i) => at(from + i, (i - count / 2) * 5, 0, -400, 2));
+  /** Bright stars behind `testCamera`, which only a selection blind to the view would draw. */
+  const brightBehind = (from: number, count = 30) => Array.from({ length: count }, (_, i) => at(from + i, (i - count / 2) * 5, 0, 400, 2));
+
+  it('draws only what is in view, and a pinned star wherever it is', () => {
+    const ahead = Array.from({ length: 5 }, (_, i) => at(i, i * 10, 0, -240, 12));
+    const pinnedBehind = at(5, 0, 0, 240, 14);
+    const catalogue = [...ahead, pinnedBehind, ...brightBehind(6)];
+
+    const drawn = Array.from(selectDrawnStars(catalogue, 20, { pinned: [5], view: viewOf(testCamera()) }));
+
+    expect(drawn).toEqual([5, 0, 1, 2, 3, 4]);
+  });
+
+  it('reaches a quarter of the frame past its edges, and no further', () => {
+    // At 100 pc in front of a 55° camera the frame's half-height is 52 pc: 1.2 of it is 62.5 pc, 1.3 is 67.7.
+    const halfHeight = 100 * Math.tan((55 * Math.PI) / 360);
+    const catalogue = [at(0, 0, 1.2 * halfHeight, -100, 12), at(1, 0, 1.3 * halfHeight, -100, 12), ...brightBehind(2)];
+
+    const drawn = Array.from(selectDrawnStars(catalogue, 20, { view: viewOf(testCamera()) }));
+
+    expect(drawn).toEqual([0]);
+  });
+
+  it("draws the neighbourhood of the view's centre ahead of brighter stars, but only the part in view", () => {
+    const camera = new THREE.PerspectiveCamera(55, 16 / 9, 0.01, 5000);
+    camera.position.set(0, 0, -140);
+    camera.lookAt(0, 0, -1000);
+    camera.updateMatrixWorld(true);
+    const memberAhead = at(0, 0, 0, -160, 14);
+    const memberBehind = at(1, 0, 0, -130, 14);
+    const catalogue = [memberAhead, memberBehind, ...Array.from({ length: 30 }, (_, i) => at(2 + i, (i - 15) * 5, 0, -600, 2))];
+
+    const drawn = Array.from(selectDrawnStars(catalogue, 20, { centre: { x: 0, y: 0, z: -150 }, view: viewOf(camera) }));
+
+    expect(drawn[0]).toBe(0);
+    expect(drawn).not.toContain(1);
+  });
+
+  it('draws the planet hosts in view first after the pinned stars, and not those out of view', () => {
+    const hostAhead = at(0, 0, 0, -240, 14);
+    const hostBehind = at(1, 0, 0, 240, 14);
+    const nearSun = at(2, 0, 0, -10, 13);
+    const catalogue = [hostAhead, hostBehind, nearSun, ...brightAhead(3)];
+    const hosts = Uint8Array.from(catalogue, (_, index) => (index < 2 ? 1 : 0));
+
+    const drawn = Array.from(selectDrawnStars(catalogue, 3, { hosts, view: viewOf(testCamera()) }));
+
+    expect(drawn).toEqual([0, 2, 3]);
+  });
+
+  it('frames a plan view as a box, however deep: behind the camera included', () => {
+    const plan = new THREE.OrthographicCamera(-10, 10, 10, -10, -5000, 5000);
+    plan.position.set(0, 0, 0);
+    plan.lookAt(0, 0, -1);
+    plan.updateMatrixWorld(true);
+    const catalogue = [at(0, 0, 0, 50, 12), at(1, 12, 0, -50, 12), at(2, 13, 0, -50, 12), ...Array.from({ length: 30 }, (_, i) => at(3 + i, 500, i, 0, 2))];
+
+    const drawn = Array.from(selectDrawnStars(catalogue, 20, { view: viewOf(plan) }));
+
+    expect(drawn).toEqual([0, 1]);
+  });
+});
+
 describe('StarFieldRenderer refocus', () => {
   const camera = testCamera();
   /** A faint star straight ahead, 150 pc out, among bright ones well off to the side. */
@@ -403,6 +473,22 @@ describe('StarFieldRenderer refocus', () => {
     expect(renderer.pickAt(new THREE.Vector2(0, 0), camera, camera.aspect)).toBe(77);
 
     renderer.refocus({ centre: { x: 0, y: 0, z: 0 } });
+
+    expect(renderer.pickAt(new THREE.Vector2(0, 0), camera, camera.aspect)).toBeUndefined();
+    expect(Array.from({ length: renderer.drawnCount }, (_, i) => renderer.starIdAt(i))).not.toContain(77);
+    renderer.dispose();
+  });
+
+  it('drops a star from the drawn set, and from picking, once the camera has turned away from it', () => {
+    const renderer = new StarFieldRenderer(catalogue, positions, 10);
+    const view = (from: THREE.Camera) => new THREE.Matrix4().multiplyMatrices(from.projectionMatrix, from.matrixWorldInverse);
+    renderer.refocus({ centre: { x: 0, y: 0, z: -140 }, view: view(camera) });
+    expect(renderer.pickAt(new THREE.Vector2(0, 0), camera, camera.aspect)).toBe(77);
+
+    const turned = testCamera();
+    turned.lookAt(0, 0, 1);
+    turned.updateMatrixWorld(true);
+    renderer.refocus({ centre: { x: 0, y: 0, z: -140 }, view: view(turned) });
 
     expect(renderer.pickAt(new THREE.Vector2(0, 0), camera, camera.aspect)).toBeUndefined();
     expect(Array.from({ length: renderer.drawnCount }, (_, i) => renderer.starIdAt(i))).not.toContain(77);

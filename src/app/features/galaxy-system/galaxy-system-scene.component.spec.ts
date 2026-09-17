@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import * as THREE from 'three/webgpu';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, MockInstance, vi } from 'vitest';
 
 import { DataLoaderService, StarField } from '../../core/data/data-loader.service';
 import { EngineService, EngineTickCallback } from '../../core/engine/engine.service';
@@ -10,6 +10,7 @@ import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
 import { NavigationStore } from '../../shared/state/navigation.store';
+import { HudDisplay } from '../hud/hud-dock.component';
 import { GalaxySystemSceneComponent } from './galaxy-system-scene.component';
 import { JumpLinkRenderer } from './jump-link-renderer';
 import { StarFieldRenderer } from './star-field-renderer';
@@ -97,14 +98,18 @@ class FakeEngineService {
 
   setProjection(projection: 'perspective' | 'orthographic', distanceToTarget: number): void {
     this.projection = projection;
+    this.orthographic.zoom = 1;
+    this.orthographic.position.copy(this.camera.position);
+    this.orthographic.quaternion.copy(this.camera.quaternion);
+    this.frameOrthographic(distanceToTarget);
+  }
+
+  frameOrthographic(distanceToTarget: number): void {
     const halfHeight = Math.max(distanceToTarget, 1e-6) * Math.tan((this.camera.fov * Math.PI) / 360);
     this.orthographic.top = halfHeight;
     this.orthographic.bottom = -halfHeight;
     this.orthographic.left = -halfHeight * this.camera.aspect;
     this.orthographic.right = halfHeight * this.camera.aspect;
-    this.orthographic.zoom = 1;
-    this.orthographic.position.copy(this.camera.position);
-    this.orthographic.quaternion.copy(this.camera.quaternion);
     this.orthographic.updateProjectionMatrix();
   }
 
@@ -229,29 +234,130 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     refocus.mockRestore();
   });
 
-  it('does not choose the drawn stars again at load, where the renderer has just chosen them', async () => {
-    const refocus = vi.spyOn(StarFieldRenderer.prototype, 'refocus');
+  describe('the drawn stars, chosen for what the camera shows', () => {
+    type ViewScene = { controls: { target: THREE.Vector3; update(): void }; display: { update(change: (display: HudDisplay) => HudDisplay): void } };
+    let refocus: MockInstance<StarFieldRenderer['refocus']>;
 
-    await advanceFrames(engine, 0.6);
+    beforeEach(() => {
+      refocus = vi.spyOn(StarFieldRenderer.prototype, 'refocus');
+    });
+    afterEach(() => refocus.mockRestore());
 
-    expect(refocus).not.toHaveBeenCalled();
-    refocus.mockRestore();
-  });
+    /** Swings the camera about the view's centre, around the scene's vertical, by `degrees`. */
+    function orbit(component: ViewScene, degrees: number): void {
+      const camera = engine.getCamera();
+      const target = component.controls.target;
+      camera.position.sub(target).applyAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(degrees)).add(target);
+      component.controls.update();
+    }
 
-  it('leaves the drawn stars alone at galactic scale, however far the view centre sweeps', async () => {
-    const component = fixture.componentInstance as unknown as { controls: { target: THREE.Vector3 } };
-    const camera = engine.getCamera();
-    camera.position.set(0, 0, 30000);
-    await advanceFrames(engine, 0.3);
-    const refocus = vi.spyOn(StarFieldRenderer.prototype, 'refocus');
+    it('chooses them for the opening view on the first pass, planet hosts included', async () => {
+      await advanceFrames(engine, 0.6);
 
-    component.controls.target.set(500, 0, 0);
-    await advanceFrames(engine, 0.3);
-    component.controls.target.set(1500, 0, 0);
-    await advanceFrames(engine, 0.3);
+      expect(refocus).toHaveBeenCalledTimes(1);
+      const [focus] = refocus.mock.calls[0];
+      expect(focus.view).toBeDefined();
+      // The Sun has Earth, so it is a host; the others have nothing catalogued.
+      expect(Array.from(focus.hosts ?? [])).toEqual([1, 0, 0]);
+    });
 
-    expect(refocus).not.toHaveBeenCalled();
-    refocus.mockRestore();
+    it('chooses again once the camera has turned half the margin, and not for less', async () => {
+      const component = fixture.componentInstance as unknown as ViewScene;
+      await advanceFrames(engine, 0.3);
+
+      orbit(component, 1);
+      await advanceFrames(engine, 0.3);
+      expect(refocus).toHaveBeenCalledTimes(1);
+
+      orbit(component, 3);
+      await advanceFrames(engine, 0.3);
+      expect(refocus).toHaveBeenCalledTimes(2);
+    });
+
+    it('chooses again once a pan has moved the view further than a fifth of the neighbourhood, and not for less', async () => {
+      const component = fixture.componentInstance as unknown as ViewScene;
+      const camera = engine.getCamera();
+      // Camera and centre together, so the camera neither turns nor zooms.
+      const pan = (pc: number) => {
+        component.controls.target.x += pc;
+        camera.position.x += pc;
+        component.controls.update();
+      };
+      await advanceFrames(engine, 0.3);
+
+      pan(3);
+      await advanceFrames(engine, 0.3);
+      expect(refocus).toHaveBeenCalledTimes(1);
+
+      pan(3);
+      await advanceFrames(engine, 0.3);
+      expect(refocus).toHaveBeenCalledTimes(2);
+    });
+
+    it('chooses again once a zoom has changed the frame by half the margin, and not for less', async () => {
+      const component = fixture.componentInstance as unknown as ViewScene;
+      const camera = engine.getCamera();
+      const dolly = (factor: number) => camera.position.sub(component.controls.target).multiplyScalar(factor).add(component.controls.target);
+      await advanceFrames(engine, 0.3);
+
+      dolly(0.95);
+      await advanceFrames(engine, 0.3);
+      expect(refocus).toHaveBeenCalledTimes(1);
+
+      dolly(0.8);
+      await advanceFrames(engine, 0.3);
+      expect(refocus).toHaveBeenCalledTimes(2);
+    });
+
+    it('chooses again for the plan view, where a small turn moves deep stars furthest', async () => {
+      const component = fixture.componentInstance as unknown as ViewScene;
+      // About 10 pc of frame either side of the centre.
+      engine.getCamera().position.setLength(21.4);
+      component.controls.update();
+      await advanceFrames(engine, 0.3);
+      const beforePlan = refocus.mock.calls.length;
+
+      component.display.update((display) => ({ ...display, plan: true }));
+      TestBed.tick();
+      await advanceFrames(engine, 0.3);
+      expect(refocus).toHaveBeenCalledTimes(beforePlan + 1);
+
+      // Harmless under perspective; under the plan it moves a star 250 pc deep by 4 pc, against a 2.5 pc margin.
+      orbit(component, 1);
+      await advanceFrames(engine, 0.3);
+      expect(refocus).toHaveBeenCalledTimes(beforePlan + 2);
+    });
+
+    it('chooses again when the projection changes under a pose that has not moved at all', async () => {
+      await advanceFrames(engine, 0.3);
+      const before = refocus.mock.calls.length;
+      // The same place, direction and frame height, but a box instead of a frustum, which frames other stars.
+      const perspective = engine.getPerspectiveCamera();
+      const plan = (engine as unknown as { orthographic: THREE.OrthographicCamera }).orthographic;
+      plan.position.copy(perspective.position);
+      plan.quaternion.copy(perspective.quaternion);
+      engine.projection = 'orthographic';
+
+      await advanceFrames(engine, 0.3);
+
+      expect(refocus).toHaveBeenCalledTimes(before + 1);
+    });
+
+    it('chooses once for the whole sky on the way out to the Galaxy, then leaves them alone', async () => {
+      const component = fixture.componentInstance as unknown as ViewScene;
+      engine.getCamera().position.set(0, 0, 30000);
+      await advanceFrames(engine, 0.3);
+      const onArrival = refocus.mock.calls.length;
+      expect(refocus.mock.calls.at(-1)![0].view).toBeUndefined();
+
+      component.controls.target.set(500, 0, 0);
+      await advanceFrames(engine, 0.3);
+      component.controls.target.set(1500, 0, 0);
+      await advanceFrames(engine, 0.3);
+
+      expect(refocus).toHaveBeenCalledTimes(onArrival);
+      expect(refocus.mock.calls.filter(([focus]) => focus.view === undefined)).toHaveLength(1);
+    });
   });
 
   it('keeps the stars of a plotted route drawn, and the selected star', async () => {

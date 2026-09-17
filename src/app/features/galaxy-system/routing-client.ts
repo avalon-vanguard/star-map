@@ -18,7 +18,11 @@ export class SupersededRequest extends Error {
 /** A request made and not yet answered: what was asked, and the promise whoever asked is holding. */
 interface Outstanding {
   readonly request: RoutingRequest;
-  /** The question without its id, so the same question asked twice can be recognised. */
+  /**
+   * A route question without its id, so the same route asked for twice can be recognised. Empty for
+   * a graph: the scene never asks for the same graph twice, and spelling out 70 000 drawn stars to
+   * compare costs more than the comparison could save.
+   */
   readonly question: string;
   readonly promise: Promise<RoutingResponse>;
   readonly resolve: (response: RoutingResponse) => void;
@@ -34,7 +38,7 @@ function outstanding(request: RoutingRequest): Outstanding {
   });
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { requestId, ...question } = request;
-  return { request, question: JSON.stringify(question), promise, resolve, reject };
+  return { request, question: request.kind === 'route' ? JSON.stringify(question) : '', promise, resolve, reject };
 }
 
 /** The routing worker, where this environment has one. */
@@ -50,7 +54,7 @@ function startRoutingWorker(): Worker | undefined {
  * at 8 pc is seconds of work. So requests are held here and sent one by one, and while one is out,
  * only the latest of each kind waits behind it — a newer graph replaces an older one before it is
  * ever built, and the older promise is rejected with {@link SupersededRequest}. Routes go ahead of
- * graphs, being quick and asked for by a click. The same question asked again while it is still
+ * graphs, being quick and asked for by a click. The same route asked for again while it is still
  * outstanding shares the answer rather than being worked out twice.
  *
  * Where there is no worker — the unit tests' DOM has none, and a worker can fail to load or crash —
@@ -89,9 +93,12 @@ export class RoutingClient {
     );
   }
 
-  /** Vertex pairs for every link within `rangePc`, three floats to an end. */
-  links(rangePc: number): Promise<Float32Array> {
-    return this.ask({ kind: 'links', requestId: this.nextRequestId++, rangePc }).then((response) =>
+  /**
+   * Vertex pairs for every link within `rangePc` between two of the `drawn` stars (catalogue
+   * indices), three floats to an end.
+   */
+  links(rangePc: number, drawn: Uint32Array): Promise<Float32Array> {
+    return this.ask({ kind: 'links', requestId: this.nextRequestId++, rangePc, drawn }).then((response) =>
       response.kind === 'links' ? response.segments : new Float32Array(0)
     );
   }
@@ -109,7 +116,7 @@ export class RoutingClient {
       return new Promise((resolve) => resolve(answerRouting(this.localIndex, request)));
     }
     const asked = outstanding(request);
-    const same = [this.inFlight, this.waiting[request.kind]].find((other) => other?.question === asked.question);
+    const same = asked.question ? [this.inFlight, this.waiting[request.kind]].find((other) => other?.question === asked.question) : undefined;
     if (same) {
       return same.promise;
     }
@@ -129,6 +136,8 @@ export class RoutingClient {
     }
     delete this.waiting[next.request.kind];
     this.inFlight = next;
+    // Cloned, never transferred: a graph's `drawn` is the star field's own list, still drawn and
+    // picked from, and answered in place from should the worker die.
     this.worker.postMessage(next.request);
   }
 

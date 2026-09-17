@@ -53,6 +53,10 @@ export class JumpLinkRenderer {
   /** The graph, as vertex pairs: six floats a link, one end then the other. See `jumpLinkSegments`. */
   setSegments(vertices: Float32Array): void {
     this.replaceGeometry(this.links, vertices);
+    // Given rather than left for the renderer to compute: it wants a bounding sphere to sort by and,
+    // finding none, walks every vertex on the main thread in the first frame that draws the graph.
+    // The graph is never culled, and it sorts by its centre, where the catalogue is centred too.
+    this.links.geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), Infinity);
   }
 
   /** The chain to draw over the graph, departure first. Fewer than two stars draws nothing. */

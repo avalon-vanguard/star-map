@@ -71,7 +71,10 @@ const LABEL_MIN_SEPARATION_NDC = 0.12;
 const LABEL_EDGE_NDC = 0.7;
 /** How far right of its point a label's text reaches, in aspect-scaled NDC (~135px at 1440). */
 const LABEL_REACH_NDC = 0.3;
-/** How long the range control has to be still before the graph is rebuilt at its value. */
+/**
+ * How long the range control, and the set of drawn stars, have to be still before the graph is
+ * rebuilt for them: a drag emits per pixel, and a flight re-chooses the drawn stars every few passes.
+ */
 const JUMP_LINK_REBUILD_DELAY_MS = 250;
 
 /**
@@ -355,8 +358,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     );
   });
   private readonly routeQuery = signal('');
-  /** The range the drawn graph was last built at, so a redraw is skipped when nothing moved. */
+  /** The range and the stars the drawn graph was last asked for, so a rebuild is skipped when neither moved. */
   private drawnJumpRangePc: number | null = null;
+  private linkedStars: Uint32Array | null = null;
   private jumpLinkRebuild?: ReturnType<typeof setTimeout>;
   /** The current system's neighbours, resolved on arrival: id, name, distance and bearing. */
   private neighbours: readonly { star: StarRecord; distancePc: number; direction: THREE.Vector3 }[] = [];
@@ -420,14 +424,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     });
     effect(() => this.applyDisplay(this.display()));
     effect(() => this.applyProjection(this.display().plan));
-    // Reads both signals, so flipping the layer on and dragging the range each land here. The
-    // rebuild is a quarter-second of walking the catalogue, and the range control emits per
-    // pixel dragged, so it waits for the hand to settle rather than running once per pixel.
+    // Reads both signals, so flipping the layer on and dragging the range each land here.
     effect(() => {
       this.jumpRangePc();
       this.display().jumpLinks;
-      clearTimeout(this.jumpLinkRebuild);
-      this.jumpLinkRebuild = setTimeout(() => this.refreshJumpLinks(), JUMP_LINK_REBUILD_DELAY_MS);
+      this.scheduleJumpLinks();
     });
   }
 
@@ -807,6 +808,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.starField.refocus({ centre, pinned });
     this.starFieldFocus = centre.clone();
     this.starFieldPins = pins;
+    // The graph links the drawn stars, so a new set wants a new graph once it stops changing.
+    this.scheduleJumpLinks();
   }
 
   private updateLabels(camera: SceneCamera): void {
@@ -1449,14 +1452,23 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     );
   }
 
+  /** Rebuilds the graph once the range and the drawn stars have held still. */
+  private scheduleJumpLinks(): void {
+    clearTimeout(this.jumpLinkRebuild);
+    this.jumpLinkRebuild = setTimeout(() => this.refreshJumpLinks(), JUMP_LINK_REBUILD_DELAY_MS);
+  }
+
   /**
-   * Rebuilds the drawn graph, which is the expensive half: every star's neighbours, once, and 3.7
-   * million links at 8 pc, so it is built in the worker. Only when the layer is on and the range
-   * has actually moved — the control emits per pixel dragged — and only the graph for the range
-   * last asked for is drawn, in whatever order the answers arrive.
+   * Rebuilds the drawn graph: the links between the stars the field is drawing, so what is linked
+   * is what can be seen and clicked. Hundreds of thousands of links at 8 pc, so it is built in the
+   * worker, and only when the layer is on and the range or the drawn stars have actually changed.
+   *
+   * An answer is drawn if it is for the range last asked for, even when the drawn stars have moved
+   * on since: the client answers in the order it was asked, so it is never older than the graph on
+   * screen, and holding out for the latest set would draw nothing while the view keeps moving.
    */
   private refreshJumpLinks(): void {
-    if (!this.jumpLinks || !this.routing) {
+    if (!this.jumpLinks || !this.routing || !this.starField) {
       return;
     }
     const rangePc = this.jumpRangePc();
@@ -1464,24 +1476,28 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       if (this.drawnJumpRangePc !== null) {
         this.jumpLinks.setSegments(new Float32Array(0));
         this.drawnJumpRangePc = null;
+        this.linkedStars = null;
       }
       return;
     }
-    if (this.drawnJumpRangePc === rangePc) {
+    const drawn = this.starField.drawnStars;
+    if (this.drawnJumpRangePc === rangePc && this.linkedStars === drawn) {
       return;
     }
     this.drawnJumpRangePc = rangePc;
-    void this.routing.links(rangePc).then(
+    this.linkedStars = drawn;
+    void this.routing.links(rangePc, drawn).then(
       (segments) => {
         if (this.drawnJumpRangePc === rangePc) {
           this.jumpLinks?.setSegments(segments);
         }
       },
       () => {
-        // Replaced by a newer range, or failed. Either way this range is not drawn, and must not be
-        // remembered as if it were, or asking for it again would be skipped.
-        if (this.drawnJumpRangePc === rangePc) {
+        // Replaced by a newer request, or failed. Either way this graph is not drawn, and must not
+        // be remembered as if it were, or asking for it again would be skipped.
+        if (this.drawnJumpRangePc === rangePc && this.linkedStars === drawn) {
           this.drawnJumpRangePc = null;
+          this.linkedStars = null;
         }
       }
     );

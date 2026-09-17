@@ -5,8 +5,9 @@ import { StarNeighbourhood } from './star-neighbourhood';
 
 /**
  * Walks routes and builds the jump-link graph off the main thread. A search to a star 236 pc
- * away, and the range it would need when there is none, can take seconds; a graph at 8 pc is
- * 3.7 million links. On the page's own thread either stops the map for as long as it runs.
+ * away, and the range it would need when there is none, can take seconds; a graph of the drawn
+ * stars at 8 pc is hundreds of thousands of links. On the page's own thread either stops the map
+ * for as long as it runs.
  */
 let index: StarNeighbourhood | undefined;
 

@@ -307,6 +307,14 @@ export class StarFieldRenderer {
   }
 
   /**
+   * The catalogue indices being drawn. Replaced by a refocus that changes them, never changed in
+   * place, so the same array means the same stars.
+   */
+  get drawnStars(): Uint32Array {
+    return this.drawn;
+  }
+
+  /**
    * Chooses the drawn stars again for where the view now is, and rewrites the instance buffers
    * with them. See {@link selectDrawnStars}.
    */

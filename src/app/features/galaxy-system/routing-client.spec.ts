@@ -148,12 +148,38 @@ describe('RoutingClient with a worker', () => {
     const { client, worker } = clientWithFake();
     const once = client.route(100, 104, 1.5, 8);
     const again = client.route(100, 104, 1.5, 8);
+    const widerRange = client.route(100, 104, 2.5, 8);
 
     expect(worker.requests).toHaveLength(1);
     worker.answer({ kind: 'route', requestId: worker.requests[0].requestId, route: null, neededRangePc: 4 });
 
     expect(await again).toEqual(await once);
-    expect(worker.requests).toHaveLength(1);
+    await flush();
+    // The same two stars at another range is another question.
+    expect(worker.requests.map((request) => request.rangePc)).toEqual([1.5, 2.5]);
+    worker.answer({ kind: 'route', requestId: worker.requests[1].requestId, route: null, neededRangePc: null });
+    await expect(widerRange).resolves.toEqual({ route: null, neededRangePc: null });
+    client.dispose();
+  });
+
+  // Turning the layer off and on again while the worker is busy asks for the same graph twice. Were
+  // the second to replace the first, the first's rejection would wipe the scene's record of the second.
+  it('shares a graph already on its way for the same range and the same list of drawn stars', async () => {
+    const { client, worker } = clientWithFake();
+    const drawn = Uint32Array.of(0, 1, 2);
+    const building = client.links(3, drawn);
+    const waiting = client.links(5, drawn);
+    const again = client.links(5, drawn);
+    const sameAsBuilding = client.links(3, drawn);
+
+    worker.answer({ kind: 'links', requestId: worker.requests[0].requestId, segments: new Float32Array(6) });
+    await expect(building).resolves.toHaveLength(6);
+    await expect(sameAsBuilding).resolves.toHaveLength(6);
+    await flush();
+    worker.answer({ kind: 'links', requestId: worker.requests[1].requestId, segments: new Float32Array(12) });
+    await expect(waiting).resolves.toHaveLength(12);
+    await expect(again).resolves.toHaveLength(12);
+    expect(worker.requests.map((request) => request.kind === 'links' && request.rangePc)).toEqual([3, 5]);
     client.dispose();
   });
 

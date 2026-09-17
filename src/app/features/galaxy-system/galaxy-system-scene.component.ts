@@ -36,7 +36,7 @@ import { RouteRequest, RouteResult, RouteStarOption } from '../hud/routes-panel.
 import { buildSearchIndex, IndexedSearchEntry, rankSearchResults } from '../search/search-ranking';
 import { StarmapHudComponent } from './starmap-hud.component';
 import { SystemObjectCardComponent } from './system-object-card.component';
-import { colorIndexToRgb, StarFieldRenderer, starRenderBudgetFromUrl } from './star-field-renderer';
+import { colorIndexToRgb, FOCUS_RADIUS_PC, StarFieldRenderer, starRenderBudgetFromUrl } from './star-field-renderer';
 import { collectJumpLinks, minimumRangeBetween, routeBetween } from '../../shared/astro/jump-links';
 import { BrightnessIndex, brightestWithin, brightnessIndex } from '../../shared/astro/brightest';
 import { StarNeighbourhood } from '../../shared/astro/star-neighbourhood';
@@ -117,6 +117,12 @@ const HUD_ACCENT = 0x4dd7ff;
 const DEEP_SKY_LABEL_COUNT = 12;
 /** How often (seconds) the visible label set is recomputed; doesn't need to be per-frame. */
 const LABEL_UPDATE_INTERVAL_SECONDS = 0.2;
+/**
+ * How far the view's centre may drift, in parsecs, before the star field chooses its stars again: a
+ * fifth of the radius it draws whole, so nothing within four fifths of it ever goes missing, and
+ * a slow pan does not rewrite the buffers every label pass.
+ */
+const STAR_FIELD_REFOCUS_PC = FOCUS_RADIUS_PC / 5;
 /** Pointer travel (px) above which a press counts as an orbit drag rather than a selection. */
 const CLICK_DRAG_SLOP_PX = 5;
 
@@ -313,6 +319,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private controls?: OrbitControls;
   private rig?: CameraRigController;
   private starField?: StarFieldRenderer;
+  /** Where the star field last chose its stars for, and which it was told to keep. See `refocusStarField`. */
+  private starFieldFocus: THREE.Vector3 | null = null;
+  private starFieldPins = '';
   private hostRings?: HostStarRings;
   /** Proximity over the whole catalogue, built once; the neighbour labels are one query on it. */
   private neighbourhood?: StarNeighbourhood;
@@ -535,7 +544,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       (id): id is number => id !== null && id !== undefined
     ));
 
-    this.starField = new StarFieldRenderer(stars, positions, starRenderBudgetFromUrl(window.location.search));
+    this.starField = new StarFieldRenderer(stars, positions, starRenderBudgetFromUrl(window.location.search), this.starsByBrightness.order);
+    // It has just chosen around the Sun, which is where the view opens: the first label pass need not choose again.
+    this.starFieldFocus = GALAXY_OVERVIEW_TARGET.clone();
     this.galaxyGroup.add(this.starField.object);
     this.hostRings = new HostStarRings(stars.filter((star) => this.starIdsWithBodies.has(star.id)), HUD_ACCENT);
     this.galaxyGroup.add(this.hostRings.object);
@@ -611,6 +622,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     if (this.labelUpdateAccumulator >= LABEL_UPDATE_INTERVAL_SECONDS) {
       this.labelUpdateAccumulator = 0;
       if (this.galaxyGroup.visible) {
+        this.refocusStarField();
         this.updateLabels(camera);
       } else if (this.systemGroup.visible) {
         this.updateSystemLabels(camera);
@@ -758,6 +770,34 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
     const halfHeight = this.engine.visibleHalfHeight(camera.position.distanceTo(this.controls?.target ?? GALAXY_OVERVIEW_TARGET));
     return scaleBar((2 * halfHeight) / heightPx, SCALE_BAR_MAX_PX, unit);
+  }
+
+  /**
+   * Keeps the drawn stars those around what the view is centred on, and the ones the map is
+   * pointing at: the selected star and the stars of a plotted route. Re-chosen only once the
+   * centre has moved far enough to matter, so any star within `FOCUS_RADIUS_PC - STAR_FIELD_REFOCUS_PC`
+   * of it is always drawn, however faint.
+   */
+  private refocusStarField(): void {
+    // At galactic scale the whole catalogue is a smudge a few pixels across, and the view's centre
+    // sweeps hundreds of parsecs a pass across empty space: nothing to choose, and nothing to see.
+    if (!this.starField || !this.neighbourhood || this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD) {
+      return;
+    }
+    const centre = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
+    const selectedId = this.navigationStore.selectedStarId();
+    const pinnedIds = [...(selectedId === null ? [] : [selectedId]), ...(this.routeResult()?.stars.map((star) => star.id) ?? [])];
+    const pins = pinnedIds.join();
+    if (this.starFieldFocus && this.starFieldFocus.distanceTo(centre) <= STAR_FIELD_REFOCUS_PC && pins === this.starFieldPins) {
+      return;
+    }
+    // By catalogue index, through the lookup the neighbourhood already holds: building a second
+    // one of 423 651 entries on the first pin stalled the first flight of a session for 50-140 ms.
+    const neighbourhood = this.neighbourhood;
+    const pinned = pinnedIds.map((id) => neighbourhood.indexOf(id)).filter((index): index is number => index !== undefined);
+    this.starField.refocus({ centre, pinned });
+    this.starFieldFocus = centre.clone();
+    this.starFieldPins = pins;
   }
 
   private updateLabels(camera: SceneCamera): void {

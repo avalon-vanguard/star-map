@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 
 import { buildStarNameIndex, resolveHostStarId } from '../../src/app/shared/astro/host-star-matching';
@@ -15,6 +16,8 @@ const TAP_COLUMNS = [
   'ra',
   'dec',
   'sy_dist',
+  'sy_pmra',
+  'sy_pmdec',
   'pl_orbsmax',
   'pl_orbeccen',
   'pl_orbincl',
@@ -32,9 +35,11 @@ const TAP_COLUMNS = [
 const TAP_QUERY = `select+${TAP_COLUMNS}+from+ps+where+default_flag=1+order+by+pl_name&format=csv`;
 const TAP_URL = `${TAP_BASE_URL}?query=${TAP_QUERY}`;
 
-// A host star match must be within this many parsecs of the catalog position to be
-// accepted as a cross-reference (guards against coincidental name/position collisions).
-const MATCH_TOLERANCE_PC = 0.5;
+// The cache is keyed by the request it answers — endpoint included, since the cache records
+// only that some response arrived: one cached before a column was added would otherwise keep
+// serving rows without it, and a missing proper-motion cell reads as "does not move",
+// silently wrong rather than visibly broken.
+const CACHE_FILE = `exoplanet-archive-ps-${createHash('sha1').update(TAP_URL).digest('hex').slice(0, 8)}.csv`;
 
 /**
  * Downloads confirmed exoplanets from the NASA Exoplanet Archive (`Planetary Systems` TAP
@@ -45,7 +50,7 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<ExoplanetRe
   const knownStars = stars ?? (await fetchStars());
   const nameIndex = buildStarNameIndex(knownStars);
 
-  const csv = await fetchTextCached(TAP_URL, 'exoplanet-archive-ps.csv');
+  const csv = await fetchTextCached(TAP_URL, CACHE_FILE);
   const rows = parseCsvObjects(csv);
 
   let matched = 0;
@@ -55,11 +60,12 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<ExoplanetRe
     const raDeg = parseOptionalNumber(row['ra']) ?? Number.NaN;
     const decDeg = parseOptionalNumber(row['dec']) ?? Number.NaN;
     const distancePc = parseOptionalNumber(row['sy_dist']) ?? Number.NaN;
+    const pmRaMasPerYear = parseOptionalNumber(row['sy_pmra']);
+    const pmDecMasPerYear = parseOptionalNumber(row['sy_pmdec']);
 
     const hostStarId = resolveHostStarId(
-      { hostname: row['hostname'], raDeg, decDeg, distancePc },
+      { hostname: row['hostname'], raDeg, decDeg, distancePc, pmRaMasPerYear, pmDecMasPerYear },
       knownStars,
-      MATCH_TOLERANCE_PC,
       nameIndex
     );
     if (hostStarId !== null) {
@@ -84,6 +90,8 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<ExoplanetRe
       hostRaDeg: parseOptionalNumber(row['ra']),
       hostDecDeg: parseOptionalNumber(row['dec']),
       hostDistancePc: parseOptionalNumber(row['sy_dist']),
+      hostPmRaMasPerYear: pmRaMasPerYear,
+      hostPmDecMasPerYear: pmDecMasPerYear,
       orbit: {
         semiMajorAxisAu: parseOptionalNumber(row['pl_orbsmax']),
         eccentricity: parseOptionalNumber(row['pl_orbeccen']),

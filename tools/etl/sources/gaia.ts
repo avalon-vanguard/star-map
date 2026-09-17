@@ -87,9 +87,10 @@ export async function fetchGaiaStars(): Promise<StarRecord[]> {
   const url = `${GAIA_TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=${encodeURIComponent(query)}`;
   console.log(`Fetching Gaia DR3 (within ${DISTANCE_CUTOFF_PC} pc, G < ${MAGNITUDE_LIMIT}, at most ${ROW_LIMIT} rows)...`);
 
-  // Keyed by the query itself, so a response cached for other columns or another order can
-  // never be mistaken for this one.
-  const csv = await fetchTextCached(url, `gaia-dr3-${createHash('sha1').update(query).digest('hex').slice(0, 8)}.csv`);
+  // Keyed by the whole request, so a response cached for other columns, another order, or
+  // another endpoint can never be mistaken for this one — the cache records only that some
+  // response arrived, not what it answered.
+  const csv = await fetchTextCached(url, `gaia-dr3-${createHash('sha1').update(url).digest('hex').slice(0, 8)}.csv`);
   const rows = parseCsvObjects(csv);
   const stars: StarRecord[] = [];
 

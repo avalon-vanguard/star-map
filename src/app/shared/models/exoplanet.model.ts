@@ -21,17 +21,19 @@ export interface ExoplanetRecord {
   /** Host star mass in solar masses (`st_mass`); the fallback when no period is published. */
   hostStarMassSolar?: number;
   /**
-   * The host star's own published position (`ra`, `dec`, `sy_dist`) — the coordinates the
-   * cross-reference above is resolved from.
+   * The host star's own published astrometry (`ra`, `dec`, `sy_dist`, `sy_pmra`, `sy_pmdec`) —
+   * everything the cross-reference above was resolved from.
    *
    * Kept rather than consumed and discarded. `hostStarId` is the *result* of a match against
-   * whatever star catalogue was loaded at the time, so widening that catalogue ought to rescue
-   * some of the 4347 hosts that currently resolve to nothing — but with only the result stored,
-   * redoing the match meant re-downloading the archive. These three numbers make it a local
-   * operation. See `rematchHostStars`.
+   * whatever star catalogue was loaded at the time; keeping the inputs makes auditing or
+   * redoing that match a local operation instead of a TAP query against an archive that is not
+   * always reachable — it is how the matcher's tolerances were measured. See
+   * `resolveHostStarId`.
    */
   hostRaDeg?: number;
   hostDecDeg?: number;
   hostDistancePc?: number;
+  hostPmRaMasPerYear?: number;
+  hostPmDecMasPerYear?: number;
   orbit: Partial<OrbitalElements>;
 }

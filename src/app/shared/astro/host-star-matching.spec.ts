@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildStarNameIndex, normalizeStarName, resolveHostStarId } from './host-star-matching';
+import { propagateProperMotion, raDegDecDistanceToXyz } from './coordinates';
 import { StarRecord } from '../models/star.model';
 
-// A small fixture standing in for a slice of the HYG star index, used to exercise the
+function star(id: number, name: string, raDeg: number, decDeg: number, distancePc: number): StarRecord {
+  return { id, name, ...raDegDecDistanceToXyz(raDeg, decDeg, distancePc), magnitude: 10, spectralType: 'M', colorIndex: 1.0 };
+}
+
+// A small fixture standing in for a slice of the star catalogue, used to exercise the
 // exoplanet host-star cross-referencing logic without hitting any real API.
 const FIXTURE_STARS: StarRecord[] = [
   // The Sun sits at the origin, exactly where a host with a missing distance lands.
@@ -22,46 +27,150 @@ describe('normalizeStarName', () => {
 
 describe('resolveHostStarId', () => {
   it('matches by exact (normalized) host star name', () => {
-    const id = resolveHostStarId({ hostname: 'Proxima Centauri', raDeg: NaN, decDeg: NaN, distancePc: NaN }, FIXTURE_STARS, 0.5);
+    const id = resolveHostStarId({ hostname: 'Proxima Centauri', raDeg: NaN, decDeg: NaN, distancePc: NaN }, FIXTURE_STARS);
 
     expect(id).toBe(1);
   });
 
   it('matches by name regardless of case/spacing differences', () => {
-    const id = resolveHostStarId({ hostname: 'gj3512', raDeg: NaN, decDeg: NaN, distancePc: NaN }, FIXTURE_STARS, 0.5);
+    const id = resolveHostStarId({ hostname: 'gj3512', raDeg: NaN, decDeg: NaN, distancePc: NaN }, FIXTURE_STARS);
 
     expect(id).toBe(3);
   });
 
-  it('falls back to nearest-neighbour position matching when the name is unknown', () => {
-    // Slightly off from Sirius's exact position, within tolerance.
-    const id = resolveHostStarId({ hostname: 'Sirius A', raDeg: 101.29, decDeg: -16.72, distancePc: 2.64 }, FIXTURE_STARS, 0.5);
-
-    expect(id).toBe(2);
-  });
-
-  it('returns null when no name match and no star is within tolerance', () => {
-    const id = resolveHostStarId({ hostname: 'Unknown Star XYZ', raDeg: 0, decDeg: 0, distancePc: 100 }, FIXTURE_STARS, 0.5);
-
-    expect(id).toBeNull();
-  });
-
   it('returns null when there is no name match and no position is available', () => {
-    const id = resolveHostStarId({ hostname: 'Unknown Star XYZ', raDeg: NaN, decDeg: NaN, distancePc: NaN }, FIXTURE_STARS, 0.5);
+    const id = resolveHostStarId({ hostname: 'Unknown Star XYZ', raDeg: NaN, decDeg: NaN, distancePc: NaN }, FIXTURE_STARS);
 
     expect(id).toBeNull();
   });
 
-  it('picks the closest star when more than one falls within tolerance', () => {
-    const stars: StarRecord[] = [
-      { id: 10, name: 'Near', x: 0, y: 0, z: 0, magnitude: 5, spectralType: 'G', colorIndex: 0.5 },
-      { id: 11, name: 'Far', x: 0.4, y: 0, z: 0, magnitude: 5, spectralType: 'G', colorIndex: 0.5 }
-    ];
-    const nameIndex = buildStarNameIndex(stars);
+  describe('matching on the sky', () => {
+    // GJ 887's archive row: position at Gaia's epoch, carried by 6.9″/yr of proper motion —
+    // 110″ from where the catalogue has the star at J2000. The matcher must carry the query
+    // back those sixteen years itself, and judge each star on the better of the two epochs: the
+    // decoy standing halfway along the star's own track is nearer than Lacaille 9352 at the
+    // published point *and* nearer at the worse of the two epochs, so it wins unless the
+    // carried-back position is tried and the best epoch — not the worst — decides.
+    it('matches a host published at the Gaia epoch to its star at J2000, past a decoy on its track', () => {
+      const lacaille9352 = star(70, 'Lacaille 9352', 346.46683, -35.85306, 3.29);
+      const archive = propagateProperMotion(346.46683, -35.85306, 6768.2, 1327.52, 16);
+      const decoy = star(71, 'Decoy', (346.46683 + archive.raDeg) / 2, (-35.85306 + archive.decDeg) / 2, 3.29);
 
-    const id = resolveHostStarId({ hostname: 'Unmatched', raDeg: 0, decDeg: 0, distancePc: 0.2 }, stars, 0.5, nameIndex);
+      const id = resolveHostStarId(
+        { hostname: 'GJ 887', raDeg: archive.raDeg, decDeg: archive.decDeg, distancePc: 3.28679, pmRaMasPerYear: 6768.2, pmDecMasPerYear: 1327.52 },
+        [decoy, lacaille9352]
+      );
 
-    expect(id).toBe(10);
+      expect(id).toBe(70);
+    });
+
+    // alf Tau's archive row publishes J2000 outright, and the archive never says which epoch a
+    // row is at. If the matcher trusted one epoch and carried every query back, Aldebaran's
+    // planet would land on the Gliese entry sitting 3″ from the carried-back point; the raw
+    // position, zero arcseconds from Aldebaran itself, has to win.
+    it('keeps a host published at J2000 on its star, proper motion or not', () => {
+      const aldebaran = star(80, 'Aldebaran', 68.980163, 16.509302, 20.43);
+      const carried = propagateProperMotion(68.980163, 16.509302, 63, -189, -16);
+      const ghost = star(81, 'Gl 171.1B', carried.raDeg, carried.decDeg + 3 / 3600, 20.43);
+
+      const id = resolveHostStarId(
+        { hostname: 'alf Tau', raDeg: 68.980163, decDeg: 16.509302, distancePc: 20.43, pmRaMasPerYear: 63, pmDecMasPerYear: -189 },
+        [ghost, aldebaran]
+      );
+
+      expect(id).toBe(80);
+    });
+
+    // GJ 15 A's archive row sits at J2016, 46″ along its proper motion from Groombridge 34's
+    // J2000 place — and only 16″ from an unrelated Gaia entry. Nearest-to-the-published-point
+    // picks the interloper; carrying the query back the sixteen years must put the planets on
+    // the star that actually moved there.
+    it('picks the star the proper motion says the query is, not the entry nearest the published point', () => {
+      const primary = star(90, 'Groombridge 34', 4.595364, 44.022955, 3.562);
+      const published = propagateProperMotion(4.595364, 44.022955, 2891.5, 411.9, 16);
+      const interloper = star(91, 'Gaia DR3 385334196532776576', published.raDeg, published.decDeg + 16 / 3600, 3.563);
+
+      const id = resolveHostStarId(
+        { hostname: 'GJ 15 A', raDeg: published.raDeg, decDeg: published.decDeg, distancePc: 3.56228, pmRaMasPerYear: 2891.5, pmDecMasPerYear: 411.9 },
+        [interloper, primary]
+      );
+
+      expect(id).toBe(90);
+    });
+
+    // GJ 273 is Luyten's Star to the arcsecond, but the archive publishes 5.92 pc for a star
+    // at 3.79 — a 56% disagreement. Direction alone must not override a distance in flat
+    // contradiction, or every line-of-sight coincidence becomes a match.
+    it('refuses a host whose distance flatly contradicts the star it points at', () => {
+      const luytens = star(100, "Luyten's Star", 111.8496, 5.2258, 3.79);
+
+      const id = resolveHostStarId({ hostname: 'GJ 273', raDeg: 111.8496, decDeg: 5.2258, distancePc: 5.921535 }, [luytens]);
+
+      expect(id).toBeNull();
+    });
+
+    // The tolerance is transverse — parsecs on the sky, not an angle — so the same 15″ offset
+    // is a match at 50 pc and a stranger at 200 pc.
+    it('scales the angular tolerance with the host distance', () => {
+      const at200 = resolveHostStarId(
+        { hostname: 'Unmatched', raDeg: 150, decDeg: -40 + 15 / 3600, distancePc: 200 },
+        [star(110, 'Far', 150, -40, 200)]
+      );
+      const at50 = resolveHostStarId(
+        { hostname: 'Unmatched', raDeg: 150, decDeg: -40 + 15 / 3600, distancePc: 50 },
+        [star(111, 'Near', 150, -40, 50)]
+      );
+
+      expect(at200).toBeNull();
+      expect(at50).toBe(111);
+    });
+
+    // A star whose distance disqualifies it is not merely rejected — it must not become the
+    // best-so-far either, or an unmerged twin with a bad parallax, sitting nearer on the sky
+    // than the true host, silently unhosts the planet by outranking a star that is never
+    // allowed to win.
+    it('does not let a star its distance disqualifies shadow the true host behind it', () => {
+      const badParallaxTwin = star(120, 'Gaia DR3 twin', 40, 12 + 1 / 3600, 480);
+      const host = star(121, 'True host', 40, 12 + 3 / 3600, 100);
+
+      const id = resolveHostStarId({ hostname: 'Unmatched', raDeg: 40, decDeg: 12, distancePc: 100 }, [badParallaxTwin, host]);
+
+      expect(id).toBe(121);
+    });
+
+    // A proper motion that is not a number must not poison the comparison: NaN loses every
+    // `<` it appears in, so an unguarded one lets each star past the direction test and hands
+    // the planet to whichever happens to be last in the catalogue.
+    it('treats an unusable proper motion as no motion rather than matching by array order', () => {
+      const pointedAt = star(130, 'Pointed at', 10, 10, 5);
+      const acrossTheSky = star(131, 'Across the sky', 190, -10, 5);
+
+      const id = resolveHostStarId(
+        { hostname: 'Unmatched', raDeg: 10, decDeg: 10, distancePc: 5, pmRaMasPerYear: NaN, pmDecMasPerYear: 0 },
+        [pointedAt, acrossTheSky]
+      );
+
+      expect(id).toBe(130);
+    });
+
+    // Normalizing strips the dot, so `Gl 55.2` and `Gl 552` — two stars 135° apart — answer to
+    // one key. A name that names both names neither: the sky has to settle it.
+    it('sends a name two stars answer to back to the sky', () => {
+      const gl552 = star(140, 'Gl 552', 217.0, 15.0, 14.2);
+      const gl55dot2 = star(141, 'Gl 55.2', 30.0, -20.0, 23.9);
+
+      const id = resolveHostStarId({ hostname: 'Gl 552', raDeg: 217.0, decDeg: 15.0, distancePc: 14.2 }, [gl552, gl55dot2]);
+
+      expect(id).toBe(140);
+    });
+
+    it('reuses a prebuilt name index when given one', () => {
+      const nameIndex = buildStarNameIndex(FIXTURE_STARS);
+
+      const id = resolveHostStarId({ hostname: 'Sirius', raDeg: NaN, decDeg: NaN, distancePc: NaN }, [], nameIndex);
+
+      expect(id).toBe(2);
+    });
   });
 
   describe('missing distance column', () => {
@@ -70,25 +179,25 @@ describe('resolveHostStarId', () => {
     // the Sun at distance 0. That shipped 127 alien planets, all seven TRAPPIST-1 worlds among
     // them, into our own solar system.
     it('does not match a host with a zero distance to the Sun', () => {
-      const id = resolveHostStarId({ hostname: 'TRAPPIST-1', raDeg: 346.6, decDeg: -5.04, distancePc: 0 }, FIXTURE_STARS, 0.5);
+      const id = resolveHostStarId({ hostname: 'TRAPPIST-1', raDeg: 346.6, decDeg: -5.04, distancePc: 0 }, FIXTURE_STARS);
 
       expect(id).toBeNull();
     });
 
     it('rejects a negative distance too', () => {
-      const id = resolveHostStarId({ hostname: 'Nowhere', raDeg: 10, decDeg: 10, distancePc: -3 }, FIXTURE_STARS, 0.5);
+      const id = resolveHostStarId({ hostname: 'Nowhere', raDeg: 10, decDeg: 10, distancePc: -3 }, FIXTURE_STARS);
 
       expect(id).toBeNull();
     });
 
     it('still matches a real host at a genuinely small distance', () => {
-      const id = resolveHostStarId({ hostname: 'Unmatched', raDeg: 217.4, decDeg: -62.68, distancePc: 1.2959 }, FIXTURE_STARS, 0.5);
+      const id = resolveHostStarId({ hostname: 'Unmatched', raDeg: 217.4, decDeg: -62.68, distancePc: 1.2959 }, FIXTURE_STARS);
 
       expect(id).toBe(1);
     });
 
     it('lets a named host resolve even with no usable distance', () => {
-      const id = resolveHostStarId({ hostname: 'Sirius', raDeg: 101.3, decDeg: -16.7, distancePc: 0 }, FIXTURE_STARS, 0.5);
+      const id = resolveHostStarId({ hostname: 'Sirius', raDeg: 101.3, decDeg: -16.7, distancePc: 0 }, FIXTURE_STARS);
 
       expect(id).toBe(2);
     });

@@ -29,13 +29,6 @@ export interface Route {
   readonly longestHopPc: number;
 }
 
-/** An unordered pair of stars within range of each other. */
-export interface JumpLink {
-  readonly from: number;
-  readonly to: number;
-  readonly distancePc: number;
-}
-
 /**
  * A cap on how much of the catalogue one search may walk. A search that hits it has already
  * visited more stars than any real chain passes through: the longest measured, Sol to HD 2626 at
@@ -221,17 +214,30 @@ export function minimumRangeBetween(index: StarNeighbourhood, fromId: number, to
 }
 
 /**
- * Every link within `rangePc` in the whole catalogue, each pair once.
+ * Every link within `rangePc` in the whole catalogue, each pair once, as vertex pairs ready to
+ * draw: six floats a link, one end then the other.
  *
- * For drawing the graph, which is the only thing that wants all of it: routing asks for a
- * star's neighbours as it reaches that star and never builds this.
+ * For drawing the graph, which is the only thing that wants all of it: routing asks for a star's
+ * neighbours as it reaches that star and never builds this. Written straight into floats rather
+ * than collected as link objects first, since at 8 pc there are 3.7 million links.
  */
-export function collectJumpLinks(index: StarNeighbourhood, rangePc: number): JumpLink[] {
-  const links: JumpLink[] = [];
-  index.forEachPairWithin(rangePc, (a, b, distancePc) => {
-    // The smaller id first, always. The grid hands pairs over in whatever order it walks its
-    // cells, and a link that is `3-7` here and `7-3` there is two links to anything comparing.
-    links.push(a.id < b.id ? { from: a.id, to: b.id, distancePc } : { from: b.id, to: a.id, distancePc });
+export function jumpLinkSegments(index: StarNeighbourhood, rangePc: number): Float32Array {
+  let vertices = new Float32Array(6 * 4096);
+  let length = 0;
+  index.forEachPairWithin(rangePc, (a, b) => {
+    if (length + 6 > vertices.length) {
+      const grown = new Float32Array(vertices.length * 2);
+      grown.set(vertices);
+      vertices = grown;
+    }
+    vertices[length++] = a.x;
+    vertices[length++] = a.y;
+    vertices[length++] = a.z;
+    vertices[length++] = b.x;
+    vertices[length++] = b.y;
+    vertices[length++] = b.z;
   });
-  return links;
+  // Exact length rather than a view on the grown buffer: the answer is transferred whole, and a
+  // view would carry up to as much again in unused capacity with it.
+  return vertices.slice(0, length);
 }

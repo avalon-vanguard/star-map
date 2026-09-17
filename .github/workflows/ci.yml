@@ -37,13 +37,18 @@ jobs:
       # different dependency tree than the one committed.
       - run: npm ci
 
-      # Four TypeScript projects, checked by four different things. These two have no build of
-      # their own, so nothing else would ever compile them.
+      # Five TypeScript projects, checked by four different things. These three have no build of
+      # their own that checks them, so nothing else would ever compile them. The worker is bundled by
+      # the build, but esbuild only strips its types, and `tsconfig.app.json` leaves it out, since
+      # its lib is `webworker` rather than `dom`.
       - name: Typecheck the ETL
         run: npm run etl:typecheck
 
       - name: Typecheck the end-to-end tests
         run: npm run e2e:typecheck
+
+      - name: Typecheck the routing worker
+        run: npm run worker:typecheck
 
       # `tsconfig.spec.json` is compiled here, `tsconfig.app.json` by the build below.
       - name: Unit tests

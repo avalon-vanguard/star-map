@@ -10,6 +10,7 @@ import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
 import { NavigationStore } from '../../shared/state/navigation.store';
+import { LinkBudget } from '../../shared/astro/jump-links';
 import { HudDisplay } from '../hud/hud-dock.component';
 import { GalaxySystemSceneComponent } from './galaxy-system-scene.component';
 import { JumpLinkRenderer } from './jump-link-renderer';
@@ -425,7 +426,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
   describe('the jump-link graph', () => {
     type LinkScene = {
-      routing: { links(rangePc: number, drawn: Uint32Array): Promise<Float32Array>; route(): Promise<never>; dispose(): void };
+      routing: { links(rangePc: number, drawn: Uint32Array, budget?: LinkBudget): Promise<Float32Array>; route(): Promise<never>; dispose(): void };
       display: { update(change: (display: { jumpLinks: boolean }) => unknown): void };
       jumpRangePc: { set(rangePc: number): void };
       routeResult: { set(value: unknown): void };
@@ -455,7 +456,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       const component = linkScene(links);
       await settle();
       expect(links).toHaveBeenCalledTimes(1);
-      expect(links.mock.calls[0]).toEqual([3, component.starField.drawnStars]);
+      expect(links.mock.calls[0].slice(0, 2)).toEqual([3, component.starField.drawnStars]);
 
       await changeDrawnStars(component, 40);
       expect(links).toHaveBeenCalledTimes(1);
@@ -469,6 +470,19 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       await advanceFrames(engine, 0.3);
       await settle();
       expect(links).toHaveBeenCalledTimes(2);
+    });
+
+    it('asks for as much of the graph as a million pixels of line make, around where the view is centred', async () => {
+      const links = vi.fn((_rangePc: number, _drawn: Uint32Array, _budget?: LinkBudget) => Promise.resolve(new Float32Array(0)));
+      Object.defineProperty((fixture.nativeElement as HTMLElement).querySelector('canvas')!, 'clientHeight', { value: 1080 });
+      linkScene(links);
+      await settle();
+
+      const budget = links.mock.calls[0][2];
+      // The view opens centred on the Sun: its frame's half-height there, over 540 pixels, is a pixel's worth of parsecs.
+      const halfHeight = engine.getCamera().position.length() * Math.tan((50 * Math.PI) / 360);
+      expect(budget?.centre).toEqual({ x: 0, y: 0, z: 0 });
+      expect(budget?.lengthPc).toBeCloseTo((1_000_000 * halfHeight) / 540, 3);
     });
 
     it('gives a view on the move a new graph at least every quarter second, rather than waiting for it to stop', async () => {

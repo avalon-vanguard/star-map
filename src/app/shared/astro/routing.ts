@@ -7,7 +7,7 @@
  * answers them in place where one does not.
  */
 
-import { jumpLinkSegments, minimumRangeBetween, Route, routeBetween } from './jump-links';
+import { jumpLinkSegments, LinkBudget, minimumRangeBetween, Route, routeBetween } from './jump-links';
 import { StarNeighbourhood } from './star-neighbourhood';
 
 /** The catalogue, sent once: ids, and positions packed three to a star in the same order. */
@@ -19,8 +19,11 @@ export interface RoutingCatalogue {
 
 export type RoutingRequest =
   | { readonly kind: 'route'; readonly requestId: number; readonly fromId: number; readonly toId: number; readonly rangePc: number; readonly ceilingPc: number }
-  /** `drawn` is the stars the map is drawing, as positions in the catalogue that was sent: only they are linked. */
-  | { readonly kind: 'links'; readonly requestId: number; readonly rangePc: number; readonly drawn: Uint32Array };
+  /**
+   * `drawn` is the stars the map is drawing, as positions in the catalogue that was sent: only they
+   * are linked. `budget`, where given, keeps only the links nearest the view that fit its length.
+   */
+  | { readonly kind: 'links'; readonly requestId: number; readonly rangePc: number; readonly drawn: Uint32Array; readonly budget?: LinkBudget };
 
 export type RoutingResponse =
   | { readonly kind: 'route'; readonly requestId: number; readonly route: Route | null; readonly neededRangePc: number | null }
@@ -42,7 +45,7 @@ export function answerRouting(index: StarNeighbourhood, request: RoutingRequest)
     // An index of its own over the drawn stars, in cells as wide as the range, so each cell is
     // paired with its immediate neighbours only: 14 cells a cell at 8 pc rather than 63.
     const drawn = new StarNeighbourhood(Array.from(request.drawn, (at) => index.pointAt(at)), request.rangePc);
-    return { kind: 'links', requestId: request.requestId, segments: jumpLinkSegments(drawn, request.rangePc) };
+    return { kind: 'links', requestId: request.requestId, segments: jumpLinkSegments(drawn, request.rangePc, request.budget) };
   }
   const route = routeBetween(index, request.fromId, request.toId, request.rangePc);
   return {

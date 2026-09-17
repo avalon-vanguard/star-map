@@ -191,6 +191,27 @@ describe('jumpLinkSegments', () => {
     expect(jumpLinkSegments(chain(4), 0)).toHaveLength(0);
   });
 
+  it('keeps the links nearest the centre first, for as much length as the budget holds', () => {
+    // A parsec apart from 0 to 20, the centre at 10.3. By nearer end: 9-10 and 10-11 (0.3 away),
+    // then 11-12 (0.7), then 8-9 (1.3). Three parsecs of them fit in 3.5; a fourth would not.
+    const budget = { centre: { x: 10.3, y: 0, z: 0 }, lengthPc: 3.5 };
+
+    const segments = jumpLinkSegments(chain(21), 1.5, budget);
+
+    expect(linksDrawn(segments, chainPoints(21)).sort()).toEqual(['10-11', '11-12', '9-10']);
+    expect(segments.buffer.byteLength).toBe(segments.byteLength);
+  });
+
+  it('counts the budget in parsecs of link, not in links', () => {
+    // Stars at 0, 1 and 3: a 2 pc link nearest the centre, then a 1 pc one. Two and a half parsecs
+    // hold the first and not both, though two links would fit a count of two and a half.
+    const points: StarPoint[] = [{ id: 0, x: 0, y: 0, z: 0 }, { id: 1, x: 1, y: 0, z: 0 }, { id: 2, x: 3, y: 0, z: 0 }];
+
+    const segments = jumpLinkSegments(index(points), 2.5, { centre: { x: 3, y: 0, z: 0 }, lengthPc: 2.5 });
+
+    expect(linksDrawn(segments, points)).toEqual(['1-2']);
+  });
+
   it('grows past its first buffer without losing a link', () => {
     // 5 000 stars a tenth of a parsec apart, ten neighbours each way in range: some 50 000 links, far past
     // the 4 096 the buffer starts with, so it has to grow several times.

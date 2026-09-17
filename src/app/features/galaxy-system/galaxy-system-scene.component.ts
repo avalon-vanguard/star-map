@@ -39,6 +39,7 @@ import { SystemObjectCardComponent } from './system-object-card.component';
 import { RoutingClient } from './routing-client';
 import { colorIndexToRgb, FOCUS_RADIUS_PC, StarFieldRenderer, starRenderBudgetFromUrl, VIEW_MARGIN } from './star-field-renderer';
 import { BrightnessIndex, brightestWithin, brightnessIndex } from '../../shared/astro/brightest';
+import { LinkBudget } from '../../shared/astro/jump-links';
 import { StarNeighbourhood } from '../../shared/astro/star-neighbourhood';
 import { MAX_JUMP_RANGE_PC } from '../hud/routes-panel.component';
 import { HostStarRings } from './host-star-rings';
@@ -76,6 +77,22 @@ const LABEL_REACH_NDC = 0.3;
  * emits per pixel; and how often at most a view on the move gets a graph for its new drawn stars.
  */
 const JUMP_LINK_REBUILD_DELAY_MS = 250;
+/**
+ * How much jump-link line the layer draws, in pixels of length on screen: about a million, measured
+ * where lines are longest.
+ *
+ * What a graph costs to draw is its length on screen, not its number of links: every pixel of it is
+ * blended over whatever is already there. On the Ryzen 7700X's integrated Radeon, standing in for an
+ * entry-level laptop, at 1920 × 1080 with the range at 8 pc:
+ * - near the Sun, about 10 ms a frame per million pixels. At 30 pc from it, 25 000 links were 4.8
+ *   million pixels and 60 ms; 5 000 were 0.9 million and 18 ms, about 55 frames a second;
+ * - at the opening view, where the links are short, 100 000 links were 1.8 million pixels and 12 ms.
+ *
+ * So a count could not serve both: the budget is a length, turned into parsecs at the depth the view
+ * is centred on, and spent on the links nearest that centre. The RTX 4080 draws every graph in the
+ * same 6 ms, but the budget is the same everywhere, like the stars'.
+ */
+const JUMP_LINK_PIXEL_BUDGET = 1_000_000;
 
 /**
  * How far in or out the plan view may be zoomed from the extent its distance frames. Under a
@@ -1553,7 +1570,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
     this.drawnJumpRangePc = rangePc;
     this.linkedStars = drawn;
-    void this.routing.links(rangePc, drawn).then(
+    void this.routing.links(rangePc, drawn, this.jumpLinkBudget()).then(
       (segments) => {
         if (this.drawnJumpRangePc === rangePc) {
           this.jumpLinks?.setSegments(segments);
@@ -1568,6 +1585,20 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         }
       }
     );
+  }
+
+  /**
+   * How much of the graph to draw: the links nearest the view's centre, up to the length that
+   * `JUMP_LINK_PIXEL_BUDGET` pixels of line make at that depth. None without a canvas to measure.
+   */
+  private jumpLinkBudget(): LinkBudget | undefined {
+    const heightPx = this.canvasRef().nativeElement.clientHeight;
+    if (heightPx === 0) {
+      return undefined;
+    }
+    const centre = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
+    const halfHeight = this.engine.visibleHalfHeight(this.engine.getCamera().position.distanceTo(centre));
+    return { centre: { x: centre.x, y: centre.y, z: centre.z }, lengthPc: (JUMP_LINK_PIXEL_BUDGET * 2 * halfHeight) / heightPx };
   }
 
   /** A pinned body wins over a hovered one, so the card does not change under the pointer. */

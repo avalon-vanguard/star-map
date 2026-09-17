@@ -1,5 +1,5 @@
 import { answerRouting, RoutingRequest, RoutingResponse } from '../../shared/astro/routing';
-import { Route } from '../../shared/astro/jump-links';
+import { LinkBudget, Route } from '../../shared/astro/jump-links';
 import { StarNeighbourhood } from '../../shared/astro/star-neighbourhood';
 import { StarRecord } from '../../shared/models/star.model';
 
@@ -34,13 +34,23 @@ function outstanding(request: RoutingRequest): Outstanding {
 }
 
 /**
- * Whether two requests ask the same question. A graph is the same when it is for the same range and
- * the very same list of drawn stars: the star field replaces that list whenever the set changes, so
- * one array is one set, and comparing 70 000 indices would cost more than sharing could save.
+ * Whether two requests ask the same question. A graph is the same when it is for the same range, the
+ * same budget and the very same list of drawn stars: the star field replaces that list whenever the
+ * set changes, so one array is one set, and comparing 70 000 indices would cost more than sharing
+ * could save.
  */
 function asksTheSame(a: RoutingRequest, b: RoutingRequest): boolean {
   if (a.kind === 'links' || b.kind === 'links') {
-    return a.kind === 'links' && b.kind === 'links' && a.rangePc === b.rangePc && a.drawn === b.drawn;
+    return (
+      a.kind === 'links' &&
+      b.kind === 'links' &&
+      a.rangePc === b.rangePc &&
+      a.drawn === b.drawn &&
+      a.budget?.lengthPc === b.budget?.lengthPc &&
+      a.budget?.centre.x === b.budget?.centre.x &&
+      a.budget?.centre.y === b.budget?.centre.y &&
+      a.budget?.centre.z === b.budget?.centre.z
+    );
   }
   return a.fromId === b.fromId && a.toId === b.toId && a.rangePc === b.rangePc && a.ceilingPc === b.ceilingPc;
 }
@@ -100,10 +110,10 @@ export class RoutingClient {
 
   /**
    * Vertex pairs for every link within `rangePc` between two of the `drawn` stars (catalogue
-   * indices), three floats to an end.
+   * indices), three floats to an end; only those nearest the budget's centre that fit it, if given.
    */
-  links(rangePc: number, drawn: Uint32Array): Promise<Float32Array> {
-    return this.ask({ kind: 'links', requestId: this.nextRequestId++, rangePc, drawn }).then((response) =>
+  links(rangePc: number, drawn: Uint32Array, budget?: LinkBudget): Promise<Float32Array> {
+    return this.ask({ kind: 'links', requestId: this.nextRequestId++, rangePc, drawn, budget }).then((response) =>
       response.kind === 'links' ? response.segments : new Float32Array(0)
     );
   }

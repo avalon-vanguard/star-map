@@ -94,6 +94,16 @@ describe('RoutingClient without a worker', () => {
     client.dispose();
   });
 
+  it('keeps only the links its budget holds, nearest the centre first', async () => {
+    const client = new RoutingClient(STARS, POSITIONS, index);
+
+    // Stars at x = 0 to 4 a parsec apart: from a centre at 3.9, one and a half parsecs is the link 3-4 alone.
+    const segments = await client.links(1.5, ALL, { centre: { x: 3.9, y: 0, z: 0 }, lengthPc: 1.5 });
+
+    expect(Array.from(segments)).toEqual([3, 0, 0, 4, 0, 0]);
+    client.dispose();
+  });
+
   it('links only the stars it is told are drawn', async () => {
     const client = new RoutingClient(STARS, POSITIONS, index);
 
@@ -196,6 +206,12 @@ describe('RoutingClient with a worker', () => {
     expect(worker.requests.map((request) => request.kind === 'links' && Array.from(request.drawn))).toEqual([[0, 1, 2], [3, 4, 5]]);
     worker.answer({ kind: 'links', requestId: worker.requests[1].requestId, segments: new Float32Array(12) });
     await expect(second).resolves.toHaveLength(12);
+    // The same list at a different budget is a different graph.
+    void client.links(3, far, { centre: { x: 1, y: 0, z: 0 }, lengthPc: 10 });
+    void client.links(3, far, { centre: { x: 1, y: 0, z: 0 }, lengthPc: 20 });
+    worker.answer({ kind: 'links', requestId: worker.requests[2].requestId, segments: new Float32Array(0) });
+    await flush();
+    expect(worker.requests.map((request) => request.kind === 'links' && request.budget?.lengthPc)).toEqual([undefined, undefined, 10, 20]);
     // The star field goes on drawing and picking from these lists, so they are copied, not moved.
     expect(worker.transferred).not.toContain(near.buffer);
     expect(worker.transferred).not.toContain(far.buffer);

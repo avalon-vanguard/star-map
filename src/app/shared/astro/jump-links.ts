@@ -213,16 +213,32 @@ export function minimumRangeBetween(index: StarNeighbourhood, fromId: number, to
   return reachable;
 }
 
+/** How much of a graph to keep: the links nearest a point, up to a total length. */
+export interface LinkBudget {
+  /** Links are kept in order of how near their nearer end is to this point. */
+  readonly centre: { readonly x: number; readonly y: number; readonly z: number };
+  /** The most the kept links may add up to, end to end, in parsecs. */
+  readonly lengthPc: number;
+}
+
+/**
+ * Keys pack a link's nearer-end distance, in thousandths of a parsec, above its index, so one
+ * numeric sort of plain doubles orders the links nearest first: room for four million links and
+ * two thousand kiloparsecs, inside a double's exact integers.
+ */
+const LINK_INDEX_SPAN = 2 ** 22;
+
 /**
  * Every link within `rangePc` between two of the stars `index` holds, each pair once, as vertex
- * pairs ready to draw: six floats a link, one end then the other.
+ * pairs ready to draw: six floats a link, one end then the other. With a `budget`, only the links
+ * nearest its centre, as many as fit its length.
  *
  * For drawing the graph, which is the only thing that wants all of it: routing asks for a star's
  * neighbours as it reaches that star and never builds this. Written straight into floats rather
  * than collected as link objects first, since at 8 pc the drawn stars alone have hundreds of
  * thousands of links, and the whole catalogue 3.7 million.
  */
-export function jumpLinkSegments(index: StarNeighbourhood, rangePc: number): Float32Array {
+export function jumpLinkSegments(index: StarNeighbourhood, rangePc: number, budget?: LinkBudget): Float32Array {
   let vertices = new Float32Array(6 * 4096);
   let length = 0;
   index.forEachPairWithin(rangePc, (a, b) => {
@@ -238,7 +254,37 @@ export function jumpLinkSegments(index: StarNeighbourhood, rangePc: number): Flo
     vertices[length++] = b.y;
     vertices[length++] = b.z;
   });
-  // Exact length rather than a view on the grown buffer: the answer is transferred whole, and a
-  // view would carry up to as much again in unused capacity with it.
-  return vertices.slice(0, length);
+  if (!budget) {
+    // Exact length rather than a view on the grown buffer: the answer is transferred whole, and a
+    // view would carry up to as much again in unused capacity with it.
+    return vertices.slice(0, length);
+  }
+
+  const { centre } = budget;
+  const count = length / 6;
+  const keys = new Float64Array(count);
+  for (let link = 0; link < count; link++) {
+    const at = link * 6;
+    const nearer = Math.min(
+      Math.hypot(vertices[at] - centre.x, vertices[at + 1] - centre.y, vertices[at + 2] - centre.z),
+      Math.hypot(vertices[at + 3] - centre.x, vertices[at + 4] - centre.y, vertices[at + 5] - centre.z)
+    );
+    keys[link] = Math.floor(nearer * 1000) * LINK_INDEX_SPAN + link;
+  }
+  keys.sort();
+
+  const kept = new Float32Array(length);
+  let keptLength = 0;
+  let totalPc = 0;
+  for (const key of keys) {
+    const at = (key % LINK_INDEX_SPAN) * 6;
+    const linkPc = Math.hypot(vertices[at + 3] - vertices[at], vertices[at + 4] - vertices[at + 1], vertices[at + 5] - vertices[at + 2]);
+    if (totalPc + linkPc > budget.lengthPc) {
+      break;
+    }
+    totalPc += linkPc;
+    kept.set(vertices.subarray(at, at + 6), keptLength);
+    keptLength += 6;
+  }
+  return kept.slice(0, keptLength);
 }

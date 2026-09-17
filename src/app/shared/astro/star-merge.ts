@@ -67,6 +67,28 @@ export const MERGE_BRIGHTER_TOLERANCE = 1;
  */
 export const MERGE_DISTANCE_RATIO_TOLERANCE = 0.5;
 
+/**
+ * Where to draw a star Hipparcos and Gaia both measured, and whether the map keeps it at all.
+ *
+ * Gaia's distance wherever it has a usable one, since its parallaxes are fifty times more
+ * precise; Hipparcos's otherwise. The two catalogues used to be cut at the same radius, each on
+ * its own distance, so a star Hipparcos put at 200 pc and Gaia at 300 was kept by one, never
+ * downloaded from the other, and drawn at 200. That was 83% of the HYG stars left without a
+ * Gaia counterpart, and at the median Hipparcos had them at two-thirds of Gaia's distance.
+ *
+ * Now a star either survey places inside `cutoffPc` is kept, and every kept star sits where the
+ * better measurement puts it, inside the cutoff or not. `null` for a star neither survey places
+ * inside, or that no survey gives a distance for.
+ */
+export function placementDistancePc(hipparcosPc: number | undefined, gaiaPc: number | undefined, cutoffPc: number): number | null {
+  const best = gaiaPc ?? hipparcosPc;
+  if (best === undefined) {
+    return null;
+  }
+  const inside = best <= cutoffPc || (hipparcosPc !== undefined && hipparcosPc <= cutoffPc);
+  return inside ? best : null;
+}
+
 export interface MergeCandidate {
   readonly sourceId: string;
   /** Lower is better — the parallax precision this source measures with, in milliarcseconds. */

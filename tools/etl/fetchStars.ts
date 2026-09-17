@@ -1,8 +1,9 @@
 import { writeFileSync } from 'node:fs';
 
-import { mergeStarCatalogues } from '../../src/app/shared/astro/star-merge';
+import { mergeStarCatalogues, placementDistancePc } from '../../src/app/shared/astro/star-merge';
 import { encodeStarCatalog } from '../../src/app/shared/models/star-catalog';
 import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model';
+import { fetchGaiaDistancesByHip } from './sources/gaia';
 import { positionalSources } from './sources/registry';
 import { PARALLAX_PRECISION_MAS } from './sources/star-sources';
 import { parseCsvObjects, parseOptionalNumber } from './lib/csv';
@@ -19,13 +20,14 @@ const HYG_UNKNOWN_DISTANCE_PC = 100000; // HYG's placeholder for unmeasured/unre
 const UNKNOWN_MAGNITUDE = 15;
 
 /**
- * Stars within this distance (parsecs) of the Sun are kept for the galaxy view.
+ * Stars either survey places within this distance (parsecs) of the Sun are kept for the galaxy
+ * view; `placementDistancePc` decides which distance a kept star is drawn at.
  *
- * Set at the range HYG's own measurements reach rather than at a round number. 98.6% of its
- * rows carry a Hipparcos identifier, and Hipparcos parallaxes are good to roughly a
- * milliarcsecond — so at 250 pc (4 mas) a star's distance is uncertain by some tens of per
- * cent, and beyond it the catalogue is plotting noise. Note that only the *radial* placement
- * blurs: a star's direction on the sky stays exact at any distance.
+ * Set at the range Hipparcos's own measurements reach rather than at a round number: its
+ * parallaxes are good to roughly a milliarcsecond, so at 250 pc (4 mas) a distance is uncertain
+ * by some tens of per cent. That is why it is not applied to the Hipparcos distance alone:
+ * Gaia puts 6 833 of the stars Hipparcos places inside it outside, and 3 666 the other way
+ * round. Only the *radial* placement blurs; a star's direction on the sky stays exact.
  *
  * The catalogue is also magnitude-limited, so this is not a volume-complete sample beyond about
  * 50 pc: it thins to the intrinsically bright, which is the same selection the naked eye makes.
@@ -58,27 +60,35 @@ function resolveName(row: Record<string, string>): string {
 }
 
 /**
- * Downloads the HYG (Hipparcos/Yale/Gliese) stellar database, takes each star's equatorial
- * Cartesian position (parsecs, epoch J2000.0), filters by distance, unions the other positional
- * sources, and writes `stars.bin` (packed positions) + `stars-index.json` (everything else).
+ * Downloads the HYG (Hipparcos/Yale/Gliese) stellar database, places each star along its
+ * equatorial direction (epoch J2000.0) at the better of its Hipparcos and Gaia distances, keeps
+ * the ones either survey puts within range, unions the other positional sources, and writes
+ * `stars.bin` (packed positions) + `stars-index.json` (everything else).
  */
 export async function fetchStars(): Promise<StarRecord[]> {
   console.log(`Fetching HYG star catalog (distance cutoff: ${DISTANCE_CUTOFF_PC} pc)...`);
   const csv = await fetchTextCached(HYG_CSV_URL, 'hygdata_v41.csv');
   const rows = parseCsvObjects(csv);
+  // Not skipped when unreachable, unlike the positional sources below; see its own comment.
+  const gaiaPcByHip = await fetchGaiaDistancesByHip();
 
   const stars: StarRecord[] = [];
+  let atGaiaDistance = 0;
+  let pastCutoff = 0;
 
   for (const row of rows) {
     const id = Number(row['id']);
-    const distancePc = Number(row['dist']);
 
     if (id === SUN_STAR_ID) {
       stars.push({ id, name: 'Sol', x: 0, y: 0, z: 0, magnitude: parseOptionalNumber(row['mag']) ?? UNKNOWN_MAGNITUDE, spectralType: row['spect'] || 'G2V', colorIndex: parseOptionalNumber(row['ci']) ?? null });
       continue;
     }
 
-    if (!Number.isFinite(distancePc) || distancePc >= HYG_UNKNOWN_DISTANCE_PC || distancePc > DISTANCE_CUTOFF_PC) {
+    const hygPc = Number(row['dist']);
+    const hipparcosPc = Number.isFinite(hygPc) && hygPc > 0 && hygPc < HYG_UNKNOWN_DISTANCE_PC ? hygPc : undefined;
+    const gaiaPc = row['hip'] ? gaiaPcByHip.get(Number(row['hip'])) : undefined;
+    const distancePc = placementDistancePc(hipparcosPc, gaiaPc, DISTANCE_CUTOFF_PC);
+    if (distancePc === null) {
       continue;
     }
 
@@ -89,26 +99,37 @@ export async function fetchStars(): Promise<StarRecord[]> {
     // once brought to the same epoch — have it. 1813 stars differ by over an arcsecond, and the
     // Cartesian columns are the ones Gaia agrees with for 1155 of them against 156 (one of those,
     // HIP 57146, has x/y/z 161″ from its own ra/dec and stays double).
+    //
+    // Only their direction is used. They sit at HYG's own distance, or at its 100 000 pc
+    // placeholder where it has none, and are carried along that direction to the one chosen above.
     const x = Number(row['x']);
     const y = Number(row['y']);
     const z = Number(row['z']);
-    if (![x, y, z].every(Number.isFinite)) {
+    const length = Math.hypot(x, y, z);
+    if (![x, y, z].every(Number.isFinite) || length === 0) {
       continue;
+    }
+    const scale = distancePc / length;
+    if (gaiaPc !== undefined) {
+      atGaiaDistance++;
+    }
+    if (distancePc > DISTANCE_CUTOFF_PC) {
+      pastCutoff++;
     }
 
     stars.push({
       id,
       name: resolveName(row),
-      x,
-      y,
-      z,
+      x: x * scale,
+      y: y * scale,
+      z: z * scale,
       magnitude: parseOptionalNumber(row['mag']) ?? UNKNOWN_MAGNITUDE,
       spectralType: row['spect'] || 'Unknown',
       colorIndex: parseOptionalNumber(row['ci']) ?? null
     });
   }
 
-  console.log(`  kept ${stars.length} stars (of ${rows.length} in the catalog).`);
+  console.log(`  kept ${stars.length} stars (of ${rows.length} in the catalog): ${atGaiaDistance} at Gaia's distance, ${pastCutoff} of them past ${DISTANCE_CUTOFF_PC} pc.`);
 
   const merged = await mergeWithOtherSources(stars);
   merged.sort((a, b) => a.id - b.id);

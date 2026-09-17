@@ -78,6 +78,19 @@ const LABEL_REACH_NDC = 0.3;
  */
 const JUMP_LINK_REBUILD_DELAY_MS = 250;
 /**
+ * Whether a graph asked for with one budget still serves another: the same, unless the view has
+ * zoomed by more than half its margin or its centre has moved by more than a fifth of the
+ * neighbourhood drawn whole.
+ */
+function servesTheSame(asked: LinkBudget | undefined, now: LinkBudget | undefined): boolean {
+  if (!asked || !now) {
+    return asked === now;
+  }
+  const moved = Math.hypot(now.centre.x - asked.centre.x, now.centre.y - asked.centre.y, now.centre.z - asked.centre.z);
+  return Math.abs(now.lengthPc / asked.lengthPc - 1) <= VIEW_MARGIN / 2 && moved <= STAR_FIELD_REFOCUS_PC;
+}
+
+/**
  * How much jump-link line the layer draws, in pixels of length on screen: about a million, measured
  * where lines are longest.
  *
@@ -388,6 +401,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   /** The range and the stars the drawn graph was last asked for, so a rebuild is skipped when neither moved. */
   private drawnJumpRangePc: number | null = null;
   private linkedStars: Uint32Array | null = null;
+  private linkedBudget: LinkBudget | undefined;
+  /** Counts graph requests, so a rejection can tell whether it is for the latest one. */
+  private linkRequest = 0;
   private jumpLinkRebuild?: ReturnType<typeof setTimeout>;
   /** The current system's neighbours, resolved on arrival: id, name, distance and bearing. */
   private neighbours: readonly { star: StarRecord; distancePc: number; direction: THREE.Vector3 }[] = [];
@@ -840,7 +856,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const pinned = () => pinnedIds.map((id) => neighbourhood.indexOf(id)).filter((index): index is number => index !== undefined);
 
     const centre = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
-    const drawnBefore = this.starField.drawnStars;
+    let chose = false;
 
     // At galactic scale the whole catalogue is a smudge a few pixels across, and the view sweeps
     // hundreds of parsecs a pass: chosen once for the whole sky on the way out, then left alone,
@@ -850,6 +866,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         this.starField.refocus({ centre, pinned: pinned(), hosts: this.hostStars });
         this.starFieldCamera = null;
         this.starFieldPins = pins;
+        chose = true;
       }
     } else {
       const halfHeight = this.engine.visibleHalfHeight(camera.position.distanceTo(centre));
@@ -882,13 +899,15 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         this.starFieldFocus.copy(centre);
         this.starFieldHalfHeight = halfHeight;
         this.starFieldPins = pins;
+        chose = true;
       }
     }
 
-    // The graph links the drawn stars, so a new set wants a new graph. Not one per pass while the
-    // view keeps moving, and not one pushed back by every pass either, or an orbit would never get
-    // one: at most one every `JUMP_LINK_REBUILD_DELAY_MS`.
-    if (this.starField.drawnStars !== drawnBefore && this.jumpLinkRebuild === undefined) {
+    // The graph links the drawn stars, and spends its budget around the view's centre, so a view that
+    // has moved may want a new one; `refreshJumpLinks` asks only if the stars or the budget changed.
+    // Not one per pass while the view keeps moving, and not one pushed back by every pass either, or
+    // an orbit would never get one: at most one every `JUMP_LINK_REBUILD_DELAY_MS`.
+    if (chose && this.jumpLinkRebuild === undefined) {
       this.scheduleJumpLinks();
     }
   }
@@ -1561,27 +1580,39 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         this.jumpLinks.setSegments(new Float32Array(0));
         this.drawnJumpRangePc = null;
         this.linkedStars = null;
+        this.linkedBudget = undefined;
       }
       return;
     }
+    // Asked for in parsec space only: inside a system the camera and its centre are in astronomical
+    // units about the system's own origin, which would make a budget of the wrong size in the wrong
+    // place. The flight back out chooses the drawn stars again, and that asks.
+    if (!this.galaxyGroup.visible) {
+      return;
+    }
     const drawn = this.starField.drawnStars;
-    if (this.drawnJumpRangePc === rangePc && this.linkedStars === drawn) {
+    const budget = this.jumpLinkBudget();
+    if (this.drawnJumpRangePc === rangePc && this.linkedStars === drawn && servesTheSame(this.linkedBudget, budget)) {
       return;
     }
     this.drawnJumpRangePc = rangePc;
     this.linkedStars = drawn;
-    void this.routing.links(rangePc, drawn, this.jumpLinkBudget()).then(
+    this.linkedBudget = budget;
+    const request = ++this.linkRequest;
+    void this.routing.links(rangePc, drawn, budget).then(
       (segments) => {
         if (this.drawnJumpRangePc === rangePc) {
           this.jumpLinks?.setSegments(segments);
         }
       },
       () => {
-        // Replaced by a newer request, or failed. Either way this graph is not drawn, and must not
-        // be remembered as if it were, or asking for it again would be skipped.
-        if (this.drawnJumpRangePc === rangePc && this.linkedStars === drawn) {
+        // Replaced by a newer request, or failed. Only the latest request's rejection means no graph
+        // is on its way; then nothing is remembered as drawn, so asking again is not skipped. An older
+        // one's says nothing about the request that replaced it, which may ask the same thing.
+        if (request === this.linkRequest) {
           this.drawnJumpRangePc = null;
           this.linkedStars = null;
+          this.linkedBudget = undefined;
         }
       }
     );
@@ -1592,7 +1623,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * `JUMP_LINK_PIXEL_BUDGET` pixels of line make at that depth. None without a canvas to measure.
    */
   private jumpLinkBudget(): LinkBudget | undefined {
-    const heightPx = this.canvasRef().nativeElement.clientHeight;
+    // In the pixels the lines are drawn in, not in CSS pixels: a scaled or HiDPI screen draws more of them.
+    const heightPx = this.canvasRef().nativeElement.clientHeight * this.engine.getRenderer().getPixelRatio();
     if (heightPx === 0) {
       return undefined;
     }

@@ -222,11 +222,10 @@ export interface LinkBudget {
 }
 
 /**
- * Keys pack a link's nearer-end distance, in thousandths of a parsec, above its index, so one
- * numeric sort of plain doubles orders the links nearest first: room for four million links and
- * two thousand kiloparsecs, inside a double's exact integers.
+ * How many distance bands a budgeted graph is split into to find where its budget runs out, so that
+ * only the links in that one band are sorted rather than all of them.
  */
-const LINK_INDEX_SPAN = 2 ** 22;
+const DISTANCE_BANDS = 4096;
 
 /**
  * Every link within `rangePc` between two of the stars `index` holds, each pair once, as vertex
@@ -260,31 +259,65 @@ export function jumpLinkSegments(index: StarNeighbourhood, rangePc: number, budg
     return vertices.slice(0, length);
   }
 
+  // Each link's nearer end's distance from the centre, and its length.
   const { centre } = budget;
   const count = length / 6;
-  const keys = new Float64Array(count);
+  const nearness = new Float32Array(count);
+  const lengths = new Float32Array(count);
+  let totalPc = 0;
+  let farthest = 0;
   for (let link = 0; link < count; link++) {
     const at = link * 6;
-    const nearer = Math.min(
-      Math.hypot(vertices[at] - centre.x, vertices[at + 1] - centre.y, vertices[at + 2] - centre.z),
-      Math.hypot(vertices[at + 3] - centre.x, vertices[at + 4] - centre.y, vertices[at + 5] - centre.z)
-    );
-    keys[link] = Math.floor(nearer * 1000) * LINK_INDEX_SPAN + link;
+    const ax = vertices[at] - centre.x;
+    const ay = vertices[at + 1] - centre.y;
+    const az = vertices[at + 2] - centre.z;
+    const bx = vertices[at + 3] - centre.x;
+    const by = vertices[at + 4] - centre.y;
+    const bz = vertices[at + 5] - centre.z;
+    nearness[link] = Math.sqrt(Math.min(ax * ax + ay * ay + az * az, bx * bx + by * by + bz * bz));
+    lengths[link] = Math.hypot(bx - ax, by - ay, bz - az);
+    totalPc += lengths[link];
+    farthest = Math.max(farthest, nearness[link]);
   }
-  keys.sort();
+  if (totalPc <= budget.lengthPc) {
+    return vertices.slice(0, length);
+  }
 
-  const kept = new Float32Array(length);
-  let keptLength = 0;
-  let totalPc = 0;
-  for (const key of keys) {
-    const at = (key % LINK_INDEX_SPAN) * 6;
-    const linkPc = Math.hypot(vertices[at + 3] - vertices[at], vertices[at + 4] - vertices[at + 1], vertices[at + 5] - vertices[at + 2]);
-    if (totalPc + linkPc > budget.lengthPc) {
+  // Nearest first, without sorting them all: every link in the bands before the one where the budget
+  // runs out fits, and only that band's links are sorted to see how many of them do. Sorting all
+  // 730 000 links at 30 pc from the Sun to keep 4 400 doubled the time a graph took in the worker.
+  const bands = new Uint16Array(count);
+  const bandLengths = new Float64Array(DISTANCE_BANDS);
+  const bandsPerPc = farthest > 0 ? DISTANCE_BANDS / farthest : 0;
+  for (let link = 0; link < count; link++) {
+    bands[link] = Math.min(DISTANCE_BANDS - 1, Math.floor(nearness[link] * bandsPerPc));
+    bandLengths[bands[link]] += lengths[link];
+  }
+  let lastBand = 0;
+  let keptPc = 0;
+  while (keptPc + bandLengths[lastBand] <= budget.lengthPc) {
+    keptPc += bandLengths[lastBand++];
+  }
+  const keptLinks: number[] = [];
+  const boundary: number[] = [];
+  for (let link = 0; link < count; link++) {
+    const band = bands[link];
+    if (band < lastBand) {
+      keptLinks.push(link);
+    } else if (band === lastBand) {
+      boundary.push(link);
+    }
+  }
+  boundary.sort((a, b) => nearness[a] - nearness[b] || a - b);
+  for (const link of boundary) {
+    if (keptPc + lengths[link] > budget.lengthPc) {
       break;
     }
-    totalPc += linkPc;
-    kept.set(vertices.subarray(at, at + 6), keptLength);
-    keptLength += 6;
+    keptPc += lengths[link];
+    keptLinks.push(link);
   }
-  return kept.slice(0, keptLength);
+
+  const kept = new Float32Array(keptLinks.length * 6);
+  keptLinks.forEach((link, at) => kept.set(vertices.subarray(link * 6, link * 6 + 6), at * 6));
+  return kept;
 }

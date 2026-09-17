@@ -133,6 +133,13 @@ class FakeEngineService {
 
   resize(): void {}
 
+  /** The canvas's device pixels per CSS pixel, as the renderer was told. */
+  pixelRatio = 1;
+
+  getRenderer(): { getPixelRatio(): number } {
+    return { getPixelRatio: () => this.pixelRatio };
+  }
+
   /** Test helper: simulates one rendered frame by invoking every registered tick callback. */
   tick(deltaSeconds: number): void {
     for (const callback of this.tickCallbacks) {
@@ -475,14 +482,71 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     it('asks for as much of the graph as a million pixels of line make, around where the view is centred', async () => {
       const links = vi.fn((_rangePc: number, _drawn: Uint32Array, _budget?: LinkBudget) => Promise.resolve(new Float32Array(0)));
       Object.defineProperty((fixture.nativeElement as HTMLElement).querySelector('canvas')!, 'clientHeight', { value: 1080 });
+      // A screen scaled to 200%: 1080 CSS pixels are 2160 drawn ones, and the lines are drawn in those.
+      engine.pixelRatio = 2;
       linkScene(links);
       await settle();
 
       const budget = links.mock.calls[0][2];
-      // The view opens centred on the Sun: its frame's half-height there, over 540 pixels, is a pixel's worth of parsecs.
+      // The view opens centred on the Sun: its frame's half-height there, over 1080 drawn pixels, is a pixel's worth of parsecs.
       const halfHeight = engine.getCamera().position.length() * Math.tan((50 * Math.PI) / 360);
       expect(budget?.centre).toEqual({ x: 0, y: 0, z: 0 });
-      expect(budget?.lengthPc).toBeCloseTo((1_000_000 * halfHeight) / 540, 3);
+      expect(budget?.lengthPc).toBeCloseTo((1_000_000 * halfHeight) / 1080, 3);
+    });
+
+    it('asks again once the view has zoomed past the budget it asked with, though the drawn stars are the same', async () => {
+      // All three stars fit the star budget, so the drawn set never changes: only the budget can.
+      const links = vi.fn((_rangePc: number, _drawn: Uint32Array, _budget?: LinkBudget) => Promise.resolve(new Float32Array(0)));
+      Object.defineProperty((fixture.nativeElement as HTMLElement).querySelector('canvas')!, 'clientHeight', { value: 1080 });
+      const component = linkScene(links);
+      await advanceFrames(engine, 0.3);
+      await settle();
+      const asked = links.mock.calls.length;
+
+      const camera = engine.getCamera();
+      camera.position.sub(component.controls.target).multiplyScalar(0.5).add(component.controls.target);
+      await advanceFrames(engine, 0.3);
+      await settle();
+
+      expect(links.mock.calls.length).toBe(asked + 1);
+      expect(links.mock.calls.at(-1)![1]).toBe(links.mock.calls[0][1]);
+    });
+
+    it('asks for no graph from inside a system, where distances are in astronomical units', async () => {
+      const links = vi.fn((_rangePc: number, _drawn: Uint32Array, _budget?: LinkBudget) => Promise.resolve(new Float32Array(0)));
+      navigationStore.selectStar(SUN.id);
+      await flushAsync();
+      await advanceFrames(engine, 2.5);
+
+      linkScene(links);
+      await settle();
+
+      expect(links).not.toHaveBeenCalled();
+    });
+
+    it('keeps what it asked for when an older request it replaced is rejected', async () => {
+      // Off and on again while a graph is still waiting: the waiting one is replaced, and its
+      // rejection must not be taken for the request that replaced it.
+      const pending: Array<{ resolve: (segments: Float32Array) => void; reject: (error: Error) => void }> = [];
+      const setSegments = vi.spyOn(JumpLinkRenderer.prototype, 'setSegments');
+      const component = linkScene(() => new Promise<Float32Array>((resolve, reject) => pending.push({ resolve, reject })));
+      await settle();
+      component.display.update((display) => ({ ...display, jumpLinks: false }));
+      TestBed.tick();
+      await settle();
+      component.display.update((display) => ({ ...display, jumpLinks: true }));
+      TestBed.tick();
+      await settle();
+      expect(pending).toHaveLength(2);
+
+      pending[0].reject(new Error('Superseded by a newer request'));
+      await flushAsync();
+      const graph = new Float32Array(6);
+      pending[1].resolve(graph);
+      await flushAsync();
+
+      expect(setSegments).toHaveBeenLastCalledWith(graph);
+      setSegments.mockRestore();
     });
 
     it('gives a view on the move a new graph at least every quarter second, rather than waiting for it to stop', async () => {

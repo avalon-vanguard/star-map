@@ -119,9 +119,9 @@ export async function fetchStars(): Promise<StarRecord[]> {
 /**
  * Unions HYG with every other positional source that is wired in and reachable.
  *
- * A source that cannot be reached is reported and skipped rather than failing the run. That is
- * not defensive padding: the archives this would draw on are frequently unavailable, and a build
- * that produces a smaller catalogue is far better than one that produces none.
+ * A source that cannot be reached is reported and skipped here rather than thrown, so a run still
+ * gets as far as validation and says what it has. Whether that may be published is decided
+ * there: `validateMerge` in build.ts refuses a catalogue Gaia contributed nothing to.
  */
 async function mergeWithOtherSources(hygStars: StarRecord[]): Promise<StarRecord[]> {
   const others = positionalSources().filter((source) => source.id !== 'hyg');

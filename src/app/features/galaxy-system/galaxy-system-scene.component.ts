@@ -28,6 +28,7 @@ import { galacticNormal, PolarGridPlane, TetherField } from './grid-plane';
 import { MilkyWayRenderer } from './milky-way-renderer';
 import { starGlowExtentAu, starMarkerRadiusAu, systemFrameRadiusAu, systemFramingDistanceAu, systemViewDirection } from './system-framing';
 import { formatAu, formatLuminosity, formatParsecs } from '../../shared/format/quantity';
+import { distanceRings, formatRoundLength, scaleBar, type LengthUnit, type ScaleBar } from '../../shared/format/scale-bar';
 import { BodyDetailViewModel } from '../body-detail/body-detail.model';
 import { buildBodyViewModel, luminosityOf } from '../body-detail/body-view-model';
 import { DEFAULT_HUD_DISPLAY, HudDisplay, HudDockComponent, HudReadout  } from '../hud/hud-dock.component';
@@ -145,9 +146,21 @@ const GALAXY_APPROACH_DISTANCE_PC = 0.05;
 const GALACTIC_NEAR_PC = 5;
 const GALACTIC_FAR_PC = 250000;
 
-/** Rings for the local grid (parsecs from the Sun), with the catalogue's edge called out. */
-const LOCAL_GRID_RINGS_PC = [50, 100, 150, 200, 250];
+/**
+ * The radius Gaia is surveyed to, which the local grid calls out: inside it the catalogue holds
+ * every star Gaia measured to G < 12, and past it only the Hipparcos stars Gaia places there.
+ */
+const SURVEY_EDGE_PC = 250;
+/**
+ * The local grid's rings are distances from the Sun, at a round step that follows the camera:
+ * five of them out to about the camera's own distance, so 50 to 250 pc from the opening view and
+ * 2 to 10 pc from beside the Sun. A fixed set could only serve one end of the zoom: 50 pc rings
+ * say nothing from inside a 2 pc hop, and nothing marked the stars now drawn past 250 pc.
+ */
+const LOCAL_GRID_RING_COUNT = 5;
 const LOCAL_GRID_SPOKES = 12;
+/** How far across the view the scale bar may run, in CSS pixels. */
+const SCALE_BAR_MAX_PX = 120;
 /** Rings for the galactic grid (parsecs from the centre), with the Sun's orbit called out. */
 const GALACTIC_GRID_RINGS_PC = [2500, 5000, SUN_GALACTOCENTRIC_RADIUS_PC, 11000, 14000];
 const GALACTIC_GRID_SPOKES = 24;
@@ -224,7 +237,7 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
       <svg aria-hidden="true" class="pointer-events-none absolute inset-0 h-full w-full text-accent/60">
         <line #leader x1="0" y1="0" x2="0" y2="0" stroke="currentColor" stroke-width="1" visibility="hidden" />
       </svg>
-      <app-starmap-hud [level]="navigationStore.viewLevel()" [title]="hudTitle()" (levelSelected)="goToLevel($event)" />
+      <app-starmap-hud [level]="navigationStore.viewLevel()" [title]="hudTitle()" [scale]="hudScale()" (levelSelected)="goToLevel($event)" />
       @if (objectCard(); as card) {
         <app-system-object-card [body]="card" (dismissed)="dismissObjectCard()" (openRequested)="openObjectDetail(card.id)" />
       }
@@ -279,6 +292,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   readonly hudReadouts = signal<readonly HudReadout[]>([]);
   readonly hudNote = signal('');
   readonly hudRange = signal('');
+  readonly hudScale = signal<ScaleBar | null>(null);
   /** Which layers are drawn, as toggled from the dock. Applied by `applyDisplay`. */
   readonly display = signal<HudDisplay>(DEFAULT_HUD_DISPLAY);
 
@@ -346,6 +360,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private galacticLabels: readonly LabeledPoint[] = [];
   private galacticGrid?: PolarGridPlane;
   private localGrid?: PolarGridPlane;
+  /** The rings `localGrid` was built with, so it is rebuilt only when they change. */
+  private localGridRadii: readonly number[] = [];
   private tethers?: TetherField;
   /** Strength of the Galaxy-model crossfade, 0 (local view) to 1 (galactic view). */
   private galacticStrength = 0;
@@ -529,11 +545,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       centre: new THREE.Vector3(centre.x, centre.y, centre.z),
       emphasisRadii: [SUN_GALACTOCENTRIC_RADIUS_PC]
     });
-    this.localGrid = new PolarGridPlane({
-      ringRadii: LOCAL_GRID_RINGS_PC,
-      spokeCount: LOCAL_GRID_SPOKES,
-      emphasisRadii: [LOCAL_GRID_RINGS_PC[LOCAL_GRID_RINGS_PC.length - 1]]
-    });
+    this.setLocalGridRadii(distanceRings(GALAXY_OVERVIEW_POSITION.length(), LOCAL_GRID_RING_COUNT, SURVEY_EDGE_PC));
     // A fixed set rather than whatever is currently labelled: a tether that appears and vanishes
     // as the camera drifts reads as a glitch.
     this.tethers = new TetherField(TETHERED_STAR_COUNT);
@@ -544,7 +556,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         .map((star) => new THREE.Vector3(star.x, star.y, star.z)),
       LOCAL_PLANE_HEIGHT_PC
     );
-    this.galaxyGroup.add(this.milkyWay.object, this.galacticGrid.object, this.localGrid.object, this.tethers.object);
+    this.galaxyGroup.add(this.milkyWay.object, this.galacticGrid.object, this.tethers.object);
 
     if (deepSky.length > 0) {
       this.deepSky = new DeepSkyRenderer(deepSky);
@@ -687,7 +699,66 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  /** Swaps the local grid for one with these rings, carrying its current strength across. */
+  private setLocalGridRadii(radii: readonly number[]): void {
+    this.localGrid?.dispose();
+    this.localGridRadii = radii;
+    this.localGrid = new PolarGridPlane({ ringRadii: radii, spokeCount: LOCAL_GRID_SPOKES, emphasisRadii: [SURVEY_EDGE_PC] });
+    this.localGrid.setStrength(this.display().grid ? 1 - this.galacticStrength : 0);
+    this.galaxyGroup.add(this.localGrid.object);
+  }
+
+  /**
+   * One label per ring of the local grid, naming its distance from the Sun. Each sits on the side
+   * of its ring facing what the view is centred on, so the ring running under the stars being
+   * looked at is the one named; a label pinned to one bearing is off screen most of the time.
+   */
+  private ringLabels(camera: SceneCamera): LabeledPoint[] {
+    const normal = galacticNormal();
+    const onPlane = (point: THREE.Vector3) => point.clone().addScaledVector(normal, -point.dot(normal));
+    const target = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
+    // Toward what the view is centred on, when that is out among the rings. Otherwise across the
+    // far side of the grid, the part of it in front of the eye (the near side is under the
+    // camera and out of frame), or toward the top of the screen for a camera looking straight down.
+    let bearing = onPlane(target);
+    if (bearing.length() < (this.localGridRadii[0] ?? 0)) {
+      bearing = onPlane(target.clone().sub(camera.position));
+    }
+    if (bearing.lengthSq() < 1e-12) {
+      bearing = onPlane(new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion));
+    }
+    if (bearing.lengthSq() < 1e-12) {
+      return [];
+    }
+    bearing.normalize();
+    return this.localGridRadii.map(
+      (radius): LabeledPoint => ({
+        id: `ring-${radius}`,
+        name: formatRoundLength(radius, 'pc'),
+        ...(radius === SURVEY_EDGE_PC ? { kind: 'Survey edge' } : {}),
+        tone: 'ghost',
+        x: bearing.x * radius,
+        y: bearing.y * radius,
+        z: bearing.z * radius
+      })
+    );
+  }
+
+  /** The scale bar for the current zoom, measured at the depth the view is centred on. */
+  private scaleBarFor(camera: SceneCamera, unit: LengthUnit): ScaleBar | null {
+    const heightPx = this.canvasRef().nativeElement.clientHeight;
+    if (heightPx === 0) {
+      return null;
+    }
+    const halfHeight = this.engine.visibleHalfHeight(camera.position.distanceTo(this.controls?.target ?? GALAXY_OVERVIEW_TARGET));
+    return scaleBar((2 * halfHeight) / heightPx, SCALE_BAR_MAX_PX, unit);
+  }
+
   private updateLabels(camera: SceneCamera): void {
+    const radii = distanceRings(this.effectiveDistance(camera), LOCAL_GRID_RING_COUNT, SURVEY_EDGE_PC);
+    if (radii.join() !== this.localGridRadii.join()) {
+      this.setLocalGridRadii(radii);
+    }
     const selectedId = this.navigationStore.selectedStarId();
     // Measured from what the camera is looking at, not from where it is. Those differ by the
     // orbit distance, so a camera-relative rule names the stars closest to the near edge of the
@@ -735,7 +806,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
           selectedId
         );
     const backdropLabels = isGalactic ? this.galacticLabels : this.deepSkyLabels;
-    this.labelOverlay?.update([...starLabels, ...backdropLabels]);
+    const ringLabels = isGalactic || !this.display().grid ? [] : this.ringLabels(camera);
+    this.labelOverlay?.update([...starLabels, ...ringLabels, ...backdropLabels]);
   }
 
   /**
@@ -1163,10 +1235,12 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       ]);
       this.hudNote.set('Orbits propagated from published elements to the current date.');
       this.hudRange.set(formatAu(this.engine.visibleHalfHeight(camera.position.distanceTo(this.controls?.target ?? GALAXY_OVERVIEW_TARGET)) / Math.tan((this.engine.getPerspectiveCamera().fov * Math.PI) / 360)));
+      this.hudScale.set(this.scaleBarFor(camera, 'AU'));
       return;
     }
 
     this.hudRange.set(formatParsecs(this.effectiveDistance(camera)));
+    this.hudScale.set(this.scaleBarFor(camera, 'pc'));
 
     if (this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD) {
       this.hudEyebrow.set('Galactic Scale');
@@ -1191,7 +1265,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       { label: 'Stars', value: this.starField && this.starField.drawnCount < this.stars.length ? `${this.starField.drawnCount} / ${this.stars.length}` : `${this.stars.length}` },
       // The radius Gaia is surveyed to, not the edge of the map: the Hipparcos stars Gaia places
       // further out are drawn where it places them.
-      { label: 'Survey radius', value: `${LOCAL_GRID_RINGS_PC[LOCAL_GRID_RINGS_PC.length - 1]} pc` },
+      { label: 'Survey radius', value: `${SURVEY_EDGE_PC} pc` },
       { label: 'Exoplanets', value: `${this.exoplanets.length}` },
       // The one thing the field itself cannot show: which of those points can be flown into.
       { label: 'Systems', value: `${this.enterableSystems}` }

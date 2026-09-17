@@ -79,4 +79,17 @@ describe('StarmapHudComponent', () => {
     // An empty nameplate is worse than none: it reads as a selection that failed to resolve.
     expect(render('galaxy').querySelector('[data-testid="hud-banner"]')).toBeNull();
   });
+
+  it('shows the scale it is given, as a bar of that width', () => {
+    fixture.componentRef.setInput('scale', { label: '10 pc', widthPx: 100 });
+    const bar = render('galaxy').querySelector<HTMLElement>('[data-testid="hud-scale"]');
+
+    expect(bar?.getAttribute('aria-label')).toBe('Scale: 10 pc');
+    expect(bar?.textContent?.trim()).toBe('10 pc');
+    expect(bar?.querySelector<HTMLElement>('span:last-child')?.style.width).toBe('100px');
+  });
+
+  it('shows no scale bar while there is no scale to show', () => {
+    expect(render('galaxy').querySelector('[data-testid="hud-scale"]')).toBeNull();
+  });
 });

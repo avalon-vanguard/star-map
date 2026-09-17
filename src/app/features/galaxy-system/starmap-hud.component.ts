@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 
+import { ScaleBar } from '../../shared/format/scale-bar';
 import { ViewLevel } from '../../shared/state/navigation.store';
 import { ReticleIconComponent } from '../../shared/ui/reticle-icon.component';
 
@@ -20,9 +21,9 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
 ];
 
 /**
- * The top of the map's heads-up display: the scale ladder on the left, the nameplate across
- * the centre, and a centre reticle on whatever the camera is holding. Readouts and tools live
- * in the dock along the bottom (`HudDockComponent`).
+ * The top of the map's heads-up display: the scale ladder on the left with the scale bar under
+ * it, the nameplate across the centre, and a centre reticle on whatever the camera is holding.
+ * Readouts and tools live in the dock along the bottom (`HudDockComponent`).
  *
  * Purely presentational — every value arrives as an input and the only thing it emits is a
  * request to move to another scale. The scene owns the camera and decides what that means.
@@ -68,6 +69,15 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
       }
     </nav>
 
+    @if (scale(); as bar) {
+      <!-- The map's scale bar, under the rail that names the scale: a round length, measured at the
+           depth the view is centred on, since under perspective every depth has its own. -->
+      <div data-testid="hud-scale" role="img" [attr.aria-label]="'Scale: ' + bar.label" class="absolute top-16 left-6 flex flex-col items-start gap-1">
+        <span class="type-label text-muted tabular-nums">{{ bar.label }}</span>
+        <span class="block h-1.5 border-x border-b border-accent/70" [style.width.px]="bar.widthPx"></span>
+      </div>
+    }
+
     @if (title()) {
       <!-- Hidden below lg: the readout panel names the same thing, and at narrower widths a
            long star name runs into the scale rail on its left and under the object card on its
@@ -86,6 +96,8 @@ export class StarmapHudComponent {
   /** What the view is holding, for the nameplate — the selected star, or nothing. */
   readonly title = input('');
   readonly showReticle = input(true);
+  /** The scale bar for the current zoom, worked out by the scene, which knows the camera. */
+  readonly scale = input<ScaleBar | null>(null);
 
   readonly levelSelected = output<ViewLevel>();
 

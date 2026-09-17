@@ -128,20 +128,6 @@ function isWideViewport(): boolean {
               }
             </section>
           }
-          @case ('routes') {
-            <section id="dock-panel-routes" role="tabpanel" aria-labelledby="dock-tab-routes" class="hud-acquire hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-xl px-4 py-3">
-              <app-routes-panel
-                [result]="routeResult()"
-                [pending]="routePending()"
-                [options]="routeOptions()"
-                [currentStar]="currentStar()"
-                (queryChange)="routeQuery.emit($event)"
-                (routeRequested)="routeRequested.emit($event)"
-                (starSelected)="onRouteStarSelected($event)"
-                (rangeChange)="jumpRangeChange.emit($event)"
-              />
-            </section>
-          }
           @case ('bookmarks') {
             <section id="dock-panel-bookmarks" role="tabpanel" aria-labelledby="dock-tab-bookmarks" class="hud-acquire hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-lg">
               @if (bookmarks.bookmarks().length) {
@@ -197,6 +183,23 @@ function isWideViewport(): boolean {
             </section>
           }
         }
+      }
+      <!-- Hidden rather than unmounted: the departure, destination and range it holds would
+           otherwise reset on every trip to another tab, while the scene kept drawing the graph at
+           the old range. Hiding still replays the acquire wipe when it is shown again. -->
+      @if (routing()) {
+        <section id="dock-panel-routes" role="tabpanel" aria-labelledby="dock-tab-routes" [hidden]="activeTab() !== 'routes'" class="hud-acquire hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-xl px-4 py-3">
+          <app-routes-panel
+            [result]="routeResult()"
+            [pending]="routePending()"
+            [options]="routeOptions()"
+            [currentStar]="currentStar()"
+            (queryChange)="routeQuery.emit($event)"
+            (routeRequested)="routeRequested.emit($event)"
+            (starSelected)="onRouteStarSelected($event)"
+            (rangeChange)="jumpRangeChange.emit($event)"
+          />
+        </section>
       }
 
       <div class="hud-brackets hud-surface pointer-events-auto flex w-full items-stretch">

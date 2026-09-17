@@ -252,4 +252,32 @@ describe('HudDockComponent', () => {
     fixture.detectChanges();
     expect(tab('Readout').getAttribute('aria-selected')).toBe('true');
   });
+
+  it('keeps what the Routes panel was set to across a trip to another tab', () => {
+    setReadout();
+    fixture.componentRef.setInput('routing', true);
+    fixture.componentRef.setInput('routeOptions', [{ id: 7, name: 'Sirius', subtitle: '2.6 pc' }]);
+    fixture.componentRef.setInput('defaultTab', 'routes');
+    fixture.detectChanges();
+
+    const destination = host().querySelector<HTMLInputElement>('#route-to')!;
+    destination.value = 'Sir';
+    destination.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    host().querySelector<HTMLButtonElement>('#dock-panel-routes ul button')!.click();
+    const range = host().querySelector<HTMLInputElement>('#route-range')!;
+    range.value = '6';
+    range.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    tab('Readout').click();
+    fixture.detectChanges();
+    expect(host().querySelector<HTMLElement>('#dock-panel-routes')!.hidden).toBe(true);
+    tab('Routes').click();
+    fixture.detectChanges();
+
+    expect(host().querySelector<HTMLElement>('#dock-panel-routes')!.hidden).toBe(false);
+    expect(host().querySelector<HTMLInputElement>('#route-to')!.value).toBe('Sirius');
+    expect(host().querySelector<HTMLInputElement>('#route-range')!.value).toBe('6');
+  });
 });

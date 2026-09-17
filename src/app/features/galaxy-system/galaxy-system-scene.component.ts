@@ -554,7 +554,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       (id): id is number => id !== null && id !== undefined
     ));
 
-    this.starField = new StarFieldRenderer(stars, positions, starRenderBudgetFromUrl(window.location.search), this.starsByBrightness.order);
+    this.starField = new StarFieldRenderer(stars, positions, starRenderBudgetFromUrl(window.location.search), this.starsByBrightness);
     // It has just chosen around the Sun, which is where the view opens: the first label pass need not choose again.
     this.starFieldFocus = GALAXY_OVERVIEW_TARGET.clone();
     this.galaxyGroup.add(this.starField.object);

@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { float, instancedBufferAttribute, mix, modelViewMatrix, smoothstep, uniform, uv, vec2, vec4 } from 'three/tsl';
 
-import { brightnessOrder, Positioned } from '../../shared/astro/brightest';
+import { BrightnessIndex, brightnessIndex, Positioned } from '../../shared/astro/brightest';
 import { spectralTypeToColorIndex } from '../../shared/astro/spectral';
 import { SceneCamera } from '../../core/engine/engine.service';
 import { StarRecord } from '../../shared/models/star.model';
@@ -138,18 +138,44 @@ export function starRenderBudgetFromUrl(search: string, fallback = STAR_RENDER_B
  * is centred, everything within it of the Sun, then the brightest of the rest. Each neighbourhood
  * is taken brightest first, so a budget too small to hold one whole keeps its most visible part.
  *
- * Returns indices into the original list, in the order they were chosen. `order` is the
- * catalogue's brightness order, passed in when the caller already has it rather than sorted again
+ * Returns indices into the original list, in the order they were chosen. `index` is the
+ * catalogue's brightness index, passed in when the caller already has it rather than sorted again
  * on every call.
  */
 export function selectDrawnStars(
   stars: readonly StarRecord[],
   budget = STAR_RENDER_BUDGET,
   focus: DrawFocus = {},
-  order: Uint32Array = brightnessOrder(stars)
+  index: BrightnessIndex = brightnessIndex(stars)
 ): Uint32Array {
   if (stars.length <= budget) {
     return Uint32Array.from(stars.keys());
+  }
+
+  // One walk of the brightness order, reading positions laid out in that order, sorts each tier
+  // brightest first as it goes: 2.4-3.1 ms on the real catalogue in Node, against 6.4-8.5 ms
+  // gathering both neighbourhoods in catalogue order and sorting them. Beyond both neighbourhoods
+  // only the first `budget` stars can ever be taken, so past those it only looks for members.
+  const { order, positions } = index;
+  const radiusSq = FOCUS_RADIUS_PC * FOCUS_RADIUS_PC;
+  const centre = focus.centre ?? SUN;
+  const nearCentre: number[] = [];
+  const nearSun: number[] = [];
+  const rest: number[] = [];
+  for (let at = 0; at < order.length; at++) {
+    const x = positions[at * 3];
+    const y = positions[at * 3 + 1];
+    const z = positions[at * 3 + 2];
+    const dx = x - centre.x;
+    const dy = y - centre.y;
+    const dz = z - centre.z;
+    if (dx * dx + dy * dy + dz * dz <= radiusSq) {
+      nearCentre.push(order[at]);
+    } else if (x * x + y * y + z * z <= radiusSq) {
+      nearSun.push(order[at]);
+    } else if (rest.length < budget) {
+      rest.push(order[at]);
+    }
   }
 
   const chosen = new Uint8Array(stars.length);
@@ -160,40 +186,14 @@ export function selectDrawnStars(
       selected.push(index);
     }
   };
-
-  for (const index of focus.pinned ?? []) {
-    if (index >= 0 && index < stars.length) {
-      take(index);
+  for (const pinned of focus.pinned ?? []) {
+    if (pinned >= 0 && pinned < stars.length) {
+      take(pinned);
     }
   }
-
-  // Both neighbourhoods in one pass in catalogue order, then each sorted brightest first. They hold
-  // a few thousand stars between them, so sorting them costs far less than walking the whole
-  // brightness order once per neighbourhood, which reads the catalogue out of order: 26 ms a
-  // refocus on the real catalogue, against 4 ms this way.
-  const radiusSq = FOCUS_RADIUS_PC * FOCUS_RADIUS_PC;
-  const centres = focus.centre ? [focus.centre, SUN] : [SUN];
-  const members = centres.map(() => [] as number[]);
-  for (let index = 0; index < stars.length; index++) {
-    const star = stars[index];
-    for (let which = 0; which < centres.length; which++) {
-      const dx = star.x - centres[which].x;
-      const dy = star.y - centres[which].y;
-      const dz = star.z - centres[which].z;
-      if (dx * dx + dy * dy + dz * dz <= radiusSq) {
-        members[which].push(index);
-      }
-    }
-  }
-  for (const neighbourhood of members) {
-    // Ties in catalogue order, as in the brightness order itself.
-    neighbourhood.sort((a, b) => stars[a].magnitude - stars[b].magnitude || a - b).forEach(take);
-  }
-
-  for (let at = 0; at < order.length && selected.length < budget; at++) {
-    take(order[at]);
-  }
-
+  nearCentre.forEach(take);
+  nearSun.forEach(take);
+  rest.forEach(take);
   return Uint32Array.from(selected);
 }
 
@@ -227,7 +227,7 @@ export class StarFieldRenderer {
   private readonly geometry: THREE.InstancedBufferGeometry;
   private readonly material: THREE.SpriteNodeMaterial;
   private readonly budget: number;
-  private readonly order: Uint32Array;
+  private readonly brightness: BrightnessIndex;
   /**
    * Colour and angular size of every star in the catalogue, worked out once: a refocus then only
    * copies them into the instances, 0.7 ms for the budget rather than 5.6 ms computing them again.
@@ -246,10 +246,10 @@ export class StarFieldRenderer {
     private readonly catalogue: readonly StarRecord[],
     private readonly cataloguePositions: Float32Array,
     budget = STAR_RENDER_BUDGET,
-    order?: Uint32Array
+    brightness?: BrightnessIndex
   ) {
     this.budget = budget;
-    this.order = order ?? brightnessOrder(catalogue);
+    this.brightness = brightness ?? brightnessIndex(catalogue);
     const capacity = Math.min(budget, catalogue.length);
     this.geometry = createQuadGeometry(0);
 
@@ -319,7 +319,7 @@ export class StarFieldRenderer {
    * with them. See {@link selectDrawnStars}.
    */
   refocus(focus: DrawFocus): void {
-    const drawn = selectDrawnStars(this.catalogue, this.budget, focus, this.order);
+    const drawn = selectDrawnStars(this.catalogue, this.budget, focus, this.brightness);
     // The same stars in the same instances: the buffers already hold them, and a rewrite would
     // upload 2 MB to the GPU for nothing — which a pan across empty space would do every pass.
     if (drawn.length === this.drawn.length && drawn.every((index, instance) => index === this.drawn[instance])) {

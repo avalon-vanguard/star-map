@@ -81,9 +81,40 @@ describe('routeBetween', () => {
 
     expect(route?.longestHopPc).toBeCloseTo(4);
   });
+
+  it('heads for the destination rather than exhausting a dense knot around the departure', () => {
+    // The Gaia catalogue in miniature: a crowd around the departure, larger than the search's
+    // budget, with the only way on a thin chain leading out of it. A search widening evenly from
+    // the departure spends the budget on the crowd and never reaches the chain's far end.
+    const route = routeBetween(knotAndChain(), 0, CHAIN_END, 1.5);
+
+    expect(route).not.toBeNull();
+    expect(route!.stars[route!.stars.length - 1]).toBe(CHAIN_END);
+    expect(route!.longestHopPc).toBeLessThanOrEqual(1.5);
+  });
 });
 
+/**
+ * 21 000 stars scattered through the 30 pc cube around the origin, about ten times the density
+ * around the real Sun and more than a search's budget, with a chain a parsec a hop running along
+ * x from the origin out through the crowd and on to 75 pc.
+ */
+const CHAIN_END = 75;
+function knotAndChain(): StarNeighbourhood {
+  let seed = 7;
+  const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 30 - 15;
+  const knot: StarPoint[] = Array.from({ length: 21000 }, (_, i) => ({ id: 1000 + i, x: random(), y: random(), z: random() }));
+  const chainOut: StarPoint[] = Array.from({ length: CHAIN_END }, (_, i) => ({ id: i + 1, x: i + 1, y: 0, z: 0 }));
+  return index([{ id: 0, x: 0, y: 0, z: 0 }, ...knot, ...chainOut]);
+}
+
 describe('minimumRangeBetween', () => {
+  it('works out the range past a dense knot around the departure', () => {
+    // Past the crowd the chain's hops of a parsec are the only way on, so a parsec is the
+    // answer, to the half-step the panel rounds up to.
+    expect(minimumRangeBetween(knotAndChain(), 0, CHAIN_END, 8)).toBeCloseTo(1, 1);
+  });
+
   it('names the shortest range that opens a way through', () => {
     // Hops of 1 and 4: no range under 4 connects them, and 4 exactly does.
     const stepped = index([

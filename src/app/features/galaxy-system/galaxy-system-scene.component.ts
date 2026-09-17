@@ -39,6 +39,7 @@ import { SystemObjectCardComponent } from './system-object-card.component';
 import { colorIndexToRgb, StarFieldRenderer, starRenderBudgetFromUrl } from './star-field-renderer';
 import { collectJumpLinks, minimumRangeBetween, routeBetween } from '../../shared/astro/jump-links';
 import { StarNeighbourhood } from '../../shared/astro/star-neighbourhood';
+import { MAX_JUMP_RANGE_PC } from '../hud/routes-panel.component';
 import { HostStarRings } from './host-star-rings';
 import { JumpLinkRenderer } from './jump-link-renderer';
 import { ReservedBox, ringPlacement } from './label-ring';
@@ -83,10 +84,11 @@ const PLAN_ZOOM_SPAN = 64;
 const ROUTE_OPTION_COUNT = 6;
 const MIN_ROUTE_QUERY_LENGTH = 2;
 /**
- * The widest crossing `minimumRangeBetween` will consider when saying what a route would need.
- * Beyond this the catalogue is one component and the answer stops being informative.
+ * The widest crossing `minimumRangeBetween` will consider when saying what a route would need:
+ * the Routes panel's own maximum, since a range the control cannot be set to is no answer. At
+ * 30 pc, as it was, the search could run for a minute through the dense core before answering.
  */
-const ROUTE_RANGE_CEILING_PC = 30;
+const ROUTE_RANGE_CEILING_PC = MAX_JUMP_RANGE_PC;
 
 /** How many neighbouring stars are named from inside a system. */
 const NEIGHBOUR_COUNT = 4;

@@ -115,4 +115,49 @@ describe('StarNeighbourhood', () => {
 
     expect(ids(index.nearest(1, 2)).sort()).toEqual([2, 3]);
   });
+
+  /** 400 stars scattered 20 pc either side of the origin on every axis, so cells on both sides of zero. */
+  function cloud(): StarPoint[] {
+    let seed = 3;
+    const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 40 - 20;
+    return Array.from({ length: 400 }, (_, id) => ({ id, x: random(), y: random(), z: random() }));
+  }
+
+  it('visits every star within a radius and no other', () => {
+    const points = cloud();
+    const origin = points[0];
+    const expected = points
+      .filter((point) => point.id !== origin.id && Math.hypot(point.x - origin.x, point.y - origin.y, point.z - origin.z) <= 7)
+      .map((point) => point.id)
+      .sort((a, b) => a - b);
+
+    const visited: number[] = [];
+    new StarNeighbourhood(points).forEachWithin(origin.id, 7, (neighbour) => visited.push(neighbour.id));
+
+    expect(visited.sort((a, b) => a - b)).toEqual(expected);
+  });
+
+  // The pair walk reads each cell's indices back out of its key; read wrong, it quietly drops
+  // pairs instead of failing.
+  it('walks every pair within a radius exactly once', () => {
+    const points = cloud();
+    let expected = 0;
+    for (let i = 0; i < points.length; i++) {
+      for (let j = i + 1; j < points.length; j++) {
+        if (Math.hypot(points[j].x - points[i].x, points[j].y - points[i].y, points[j].z - points[i].z) <= 5) {
+          expected++;
+        }
+      }
+    }
+
+    const walked = new Set<string>();
+    let visits = 0;
+    new StarNeighbourhood(points).forEachPairWithin(5, (a, b) => {
+      visits++;
+      walked.add(a.id < b.id ? `${a.id}-${b.id}` : `${b.id}-${a.id}`);
+    });
+
+    expect(visits).toBe(expected);
+    expect(walked.size).toBe(expected);
+  });
 });

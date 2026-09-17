@@ -49,10 +49,27 @@ describe('answerRouting', () => {
   });
 
   it('answers the graph as the segments it draws', () => {
-    const answer = answerRouting(index, { kind: 'links', requestId: 3, rangePc: 1.5 });
+    const answer = answerRouting(index, { kind: 'links', requestId: 3, rangePc: 1.5, drawn: Uint32Array.from(POINTS.keys()) });
 
     expect(answer.kind).toBe('links');
     expect(answer.requestId).toBe(3);
-    expect(answer.kind === 'links' && Array.from(answer.segments)).toEqual(Array.from(jumpLinkSegments(direct, 1.5)));
+    expect(answer.kind === 'links' && linkEnds(answer.segments)).toEqual(linkEnds(jumpLinkSegments(direct, 1.5)));
+  });
+
+  it('links only the drawn stars, including a pair exactly the range apart', () => {
+    // Stars at x = 0, 1, 2 and 4 drawn; the one at 3, which would bridge 2 and 4, is not. At 1 pc
+    // every link is exactly the range long, and the cells are exactly the range wide.
+    const answer = answerRouting(index, { kind: 'links', requestId: 4, rangePc: 1, drawn: Uint32Array.of(0, 1, 2, 4) });
+
+    expect(answer.kind === 'links' && linkEnds(answer.segments)).toEqual(['0-1', '1-2']);
   });
 });
+
+/** Each link as its two ends' x, lower first, in order: the pairs, whatever order they were walked in. */
+function linkEnds(segments: Float32Array): string[] {
+  const ends: string[] = [];
+  for (let at = 0; at < segments.length; at += 6) {
+    ends.push([segments[at], segments[at + 3]].sort((a, b) => a - b).join('-'));
+  }
+  return ends.sort();
+}

@@ -214,12 +214,13 @@ export function minimumRangeBetween(index: StarNeighbourhood, fromId: number, to
 }
 
 /**
- * Every link within `rangePc` in the whole catalogue, each pair once, as vertex pairs ready to
- * draw: six floats a link, one end then the other.
+ * Every link within `rangePc` between two of the stars `index` holds, each pair once, as vertex
+ * pairs ready to draw: six floats a link, one end then the other.
  *
  * For drawing the graph, which is the only thing that wants all of it: routing asks for a star's
  * neighbours as it reaches that star and never builds this. Written straight into floats rather
- * than collected as link objects first, since at 8 pc there are 3.7 million links.
+ * than collected as link objects first, since at 8 pc the drawn stars alone have hundreds of
+ * thousands of links, and the whole catalogue 3.7 million.
  */
 export function jumpLinkSegments(index: StarNeighbourhood, rangePc: number): Float32Array {
   let vertices = new Float32Array(6 * 4096);

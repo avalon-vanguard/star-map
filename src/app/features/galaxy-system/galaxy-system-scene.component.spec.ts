@@ -11,6 +11,7 @@ import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
 import { NavigationStore } from '../../shared/state/navigation.store';
 import { GalaxySystemSceneComponent } from './galaxy-system-scene.component';
+import { JumpLinkRenderer } from './jump-link-renderer';
 import { StarFieldRenderer } from './star-field-renderer';
 
 // jsdom does not implement ResizeObserver; the component only uses it to react to real
@@ -264,6 +265,85 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     // As catalogue indices: the Sun is the first entry of STARS, Proxima the third.
     expect(refocus.mock.calls.at(-1)![0].pinned).toEqual([0, 2]);
     refocus.mockRestore();
+  });
+
+  describe('the jump-link graph', () => {
+    type LinkScene = {
+      routing: { links(rangePc: number, drawn: Uint32Array): Promise<Float32Array>; route(): Promise<never>; dispose(): void };
+      display: { update(change: (display: { jumpLinks: boolean }) => unknown): void };
+      jumpRangePc: { set(rangePc: number): void };
+      routeResult: { set(value: unknown): void };
+      controls: { target: THREE.Vector3 };
+      starField: { drawnStars: Uint32Array; drawn: Uint32Array };
+    };
+    /** Real time, since the rebuild waits on a real timer for the range and the drawn stars to settle. */
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
+
+    function linkScene(links: LinkScene['routing']['links']): LinkScene {
+      const component = fixture.componentInstance as unknown as LinkScene;
+      component.routing = { links, route: () => new Promise<never>(() => undefined), dispose: () => undefined };
+      component.display.update((display) => ({ ...display, jumpLinks: true }));
+      TestBed.tick();
+      return component;
+    }
+
+    /** Makes the next refocus choose a different set: the field is told it draws one star, then the view moves. */
+    async function changeDrawnStars(component: LinkScene, targetX: number): Promise<void> {
+      component.starField.drawn = Uint32Array.of(0);
+      component.controls.target.set(targetX, 0, 0);
+      await advanceFrames(engine, 0.3);
+    }
+
+    it('links the stars being drawn, and asks again once a new set of them holds still', async () => {
+      const links = vi.fn((_rangePc: number, _drawn: Uint32Array) => Promise.resolve(new Float32Array(0)));
+      const component = linkScene(links);
+      await settle();
+      expect(links).toHaveBeenCalledTimes(1);
+      expect(links.mock.calls[0]).toEqual([3, component.starField.drawnStars]);
+
+      await changeDrawnStars(component, 40);
+      expect(links).toHaveBeenCalledTimes(1);
+      await settle();
+      expect(links).toHaveBeenCalledTimes(2);
+      expect(links.mock.calls[1][1]).toBe(component.starField.drawnStars);
+      expect(links.mock.calls[1][1]).not.toBe(links.mock.calls[0][1]);
+
+      // A route re-chooses the drawn stars around its pins, and here they come out the same: no new graph.
+      component.routeResult.set({ stars: [{ id: SUN.id, name: 'Sol' }], totalPc: 0, neededRangePc: null });
+      await advanceFrames(engine, 0.3);
+      await settle();
+      expect(links).toHaveBeenCalledTimes(2);
+    });
+
+    it('draws a late graph for the range still asked for, and not one for a range left behind', async () => {
+      const answers: Array<(segments: Float32Array) => void> = [];
+      const setSegments = vi.spyOn(JumpLinkRenderer.prototype, 'setSegments');
+      const component = linkScene(() => new Promise<Float32Array>((resolve) => answers.push(resolve)));
+      await settle();
+      await changeDrawnStars(component, 40);
+      await settle();
+      expect(answers).toHaveLength(2);
+
+      // For stars no longer drawn, but at the range still asked for: newer than what is on screen.
+      const olderSet = new Float32Array(6);
+      answers[0](olderSet);
+      await flushAsync();
+      expect(setSegments).toHaveBeenLastCalledWith(olderSet);
+
+      component.jumpRangePc.set(5);
+      TestBed.tick();
+      await settle();
+      expect(answers).toHaveLength(3);
+      answers[1](new Float32Array(12));
+      await flushAsync();
+      expect(setSegments).toHaveBeenLastCalledWith(olderSet);
+
+      const current = new Float32Array(18);
+      answers[2](current);
+      await flushAsync();
+      expect(setSegments).toHaveBeenLastCalledWith(current);
+      setSegments.mockRestore();
+    });
   });
 
   it('shows the answer to the latest route asked for, whatever order the answers arrive in', async () => {

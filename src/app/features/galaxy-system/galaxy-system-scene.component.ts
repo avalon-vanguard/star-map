@@ -1391,6 +1391,15 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     if (this.busy || selectedStarId === this.currentStarId) {
       return;
     }
+
+    // An id the catalogue no longer holds — a bookmark to a Gaia row that a refresh renumbered
+    // or folded into a named star — has nowhere to fly to. It is cleared here rather than left
+    // to `enterSystem` to decline, because declining completes the transition, and completing
+    // re-reads the same id: the two would call each other until the stack ran out.
+    if (selectedStarId !== null && !this.starsById.has(selectedStarId)) {
+      this.navigationStore.selectStar(null);
+      return;
+    }
     this.busy = true;
 
     if (selectedStarId === null) {

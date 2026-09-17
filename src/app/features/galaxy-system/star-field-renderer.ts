@@ -44,7 +44,7 @@ export const STAR_RENDER_BUDGET = 70_000;
 
 /**
  * Radius (parsecs) around the Sun, and around wherever the view is centred, inside which every
- * star is drawn regardless of brightness.
+ * star in view is drawn regardless of brightness.
  *
  * A pure brightness cut would be defensible — apparent magnitude is exactly "how visible this
  * is" — but it would drop the solar neighbourhood, because the nearest stars are overwhelmingly
@@ -62,6 +62,17 @@ export const STAR_RENDER_BUDGET = 70_000;
  */
 export const FOCUS_RADIUS_PC = 25;
 
+/**
+ * How far past the edges of the frame the drawn stars reach, as a share of the frame's half-width
+ * and half-height: 5° beyond the top and bottom at the 50° field of view, 6° beyond each side.
+ *
+ * The drawn set is chosen for a camera pose and kept until the view has turned or moved half this
+ * far, so the margin is what is on screen by the time it is chosen again. Wider stays whole
+ * through faster turns but spends the budget off screen: at 30 pc from the Sun, where the budget
+ * binds, 0.25 leaves 52 000 of the 70 000 on screen and 0.5 only 44 000.
+ */
+export const VIEW_MARGIN = 0.25;
+
 /** What, besides the brightest stars, the field should be sure to draw. */
 export interface DrawFocus {
   /** Where the view is centred. Its neighbourhood is drawn whole, like the Sun's. */
@@ -71,6 +82,17 @@ export interface DrawFocus {
    * of a plotted route. Anything the map points at has to be there to be pointed at.
    */
   readonly pinned?: readonly number[];
+  /**
+   * 1 for each catalogue index with known planets. Drawn next after the pinned stars, however
+   * faint: each carries a ring, and a ring around a star that is not drawn circles nothing that
+   * can be clicked.
+   */
+  readonly hosts?: Uint8Array;
+  /**
+   * The camera's projection times its view matrix. Only stars inside its frame, widened by
+   * {@link VIEW_MARGIN}, are drawn, pinned stars aside; without it, the whole sky is in view.
+   */
+  readonly view?: THREE.Matrix4;
 }
 
 const SUN: Positioned = { x: 0, y: 0, z: 0 };
@@ -134,9 +156,10 @@ export function starRenderBudgetFromUrl(search: string, fallback = STAR_RENDER_B
 
 /**
  * Chooses which stars to draw when the catalogue is larger than the budget. In order, until the
- * budget is spent: the pinned stars, everything within {@link FOCUS_RADIUS_PC} of where the view
- * is centred, everything within it of the Sun, then the brightest of the rest. Each neighbourhood
- * is taken brightest first, so a budget too small to hold one whole keeps its most visible part.
+ * budget is spent: the pinned stars wherever they are, then of the stars in view, the planet
+ * hosts, everything within {@link FOCUS_RADIUS_PC} of where the view is centred, everything within
+ * it of the Sun, and the brightest of the rest. Each tier is taken brightest first, so a budget too
+ * small to hold one whole keeps its most visible part.
  *
  * Returns indices into the original list, in the order they were chosen. `index` is the
  * catalogue's brightness index, passed in when the caller already has it rather than sorted again
@@ -154,11 +177,14 @@ export function selectDrawnStars(
 
   // One walk of the brightness order, reading positions laid out in that order, sorts each tier
   // brightest first as it goes: 2.4-3.1 ms on the real catalogue in Node, against 6.4-8.5 ms
-  // gathering both neighbourhoods in catalogue order and sorting them. Beyond both neighbourhoods
-  // only the first `budget` stars can ever be taken, so past those it only looks for members.
+  // gathering both neighbourhoods in catalogue order and sorting them. Of the stars in no earlier
+  // tier only the first `budget` in view can ever be taken, so past those it looks for the tiers.
   const { order, positions } = index;
   const radiusSq = FOCUS_RADIUS_PC * FOCUS_RADIUS_PC;
   const centre = focus.centre ?? SUN;
+  const view = focus.view?.elements;
+  const reachScale = 1 + VIEW_MARGIN;
+  const hosts: number[] = [];
   const nearCentre: number[] = [];
   const nearSun: number[] = [];
   const rest: number[] = [];
@@ -169,13 +195,21 @@ export function selectDrawnStars(
     const dx = x - centre.x;
     const dy = y - centre.y;
     const dz = z - centre.z;
-    if (dx * dx + dy * dy + dz * dz <= radiusSq) {
-      nearCentre.push(order[at]);
-    } else if (x * x + y * y + z * z <= radiusSq) {
-      nearSun.push(order[at]);
-    } else if (rest.length < budget) {
-      rest.push(order[at]);
+    const isHost = focus.hosts?.[order[at]] === 1;
+    const inCentre = dx * dx + dy * dy + dz * dz <= radiusSq;
+    const inSun = x * x + y * y + z * z <= radiusSq;
+    if (!isHost && !inCentre && !inSun && rest.length >= budget) {
+      continue;
     }
+    if (view) {
+      // In clip space: in frame when |x| and |y| are within w, widened by the margin. Behind a
+      // perspective camera w is negative, so nothing there passes; an orthographic camera's w is 1.
+      const reach = (view[3] * x + view[7] * y + view[11] * z + view[15]) * reachScale;
+      if (Math.abs(view[0] * x + view[4] * y + view[8] * z + view[12]) > reach || Math.abs(view[1] * x + view[5] * y + view[9] * z + view[13]) > reach) {
+        continue;
+      }
+    }
+    (isHost ? hosts : inCentre ? nearCentre : inSun ? nearSun : rest).push(order[at]);
   }
 
   const chosen = new Uint8Array(stars.length);
@@ -191,6 +225,7 @@ export function selectDrawnStars(
       take(pinned);
     }
   }
+  hosts.forEach(take);
   nearCentre.forEach(take);
   nearSun.forEach(take);
   rest.forEach(take);

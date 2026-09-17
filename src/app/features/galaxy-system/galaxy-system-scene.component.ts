@@ -37,7 +37,7 @@ import { buildSearchIndex, IndexedSearchEntry, rankSearchResults } from '../sear
 import { StarmapHudComponent } from './starmap-hud.component';
 import { SystemObjectCardComponent } from './system-object-card.component';
 import { RoutingClient } from './routing-client';
-import { colorIndexToRgb, FOCUS_RADIUS_PC, StarFieldRenderer, starRenderBudgetFromUrl } from './star-field-renderer';
+import { colorIndexToRgb, FOCUS_RADIUS_PC, StarFieldRenderer, starRenderBudgetFromUrl, VIEW_MARGIN } from './star-field-renderer';
 import { BrightnessIndex, brightestWithin, brightnessIndex } from '../../shared/astro/brightest';
 import { StarNeighbourhood } from '../../shared/astro/star-neighbourhood';
 import { MAX_JUMP_RANGE_PC } from '../hud/routes-panel.component';
@@ -72,8 +72,8 @@ const LABEL_EDGE_NDC = 0.7;
 /** How far right of its point a label's text reaches, in aspect-scaled NDC (~135px at 1440). */
 const LABEL_REACH_NDC = 0.3;
 /**
- * How long the range control, and the set of drawn stars, have to be still before the graph is
- * rebuilt for them: a drag emits per pixel, and a flight re-chooses the drawn stars every few passes.
+ * How long the range control has to be still before the graph is rebuilt at its value, since a drag
+ * emits per pixel; and how often at most a view on the move gets a graph for its new drawn stars.
  */
 const JUMP_LINK_REBUILD_DELAY_MS = 250;
 
@@ -121,9 +121,9 @@ const DEEP_SKY_LABEL_COUNT = 12;
 /** How often (seconds) the visible label set is recomputed; doesn't need to be per-frame. */
 const LABEL_UPDATE_INTERVAL_SECONDS = 0.2;
 /**
- * How far the view's centre may drift, in parsecs, before the star field chooses its stars again: a
- * fifth of the radius it draws whole, so nothing within four fifths of it ever goes missing, and
- * a slow pan does not rewrite the buffers every label pass.
+ * The furthest the view's centre may drift, in parsecs, before the star field chooses its stars
+ * again: a fifth of the radius it draws whole, so nothing within four fifths of it ever goes
+ * missing. Closer in, half the frame's margin is the tighter limit. See `refocusStarField`.
  */
 const STAR_FIELD_REFOCUS_PC = FOCUS_RADIUS_PC / 5;
 /** Pointer travel (px) above which a press counts as an orbit drag rather than a selection. */
@@ -323,9 +323,19 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private controls?: OrbitControls;
   private rig?: CameraRigController;
   private starField?: StarFieldRenderer;
-  /** Where the star field last chose its stars for, and which it was told to keep. See `refocusStarField`. */
-  private starFieldFocus: THREE.Vector3 | null = null;
+  /**
+   * The view the star field last chose its stars for, and which it was told to keep. See
+   * `refocusStarField`. `undefined` chooses again on the next pass; `null` means the last choice
+   * was made at galactic scale, for the whole sky.
+   */
+  private starFieldCamera: SceneCamera | null | undefined;
+  private readonly starFieldQuaternion = new THREE.Quaternion();
+  private readonly starFieldFocus = new THREE.Vector3();
+  private starFieldHalfHeight = 0;
   private starFieldPins = '';
+  private readonly starFieldView = new THREE.Matrix4();
+  /** 1 for each catalogue index with known planets, which the star field draws ahead of the rest in view. */
+  private hostStars = new Uint8Array(0);
   private hostRings?: HostStarRings;
   /** Proximity over the whole catalogue, built once; the neighbour labels are one query on it. */
   private neighbourhood?: StarNeighbourhood;
@@ -555,8 +565,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     ));
 
     this.starField = new StarFieldRenderer(stars, positions, starRenderBudgetFromUrl(window.location.search), this.starsByBrightness);
-    // It has just chosen around the Sun, which is where the view opens: the first label pass need not choose again.
-    this.starFieldFocus = GALAXY_OVERVIEW_TARGET.clone();
+    this.hostStars = Uint8Array.from(stars, (star) => (this.starIdsWithBodies.has(star.id) ? 1 : 0));
     this.galaxyGroup.add(this.starField.object);
     this.hostRings = new HostStarRings(stars.filter((star) => this.starIdsWithBodies.has(star.id)), HUD_ACCENT);
     this.galaxyGroup.add(this.hostRings.object);
@@ -626,13 +635,19 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       // Per-frame, unlike the labels: this is a handful of uniform writes, and it is what keeps
       // the zoom continuous rather than stepping between two discrete scales.
       this.updateGalacticCrossfade(camera);
+      // A flight turns and zooms far faster than a label pass: the return from a system zooms out
+      // forty-fold in a second. So while one is under way the drawn stars are checked every frame,
+      // and chosen again whenever the view has used up half the margin.
+      if (this.rig?.isAnimating) {
+        this.refocusStarField(camera);
+      }
     }
 
     this.labelUpdateAccumulator += deltaSeconds;
     if (this.labelUpdateAccumulator >= LABEL_UPDATE_INTERVAL_SECONDS) {
       this.labelUpdateAccumulator = 0;
       if (this.galaxyGroup.visible) {
-        this.refocusStarField();
+        this.refocusStarField(camera);
         this.updateLabels(camera);
       } else if (this.systemGroup.visible) {
         this.updateSystemLabels(camera);
@@ -783,33 +798,82 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
-   * Keeps the drawn stars those around what the view is centred on, and the ones the map is
-   * pointing at: the selected star and the stars of a plotted route. Re-chosen only once the
-   * centre has moved far enough to matter, so any star within `FOCUS_RADIUS_PC - STAR_FIELD_REFOCUS_PC`
-   * of it is always drawn, however faint.
+   * Keeps the drawn stars those the camera shows: the ones the map is pointing at wherever they
+   * are, then of what is in frame, the planet hosts, the neighbourhoods of the view's centre and of
+   * the Sun, and the brightest. See `selectDrawnStars`.
+   *
+   * Chosen for a frame widened by `VIEW_MARGIN`, and chosen again, at the label cadence, once the
+   * view could have used up half that margin: turned, zoomed or moved by half of it, switched
+   * projection or resized. So a turn slower than a margin every two passes, about 25° a second,
+   * brings no empty edge into view. Two things still outrun it, measured and accepted: stars much
+   * nearer the camera than the view's centre, which an orbit sweeps across the frame faster than it
+   * turns, and deep stars under a zoomed-in plan view, which a turn moves by their depth. Flights are
+   * checked every frame instead of every pass; the galactic scale gets the whole sky.
    */
-  private refocusStarField(): void {
-    // At galactic scale the whole catalogue is a smudge a few pixels across, and the view's centre
-    // sweeps hundreds of parsecs a pass across empty space: nothing to choose, and nothing to see.
-    if (!this.starField || !this.neighbourhood || this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD) {
+  private refocusStarField(camera: SceneCamera): void {
+    if (!this.starField || !this.neighbourhood) {
       return;
     }
-    const centre = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
     const selectedId = this.navigationStore.selectedStarId();
     const pinnedIds = [...(selectedId === null ? [] : [selectedId]), ...(this.routeResult()?.stars.map((star) => star.id) ?? [])];
     const pins = pinnedIds.join();
-    if (this.starFieldFocus && this.starFieldFocus.distanceTo(centre) <= STAR_FIELD_REFOCUS_PC && pins === this.starFieldPins) {
-      return;
-    }
     // By catalogue index, through the lookup the neighbourhood already holds: building a second
     // one of 423 651 entries on the first pin stalled the first flight of a session for 50-140 ms.
     const neighbourhood = this.neighbourhood;
-    const pinned = pinnedIds.map((id) => neighbourhood.indexOf(id)).filter((index): index is number => index !== undefined);
-    this.starField.refocus({ centre, pinned });
-    this.starFieldFocus = centre.clone();
-    this.starFieldPins = pins;
-    // The graph links the drawn stars, so a new set wants a new graph once it stops changing.
-    this.scheduleJumpLinks();
+    const pinned = () => pinnedIds.map((id) => neighbourhood.indexOf(id)).filter((index): index is number => index !== undefined);
+
+    const centre = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
+    const drawnBefore = this.starField.drawnStars;
+
+    // At galactic scale the whole catalogue is a smudge a few pixels across, and the view sweeps
+    // hundreds of parsecs a pass: chosen once for the whole sky on the way out, then left alone,
+    // rather than frozen on whatever narrow frame the zoom-out last passed through.
+    if (this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD) {
+      if (this.starFieldCamera !== null || pins !== this.starFieldPins) {
+        this.starField.refocus({ centre, pinned: pinned(), hosts: this.hostStars });
+        this.starFieldCamera = null;
+        this.starFieldPins = pins;
+      }
+    } else {
+      const halfHeight = this.engine.visibleHalfHeight(camera.position.distanceTo(centre));
+      const perspective = this.engine.getPerspectiveCamera();
+      // The narrower of the frame's two half-extents: on a portrait screen the width, where the
+      // same share of margin is the fewest degrees and the fewest parsecs.
+      const narrowing = Math.min(1, perspective.aspect);
+      const marginPc = (VIEW_MARGIN / 2) * halfHeight * narrowing;
+      // The turn that moves a star at the frame's edge half the margin further out. Under a plan
+      // view a turn moves a star by its depth times the angle instead; the survey edge stands in
+      // for the depth of the stars drawn.
+      const tanHalfFov = Math.tan((perspective.fov * Math.PI) / 360) * narrowing;
+      let turnLimit = (Math.atan((1 + VIEW_MARGIN) * tanHalfFov) - Math.atan(tanHalfFov)) / 2;
+      if (this.engine.currentProjection === 'orthographic') {
+        turnLimit = Math.min(turnLimit, marginPc / (SURVEY_EDGE_PC + centre.length()));
+      }
+      const held =
+        camera === this.starFieldCamera &&
+        pins === this.starFieldPins &&
+        camera.quaternion.angleTo(this.starFieldQuaternion) <= turnLimit &&
+        Math.abs(halfHeight / this.starFieldHalfHeight - 1) <= VIEW_MARGIN / 2 &&
+        this.starFieldFocus.distanceTo(centre) <= Math.min(STAR_FIELD_REFOCUS_PC, marginPc);
+      if (!held) {
+        // The tick runs before the frame is drawn, so the camera's matrices can still be last frame's.
+        camera.updateMatrixWorld();
+        this.starFieldView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+        this.starField.refocus({ centre, pinned: pinned(), hosts: this.hostStars, view: this.starFieldView });
+        this.starFieldCamera = camera;
+        this.starFieldQuaternion.copy(camera.quaternion);
+        this.starFieldFocus.copy(centre);
+        this.starFieldHalfHeight = halfHeight;
+        this.starFieldPins = pins;
+      }
+    }
+
+    // The graph links the drawn stars, so a new set wants a new graph. Not one per pass while the
+    // view keeps moving, and not one pushed back by every pass either, or an orbit would never get
+    // one: at most one every `JUMP_LINK_REBUILD_DELAY_MS`.
+    if (this.starField.drawnStars !== drawnBefore && this.jumpLinkRebuild === undefined) {
+      this.scheduleJumpLinks();
+    }
   }
 
   private updateLabels(camera: SceneCamera): void {
@@ -1455,7 +1519,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   /** Rebuilds the graph once the range and the drawn stars have held still. */
   private scheduleJumpLinks(): void {
     clearTimeout(this.jumpLinkRebuild);
-    this.jumpLinkRebuild = setTimeout(() => this.refreshJumpLinks(), JUMP_LINK_REBUILD_DELAY_MS);
+    this.jumpLinkRebuild = setTimeout(() => {
+      this.jumpLinkRebuild = undefined;
+      this.refreshJumpLinks();
+    }, JUMP_LINK_REBUILD_DELAY_MS);
   }
 
   /**
@@ -1749,6 +1816,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       const { width, height } = entry.contentRect;
       this.engine.resize(width, height);
       this.labelOverlay?.setSize(width, height);
+      // A new shape of frame: the stars chosen for the old one no longer fill it.
+      this.starFieldCamera = undefined;
     });
     this.resizeObserver.observe(canvas);
   }

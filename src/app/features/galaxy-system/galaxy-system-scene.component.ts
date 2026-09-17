@@ -72,8 +72,8 @@ const LABEL_EDGE_NDC = 0.7;
 /** How far right of its point a label's text reaches, in aspect-scaled NDC (~135px at 1440). */
 const LABEL_REACH_NDC = 0.3;
 /**
- * How long the range control, and the set of drawn stars, have to be still before the graph is
- * rebuilt for them: a drag emits per pixel, and a flight re-chooses the drawn stars every few passes.
+ * How long the range control has to be still before the graph is rebuilt at its value, since a drag
+ * emits per pixel; and how often at most a view on the move gets a graph for its new drawn stars.
  */
 const JUMP_LINK_REBUILD_DELAY_MS = 250;
 
@@ -635,6 +635,12 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       // Per-frame, unlike the labels: this is a handful of uniform writes, and it is what keeps
       // the zoom continuous rather than stepping between two discrete scales.
       this.updateGalacticCrossfade(camera);
+      // A flight turns and zooms far faster than a label pass: the return from a system zooms out
+      // forty-fold in a second. So while one is under way the drawn stars are checked every frame,
+      // and chosen again whenever the view has used up half the margin.
+      if (this.rig?.isAnimating) {
+        this.refocusStarField(camera);
+      }
     }
 
     this.labelUpdateAccumulator += deltaSeconds;
@@ -799,9 +805,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * Chosen for a frame widened by `VIEW_MARGIN`, and chosen again, at the label cadence, once the
    * view could have used up half that margin: turned, zoomed or moved by half of it, switched
    * projection or resized. So a turn slower than a margin every two passes, about 25° a second,
-   * brings no empty edge into view. Two things outrun it: stars much nearer the camera than the
-   * view's centre, which an orbit sweeps across the frame faster than it turns, and deep stars
-   * under a zoomed-in plan view, which a turn moves by their depth.
+   * brings no empty edge into view. Two things still outrun it, measured and accepted: stars much
+   * nearer the camera than the view's centre, which an orbit sweeps across the frame faster than it
+   * turns, and deep stars under a zoomed-in plan view, which a turn moves by their depth. Flights are
+   * checked every frame instead of every pass; the galactic scale gets the whole sky.
    */
   private refocusStarField(camera: SceneCamera): void {
     if (!this.starField || !this.neighbourhood) {
@@ -815,49 +822,58 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const neighbourhood = this.neighbourhood;
     const pinned = () => pinnedIds.map((id) => neighbourhood.indexOf(id)).filter((index): index is number => index !== undefined);
 
+    const centre = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
+    const drawnBefore = this.starField.drawnStars;
+
     // At galactic scale the whole catalogue is a smudge a few pixels across, and the view sweeps
     // hundreds of parsecs a pass: chosen once for the whole sky on the way out, then left alone,
     // rather than frozen on whatever narrow frame the zoom-out last passed through.
     if (this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD) {
       if (this.starFieldCamera !== null || pins !== this.starFieldPins) {
-        this.starField.refocus({ pinned: pinned(), hosts: this.hostStars });
+        this.starField.refocus({ centre, pinned: pinned(), hosts: this.hostStars });
         this.starFieldCamera = null;
         this.starFieldPins = pins;
-        this.scheduleJumpLinks();
       }
-      return;
+    } else {
+      const halfHeight = this.engine.visibleHalfHeight(camera.position.distanceTo(centre));
+      const perspective = this.engine.getPerspectiveCamera();
+      // The narrower of the frame's two half-extents: on a portrait screen the width, where the
+      // same share of margin is the fewest degrees and the fewest parsecs.
+      const narrowing = Math.min(1, perspective.aspect);
+      const marginPc = (VIEW_MARGIN / 2) * halfHeight * narrowing;
+      // The turn that moves a star at the frame's edge half the margin further out. Under a plan
+      // view a turn moves a star by its depth times the angle instead; the survey edge stands in
+      // for the depth of the stars drawn.
+      const tanHalfFov = Math.tan((perspective.fov * Math.PI) / 360) * narrowing;
+      let turnLimit = (Math.atan((1 + VIEW_MARGIN) * tanHalfFov) - Math.atan(tanHalfFov)) / 2;
+      if (this.engine.currentProjection === 'orthographic') {
+        turnLimit = Math.min(turnLimit, marginPc / (SURVEY_EDGE_PC + centre.length()));
+      }
+      const held =
+        camera === this.starFieldCamera &&
+        pins === this.starFieldPins &&
+        camera.quaternion.angleTo(this.starFieldQuaternion) <= turnLimit &&
+        Math.abs(halfHeight / this.starFieldHalfHeight - 1) <= VIEW_MARGIN / 2 &&
+        this.starFieldFocus.distanceTo(centre) <= Math.min(STAR_FIELD_REFOCUS_PC, marginPc);
+      if (!held) {
+        // The tick runs before the frame is drawn, so the camera's matrices can still be last frame's.
+        camera.updateMatrixWorld();
+        this.starFieldView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+        this.starField.refocus({ centre, pinned: pinned(), hosts: this.hostStars, view: this.starFieldView });
+        this.starFieldCamera = camera;
+        this.starFieldQuaternion.copy(camera.quaternion);
+        this.starFieldFocus.copy(centre);
+        this.starFieldHalfHeight = halfHeight;
+        this.starFieldPins = pins;
+      }
     }
 
-    const centre = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
-    const halfHeight = this.engine.visibleHalfHeight(camera.position.distanceTo(centre));
-    // The turn that moves a star at the frame's edge half the margin further out. Under a plan
-    // view a turn moves a star by its depth times the angle instead, so the deepest star the
-    // catalogue draws sets the limit too.
-    const tanHalfFov = Math.tan((this.engine.getPerspectiveCamera().fov * Math.PI) / 360);
-    let turnLimit = (Math.atan((1 + VIEW_MARGIN) * tanHalfFov) - Math.atan(tanHalfFov)) / 2;
-    if (this.engine.currentProjection === 'orthographic') {
-      turnLimit = Math.min(turnLimit, ((VIEW_MARGIN / 2) * halfHeight) / (SURVEY_EDGE_PC + centre.length()));
+    // The graph links the drawn stars, so a new set wants a new graph. Not one per pass while the
+    // view keeps moving, and not one pushed back by every pass either, or an orbit would never get
+    // one: at most one every `JUMP_LINK_REBUILD_DELAY_MS`.
+    if (this.starField.drawnStars !== drawnBefore && this.jumpLinkRebuild === undefined) {
+      this.scheduleJumpLinks();
     }
-    if (
-      camera === this.starFieldCamera &&
-      pins === this.starFieldPins &&
-      camera.quaternion.angleTo(this.starFieldQuaternion) <= turnLimit &&
-      Math.abs(halfHeight / this.starFieldHalfHeight - 1) <= VIEW_MARGIN / 2 &&
-      this.starFieldFocus.distanceTo(centre) <= Math.min(STAR_FIELD_REFOCUS_PC, (VIEW_MARGIN / 2) * halfHeight)
-    ) {
-      return;
-    }
-    // The tick runs before the frame is drawn, so the camera's matrices can still be last frame's.
-    camera.updateMatrixWorld();
-    this.starFieldView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-    this.starField.refocus({ centre, pinned: pinned(), hosts: this.hostStars, view: this.starFieldView });
-    this.starFieldCamera = camera;
-    this.starFieldQuaternion.copy(camera.quaternion);
-    this.starFieldFocus.copy(centre);
-    this.starFieldHalfHeight = halfHeight;
-    this.starFieldPins = pins;
-    // The graph links the drawn stars, so a new set wants a new graph once it stops changing.
-    this.scheduleJumpLinks();
   }
 
   private updateLabels(camera: SceneCamera): void {
@@ -1503,7 +1519,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   /** Rebuilds the graph once the range and the drawn stars have held still. */
   private scheduleJumpLinks(): void {
     clearTimeout(this.jumpLinkRebuild);
-    this.jumpLinkRebuild = setTimeout(() => this.refreshJumpLinks(), JUMP_LINK_REBUILD_DELAY_MS);
+    this.jumpLinkRebuild = setTimeout(() => {
+      this.jumpLinkRebuild = undefined;
+      this.refreshJumpLinks();
+    }, JUMP_LINK_REBUILD_DELAY_MS);
   }
 
   /**

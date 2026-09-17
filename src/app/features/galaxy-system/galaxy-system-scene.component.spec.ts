@@ -222,6 +222,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
   it('chooses the drawn stars again once the view centre has moved, and not for a small drift', async () => {
     const component = fixture.componentInstance as unknown as { controls: { target: THREE.Vector3 } };
     const refocus = vi.spyOn(StarFieldRenderer.prototype, 'refocus');
+    // The first pass always chooses; what is under test is the move after it.
+    await advanceFrames(engine, 0.3);
+    refocus.mockClear();
 
     component.controls.target.set(40, 0, 0);
     await advanceFrames(engine, 0.3);
@@ -343,6 +346,53 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(refocus).toHaveBeenCalledTimes(before + 1);
     });
 
+    it('holds a turn to the narrower side of a portrait frame', async () => {
+      const component = fixture.componentInstance as unknown as ViewScene;
+      engine.getPerspectiveCamera().aspect = 0.4;
+      engine.getPerspectiveCamera().updateProjectionMatrix();
+      await advanceFrames(engine, 0.3);
+
+      // Inside half the margin above and below, past half of it at the sides.
+      orbit(component, 2);
+      await advanceFrames(engine, 0.3);
+
+      expect(refocus).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps up with a flight frame by frame, from the frame it comes back into parsec space', async () => {
+      const component = fixture.componentInstance as unknown as ViewScene & { galaxyGroup: THREE.Group; rig: { isAnimating: boolean } };
+      navigationStore.selectStar(SUN.id);
+      await flushAsync();
+      await advanceFrames(engine, 2.5);
+      refocus.mockClear();
+
+      navigationStore.selectStar(null);
+      await flushAsync();
+      let choicesOnReturningFrame = -1;
+      let flightFrames = 0;
+      let flightChoices = 0;
+      for (let frame = 0; frame < 80; frame++) {
+        const wasInSystem = !component.galaxyGroup.visible;
+        const before = refocus.mock.calls.length;
+        engine.tick(0.05);
+        await flushAsync(1);
+        if (wasInSystem && component.galaxyGroup.visible) {
+          choicesOnReturningFrame = refocus.mock.calls.length - before;
+        }
+        if (component.galaxyGroup.visible && component.rig.isAnimating) {
+          flightFrames++;
+          flightChoices += refocus.mock.calls.length - before;
+        }
+      }
+
+      // Chosen for the view in the very frame the camera jumps back, not up to a pass later.
+      expect(choicesOnReturningFrame).toBe(1);
+      // The return zooms out from inside the system to the opening view: more re-choices than one a
+      // pass could make, and every one of them for the view.
+      expect(flightChoices).toBeGreaterThan(Math.ceil((flightFrames * 0.05) / 0.2));
+      expect(refocus.mock.calls.every(([focus]) => focus.view !== undefined)).toBe(true);
+    });
+
     it('chooses once for the whole sky on the way out to the Galaxy, then leaves them alone', async () => {
       const component = fixture.componentInstance as unknown as ViewScene;
       engine.getCamera().position.set(0, 0, 30000);
@@ -419,6 +469,20 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       await advanceFrames(engine, 0.3);
       await settle();
       expect(links).toHaveBeenCalledTimes(2);
+    });
+
+    it('gives a view on the move a new graph at least every quarter second, rather than waiting for it to stop', async () => {
+      const links = vi.fn((_rangePc: number, _drawn: Uint32Array) => Promise.resolve(new Float32Array(0)));
+      const component = linkScene(links);
+      await settle();
+
+      // A new drawn set about every 150 ms for a second, as an orbit makes one each pass.
+      for (let pass = 1; pass <= 7; pass++) {
+        await changeDrawnStars(component, pass * 40);
+        await new Promise((resolve) => setTimeout(resolve, 120));
+      }
+
+      expect(links.mock.calls.length).toBeGreaterThanOrEqual(3);
     });
 
     it('draws a late graph for the range still asked for, and not one for a range left behind', async () => {

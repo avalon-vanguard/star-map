@@ -258,7 +258,8 @@ export function minimumRangeBetween(index: StarNeighbourhood, fromId: number, to
       giveUps += gaveUp ? 1 : 0;
     }
   }
-  return { rangePc: reachable, least: giveUps === 0 && reachable - unreachable <= RANGE_RESOLUTION_PC };
+  // Without a give-up the loop can only have ended by closing on the resolution, so that is the least.
+  return { rangePc: reachable, least: giveUps === 0 };
 }
 
 /** How much of a graph to keep: the links nearest a point, up to a total length. */

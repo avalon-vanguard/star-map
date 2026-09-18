@@ -24,6 +24,8 @@ export interface RouteResult {
   readonly neededRangePc: number | null;
   /** True when the search gave up rather than showing there is no route at this range. */
   readonly gaveUp: boolean;
+  /** True when the search for a range that would work looked everywhere up to the widest offered. */
+  readonly least: boolean;
 }
 
 export interface RouteRequest {
@@ -115,7 +117,7 @@ type Field = 'from' | 'to';
             </p>
           } @else {
             <p data-testid="route-summary" class="text-sm text-muted">
-              @if (plotted.gaveUp && plotted.neededRangePc === null) {
+              @if (plotted.gaveUp) {
                 Too many stars to search at this range.
               } @else {
                 No route at this range.
@@ -128,7 +130,7 @@ type Field = 'from' | 'to';
                 >
                   {{ format(plotted.neededRangePc) }} would reach.
                 </button>
-              } @else if (!plotted.gaveUp) {
+              } @else if (plotted.least) {
                 No chain of jumps up to {{ format(maxRangePc) }} reaches it.
               }
             </p>

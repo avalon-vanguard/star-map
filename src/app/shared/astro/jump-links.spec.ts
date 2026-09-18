@@ -94,14 +94,13 @@ describe('routeBetween', () => {
     expect(search.gaveUp).toBe(true);
   });
 
-  it('reports a genuine dead end as one, having looked everywhere the range reaches', () => {
-    const split = index([
-      { id: 0, x: 0, y: 0, z: 0 },
-      { id: 1, x: 1, y: 0, z: 0 },
-      { id: 2, x: 20, y: 0, z: 0 }
-    ]);
+  it('reports a dead end proved with the last star of the budget as a dead end, not a give-up', { timeout: 30_000 }, () => {
+    // Exactly the budget's worth of stars reach each other, and the destination is not among them.
+    // The search does look everywhere the range reaches, so "no chain" is what it found — but the
+    // set is full at the end of it, and a budget read off the settled count says it gave up.
+    const search = routeBetween(budgetExactly(), 0, BUDGET_ISLAND, 1.5);
 
-    expect(routeBetween(split, 0, 2, 5)).toEqual({ route: null, gaveUp: false });
+    expect(search).toEqual({ route: null, gaveUp: false });
   });
 
   it('heads for the destination rather than exhausting a dense knot around the departure', () => {
@@ -129,6 +128,19 @@ function knotAndChain(cellSizePc?: number): StarNeighbourhood {
   const knot: StarPoint[] = Array.from({ length: 45000 }, (_, i) => ({ id: 1000 + i, x: random(), y: random(), z: random() }));
   const chainOut: StarPoint[] = Array.from({ length: CHAIN_END }, (_, i) => ({ id: i + 1, x: i + 1, y: 0, z: 0 }));
   return new StarNeighbourhood([{ id: 0, x: 0, y: 0, z: 0 }, ...knot, ...chainOut, { id: ISLAND, x: 500, y: 0, z: 0 }], cellSizePc);
+}
+
+/**
+ * Exactly a search's budget of stars that reach one another — 39 999 through the 30 pc cube around
+ * the origin, plus the departure — and one at 500 pc that nothing reaches. The dead end is real and
+ * the search proves it, with the last star it is allowed.
+ */
+const BUDGET_ISLAND = 99_999;
+function budgetExactly(): StarNeighbourhood {
+  let seed = 13;
+  const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 30 - 15;
+  const crowd: StarPoint[] = Array.from({ length: 39_999 }, (_, i) => ({ id: 1000 + i, x: random(), y: random(), z: random() }));
+  return new StarNeighbourhood([{ id: 0, x: 0, y: 0, z: 0 }, ...crowd, { id: BUDGET_ISLAND, x: 500, y: 0, z: 0 }], 1.5);
 }
 
 /**
@@ -166,6 +178,9 @@ describe('minimumRangeBetween', () => {
     expect(needed.least).toBe(false);
     expect(needed.rangePc).not.toBeNull();
     expect(routeBetween(knot, 0, CROWD_CHAIN_END, needed.rangePc!).route).not.toBeNull();
+    // Narrower than the ceiling's own route, too: stopping before the bisection has found a range
+    // of its own hands back the ceiling, which is the control's maximum — the question, not an answer.
+    expect(needed.rangePc!).toBeLessThan(routeBetween(knot, 0, CROWD_CHAIN_END, 1.2).route!.longestHopPc);
   });
 
   it('names the shortest range that opens a way through', () => {

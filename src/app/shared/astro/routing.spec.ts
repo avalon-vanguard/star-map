@@ -42,13 +42,13 @@ describe('answerRouting', () => {
   it('answers a route the range allows, with nothing to raise it to', () => {
     const answer = answerRouting(index, { kind: 'route', requestId: 7, fromId: 10, toId: 14, rangePc: 1.5, ceilingPc: 8 });
 
-    expect(answer).toEqual({ kind: 'route', requestId: 7, route: routeBetween(direct, 10, 14, 1.5).route, neededRangePc: null, gaveUp: false });
+    expect(answer).toEqual({ kind: 'route', requestId: 7, route: routeBetween(direct, 10, 14, 1.5).route, neededRangePc: null, gaveUp: false, least: true });
   });
 
   it('answers a route the range does not allow with the range that would', () => {
     const answer = answerRouting(index, { kind: 'route', requestId: 8, fromId: 10, toId: 99, rangePc: 1.5, ceilingPc: 8 });
 
-    expect(answer).toEqual({ kind: 'route', requestId: 8, route: null, neededRangePc: minimumRangeBetween(direct, 10, 99, 8).rangePc, gaveUp: false });
+    expect(answer).toEqual({ kind: 'route', requestId: 8, route: null, neededRangePc: minimumRangeBetween(direct, 10, 99, 8).rangePc, gaveUp: false, least: true });
     expect(answer.kind === 'route' && answer.neededRangePc).toBeCloseTo(5, 1);
   });
 

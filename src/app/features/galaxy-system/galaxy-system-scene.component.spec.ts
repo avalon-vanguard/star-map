@@ -423,7 +423,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     const refocus = vi.spyOn(StarFieldRenderer.prototype, 'refocus');
     await advanceFrames(engine, 0.3);
 
-    component.routeResult.set({ stars: [{ id: SUN.id, name: 'Sol' }, { id: PROXIMA.id, name: 'Proxima Centauri' }], totalPc: 1.3, neededRangePc: null, gaveUp: false });
+    component.routeResult.set({ stars: [{ id: SUN.id, name: 'Sol' }, { id: PROXIMA.id, name: 'Proxima Centauri' }], totalPc: 1.3, neededRangePc: null, gaveUp: false, least: true });
     await advanceFrames(engine, 0.3);
 
     // As catalogue indices: the Sun is the first entry of STARS, Proxima the third.
@@ -473,7 +473,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(links.mock.calls[1][1]).not.toBe(links.mock.calls[0][1]);
 
       // A route re-chooses the drawn stars around its pins, and here they come out the same: no new graph.
-      component.routeResult.set({ stars: [{ id: SUN.id, name: 'Sol' }], totalPc: 0, neededRangePc: null, gaveUp: false });
+      component.routeResult.set({ stars: [{ id: SUN.id, name: 'Sol' }], totalPc: 0, neededRangePc: null, gaveUp: false, least: true });
       await advanceFrames(engine, 0.3);
       await settle();
       expect(links).toHaveBeenCalledTimes(2);
@@ -595,7 +595,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
   });
 
   it('shows the answer to the latest route asked for, whatever order the answers arrive in', async () => {
-    type Answer = { route: { stars: number[]; totalPc: number; longestHopPc: number } | null; neededRangePc: number | null; gaveUp: boolean };
+    type Answer = { route: { stars: number[]; totalPc: number; longestHopPc: number } | null; neededRangePc: number | null; gaveUp: boolean; least: boolean };
     const answers: Array<(answer: Answer) => void> = [];
     const component = fixture.componentInstance as unknown as {
       routing: { route(): Promise<Answer>; links(): Promise<Float32Array>; dispose(): void };
@@ -613,9 +613,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     component.onRouteRequested({ fromId: SUN.id, toId: PROXIMA.id, rangePc: 2 });
     expect(component.routePending()).toBe(true);
 
-    answers[1]({ route: { stars: [SUN.id, PROXIMA.id], totalPc: 1.3, longestHopPc: 1.3 }, neededRangePc: null, gaveUp: false });
+    answers[1]({ route: { stars: [SUN.id, PROXIMA.id], totalPc: 1.3, longestHopPc: 1.3 }, neededRangePc: null, gaveUp: false, least: true });
     await flushAsync();
-    answers[0]({ route: { stars: [SUN.id, ALPHA_CENTAURI.id], totalPc: 1.34, longestHopPc: 1.34 }, neededRangePc: null, gaveUp: false });
+    answers[0]({ route: { stars: [SUN.id, ALPHA_CENTAURI.id], totalPc: 1.34, longestHopPc: 1.34 }, neededRangePc: null, gaveUp: false, least: true });
     await flushAsync();
 
     expect(component.routeResult()?.stars.map((star) => star.id)).toEqual([SUN.id, PROXIMA.id]);
@@ -623,7 +623,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
     // "It gave up" travels to the panel, which says something else for it than for "there is none".
     component.onRouteRequested({ fromId: SUN.id, toId: ALPHA_CENTAURI.id, rangePc: 0.5 });
-    answers[2]({ route: null, neededRangePc: null, gaveUp: true });
+    answers[2]({ route: null, neededRangePc: null, gaveUp: true, least: false });
     await flushAsync();
     expect(component.routeResult()).toMatchObject({ stars: [], gaveUp: true });
   });

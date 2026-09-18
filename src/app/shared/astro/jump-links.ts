@@ -180,10 +180,17 @@ export function routeBetween(index: StarNeighbourhood, fromId: number, toId: num
   const frontier = new Frontier();
   frontier.push(fromId, straightLineOn(origin.x, origin.y, origin.z));
 
-  while (frontier.size > 0 && settled.size < MAX_VISITED) {
+  let gaveUp = false;
+  while (frontier.size > 0) {
     const starId = frontier.pop();
     if (settled.has(starId)) {
       continue;
+    }
+    // Counted against the budget only once the frontier has been drained of stale duplicates, so
+    // the flag below records why the search stopped rather than how full the set happened to be.
+    if (settled.size >= MAX_VISITED) {
+      gaveUp = true;
+      break;
     }
     settled.add(starId);
     const costHere = travelled.get(starId)!;
@@ -216,7 +223,7 @@ export function routeBetween(index: StarNeighbourhood, fromId: number, toId: num
 
   // An empty frontier means the range reaches nothing further; a spent budget means only that the
   // search stopped looking.
-  return { route: null, gaveUp: settled.size >= MAX_VISITED };
+  return { route: null, gaveUp };
 }
 
 /**
@@ -235,18 +242,24 @@ export function routeBetween(index: StarNeighbourhood, fromId: number, toId: num
  * Each step has to answer "is there a chain at this range", and a search that gives up answers
  * nothing. It is still worth carrying on from — the ranges above it are the ones left to try — but
  * the result is no longer the least range, only a range that works, and `least` says which. The
- * number of steps is bounded for the same reason: each one that gives up walks the whole budget,
- * and 11 s of them for a star at 236 pc bought two decimal places nobody reads.
+ * number of steps that may give up is bounded for the same reason: each one walks the whole budget,
+ * and 11 s of them for a star at 236 pc bought two decimal places nobody reads. Bounded, but not
+ * before the bisection has found a range of its own: until then the only range it could offer is
+ * the ceiling's, which is the control's maximum, for crossings that work well below it.
  */
 export function minimumRangeBetween(index: StarNeighbourhood, fromId: number, toId: number, ceilingPc: number): RangeSearch {
   const widest = routeBetween(index, fromId, toId, ceilingPc);
   if (!widest.route) {
     return { rangePc: null, least: !widest.gaveUp };
   }
+  const ceilingHopPc = widest.route.longestHopPc;
   let unreachable = 0;
-  let reachable = widest.route.longestHopPc;
+  let reachable = ceilingHopPc;
   let giveUps = 0;
-  while (reachable - unreachable > RANGE_RESOLUTION_PC && giveUps < MAX_RANGE_GIVE_UPS) {
+  // The cap cannot fire while `reachable` is still the ceiling route's own longest hop: that is
+  // the question, not an answer the bisection earned, and offering it sends the control to its
+  // maximum for a crossing that works well below — 8.00 pc for a star that routes at 6.
+  while (reachable - unreachable > RANGE_RESOLUTION_PC && (giveUps < MAX_RANGE_GIVE_UPS || reachable === ceilingHopPc)) {
     const range = (unreachable + reachable) / 2;
     const { route, gaveUp } = routeBetween(index, fromId, toId, range);
     if (route) {

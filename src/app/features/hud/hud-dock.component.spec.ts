@@ -258,19 +258,26 @@ describe('HudDockComponent', () => {
     fixture.componentRef.setInput('defaultTab', 'routes');
     const summary = () => host().querySelector('[data-testid="route-summary"]')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 
-    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: null, gaveUp: true });
+    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: null, gaveUp: true, least: false });
     fixture.detectChanges();
     expect(summary()).toBe('Too many stars to search at this range.');
 
     // Having looked everywhere the range reaches is a different answer, and one that can be stated.
-    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: null, gaveUp: false });
+    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: null, gaveUp: false, least: true });
     fixture.detectChanges();
     expect(summary()).toContain('No chain of jumps up to');
 
-    // A range a chain was found at is worth offering whether or not anything shorter was ruled out.
-    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: 6.4, gaveUp: true });
+    // A range a chain was found at is worth offering — but the search that gave up at the range
+    // asked for still gave up, and saying "no route" beside the offer is saying it did not.
+    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: 6.4, gaveUp: true, least: false });
     fixture.detectChanges();
-    expect(summary()).toBe('No route at this range. 6.40 pc would reach.');
+    expect(summary()).toBe('Too many stars to search at this range. 6.40 pc would reach.');
+
+    // The other way round: the range asked for was searched to exhaustion and the wider search was
+    // the one that gave up. There is no route at this range, and nothing further can be claimed.
+    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: null, gaveUp: false, least: false });
+    fixture.detectChanges();
+    expect(summary()).toBe('No route at this range.');
   });
 
   it('keeps what the Routes panel was set to across a trip to another tab', () => {

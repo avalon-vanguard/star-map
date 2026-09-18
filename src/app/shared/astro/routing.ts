@@ -27,10 +27,20 @@ export type RoutingRequest =
 
 export type RoutingResponse =
   /**
-   * `gaveUp` is true when the searches spent their budget rather than looking everywhere: there
-   * being no route and no range to offer is then what was found, not what exists.
+   * Two searches, and two things they can fail to prove, kept apart because they are printed as
+   * different sentences. `gaveUp` is about the range that was asked for: true when that search
+   * spent its budget rather than looking everywhere the range reaches. `least` is about the search
+   * for a range that would work: true when it looked everywhere up to the ceiling, so `null` there
+   * means no chain exists rather than none was found.
    */
-  | { readonly kind: 'route'; readonly requestId: number; readonly route: Route | null; readonly neededRangePc: number | null; readonly gaveUp: boolean }
+  | {
+      readonly kind: 'route';
+      readonly requestId: number;
+      readonly route: Route | null;
+      readonly neededRangePc: number | null;
+      readonly gaveUp: boolean;
+      readonly least: boolean;
+    }
   | { readonly kind: 'links'; readonly requestId: number; readonly segments: Float32Array }
   /** The question threw in the worker. Sent back so the request settles instead of waiting for good. */
   | { readonly kind: 'failed'; readonly requestId: number; readonly message: string };
@@ -56,8 +66,9 @@ export function answerRouting(index: StarNeighbourhood, request: RoutingRequest)
   // At the ceiling the question has just been asked: the range search would repeat it, identically
   // and at the same cost, before bisecting below it.
   if (route || request.rangePc >= request.ceilingPc) {
-    return { kind: 'route', requestId: request.requestId, route, neededRangePc: null, gaveUp: !route && gaveUp };
+    // Asked at the ceiling, the one search answers both questions.
+    return { kind: 'route', requestId: request.requestId, route, neededRangePc: null, gaveUp: !route && gaveUp, least: !gaveUp };
   }
   const needed = minimumRangeBetween(index, request.fromId, request.toId, request.ceilingPc);
-  return { kind: 'route', requestId: request.requestId, route: null, neededRangePc: needed.rangePc, gaveUp: gaveUp || !needed.least };
+  return { kind: 'route', requestId: request.requestId, route: null, neededRangePc: needed.rangePc, gaveUp, least: needed.least };
 }

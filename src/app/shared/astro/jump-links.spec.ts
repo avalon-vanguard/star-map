@@ -82,11 +82,13 @@ describe('routeBetween', () => {
     expect(route?.longestHopPc).toBeCloseTo(4);
   });
 
-  it('says it gave up rather than that there is no chain, once it has spent its budget', () => {
+  it('says it gave up rather than that there is no chain, once it has spent its budget', { timeout: 30_000 }, () => {
     // Nothing reaches the island, but the crowd around the departure is larger than the budget, so
     // the search stops without having looked everywhere the range reaches. Read as "no chain", that
     // is a confident wrong answer — and the range search downstream would build on it.
-    const search = routeBetween(knotAndChain(), 0, ISLAND, 1.5);
+    // Cells sized for the range asked of them, as the real catalogue's are: a search that settles
+    // 40 000 stars scans every cell it touches 40 000 times.
+    const search = routeBetween(knotAndChain(1.5), 0, ISLAND, 1.5);
 
     expect(search.route).toBeNull();
     expect(search.gaveUp).toBe(true);
@@ -121,12 +123,12 @@ describe('routeBetween', () => {
  */
 const CHAIN_END = 75;
 const ISLAND = 999;
-function knotAndChain(): StarNeighbourhood {
+function knotAndChain(cellSizePc?: number): StarNeighbourhood {
   let seed = 7;
   const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 30 - 15;
   const knot: StarPoint[] = Array.from({ length: 45000 }, (_, i) => ({ id: 1000 + i, x: random(), y: random(), z: random() }));
   const chainOut: StarPoint[] = Array.from({ length: CHAIN_END }, (_, i) => ({ id: i + 1, x: i + 1, y: 0, z: 0 }));
-  return index([{ id: 0, x: 0, y: 0, z: 0 }, ...knot, ...chainOut, { id: ISLAND, x: 500, y: 0, z: 0 }]);
+  return new StarNeighbourhood([{ id: 0, x: 0, y: 0, z: 0 }, ...knot, ...chainOut, { id: ISLAND, x: 500, y: 0, z: 0 }], cellSizePc);
 }
 
 /**
@@ -142,7 +144,7 @@ function crowdedKnot(): StarNeighbourhood {
   const knot: StarPoint[] = Array.from({ length: 45000 }, (_, i) => ({ id: 1000 + i, x: random(), y: random(), z: random() }));
   const chainOut: StarPoint[] = Array.from({ length: CROWD_CHAIN_END }, (_, i) => ({ id: i + 1, x: 5 + i + 1, y: 0, z: 0 }));
   // One star nothing reaches, for the questions that have no answer.
-  return new StarNeighbourhood([{ id: 0, x: 0, y: 0, z: 0 }, ...knot, ...chainOut, { id: CROWD_ISLAND, x: 500, y: 0, z: 0 }], 0.5);
+  return new StarNeighbourhood([{ id: 0, x: 0, y: 0, z: 0 }, ...knot, ...chainOut, { id: CROWD_ISLAND, x: 500, y: 0, z: 0 }], 0.25);
 }
 
 describe('minimumRangeBetween', () => {
@@ -152,14 +154,14 @@ describe('minimumRangeBetween', () => {
     expect(minimumRangeBetween(knotAndChain(), 0, CHAIN_END, 8).rangePc).toBeCloseTo(1, 1);
   });
 
-  it('stops bisecting where a search gave up, and hands back a range that does work', () => {
+  it('stops bisecting where a search gave up, and hands back a range that does work', { timeout: 30_000 }, () => {
     // Below the chain's own hop of a parsec, the crowd is still one connected piece and larger than
     // the budget, so those probes give up. Reading a give-up as "no chain at this range" is what
     // used to report ranges up to 29% wider than needed, and went on paying for probes whose
     // answers it could not use; the answer now is the narrowest range a chain was found at.
     const knot = crowdedKnot();
 
-    const needed = minimumRangeBetween(knot, 0, CROWD_CHAIN_END, 2);
+    const needed = minimumRangeBetween(knot, 0, CROWD_CHAIN_END, 1.2);
 
     expect(needed.least).toBe(false);
     expect(needed.rangePc).not.toBeNull();

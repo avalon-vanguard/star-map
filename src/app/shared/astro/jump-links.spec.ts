@@ -14,7 +14,7 @@ function index(points: StarPoint[]): StarNeighbourhood {
 
 describe('routeBetween', () => {
   it('walks the chain a hop at a time when that is all the range allows', () => {
-    const route = routeBetween(chain(5), 0, 4, 1.5);
+    const { route } = routeBetween(chain(5), 0, 4, 1.5);
 
     expect(route?.stars).toEqual([0, 1, 2, 3, 4]);
     expect(route?.totalPc).toBeCloseTo(4);
@@ -24,7 +24,7 @@ describe('routeBetween', () => {
   it('goes straight there when the range reaches, however many stars lie between', () => {
     // The direct crossing is never longer than a chain through anything — Euclid says so — so a
     // range that covers it makes it the answer, and the stars in between are just scenery.
-    const route = routeBetween(chain(5), 0, 4, 5);
+    const { route } = routeBetween(chain(5), 0, 4, 5);
 
     expect(route?.stars).toEqual([0, 4]);
     expect(route?.totalPc).toBeCloseTo(4);
@@ -33,7 +33,7 @@ describe('routeBetween', () => {
   it('picks the shorter of two ways round when neither is a straight line', () => {
     // 0 to 3 is 10 pc, out of a 6 pc range. Two ways round, both inside it: through 1, barely
     // off the line, or through 2, well off it. Shorter is what "the way there" means.
-    const route = routeBetween(
+    const { route } = routeBetween(
       index([
         { id: 0, x: 0, y: 0, z: 0 },
         { id: 1, x: 5, y: 0.5, z: 0 },
@@ -56,19 +56,19 @@ describe('routeBetween', () => {
       { id: 2, x: 20, y: 0, z: 0 }
     ]);
 
-    expect(routeBetween(split, 0, 2, 5)).toBeNull();
+    expect(routeBetween(split, 0, 2, 5)).toEqual({ route: null, gaveUp: false });
   });
 
   it('answers nothing for a star that is not there, or for going nowhere', () => {
     const line = chain(3);
 
-    expect(routeBetween(line, 0, 0, 2)).toBeNull();
-    expect(routeBetween(line, 0, 99, 2)).toBeNull();
-    expect(routeBetween(line, 0, 2, 0)).toBeNull();
+    expect(routeBetween(line, 0, 0, 2).route).toBeNull();
+    expect(routeBetween(line, 0, 99, 2).route).toBeNull();
+    expect(routeBetween(line, 0, 2, 0).route).toBeNull();
   });
 
   it('reports the longest hop, which is what the range has to cover', () => {
-    const route = routeBetween(
+    const { route } = routeBetween(
       index([
         { id: 0, x: 0, y: 0, z: 0 },
         { id: 1, x: 1, y: 0, z: 0 },
@@ -82,11 +82,31 @@ describe('routeBetween', () => {
     expect(route?.longestHopPc).toBeCloseTo(4);
   });
 
+  it('says it gave up rather than that there is no chain, once it has spent its budget', () => {
+    // Nothing reaches the island, but the crowd around the departure is larger than the budget, so
+    // the search stops without having looked everywhere the range reaches. Read as "no chain", that
+    // is a confident wrong answer — and the range search downstream would build on it.
+    const search = routeBetween(knotAndChain(), 0, ISLAND, 1.5);
+
+    expect(search.route).toBeNull();
+    expect(search.gaveUp).toBe(true);
+  });
+
+  it('reports a genuine dead end as one, having looked everywhere the range reaches', () => {
+    const split = index([
+      { id: 0, x: 0, y: 0, z: 0 },
+      { id: 1, x: 1, y: 0, z: 0 },
+      { id: 2, x: 20, y: 0, z: 0 }
+    ]);
+
+    expect(routeBetween(split, 0, 2, 5)).toEqual({ route: null, gaveUp: false });
+  });
+
   it('heads for the destination rather than exhausting a dense knot around the departure', () => {
     // The Gaia catalogue in miniature: a crowd around the departure, larger than the search's
     // budget, with the only way on a thin chain leading out of it. A search widening evenly from
     // the departure spends the budget on the crowd and never reaches the chain's far end.
-    const route = routeBetween(knotAndChain(), 0, CHAIN_END, 1.5);
+    const { route } = routeBetween(knotAndChain(), 0, CHAIN_END, 1.5);
 
     expect(route).not.toBeNull();
     expect(route!.stars[route!.stars.length - 1]).toBe(CHAIN_END);
@@ -95,24 +115,55 @@ describe('routeBetween', () => {
 });
 
 /**
- * 21 000 stars scattered through the 30 pc cube around the origin, about ten times the density
- * around the real Sun and more than a search's budget, with a chain a parsec a hop running along
- * x from the origin out through the crowd and on to 75 pc.
+ * 45 000 stars scattered through the 30 pc cube around the origin, twenty times the density around
+ * the real Sun and more than a search's budget, with a chain a parsec a hop running along x from
+ * the origin out through the crowd and on to 75 pc — and one star at 500 pc that nothing reaches.
  */
 const CHAIN_END = 75;
+const ISLAND = 999;
 function knotAndChain(): StarNeighbourhood {
   let seed = 7;
   const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 30 - 15;
-  const knot: StarPoint[] = Array.from({ length: 21000 }, (_, i) => ({ id: 1000 + i, x: random(), y: random(), z: random() }));
+  const knot: StarPoint[] = Array.from({ length: 45000 }, (_, i) => ({ id: 1000 + i, x: random(), y: random(), z: random() }));
   const chainOut: StarPoint[] = Array.from({ length: CHAIN_END }, (_, i) => ({ id: i + 1, x: i + 1, y: 0, z: 0 }));
-  return index([{ id: 0, x: 0, y: 0, z: 0 }, ...knot, ...chainOut]);
+  return index([{ id: 0, x: 0, y: 0, z: 0 }, ...knot, ...chainOut, { id: ISLAND, x: 500, y: 0, z: 0 }]);
+}
+
+/**
+ * 45 000 stars in a 10 pc cube — dense enough to stay one connected piece at half a parsec, where
+ * walking it costs more than a search's budget — with a chain a parsec a hop leaving its edge for
+ * 30 pc. Its cells are sized for the ranges asked of it, as the real catalogue's are for its own.
+ */
+const CROWD_CHAIN_END = 25;
+const CROWD_ISLAND = 999999;
+function crowdedKnot(): StarNeighbourhood {
+  let seed = 11;
+  const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 10 - 5;
+  const knot: StarPoint[] = Array.from({ length: 45000 }, (_, i) => ({ id: 1000 + i, x: random(), y: random(), z: random() }));
+  const chainOut: StarPoint[] = Array.from({ length: CROWD_CHAIN_END }, (_, i) => ({ id: i + 1, x: 5 + i + 1, y: 0, z: 0 }));
+  // One star nothing reaches, for the questions that have no answer.
+  return new StarNeighbourhood([{ id: 0, x: 0, y: 0, z: 0 }, ...knot, ...chainOut, { id: CROWD_ISLAND, x: 500, y: 0, z: 0 }], 0.5);
 }
 
 describe('minimumRangeBetween', () => {
   it('works out the range past a dense knot around the departure', () => {
     // Past the crowd the chain's hops of a parsec are the only way on, so a parsec is the
     // answer, to the half-step the panel rounds up to.
-    expect(minimumRangeBetween(knotAndChain(), 0, CHAIN_END, 8)).toBeCloseTo(1, 1);
+    expect(minimumRangeBetween(knotAndChain(), 0, CHAIN_END, 8).rangePc).toBeCloseTo(1, 1);
+  });
+
+  it('stops bisecting where a search gave up, and hands back a range that does work', () => {
+    // Below the chain's own hop of a parsec, the crowd is still one connected piece and larger than
+    // the budget, so those probes give up. Reading a give-up as "no chain at this range" is what
+    // used to report ranges up to 29% wider than needed, and went on paying for probes whose
+    // answers it could not use; the answer now is the narrowest range a chain was found at.
+    const knot = crowdedKnot();
+
+    const needed = minimumRangeBetween(knot, 0, CROWD_CHAIN_END, 2);
+
+    expect(needed.least).toBe(false);
+    expect(needed.rangePc).not.toBeNull();
+    expect(routeBetween(knot, 0, CROWD_CHAIN_END, needed.rangePc!).route).not.toBeNull();
   });
 
   it('names the shortest range that opens a way through', () => {
@@ -123,9 +174,9 @@ describe('minimumRangeBetween', () => {
       { id: 2, x: 5, y: 0, z: 0 }
     ]);
 
-    expect(minimumRangeBetween(stepped, 0, 2, 50)).toBeCloseTo(4);
-    expect(routeBetween(stepped, 0, 2, 4)).not.toBeNull();
-    expect(routeBetween(stepped, 0, 2, 3.99)).toBeNull();
+    expect(minimumRangeBetween(stepped, 0, 2, 50)).toEqual({ rangePc: expect.closeTo(4) as number, least: true });
+    expect(routeBetween(stepped, 0, 2, 4).route).not.toBeNull();
+    expect(routeBetween(stepped, 0, 2, 3.99).route).toBeNull();
   });
 
   it('prefers a longer way whose worst hop is shorter, since that is what the range pays for', () => {
@@ -139,8 +190,16 @@ describe('minimumRangeBetween', () => {
 
     const needed = minimumRangeBetween(both, 0, 3, 50);
 
-    expect(needed).toBeLessThan(10);
-    expect(routeBetween(both, 0, 3, needed!)).not.toBeNull();
+    expect(needed.rangePc).toBeLessThan(10);
+    expect(routeBetween(both, 0, 3, needed.rangePc!).route).not.toBeNull();
+  });
+
+  it('claims nothing about a ceiling its own search gave up on', () => {
+    // Nothing reaches the island at any range here, but the crowd spends the budget first, so the
+    // widest search proves nothing — and neither does the null it hands back.
+    const needed = minimumRangeBetween(crowdedKnot(), 0, CROWD_ISLAND, 0.5);
+
+    expect(needed).toEqual({ rangePc: null, least: false });
   });
 
   it('finds nothing when even the ceiling does not reach', () => {
@@ -149,7 +208,7 @@ describe('minimumRangeBetween', () => {
       { id: 1, x: 100, y: 0, z: 0 }
     ]);
 
-    expect(minimumRangeBetween(split, 0, 1, 50)).toBeNull();
+    expect(minimumRangeBetween(split, 0, 1, 50)).toEqual({ rangePc: null, least: true });
   });
 });
 
@@ -296,7 +355,7 @@ describe('jumpLinkSegments', () => {
 
     const drawn = new Set(linksDrawn(jumpLinkSegments(cloud, range), points));
 
-    const route = routeBetween(cloud, 0, 119, range);
+    const { route } = routeBetween(cloud, 0, 119, range);
     // Asserted, not guarded: a skipped body would let the two disagree unnoticed.
     expect(route).not.toBeNull();
     expect(route!.stars.length).toBeGreaterThan(2);

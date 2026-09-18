@@ -26,7 +26,11 @@ export type RoutingRequest =
   | { readonly kind: 'links'; readonly requestId: number; readonly rangePc: number; readonly drawn: Uint32Array; readonly budget?: LinkBudget };
 
 export type RoutingResponse =
-  | { readonly kind: 'route'; readonly requestId: number; readonly route: Route | null; readonly neededRangePc: number | null }
+  /**
+   * `gaveUp` is true when the searches spent their budget rather than looking everywhere: there
+   * being no route and no range to offer is then what was found, not what exists.
+   */
+  | { readonly kind: 'route'; readonly requestId: number; readonly route: Route | null; readonly neededRangePc: number | null; readonly gaveUp: boolean }
   | { readonly kind: 'links'; readonly requestId: number; readonly segments: Float32Array }
   /** The question threw in the worker. Sent back so the request settles instead of waiting for good. */
   | { readonly kind: 'failed'; readonly requestId: number; readonly message: string };
@@ -37,8 +41,9 @@ export function indexCatalogue({ ids, positions }: RoutingCatalogue): StarNeighb
 }
 
 /**
- * Answers one request. A route that cannot be made comes back with the range that would make
- * one, searched no wider than `ceilingPc`, so a refusal is always also an offer.
+ * Answers one request. A route that cannot be made comes back with the range that would make one,
+ * searched no wider than `ceilingPc`, so a refusal is usually also an offer — unless the searches
+ * gave up, which is reported rather than passed off as "there is no route".
  */
 export function answerRouting(index: StarNeighbourhood, request: RoutingRequest): RoutingResponse {
   if (request.kind === 'links') {
@@ -47,11 +52,12 @@ export function answerRouting(index: StarNeighbourhood, request: RoutingRequest)
     const drawn = new StarNeighbourhood(Array.from(request.drawn, (at) => index.pointAt(at)), request.rangePc);
     return { kind: 'links', requestId: request.requestId, segments: jumpLinkSegments(drawn, request.rangePc, request.budget) };
   }
-  const route = routeBetween(index, request.fromId, request.toId, request.rangePc);
-  return {
-    kind: 'route',
-    requestId: request.requestId,
-    route,
-    neededRangePc: route ? null : minimumRangeBetween(index, request.fromId, request.toId, request.ceilingPc)
-  };
+  const { route, gaveUp } = routeBetween(index, request.fromId, request.toId, request.rangePc);
+  // At the ceiling the question has just been asked: the range search would repeat it, identically
+  // and at the same cost, before bisecting below it.
+  if (route || request.rangePc >= request.ceilingPc) {
+    return { kind: 'route', requestId: request.requestId, route, neededRangePc: null, gaveUp: !route && gaveUp };
+  }
+  const needed = minimumRangeBetween(index, request.fromId, request.toId, request.ceilingPc);
+  return { kind: 'route', requestId: request.requestId, route: null, neededRangePc: needed.rangePc, gaveUp: gaveUp || !needed.least };
 }

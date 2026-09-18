@@ -6,6 +6,8 @@ import { StarRecord } from '../../shared/models/star.model';
 export interface RouteAnswer {
   readonly route: Route | null;
   readonly neededRangePc: number | null;
+  /** True when the search gave up rather than ruling a route out; see `routeBetween`. */
+  readonly gaveUp: boolean;
 }
 
 /** A request dropped before it was sent, because a newer one of the same kind replaced it. */
@@ -104,7 +106,9 @@ export class RoutingClient {
 
   route(fromId: number, toId: number, rangePc: number, ceilingPc: number): Promise<RouteAnswer> {
     return this.ask({ kind: 'route', requestId: this.nextRequestId++, fromId, toId, rangePc, ceilingPc }).then((response) =>
-      response.kind === 'route' ? { route: response.route, neededRangePc: response.neededRangePc } : { route: null, neededRangePc: null }
+      response.kind === 'route'
+        ? { route: response.route, neededRangePc: response.neededRangePc, gaveUp: response.gaveUp }
+        : { route: null, neededRangePc: null, gaveUp: false }
     );
   }
 

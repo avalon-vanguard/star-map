@@ -16,6 +16,21 @@
 
 import { StarNeighbourhood } from './star-neighbourhood';
 
+/** What a search found, and whether it looked everywhere the range reaches before answering. */
+export interface RouteSearch {
+  readonly route: Route | null;
+  /** True when the search spent its budget: "no route" then means "gave up", not "there is none". */
+  readonly gaveUp: boolean;
+}
+
+/** A range that opens a route, and whether anything shorter was actually ruled out. */
+export interface RangeSearch {
+  /** A range a chain was found at, or `null` where none was found up to the ceiling. */
+  readonly rangePc: number | null;
+  /** True when every shorter range was searched to exhaustion, so this is the least that works. */
+  readonly least: boolean;
+}
+
 /** A chain of stars from one to another, each hop within the range that was asked for. */
 export interface Route {
   /** Star ids, departure first and destination last. One hop is two ids. */
@@ -30,11 +45,17 @@ export interface Route {
 }
 
 /**
- * A cap on how much of the catalogue one search may walk. A search that hits it has already
- * visited more stars than any real chain passes through: the longest measured, Sol to HD 2626 at
- * 236 pc in jumps of 8 pc, settles about 7 000.
+ * A cap on how much of the catalogue one search may walk, so a hopeless question cannot run for
+ * ever. It is a budget, not a verdict: a search that spends it has proved nothing, and says so
+ * through {@link RouteSearch.gaveUp}.
+ *
+ * Sized against the catalogue actually shipped rather than against the longest route. At 20 000 a
+ * search from the Sun to HD 120147 (136 pc) in jumps of 5 pc gave up, though the chain it wanted,
+ * 50 jumps, is there to be found; a star at 170 pc needed 58. Both are found at this budget. The
+ * cost is paid by questions with no answer, which walk the whole of it: from the Sun to the
+ * farthest star at 8 pc, 0.7 s at 20 000 against 2.1 s here, in the worker.
  */
-const MAX_VISITED = 20000;
+const MAX_VISITED = 40000;
 
 /**
  * How close to the true minimum `minimumRangeBetween` works a range out: half the Routes panel's
@@ -42,6 +63,17 @@ const MAX_VISITED = 20000;
  * since the figure it reports is always the longest hop of a route actually found.
  */
 const RANGE_RESOLUTION_PC = 0.05;
+
+/**
+ * How many of `minimumRangeBetween`'s probes may give up before it answers with what it has.
+ *
+ * A probe that finds a route is quick — it heads straight for the destination — while one that
+ * gives up walks the whole search budget, about two seconds on the real catalogue. Those are also
+ * the probes that buy the least: they cannot rule anything out. Two of them is the difference
+ * between an answer of 7.96 pc in half a second and 5.76 pc in seventeen, for a star at 236 pc; it
+ * lands on 5.97 pc in five.
+ */
+const MAX_RANGE_GIVE_UPS = 2;
 
 /** A binary min-heap of star ids by priority. Duplicates are allowed; stale ones are skipped on the way out. */
 class Frontier {
@@ -113,8 +145,8 @@ function rebuild(cameFrom: Map<number, number>, fromId: number, toId: number): n
 }
 
 /**
- * The shortest chain from one star to another in which no single hop exceeds `rangePc`, or
- * `null` where the catalogue holds no such chain.
+ * The shortest chain from one star to another in which no single hop exceeds `rangePc`, or no
+ * chain where the catalogue holds none within the search's budget.
  *
  * Shortest by total distance travelled rather than by number of hops: two chains of the same
  * length are not equally good, and the one that covers less ground is the one a reader means by
@@ -126,12 +158,15 @@ function rebuild(cameFrom: Map<number, number>, fromId: number, toId: number): n
  * than widening evenly in every direction. Widening evenly is what the Gaia catalogue broke. From
  * the Sun it spent its whole budget on the 20 000 stars nearest, all inside about 40 pc, and so
  * found no route to anything farther at any range; Mirfak, 155 pc out, is 27 jumps at 8 pc.
+ *
+ * "No route" and "no chain" are not the same answer: a search that spends {@link MAX_VISITED}
+ * reports that it gave up, so nothing downstream reads it as proof that no chain exists.
  */
-export function routeBetween(index: StarNeighbourhood, fromId: number, toId: number, rangePc: number): Route | null {
+export function routeBetween(index: StarNeighbourhood, fromId: number, toId: number, rangePc: number): RouteSearch {
   const origin = index.point(fromId);
   const destination = index.point(toId);
   if (fromId === toId || rangePc <= 0 || !origin || !destination) {
-    return null;
+    return { route: null, gaveUp: false };
   }
   const straightLineOn = (x: number, y: number, z: number) => Math.hypot(destination.x - x, destination.y - y, destination.z - z);
 
@@ -156,13 +191,13 @@ export function routeBetween(index: StarNeighbourhood, fromId: number, toId: num
     if (starId === toId) {
       const stars = rebuild(cameFrom, fromId, toId);
       if (stars.length === 0) {
-        return null;
+        return { route: null, gaveUp: false };
       }
       let longestHopPc = 0;
       for (let i = 1; i < stars.length; i++) {
         longestHopPc = Math.max(longestHopPc, hopTo.get(stars[i])!);
       }
-      return { stars, totalPc: costHere, longestHopPc };
+      return { route: { stars, totalPc: costHere, longestHopPc }, gaveUp: false };
     }
 
     index.forEachWithin(starId, rangePc, (neighbour, distancePc) => {
@@ -179,38 +214,51 @@ export function routeBetween(index: StarNeighbourhood, fromId: number, toId: num
     });
   }
 
-  return null;
+  // An empty frontier means the range reaches nothing further; a spent budget means only that the
+  // search stopped looking.
+  return { route: null, gaveUp: settled.size >= MAX_VISITED };
 }
 
 /**
- * The shortest range at which any chain at all exists between two stars, to within
- * `RANGE_RESOLUTION_PC`, or `null` if none does within `ceilingPc`.
+ * A range at which a chain exists between two stars — the shortest, to within
+ * `RANGE_RESOLUTION_PC`, where every shorter range could be ruled out — or `null` where no chain
+ * was found up to `ceilingPc`.
  *
- * This is what turns "no route" from a dead end into an answer: the range control can be told
- * what it would have to be raised to. The exact figure is the minimax path, the chain whose
- * longest hop is as short as possible. It used to be searched for directly, widening from the
- * departure in order of the worst hop needed, which from the Sun meant exhausting the whole dense
- * core before anything farther could be reached: it gave up with nothing after up to a minute.
- * Whether a chain exists can only become truer as the range grows, so the range is bisected
- * instead, each step one directed `routeBetween`.
+ * This is what turns "no route" from a dead end into an answer: the range control can be told what
+ * it would have to be raised to. The figure aimed at is the minimax path, the chain whose longest
+ * hop is as short as possible. It used to be searched for directly, widening from the departure in
+ * order of the worst hop needed, which from the Sun meant exhausting the whole dense core before
+ * anything farther could be reached: it gave up with nothing after up to a minute. Whether a chain
+ * exists can only become truer as the range grows, so the range is bisected instead, each step one
+ * directed `routeBetween`.
+ *
+ * Each step has to answer "is there a chain at this range", and a search that gives up answers
+ * nothing. It is still worth carrying on from — the ranges above it are the ones left to try — but
+ * the result is no longer the least range, only a range that works, and `least` says which. The
+ * number of steps is bounded for the same reason: each one that gives up walks the whole budget,
+ * and 11 s of them for a star at 236 pc bought two decimal places nobody reads.
  */
-export function minimumRangeBetween(index: StarNeighbourhood, fromId: number, toId: number, ceilingPc: number): number | null {
+export function minimumRangeBetween(index: StarNeighbourhood, fromId: number, toId: number, ceilingPc: number): RangeSearch {
   const widest = routeBetween(index, fromId, toId, ceilingPc);
-  if (!widest) {
-    return null;
+  if (!widest.route) {
+    return { rangePc: null, least: !widest.gaveUp };
   }
   let unreachable = 0;
-  let reachable = widest.longestHopPc;
-  while (reachable - unreachable > RANGE_RESOLUTION_PC) {
+  let reachable = widest.route.longestHopPc;
+  let giveUps = 0;
+  while (reachable - unreachable > RANGE_RESOLUTION_PC && giveUps < MAX_RANGE_GIVE_UPS) {
     const range = (unreachable + reachable) / 2;
-    const route = routeBetween(index, fromId, toId, range);
+    const { route, gaveUp } = routeBetween(index, fromId, toId, range);
     if (route) {
       reachable = route.longestHopPc;
     } else {
+      // A search that gave up is worth going on from — the ranges above it are the ones left to
+      // try — but it is not evidence that nothing routes here, so the answer stops being the least.
       unreachable = range;
+      giveUps += gaveUp ? 1 : 0;
     }
   }
-  return reachable;
+  return { rangePc: reachable, least: giveUps === 0 && reachable - unreachable <= RANGE_RESOLUTION_PC };
 }
 
 /** How much of a graph to keep: the links nearest a point, up to a total length. */

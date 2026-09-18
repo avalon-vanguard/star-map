@@ -1528,7 +1528,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const request = ++this.routeRequest;
     this.routePending.set(true);
     void this.routing.route(fromId, toId, rangePc, ROUTE_RANGE_CEILING_PC).then(
-      ({ route, neededRangePc }) => {
+      ({ route, neededRangePc, gaveUp }) => {
         if (request !== this.routeRequest) {
           return;
         }
@@ -1536,7 +1536,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         this.routeResult.set({
           stars: route ? route.stars.map((id) => ({ id, name: this.starsById.get(id)?.name ?? `Star ${id}` })) : [],
           totalPc: route?.totalPc ?? 0,
-          neededRangePc
+          neededRangePc,
+          gaveUp
         });
         this.jumpLinks?.setRoute(route?.stars ?? [], (id) => this.starsById.get(id));
       },

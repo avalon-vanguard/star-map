@@ -253,6 +253,26 @@ describe('HudDockComponent', () => {
     expect(tab('Readout').getAttribute('aria-selected')).toBe('true');
   });
 
+  it('says the search gave up rather than that there is no route, when that is what happened', () => {
+    fixture.componentRef.setInput('routing', true);
+    fixture.componentRef.setInput('defaultTab', 'routes');
+    const summary = () => host().querySelector('[data-testid="route-summary"]')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+
+    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: null, gaveUp: true });
+    fixture.detectChanges();
+    expect(summary()).toBe('Too many stars to search at this range.');
+
+    // Having looked everywhere the range reaches is a different answer, and one that can be stated.
+    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: null, gaveUp: false });
+    fixture.detectChanges();
+    expect(summary()).toContain('No chain of jumps up to');
+
+    // A range a chain was found at is worth offering whether or not anything shorter was ruled out.
+    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: 6.4, gaveUp: true });
+    fixture.detectChanges();
+    expect(summary()).toBe('No route at this range. 6.40 pc would reach.');
+  });
+
   it('keeps what the Routes panel was set to across a trip to another tab', () => {
     setReadout();
     fixture.componentRef.setInput('routing', true);

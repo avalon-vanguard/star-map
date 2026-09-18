@@ -58,6 +58,10 @@ describe('distanceRings', () => {
 
   it('leaves the callout out when it is past the last ring, or behind the first', () => {
     expect(distanceRings(0, 100, 5, 250)).toEqual([20, 40, 60, 80, 100]);
+    // Short of the survey edge by less than one step is not the rule — the last ring is: 245 pc
+    // overshoots to 260 and gets it, 235 pc stops at 240 and does not, on the same 20 pc step.
+    expect(distanceRings(0, 245, 5, 250)).toContain(250);
+    expect(distanceRings(0, 235, 5, 250)).not.toContain(250);
     expect(distanceRings(400, 440, 5, 250)).toEqual([400, 405, 410, 415, 420, 425, 430, 435, 440]);
   });
 

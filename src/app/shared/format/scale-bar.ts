@@ -19,16 +19,18 @@ export function roundLengthAtMost(value: number): number | null {
  * Rings across the span from `nearest` to `reach`, at a round step of about a `count`th of it,
  * plus `callout` where it falls between the first ring and the last: the grid's own radii are
  * round, and the one radius that means something in its own right is marked whether the step lands
- * on it or not. A frame short of it by less than one step still gets it, since the last ring
- * overshoots `reach`; one that stops well short does not.
+ * on it or not. A frame that stops short of it gets it only when the last ring — the first multiple
+ * of `step` at or past `reach` — is past it: reach 245 with a 20 pc step gets it, reach 235 does
+ * not, since its last ring is 240.
  *
  * Two numbers rather than one because these rings are centred on a fixed point — the Sun — and a
  * frame need not be. Looking at something 200 pc out from 20 pc away, what is on screen is a band
  * 200 pc wide at its narrowest and nowhere near the Sun; a step sized to the whole 220 puts every
  * ring off the frame. The span is what the frame covers, so the step is what it can resolve.
  *
- * Rounding the step down makes for `count` to `ceil(2.5 × count)` rings, and the callout can add
- * one: 5 to 14 for a count of 5.
+ * Rounding the step down, over a span that need not start at the Sun, makes for `count` to
+ * `ceil(2.5 × count) + 2` rings — `ceil(reach / step) - floor(nearest / step) + 1` — and the
+ * callout can add one: 5 to 16 for a count of 5.
  */
 export function distanceRings(nearest: number, reach: number, count: number, callout: number): number[] {
   const step = roundLengthAtMost((reach - nearest) / count);

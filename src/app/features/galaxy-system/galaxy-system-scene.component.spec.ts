@@ -13,6 +13,7 @@ import { NavigationStore } from '../../shared/state/navigation.store';
 import { LinkBudget } from '../../shared/astro/jump-links';
 import { HudDisplay } from '../hud/hud-dock.component';
 import { GalaxySystemSceneComponent } from './galaxy-system-scene.component';
+import { galacticNormal } from './grid-plane';
 import { JumpLinkRenderer } from './jump-link-renderer';
 import { StarFieldRenderer } from './star-field-renderer';
 import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
@@ -429,9 +430,12 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     it('sizes the rings by how far the frame reaches from the Sun, under either projection', async () => {
       const component = fixture.componentInstance as unknown as GridScene;
       const camera = engine.getCamera();
-      // Centred on a star 200 pc out, seen from 20 pc away: the rings have to reach it.
-      component.controls.target.set(200, 0, 0);
-      camera.position.set(200, 0, 20);
+      // Centred on a point 200 pc out along the galactic plane — where the rings are — seen from
+      // 20 pc above it. The rings have to reach it, and one of them has to cross the frame.
+      const normal = galacticNormal();
+      const centre = new THREE.Vector3(1, 0, 0).projectOnPlane(normal).normalize().multiplyScalar(200);
+      component.controls.target.copy(centre);
+      camera.position.copy(centre).addScaledVector(normal, 20);
       component.controls.update();
       await advanceFrames(engine, 0.3);
       const underPerspective = [...component.localGridRadii];
@@ -441,13 +445,29 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       await advanceFrames(engine, 0.3);
 
       expect(underPerspective.at(-1)).toBeGreaterThanOrEqual(200);
-      // And one of them has to cross the frame, which is a band about 19 pc either side of 200 pc:
-      // rings out to 220 at a step sized to all 220 are 180 and 200, both of them off screen.
+      // The frame is a band about 19 pc either side of 200 pc: rings out to 220 at a step sized to
+      // all 220 are 180 and 200, both of them off screen.
       const halfHeight = engine.visibleHalfHeight(20);
       expect(underPerspective.some((radius) => Math.abs(radius - 200) < halfHeight)).toBe(true);
       // The plan view's wheel moves the frame rather than the camera, so "how far out the camera
       // is" means something else there; what the rings have to cover does not.
       expect([...component.localGridRadii]).toEqual(underPerspective);
+    });
+
+    it('measures the span in the plane the rings lie in, not through it', async () => {
+      const component = fixture.componentInstance as unknown as GridScene;
+      const camera = engine.getCamera();
+      // The same 200 pc out along the plane, but lifted 150 pc above it: 250 pc from the Sun as the
+      // crow flies, and still 200 pc out among the rings, which is the distance they are drawn at.
+      const normal = galacticNormal();
+      const centre = new THREE.Vector3(1, 0, 0).projectOnPlane(normal).normalize().multiplyScalar(200).addScaledVector(normal, 150);
+      component.controls.target.copy(centre);
+      camera.position.copy(centre).addScaledVector(normal, 20);
+      component.controls.update();
+      await advanceFrames(engine, 0.3);
+
+      const halfHeight = engine.visibleHalfHeight(20);
+      expect([...component.localGridRadii].some((radius) => Math.abs(radius - 200) < halfHeight)).toBe(true);
     });
 
     it('leaves the rings alone while the grid is not drawn', async () => {
@@ -511,6 +531,15 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(component.ringLabelsInTheClear([rung], camera, [rightHand])).toEqual([]);
       // The same name hanging the other way leaves that space empty, and the rung with it.
       expect(component.ringLabelsInTheClear([rung], camera, [{ ...rightHand, side: 'left' }])).toEqual([rung]);
+
+      // And a rung to the left of a name keeps its place: "50 pc" is a third of a star name's
+      // width, so it ends well before the name starts, whatever the anchors' spacing suggests.
+      const centred = at(0, 0);
+      const spanning: LabeledPoint = { id: 8, name: 'Alnitak', side: 'right', x: centred.x, y: centred.y, z: centred.z };
+      const toTheLeft = at(-0.25, 0.02);
+      const clearRung: LabeledPoint = { id: 'ring-100', name: '100 pc', x: toTheLeft.x, y: toTheLeft.y, z: toTheLeft.z };
+
+      expect(component.ringLabelsInTheClear([clearRung], camera, [spanning])).toEqual([clearRung]);
     });
 
     it('places the ring labels with the star names rather than over them', async () => {

@@ -80,6 +80,12 @@ const RING_LABEL_CLEARANCE_NDC = LABEL_MIN_SEPARATION_NDC / 2;
 /** How far right of its point a label's text reaches, in aspect-scaled NDC (~135px at 1440). */
 const LABEL_REACH_NDC = 0.3;
 /**
+ * The same for a ring label, which is shorter: "1.5 kpc" with "Survey edge" under it is the widest
+ * of them, about 100px at 1440. Measuring those as a star name's width rejected rungs a hand's
+ * breadth clear of it.
+ */
+const RING_LABEL_REACH_NDC = 0.23;
+/**
  * How long the range control has to be still before the graph is rebuilt at its value, since a drag
  * emits per pixel; and how often at most a view on the move gets a graph for its new drawn stars.
  */
@@ -953,7 +959,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         !taken.some(
           (name) =>
             name.at.distanceTo(point) < RING_LABEL_CLEARANCE_NDC ||
-            (Math.abs(name.at.y - point.y) < RING_LABEL_CLEARANCE_NDC && name.from < point.x + LABEL_REACH_NDC && point.x < name.to)
+            (Math.abs(name.at.y - point.y) < RING_LABEL_CLEARANCE_NDC && name.from < point.x + RING_LABEL_REACH_NDC && point.x < name.to)
         )
       );
     });
@@ -985,7 +991,13 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       // does not contain the Sun — 20 pc rings for a view of a 19 pc band at 190 pc drew none of
       // them on screen, and the ladder of labels went with them.
       const frameRadiusPc = this.engine.visibleHalfHeight(orbitPc) * Math.hypot(1, this.viewportAspect());
-      const radii = distanceRings(Math.max(0, target.length() - frameRadiusPc), target.length() + orbitPc, LOCAL_GRID_RING_COUNT, SURVEY_EDGE_PC);
+      // Measured in the plane the rings lie in, not through it: a ring of radius r passes within
+      // `|r - p|` of the view's centre, where p is how far out the centre is *along the plane*. For
+      // a target above it the two differ by its height, which would put the band around a radius no
+      // ring has — and `ringLabels` compares its own in-plane bearing against the innermost.
+      const normal = galacticNormal();
+      const inPlanePc = target.clone().addScaledVector(normal, -target.dot(normal)).length();
+      const radii = distanceRings(Math.max(0, inPlanePc - frameRadiusPc), inPlanePc + orbitPc, LOCAL_GRID_RING_COUNT, SURVEY_EDGE_PC);
       if (radii.join() !== this.localGridRadii.join()) {
         this.setLocalGridRadii(radii);
       }

@@ -3,7 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { mergeStarCatalogues, placementDistancePc } from '../../src/app/shared/astro/star-merge';
 import { encodeStarCatalog } from '../../src/app/shared/models/star-catalog';
 import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model';
-import { fetchGaiaDistancesByHip } from './sources/gaia';
+import { fetchGaiaDistancesByHip, GaiaAnswerError } from './sources/gaia';
 import { positionalSources } from './sources/registry';
 import { PARALLAX_PRECISION_MAS } from './sources/star-sources';
 import { parseCsvObjects, parseOptionalNumber } from './lib/csv';
@@ -142,7 +142,9 @@ export async function fetchStars(): Promise<StarRecord[]> {
  *
  * A source that cannot be reached is reported and skipped here rather than thrown, so a run still
  * gets as far as validation and says what it has. Whether that may be published is decided
- * there: `validateMerge` in build.ts refuses a catalogue Gaia contributed nothing to.
+ * there: `validateMerge` in build.ts refuses a catalogue Gaia contributed nothing to. A source
+ * that answered with something unusable ({@link GaiaAnswerError}) is a different matter, and stops
+ * the run where it happened rather than being reported later as an outage.
  */
 async function mergeWithOtherSources(hygStars: StarRecord[]): Promise<StarRecord[]> {
   const others = positionalSources().filter((source) => source.id !== 'hyg');
@@ -160,6 +162,11 @@ async function mergeWithOtherSources(hygStars: StarRecord[]): Promise<StarRecord
         stars: await source.fetch!()
       });
     } catch (error) {
+      // An answer that cannot be worked with is not an outage: skipping it would write a
+      // half-catalogue over the published assets before the merge gate got to say so.
+      if (error instanceof GaiaAnswerError) {
+        throw error;
+      }
       console.log(`  skipping ${source.name}: ${error instanceof Error ? error.message : error}`);
     }
   }

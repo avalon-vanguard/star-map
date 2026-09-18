@@ -49,9 +49,11 @@ jobs:
           key: gaia-dr3-${{ hashFiles('tools/etl/sources/gaia.ts') }}
 
       # Every other source is fetched live on this fresh runner. A failed fetch fails the run by
-      # design — no refresh is better than a partial one. That includes Gaia on a cold cache:
-      # the ETL skips it when unreachable, and the merge gate in build.ts then refuses a
-      # catalogue it contributed nothing to.
+      # design — no refresh is better than a partial one. That includes Gaia on a cold cache, by
+      # two different paths: its Hipparcos cross-match is required, so an unreachable archive
+      # fails the run from fetchStars itself, while its main query is skipped when unreachable and
+      # the merge gate in build.ts then refuses a catalogue it contributed nothing to. An archive
+      # that answers short rather than not at all is caught in fetchGaiaStars.
       - name: Rebuild the datasets
         run: npm run etl
 

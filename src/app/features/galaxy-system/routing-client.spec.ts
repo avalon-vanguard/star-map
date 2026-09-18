@@ -73,7 +73,7 @@ describe('RoutingClient without a worker', () => {
   it('answers a route from the index it was given', async () => {
     const client = new RoutingClient(STARS, POSITIONS, index);
 
-    await expect(client.route(100, 104, 1.5, 8)).resolves.toEqual({ route: routeBetween(index, 100, 104, 1.5), neededRangePc: null });
+    await expect(client.route(100, 104, 1.5, 8)).resolves.toEqual({ route: routeBetween(index, 100, 104, 1.5).route, neededRangePc: null, gaveUp: false, least: true });
     client.dispose();
   });
 
@@ -143,8 +143,8 @@ describe('RoutingClient with a worker', () => {
     await expect(first).resolves.toHaveLength(6);
 
     const routeRequest = worker.requests[1];
-    worker.answer({ kind: 'route', requestId: routeRequest.requestId, route: null, neededRangePc: 4 });
-    await expect(route).resolves.toEqual({ route: null, neededRangePc: 4 });
+    worker.answer({ kind: 'route', requestId: routeRequest.requestId, route: null, neededRangePc: 4, gaveUp: false, least: true });
+    await expect(route).resolves.toEqual({ route: null, neededRangePc: 4, gaveUp: false, least: true });
     await flush();
 
     expect(worker.requests.map((request) => (request.kind === 'links' ? request.rangePc : request.kind))).toEqual([5, 'route', 8]);
@@ -161,14 +161,14 @@ describe('RoutingClient with a worker', () => {
     const widerRange = client.route(100, 104, 2.5, 8);
 
     expect(worker.requests).toHaveLength(1);
-    worker.answer({ kind: 'route', requestId: worker.requests[0].requestId, route: null, neededRangePc: 4 });
+    worker.answer({ kind: 'route', requestId: worker.requests[0].requestId, route: null, neededRangePc: 4, gaveUp: false, least: true });
 
     expect(await again).toEqual(await once);
     await flush();
     // The same two stars at another range is another question.
     expect(worker.requests.map((request) => request.rangePc)).toEqual([1.5, 2.5]);
-    worker.answer({ kind: 'route', requestId: worker.requests[1].requestId, route: null, neededRangePc: null });
-    await expect(widerRange).resolves.toEqual({ route: null, neededRangePc: null });
+    worker.answer({ kind: 'route', requestId: worker.requests[1].requestId, route: null, neededRangePc: null, gaveUp: false, least: true });
+    await expect(widerRange).resolves.toEqual({ route: null, neededRangePc: null, gaveUp: false, least: true });
     client.dispose();
   });
 
@@ -218,6 +218,16 @@ describe('RoutingClient with a worker', () => {
     client.dispose();
   });
 
+  it('hands on that the search gave up, along with the answer it did give', async () => {
+    const { client, worker } = clientWithFake();
+    const answer = client.route(100, 105, 1.5, 8);
+
+    worker.answer({ kind: 'route', requestId: worker.requests[0].requestId, route: null, neededRangePc: null, gaveUp: true, least: false });
+
+    await expect(answer).resolves.toEqual({ route: null, neededRangePc: null, gaveUp: true, least: false });
+    client.dispose();
+  });
+
   it('rejects a request the worker failed on, and goes on to the next', async () => {
     const { client, worker } = clientWithFake();
     const failing = client.route(100, 104, 1.5, 8).catch((error: unknown) => error);
@@ -240,7 +250,7 @@ describe('RoutingClient with a worker', () => {
 
     worker.fail();
 
-    await expect(route).resolves.toEqual({ route: routeBetween(index, 100, 104, 1.5), neededRangePc: null });
+    await expect(route).resolves.toEqual({ route: routeBetween(index, 100, 104, 1.5).route, neededRangePc: null, gaveUp: false, least: true });
     expect(Array.from(await graph)).toEqual([0, 0, 0, 1, 0, 0]);
     await expect(client.route(100, 105, 1.5, 8)).resolves.toMatchObject({ route: null });
     expect(worker.terminated).toBe(true);

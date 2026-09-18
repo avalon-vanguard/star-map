@@ -34,9 +34,15 @@ const RETRY_DELAYS_MS = [30_000, 120_000];
 
 async function fetchText(url: string): Promise<string> {
   for (let attempt = 0; ; attempt++) {
-    const response = await fetch(url).catch((error: unknown) => (error instanceof Error ? error : new Error(String(error))));
+    let response = await fetch(url).catch((error: unknown) => (error instanceof Error ? error : new Error(String(error))));
     if (!(response instanceof Error) && response.ok) {
-      return response.text();
+      // Read inside the loop, because the body is where these downloads fail: the Gaia CSV is
+      // 57 MB, and a connection reset part-way through rejects here, long after the 200.
+      const body = await response.text().catch((error: unknown) => (error instanceof Error ? error : new Error(String(error))));
+      if (typeof body === 'string') {
+        return body;
+      }
+      response = body;
     }
     const reason = response instanceof Error ? response.message : `${response.status} ${response.statusText}`;
     // A 4xx is the request's own fault, and waiting will not change the answer.

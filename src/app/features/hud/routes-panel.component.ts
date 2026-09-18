@@ -20,8 +20,12 @@ export interface RouteResult {
   /** The chain, departure first. Empty when there is no route at the range asked for. */
   readonly stars: readonly { id: number; name: string }[];
   readonly totalPc: number;
-  /** The shortest range that would open a route, where none was found at the one asked for. */
+  /** A range that would open a route, where none was found at the one asked for. */
   readonly neededRangePc: number | null;
+  /** True when the search gave up rather than showing there is no route at this range. */
+  readonly gaveUp: boolean;
+  /** True when the search for a range that would work looked everywhere up to the widest offered. */
+  readonly least: boolean;
 }
 
 export interface RouteRequest {
@@ -113,7 +117,11 @@ type Field = 'from' | 'to';
             </p>
           } @else {
             <p data-testid="route-summary" class="text-sm text-muted">
-              No route at this range.
+              @if (plotted.gaveUp) {
+                Too many stars to search at this range.
+              } @else {
+                No route at this range.
+              }
               @if (plotted.neededRangePc !== null) {
                 <button
                   type="button"
@@ -123,7 +131,7 @@ type Field = 'from' | 'to';
                 >
                   {{ format(plotted.neededRangePc) }} would reach.
                 </button>
-              } @else {
+              } @else if (plotted.least) {
                 No chain of jumps up to {{ format(maxRangePc) }} reaches it.
               }
             </p>

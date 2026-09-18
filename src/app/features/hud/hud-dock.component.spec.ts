@@ -289,7 +289,7 @@ describe('HudDockComponent', () => {
 
     // The offer beside a refusal is the same request by another route, so it is held to the same
     // test: moving the range with nothing to plot leaves the panel contradicting itself.
-    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: 1.8, gaveUp: false });
+    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: 1.8, gaveUp: false, least: true });
     fixture.detectChanges();
     const offer = () => host().querySelector<HTMLButtonElement>('[data-testid="route-summary"] button')!;
     expect(offer().disabled).toBe(false);
@@ -310,6 +310,33 @@ describe('HudDockComponent', () => {
     tab('Display').click();
     fixture.detectChanges();
     expect(host().querySelector('#dock-panel-display')?.classList.contains('hud-acquire')).toBe(true);
+  });
+
+  it('says the search gave up rather than that there is no route, when that is what happened', () => {
+    fixture.componentRef.setInput('routing', true);
+    fixture.componentRef.setInput('defaultTab', 'routes');
+    const summary = () => host().querySelector('[data-testid="route-summary"]')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+
+    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: null, gaveUp: true, least: false });
+    fixture.detectChanges();
+    expect(summary()).toBe('Too many stars to search at this range.');
+
+    // Having looked everywhere the range reaches is a different answer, and one that can be stated.
+    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: null, gaveUp: false, least: true });
+    fixture.detectChanges();
+    expect(summary()).toContain('No chain of jumps up to');
+
+    // A range a chain was found at is worth offering — but the search that gave up at the range
+    // asked for still gave up, and saying "no route" beside the offer is saying it did not.
+    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: 6.4, gaveUp: true, least: false });
+    fixture.detectChanges();
+    expect(summary()).toBe('Too many stars to search at this range. 6.40 pc would reach.');
+
+    // The other way round: the range asked for was searched to exhaustion and the wider search was
+    // the one that gave up. There is no route at this range, and nothing further can be claimed.
+    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: null, gaveUp: false, least: false });
+    fixture.detectChanges();
+    expect(summary()).toBe('No route at this range.');
   });
 
   it('keeps what the Routes panel was set to across a trip to another tab', () => {

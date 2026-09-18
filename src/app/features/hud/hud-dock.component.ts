@@ -186,9 +186,11 @@ function isWideViewport(): boolean {
       }
       <!-- Hidden rather than unmounted: the departure, destination and range it holds would
            otherwise reset on every trip to another tab, while the scene kept drawing the graph at
-           the old range. Hiding still replays the acquire wipe when it is shown again. -->
+           the old range. No acquire wipe, unlike the panels around it: this is the one that comes
+           back with what it had, so it is not acquiring anything — and for the 380 ms the wipe
+           runs, its clip path swallows clicks on the suggestions it just brought back. -->
       @if (routing()) {
-        <section id="dock-panel-routes" role="tabpanel" aria-labelledby="dock-tab-routes" [hidden]="activeTab() !== 'routes'" class="hud-acquire hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-xl px-4 py-3">
+        <section id="dock-panel-routes" role="tabpanel" aria-labelledby="dock-tab-routes" [hidden]="activeTab() !== 'routes'" class="hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-xl px-4 py-3">
           <app-routes-panel
             [result]="routeResult()"
             [pending]="routePending()"

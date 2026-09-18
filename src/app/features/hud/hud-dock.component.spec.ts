@@ -253,6 +253,65 @@ describe('HudDockComponent', () => {
     expect(tab('Readout').getAttribute('aria-selected')).toBe('true');
   });
 
+  it('will not plot from a departure that was typed but never chosen', () => {
+    setReadout();
+    fixture.componentRef.setInput('routing', true);
+    fixture.componentRef.setInput('currentStar', { id: 3, name: "Barnard's Star", subtitle: '1.8 pc' });
+    fixture.componentRef.setInput('routeOptions', [{ id: 7, name: 'Sirius', subtitle: '2.6 pc' }]);
+    fixture.componentRef.setInput('defaultTab', 'routes');
+    fixture.detectChanges();
+    const plot = () => [...host().querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('Plot route'))!;
+    const type = (field: string, value: string) => {
+      const input = host().querySelector<HTMLInputElement>(`#route-${field}`)!;
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    };
+
+    type('to', 'Sir');
+    host().querySelector<HTMLButtonElement>('#dock-panel-routes ul button')!.click();
+    fixture.detectChanges();
+    // With the departure field empty, the view's own star stands in for it.
+    expect(plot().disabled).toBe(false);
+
+    // Text that names no chosen star is not a departure: plotting from the view's star instead
+    // would name one place and leave from another.
+    type('from', 'Sol');
+    expect(plot().disabled).toBe(true);
+
+    type('from', '');
+    expect(plot().disabled).toBe(false);
+
+    // A space is not text that names a star: the field looks empty, the scene offers nothing to
+    // choose for it, and the button going dead would have nothing on screen to explain it.
+    type('from', ' ');
+    expect(plot().disabled).toBe(false);
+
+    // The offer beside a refusal is the same request by another route, so it is held to the same
+    // test: moving the range with nothing to plot leaves the panel contradicting itself.
+    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: 1.8, gaveUp: false, least: true });
+    fixture.detectChanges();
+    const offer = () => host().querySelector<HTMLButtonElement>('[data-testid="route-summary"] button')!;
+    expect(offer().disabled).toBe(false);
+
+    type('from', 'Sol');
+    expect(offer().disabled).toBe(true);
+  });
+
+  it('does not replay the acquire wipe over the Routes panel, whose entries survive the trip', () => {
+    setReadout();
+    fixture.componentRef.setInput('routing', true);
+    fixture.componentRef.setInput('display', DEFAULT_HUD_DISPLAY);
+    fixture.componentRef.setInput('defaultTab', 'routes');
+    fixture.detectChanges();
+
+    // The wipe clips its panel for 380 ms, which swallows clicks on entries that are already there.
+    expect(host().querySelector('#dock-panel-routes')?.classList.contains('hud-acquire')).toBe(false);
+    tab('Display').click();
+    fixture.detectChanges();
+    expect(host().querySelector('#dock-panel-display')?.classList.contains('hud-acquire')).toBe(true);
+  });
+
   it('says the search gave up rather than that there is no route, when that is what happened', () => {
     fixture.componentRef.setInput('routing', true);
     fixture.componentRef.setInput('defaultTab', 'routes');

@@ -125,8 +125,9 @@ type Field = 'from' | 'to';
               @if (plotted.neededRangePc !== null) {
                 <button
                   type="button"
+                  [disabled]="!canPlot() || pending()"
                   (click)="raiseTo(plotted.neededRangePc)"
-                  class="text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent focus-visible:outline-1 focus-visible:outline-accent"
+                  class="text-accent underline decoration-accent/40 underline-offset-2 disabled:opacity-40 disabled:no-underline enabled:hover:decoration-accent focus-visible:outline-1 focus-visible:outline-accent"
                 >
                   {{ format(plotted.neededRangePc) }} would reach.
                 </button>
@@ -184,8 +185,14 @@ export class RoutesPanelComponent {
   private readonly chosen = signal<Record<Field, RouteStarOption | null>>({ from: null, to: null });
   private readonly typed = signal<Record<Field, string>>({ from: '', to: '' });
 
-  /** Departure falls back to wherever the view already is, so one field is usually enough. */
-  private readonly departure = computed(() => this.chosen().from ?? this.currentStar());
+  /**
+   * Departure falls back to wherever the view already is, so one field is usually enough — but only
+   * while the field is empty. Text left in it that names no chosen star used to fall back all the
+   * same, so the panel read "Sol" and the route left from whatever the view had since flown to.
+   */
+  // Trimmed, as the scene trims the same text before offering matches for it: a field holding one
+  // space looks empty, offers nothing to choose, and would otherwise count as a departure.
+  private readonly departure = computed(() => this.chosen().from ?? (this.typed().from.trim() ? null : this.currentStar()));
 
   readonly canPlot = computed(() => this.departure() !== null && this.chosen().to !== null);
   readonly rangeLabel = computed(() => formatParsecs(this.rangePc()));

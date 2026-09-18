@@ -132,7 +132,10 @@ export async function fetchGaiaStars(): Promise<StarRecord[]> {
         `served with a 200, or the query was edited without updating DEFAULT_QUERY_ROWS; delete tools/etl/.cache/${cacheKey} once the archive answers properly`
     );
   }
-  if (jobsQuery && rows.length >= ROW_LIMIT) {
+  // Not gated on `jobsQuery` like the floor above it: the only ways to reach this cap are the
+  // overrides that *widen* the query, and they are exactly when it is worth saying. What it must
+  // not fire on is a deliberately smaller slice, where filling the limit is the whole point.
+  if (ROW_LIMIT >= DEFAULT_ROW_LIMIT && rows.length >= ROW_LIMIT) {
     throw new GaiaAnswerError(`Gaia returned the query's own ${ROW_LIMIT}-row limit, so it is the limit deciding what the map holds; raise ETL_GAIA_ROW_LIMIT.`);
   }
   const stars: StarRecord[] = [];

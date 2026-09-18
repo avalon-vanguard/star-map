@@ -15,6 +15,7 @@ import { HudDisplay } from '../hud/hud-dock.component';
 import { GalaxySystemSceneComponent } from './galaxy-system-scene.component';
 import { JumpLinkRenderer } from './jump-link-renderer';
 import { StarFieldRenderer } from './star-field-renderer';
+import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
 
 // jsdom does not implement ResizeObserver; the component only uses it to react to real
 // layout changes, which never happen in this headless test.
@@ -415,6 +416,94 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
       expect(refocus).toHaveBeenCalledTimes(onArrival);
       expect(refocus.mock.calls.filter(([focus]) => focus.view === undefined)).toHaveLength(1);
+    });
+  });
+
+  describe('the local grid of distance rings', () => {
+    type GridScene = {
+      controls: { target: THREE.Vector3; update(): void };
+      display: { update(change: (display: HudDisplay) => HudDisplay): void };
+      localGridRadii: readonly number[];
+    };
+
+    it('sizes the rings by how far the frame reaches from the Sun, under either projection', async () => {
+      const component = fixture.componentInstance as unknown as GridScene;
+      const camera = engine.getCamera();
+      // Centred on a star 200 pc out, seen from 20 pc away: the rings have to reach it.
+      component.controls.target.set(200, 0, 0);
+      camera.position.set(200, 0, 20);
+      component.controls.update();
+      await advanceFrames(engine, 0.3);
+      const underPerspective = [...component.localGridRadii];
+
+      component.display.update((display) => ({ ...display, plan: true }));
+      TestBed.tick();
+      await advanceFrames(engine, 0.3);
+
+      expect(underPerspective.at(-1)).toBeGreaterThanOrEqual(200);
+      // The plan view's wheel moves the frame rather than the camera, so "how far out the camera
+      // is" means something else there; what the rings have to cover does not.
+      expect([...component.localGridRadii]).toEqual(underPerspective);
+    });
+
+    it('leaves the rings alone while the grid is not drawn', async () => {
+      const component = fixture.componentInstance as unknown as GridScene;
+      const camera = engine.getCamera();
+      await advanceFrames(engine, 0.3);
+      component.display.update((display) => ({ ...display, grid: false }));
+      TestBed.tick();
+      await advanceFrames(engine, 0.3);
+      const hidden = [...component.localGridRadii];
+
+      // A zoom this size crosses two round steps, and each crossing rebuilds every ring's vertices.
+      camera.position.setLength(camera.position.length() / 8);
+      component.controls.update();
+      await advanceFrames(engine, 0.3);
+
+      expect([...component.localGridRadii]).toEqual(hidden);
+    });
+
+    it('drops a ring label that a star name has taken, or that is off screen, and keeps the ladder otherwise', () => {
+      const component = fixture.componentInstance as unknown as {
+        ringLabelsInTheClear(candidates: readonly LabeledPoint[], camera: THREE.Camera, stars: readonly LabeledPoint[]): LabeledPoint[];
+      };
+      const camera = engine.getCamera();
+      camera.updateMatrixWorld(true);
+      const at = (x: number, y: number) => new THREE.Vector3(x, y, 0.5).unproject(camera);
+      const near = at(0.1, 0.1);
+      const nextRungUp = at(0.1, 0.16);
+      const offScreen = at(1.6, 0.1);
+      const ladder: LabeledPoint[] = [
+        { id: 'ring-50', name: '50 pc', x: near.x, y: near.y, z: near.z },
+        { id: 'ring-100', name: '100 pc', x: nextRungUp.x, y: nextRungUp.y, z: nextRungUp.z },
+        { id: 'ring-150', name: '150 pc', x: offScreen.x, y: offScreen.y, z: offScreen.z }
+      ];
+
+      // A ladder of rings stays whole, though its rungs are closer than two star names would be.
+      expect(component.ringLabelsInTheClear(ladder, camera, []).map((label) => label.id)).toEqual(['ring-50', 'ring-100']);
+      // A star's name is worth more than a distance.
+      const star: LabeledPoint = { id: 7, name: 'Sirius', x: near.x, y: near.y, z: near.z };
+      expect(component.ringLabelsInTheClear(ladder, camera, [star]).map((label) => label.id)).toEqual(['ring-100']);
+    });
+
+    it('places the ring labels with the star names rather than over them', async () => {
+      const component = fixture.componentInstance as unknown as GridScene;
+      const update = vi.spyOn(StarLabelOverlay.prototype, 'update');
+      const cleared = vi.spyOn(GalaxySystemSceneComponent.prototype as unknown as { ringLabelsInTheClear: (...args: unknown[]) => LabeledPoint[] }, 'ringLabelsInTheClear');
+      const camera = engine.getCamera();
+      camera.position.set(0, 4, 10);
+      component.controls.target.set(0, 0, 0);
+      component.controls.update();
+      await advanceFrames(engine, 0.3);
+
+      const labels = (update.mock.calls.at(-1)?.[0] ?? []) as LabeledPoint[];
+      const rings = labels.filter((label) => String(label.id).startsWith('ring-'));
+      expect(rings.length).toBeGreaterThan(0);
+      // Handed over as the clearing pass left them, not as the grid produced them.
+      expect(cleared).toHaveBeenCalled();
+      expect(rings).toEqual(cleared.mock.results.at(-1)?.value);
+      update.mockRestore();
+      cleared.mockRestore();
     });
   });
 

@@ -70,6 +70,12 @@ const LABEL_MAX_COUNT = 15;
 const LABEL_MIN_SEPARATION_NDC = 0.12;
 /** Beyond this the text of a right-hand label would run off the view: hang it on the left. */
 const LABEL_EDGE_NDC = 0.7;
+/**
+ * How far a ring label has to sit from a star's name, in NDC — half what two star names keep
+ * between them. A ring label is one short line, and the rungs of its ladder are a twentieth of the
+ * screen apart, so the full separation would have one name clear three rungs.
+ */
+const RING_LABEL_CLEARANCE_NDC = LABEL_MIN_SEPARATION_NDC / 2;
 /** How far right of its point a label's text reaches, in aspect-scaled NDC (~135px at 1440). */
 const LABEL_REACH_NDC = 0.3;
 /**
@@ -194,10 +200,11 @@ const GALACTIC_FAR_PC = 250000;
  */
 const SURVEY_EDGE_PC = 250;
 /**
- * The local grid's rings are distances from the Sun, at a round step that follows the camera:
- * five of them out to about the camera's own distance, so 50 to 250 pc from the opening view and
- * 2 to 10 pc from beside the Sun. A fixed set could only serve one end of the zoom: 50 pc rings
- * say nothing from inside a 2 pc hop, and nothing marked the stars now drawn past 250 pc.
+ * How many rings the local grid aims for: the step is rounded down from a fifth of how far the
+ * frame reaches from the Sun, which makes five to fourteen of them. So 50 to 350 pc from the
+ * opening view, and 2 to 10 pc from beside the Sun. A fixed set could only serve one end of the
+ * zoom: 50 pc rings say nothing from inside a 2 pc hop, and nothing marked the stars now drawn
+ * past 250 pc.
  */
 const LOCAL_GRID_RING_COUNT = 5;
 const LOCAL_GRID_SPOKES = 12;
@@ -912,11 +919,29 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  /**
+   * The ring labels worth drawing: the ones on screen, and clear of the star names already placed.
+   *
+   * Not held apart from each other, as the star names are: they are a ladder up one ray, a few
+   * hundredths of the screen apart, and reading them in order is the point. What they must not do
+   * is sit on a star's name, which is worth more than a distance — or be handed to the overlay
+   * from behind or beside the camera, which draws them at the edge of the page rather than not at all.
+   */
+  private ringLabelsInTheClear(candidates: readonly LabeledPoint[], camera: SceneCamera, stars: readonly LabeledPoint[]): LabeledPoint[] {
+    const projected = new THREE.Vector3();
+    const onScreen = (label: LabeledPoint): THREE.Vector2 | null => {
+      projected.set(label.x, label.y, label.z).project(camera);
+      const outside = projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1;
+      return outside ? null : new THREE.Vector2(projected.x * this.viewportAspect(), projected.y);
+    };
+    const taken = stars.map(onScreen).filter((point): point is THREE.Vector2 => point !== null);
+    return candidates.filter((label) => {
+      const point = onScreen(label);
+      return point !== null && !taken.some((other) => other.distanceTo(point) < RING_LABEL_CLEARANCE_NDC);
+    });
+  }
+
   private updateLabels(camera: SceneCamera): void {
-    const radii = distanceRings(this.effectiveDistance(camera), LOCAL_GRID_RING_COUNT, SURVEY_EDGE_PC);
-    if (radii.join() !== this.localGridRadii.join()) {
-      this.setLocalGridRadii(radii);
-    }
     const selectedId = this.navigationStore.selectedStarId();
     // Measured from what the camera is looking at, not from where it is. Those differ by the
     // orbit distance, so a camera-relative rule names the stars closest to the near edge of the
@@ -928,6 +953,20 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // Individual star names mean nothing once the whole Galaxy is in frame — at that range the
     // entire catalogue is inside one pixel — so the labels hand over to the structural ones.
     const isGalactic = this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD;
+    // The rings are distances from the Sun, so what they have to cover is how far from the Sun the
+    // frame reaches: where the view is centred, plus how far out the camera is orbiting it. Under
+    // the plan view the orbit distance is the frame's own extent, since that is what the wheel
+    // moves there. Read as "how far the camera is from the Sun" instead, panning away from the Sun
+    // and flipping to the plan view left every ring off the frame.
+    // Rebuilt only while the grid is drawn: each new set disposes the old rings and builds every
+    // vertex of the new ones, and the set changes on any zoom that crosses a round step.
+    if (!isGalactic && this.display().grid) {
+      const orbitPc = this.engine.currentProjection === 'perspective' ? camera.position.distanceTo(target) : this.effectiveDistance(camera);
+      const radii = distanceRings(target.length() + orbitPc, LOCAL_GRID_RING_COUNT, SURVEY_EDGE_PC);
+      if (radii.join() !== this.localGridRadii.join()) {
+        this.setLocalGridRadii(radii);
+      }
+    }
     // Brightest first, not nearest first. Proximity was the right ranking when the catalogue was
     // a 50 pc bubble and everything in it was equally worth naming; across 250 pc it labels a
     // clump of whatever happens to be closest to the middle of the screen and never names the
@@ -944,7 +983,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     };
     const starLabels: LabeledPoint[] = isGalactic ? [] : this.spreadLabels(candidates(this.stars, this.starsByBrightness), camera, selectedId);
     const backdropLabels = isGalactic ? this.galacticLabels : this.deepSkyLabels;
-    const ringLabels = isGalactic || !this.display().grid ? [] : this.ringLabels(camera);
+    const ringLabels = isGalactic || !this.display().grid ? [] : this.ringLabelsInTheClear(this.ringLabels(camera), camera, starLabels);
     this.labelOverlay?.update([...starLabels, ...ringLabels, ...backdropLabels]);
   }
 

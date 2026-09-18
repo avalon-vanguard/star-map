@@ -17,9 +17,10 @@ export function roundLengthAtMost(value: number): number | null {
 
 /**
  * Rings at a round step of about `reach / count`, out to `reach` or just past it, plus `callout`
- * wherever it falls among them: the grid's own radii are round, and the one radius that means
- * something in its own right is marked whether the step lands on it or not. Rounding the step
- * down makes for `count` to `2.5 × count` rings, never fewer than it takes to cover `reach`.
+ * where it falls between the first ring and the last: the grid's own radii are round, and the one
+ * radius that means something in its own right is marked whether the step lands on it or not. A
+ * frame that does not reach it has no ring for it. Rounding the step down makes for `count` to
+ * `ceil(2.5 × count)` rings, and the callout can add one: 5 to 14 for a count of 5.
  */
 export function distanceRings(reach: number, count: number, callout: number): number[] {
   const step = roundLengthAtMost(reach / count);

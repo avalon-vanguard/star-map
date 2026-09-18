@@ -73,8 +73,11 @@ function validateStars(stars: StarRecord[]): void {
  * lacks: bright stars it saturates on, red dwarfs past its magnitude cut. So the headroom left to
  * the ceiling tracks the gap between those two cutoffs as much as Gaia's completeness.
  *
- * This bounds a merge that went wrong. It cannot bound a Gaia download that came back short: that
- * makes *fewer* survivors, not more, and is guarded where it can be seen, in `fetchGaiaStars`.
+ * This bounds a merge that went wrong, and — loosely — a Gaia download that came back short: a
+ * truncated answer leaves the HYG rows whose counterpart it dropped without one, so survivors go
+ * *up*, not down. Measured against the published catalogue: 10 886 today, 11 004 at nine tenths of
+ * the rows, 12 711 at half, 16 258 at a third. So this ceiling only catches a truncation past about
+ * two thirds, and `fetchGaiaStars` catches the shallower ones with its own row floor.
  */
 const MAX_UNMERGED_TWINS = 100;
 const MAX_HYG_SURVIVORS = 15_000;

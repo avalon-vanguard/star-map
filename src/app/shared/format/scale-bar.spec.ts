@@ -28,30 +28,41 @@ describe('distanceRings', () => {
   // The opening view sits about 307 pc from the Sun: the rings the map always had, with the
   // survey edge at the fifth, and on out past the camera for the stars now drawn beyond it.
   it('reaches past the camera from the opening view', () => {
-    expect(distanceRings(307, 5, 250)).toEqual([50, 100, 150, 200, 250, 300, 350]);
+    expect(distanceRings(0, 307, 5, 250)).toEqual([50, 100, 150, 200, 250, 300, 350]);
   });
 
   it('closes in with the camera', () => {
-    expect(distanceRings(20, 5, 250)).toEqual([2, 4, 6, 8, 10, 12, 14, 16, 18, 20]);
-    expect(distanceRings(1, 5, 250)).toEqual([0.2, 0.4, 0.6, 0.8, 1]);
+    expect(distanceRings(0, 20, 5, 250)).toEqual([2, 4, 6, 8, 10, 12, 14, 16, 18, 20]);
+    expect(distanceRings(0, 1, 5, 250)).toEqual([0.2, 0.4, 0.6, 0.8, 1]);
   });
 
   // Near Mirfak the camera is 155 pc out; rounding the step down to 20 pc must not leave the
   // rings stopping at 100.
   it('covers the whole distance whatever the rounding', () => {
-    expect(distanceRings(155, 5, 250)).toEqual([20, 40, 60, 80, 100, 120, 140, 160]);
+    expect(distanceRings(0, 155, 5, 250)).toEqual([20, 40, 60, 80, 100, 120, 140, 160]);
+  });
+
+  // A star 190 pc out seen from 20 pc away: the frame is a band about 19 pc either side of it and
+  // the Sun is nowhere in it. Sized to the 210 pc it reaches, the step would be 20 pc and the
+  // nearest rings — 180 and 200 — would both miss the frame.
+  it('spaces the rings for a frame that does not hold the Sun', () => {
+    const radii = distanceRings(171, 210, 5, 250);
+
+    expect(radii).toEqual([170, 175, 180, 185, 190, 195, 200, 205, 210]);
+    expect(radii.some((radius) => Math.abs(radius - 190) < 19)).toBe(true);
   });
 
   it('marks the callout among rings the step does not land on', () => {
-    expect(distanceRings(1000, 5, 250)).toEqual([200, 250, 400, 600, 800, 1000]);
+    expect(distanceRings(0, 1000, 5, 250)).toEqual([200, 250, 400, 600, 800, 1000]);
   });
 
-  it('leaves the callout out when it is past the last ring', () => {
-    expect(distanceRings(100, 5, 250)).toEqual([20, 40, 60, 80, 100]);
+  it('leaves the callout out when it is past the last ring, or behind the first', () => {
+    expect(distanceRings(0, 100, 5, 250)).toEqual([20, 40, 60, 80, 100]);
+    expect(distanceRings(400, 440, 5, 250)).toEqual([400, 405, 410, 415, 420, 425, 430, 435, 440]);
   });
 
   it('draws no rings for a camera with no distance', () => {
-    expect(distanceRings(0, 5, 250)).toEqual([]);
+    expect(distanceRings(0, 0, 5, 250)).toEqual([]);
   });
 });
 

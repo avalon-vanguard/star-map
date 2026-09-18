@@ -441,6 +441,10 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       await advanceFrames(engine, 0.3);
 
       expect(underPerspective.at(-1)).toBeGreaterThanOrEqual(200);
+      // And one of them has to cross the frame, which is a band about 19 pc either side of 200 pc:
+      // rings out to 220 at a step sized to all 220 are 180 and 200, both of them off screen.
+      const halfHeight = engine.visibleHalfHeight(20);
+      expect(underPerspective.some((radius) => Math.abs(radius - 200) < halfHeight)).toBe(true);
       // The plan view's wheel moves the frame rather than the camera, so "how far out the camera
       // is" means something else there; what the rings have to cover does not.
       expect([...component.localGridRadii]).toEqual(underPerspective);
@@ -470,8 +474,10 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       const camera = engine.getCamera();
       camera.updateMatrixWorld(true);
       const at = (x: number, y: number) => new THREE.Vector3(x, y, 0.5).unproject(camera);
+      // Rungs at a twentieth of the screen: well inside the separation two names would keep, and
+      // well outside the clearance a ring label keeps from a name, so neither test is a coin toss.
       const near = at(0.1, 0.1);
-      const nextRungUp = at(0.1, 0.16);
+      const nextRungUp = at(0.1, 0.18);
       const offScreen = at(1.6, 0.1);
       const ladder: LabeledPoint[] = [
         { id: 'ring-50', name: '50 pc', x: near.x, y: near.y, z: near.z },
@@ -484,6 +490,27 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       // A star's name is worth more than a distance.
       const star: LabeledPoint = { id: 7, name: 'Sirius', x: near.x, y: near.y, z: near.z };
       expect(component.ringLabelsInTheClear(ladder, camera, [star]).map((label) => label.id)).toEqual(['ring-100']);
+    });
+
+    it('stays out of the text of a name, not just off its point', () => {
+      const component = fixture.componentInstance as unknown as {
+        ringLabelsInTheClear(candidates: readonly LabeledPoint[], camera: THREE.Camera, stars: readonly LabeledPoint[]): LabeledPoint[];
+        viewportAspect(): number;
+      };
+      const camera = engine.getCamera();
+      camera.updateMatrixWorld(true);
+      const aspect = component.viewportAspect();
+      const at = (x: number, y: number) => new THREE.Vector3(x / aspect, y, 0.5).unproject(camera);
+      // A hand's breadth apart on screen — past any clearance around the point — and on the same
+      // line, with the name's text running right through where the ring label starts.
+      const ring = at(0.125, -0.123);
+      const rung: LabeledPoint = { id: 'ring-50', name: '50 pc', x: ring.x, y: ring.y, z: ring.z };
+      const beside = at(0.06, -0.12);
+      const rightHand: LabeledPoint = { id: 7, name: 'Alpha Centauri', side: 'right', x: beside.x, y: beside.y, z: beside.z };
+
+      expect(component.ringLabelsInTheClear([rung], camera, [rightHand])).toEqual([]);
+      // The same name hanging the other way leaves that space empty, and the rung with it.
+      expect(component.ringLabelsInTheClear([rung], camera, [{ ...rightHand, side: 'left' }])).toEqual([rung]);
     });
 
     it('places the ring labels with the star names rather than over them', async () => {

@@ -72,8 +72,9 @@ const LABEL_MIN_SEPARATION_NDC = 0.12;
 const LABEL_EDGE_NDC = 0.7;
 /**
  * How far a ring label has to sit from a star's name, in NDC — half what two star names keep
- * between them. A ring label is one short line, and the rungs of its ladder are a twentieth of the
- * screen apart, so the full separation would have one name clear three rungs.
+ * between them, as a clearance around the anchor and as the height of the row its text occupies.
+ * A ring label is one short line, and the rungs of its ladder are a twentieth of the screen apart,
+ * so the full separation would have one name clear three rungs.
  */
 const RING_LABEL_CLEARANCE_NDC = LABEL_MIN_SEPARATION_NDC / 2;
 /** How far right of its point a label's text reaches, in aspect-scaled NDC (~135px at 1440). */
@@ -621,7 +622,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       centre: new THREE.Vector3(centre.x, centre.y, centre.z),
       emphasisRadii: [SUN_GALACTOCENTRIC_RADIUS_PC]
     });
-    this.setLocalGridRadii(distanceRings(GALAXY_OVERVIEW_POSITION.length(), LOCAL_GRID_RING_COUNT, SURVEY_EDGE_PC));
+    this.setLocalGridRadii(distanceRings(0, GALAXY_OVERVIEW_POSITION.length(), LOCAL_GRID_RING_COUNT, SURVEY_EDGE_PC));
     // A fixed set rather than whatever is currently labelled: a tether that appears and vanishes
     // as the camera drifts reads as a glitch.
     this.tethers = new TetherField(TETHERED_STAR_COUNT);
@@ -925,7 +926,13 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * Not held apart from each other, as the star names are: they are a ladder up one ray, a few
    * hundredths of the screen apart, and reading them in order is the point. What they must not do
    * is sit on a star's name, which is worth more than a distance — or be handed to the overlay
-   * from behind or beside the camera, which draws them at the edge of the page rather than not at all.
+   * from beside the camera, which CSS2DRenderer places past the edge of the container rather than
+   * hiding, since all it tests is depth.
+   *
+   * A name is a line of text hanging to one side of its point, about 135 px of it, not the point:
+   * two anchors a tenth of the screen apart still print one inside the other. So the test is
+   * against the span the name occupies, with the anchors' own clearance kept for the pair whose
+   * text runs the other way.
    */
   private ringLabelsInTheClear(candidates: readonly LabeledPoint[], camera: SceneCamera, stars: readonly LabeledPoint[]): LabeledPoint[] {
     const projected = new THREE.Vector3();
@@ -934,10 +941,21 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       const outside = projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1;
       return outside ? null : new THREE.Vector2(projected.x * this.viewportAspect(), projected.y);
     };
-    const taken = stars.map(onScreen).filter((point): point is THREE.Vector2 => point !== null);
+    const taken = stars
+      .map((star) => ({ at: onScreen(star), side: star.side }))
+      .filter((name): name is { at: THREE.Vector2; side: LabelSide | undefined } => name.at !== null)
+      .map(({ at, side }) => ({ at, from: side === 'left' ? at.x - LABEL_REACH_NDC : at.x, to: side === 'left' ? at.x : at.x + LABEL_REACH_NDC }));
     return candidates.filter((label) => {
       const point = onScreen(label);
-      return point !== null && !taken.some((other) => other.distanceTo(point) < RING_LABEL_CLEARANCE_NDC);
+      // Ring labels hang right, as `applyPresentation` leaves anything with no side of its own.
+      return (
+        point !== null &&
+        !taken.some(
+          (name) =>
+            name.at.distanceTo(point) < RING_LABEL_CLEARANCE_NDC ||
+            (Math.abs(name.at.y - point.y) < RING_LABEL_CLEARANCE_NDC && name.from < point.x + LABEL_REACH_NDC && point.x < name.to)
+        )
+      );
     });
   }
 
@@ -962,7 +980,12 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // vertex of the new ones, and the set changes on any zoom that crosses a round step.
     if (!isGalactic && this.display().grid) {
       const orbitPc = this.engine.currentProjection === 'perspective' ? camera.position.distanceTo(target) : this.effectiveDistance(camera);
-      const radii = distanceRings(target.length() + orbitPc, LOCAL_GRID_RING_COUNT, SURVEY_EDGE_PC);
+      // Half the frame's diagonal, at the depth it is centred on: how near the Sun the frame
+      // reaches, as well as how far. A step sized to the far edge alone is no use to a frame that
+      // does not contain the Sun — 20 pc rings for a view of a 19 pc band at 190 pc drew none of
+      // them on screen, and the ladder of labels went with them.
+      const frameRadiusPc = this.engine.visibleHalfHeight(orbitPc) * Math.hypot(1, this.viewportAspect());
+      const radii = distanceRings(Math.max(0, target.length() - frameRadiusPc), target.length() + orbitPc, LOCAL_GRID_RING_COUNT, SURVEY_EDGE_PC);
       if (radii.join() !== this.localGridRadii.join()) {
         this.setLocalGridRadii(radii);
       }

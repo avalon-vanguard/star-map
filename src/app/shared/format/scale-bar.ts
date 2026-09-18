@@ -16,20 +16,31 @@ export function roundLengthAtMost(value: number): number | null {
 }
 
 /**
- * Rings at a round step of about `reach / count`, out to `reach` or just past it, plus `callout`
- * where it falls between the first ring and the last: the grid's own radii are round, and the one
- * radius that means something in its own right is marked whether the step lands on it or not. A
- * frame that does not reach it has no ring for it. Rounding the step down makes for `count` to
- * `ceil(2.5 × count)` rings, and the callout can add one: 5 to 14 for a count of 5.
+ * Rings across the span from `nearest` to `reach`, at a round step of about a `count`th of it,
+ * plus `callout` where it falls between the first ring and the last: the grid's own radii are
+ * round, and the one radius that means something in its own right is marked whether the step lands
+ * on it or not. A frame short of it by less than one step still gets it, since the last ring
+ * overshoots `reach`; one that stops well short does not.
+ *
+ * Two numbers rather than one because these rings are centred on a fixed point — the Sun — and a
+ * frame need not be. Looking at something 200 pc out from 20 pc away, what is on screen is a band
+ * 200 pc wide at its narrowest and nowhere near the Sun; a step sized to the whole 220 puts every
+ * ring off the frame. The span is what the frame covers, so the step is what it can resolve.
+ *
+ * Rounding the step down makes for `count` to `ceil(2.5 × count)` rings, and the callout can add
+ * one: 5 to 14 for a count of 5.
  */
-export function distanceRings(reach: number, count: number, callout: number): number[] {
-  const step = roundLengthAtMost(reach / count);
+export function distanceRings(nearest: number, reach: number, count: number, callout: number): number[] {
+  const step = roundLengthAtMost((reach - nearest) / count);
   if (step === null) {
     return [];
   }
+  // The ring just inside the near edge of the span, so the band is crossed rather than started at.
+  const first = Math.max(1, Math.floor(nearest / step));
+  const last = Math.ceil(reach / step);
   // `toPrecision` clears the binary noise of stepping by a tenth: 0.1 × 3 is 0.30000000000000004.
-  const radii = Array.from({ length: Math.ceil(reach / step) }, (_, index) => Number((step * (index + 1)).toPrecision(12)));
-  if (callout > step && callout < radii[radii.length - 1] && !radii.includes(callout)) {
+  const radii = Array.from({ length: last - first + 1 }, (_, index) => Number((step * (first + index)).toPrecision(12)));
+  if (callout > radii[0] && callout < radii[radii.length - 1] && !radii.includes(callout)) {
     radii.push(callout);
     radii.sort((a, b) => a - b);
   }

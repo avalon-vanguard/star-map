@@ -213,16 +213,31 @@ export function minimumRangeBetween(index: StarNeighbourhood, fromId: number, to
   return reachable;
 }
 
+/** How much of a graph to keep: the links nearest a point, up to a total length. */
+export interface LinkBudget {
+  /** Links are kept in order of how near their nearer end is to this point. */
+  readonly centre: { readonly x: number; readonly y: number; readonly z: number };
+  /** The most the kept links may add up to, end to end, in parsecs. */
+  readonly lengthPc: number;
+}
+
+/**
+ * How many distance bands a budgeted graph is split into to find where its budget runs out, so that
+ * only the links in that one band are sorted rather than all of them.
+ */
+const DISTANCE_BANDS = 4096;
+
 /**
  * Every link within `rangePc` between two of the stars `index` holds, each pair once, as vertex
- * pairs ready to draw: six floats a link, one end then the other.
+ * pairs ready to draw: six floats a link, one end then the other. With a `budget`, only the links
+ * nearest its centre, as many as fit its length.
  *
  * For drawing the graph, which is the only thing that wants all of it: routing asks for a star's
  * neighbours as it reaches that star and never builds this. Written straight into floats rather
  * than collected as link objects first, since at 8 pc the drawn stars alone have hundreds of
  * thousands of links, and the whole catalogue 3.7 million.
  */
-export function jumpLinkSegments(index: StarNeighbourhood, rangePc: number): Float32Array {
+export function jumpLinkSegments(index: StarNeighbourhood, rangePc: number, budget?: LinkBudget): Float32Array {
   let vertices = new Float32Array(6 * 4096);
   let length = 0;
   index.forEachPairWithin(rangePc, (a, b) => {
@@ -238,7 +253,71 @@ export function jumpLinkSegments(index: StarNeighbourhood, rangePc: number): Flo
     vertices[length++] = b.y;
     vertices[length++] = b.z;
   });
-  // Exact length rather than a view on the grown buffer: the answer is transferred whole, and a
-  // view would carry up to as much again in unused capacity with it.
-  return vertices.slice(0, length);
+  if (!budget) {
+    // Exact length rather than a view on the grown buffer: the answer is transferred whole, and a
+    // view would carry up to as much again in unused capacity with it.
+    return vertices.slice(0, length);
+  }
+
+  // Each link's nearer end's distance from the centre, and its length.
+  const { centre } = budget;
+  const count = length / 6;
+  const nearness = new Float32Array(count);
+  const lengths = new Float32Array(count);
+  let totalPc = 0;
+  let farthest = 0;
+  for (let link = 0; link < count; link++) {
+    const at = link * 6;
+    const ax = vertices[at] - centre.x;
+    const ay = vertices[at + 1] - centre.y;
+    const az = vertices[at + 2] - centre.z;
+    const bx = vertices[at + 3] - centre.x;
+    const by = vertices[at + 4] - centre.y;
+    const bz = vertices[at + 5] - centre.z;
+    nearness[link] = Math.sqrt(Math.min(ax * ax + ay * ay + az * az, bx * bx + by * by + bz * bz));
+    lengths[link] = Math.hypot(bx - ax, by - ay, bz - az);
+    totalPc += lengths[link];
+    farthest = Math.max(farthest, nearness[link]);
+  }
+  if (totalPc <= budget.lengthPc) {
+    return vertices.slice(0, length);
+  }
+
+  // Nearest first, without sorting them all: every link in the bands before the one where the budget
+  // runs out fits, and only that band's links are sorted to see how many of them do. Sorting all
+  // 730 000 links at 30 pc from the Sun to keep 4 400 doubled the time a graph took in the worker.
+  const bands = new Uint16Array(count);
+  const bandLengths = new Float64Array(DISTANCE_BANDS);
+  const bandsPerPc = farthest > 0 ? DISTANCE_BANDS / farthest : 0;
+  for (let link = 0; link < count; link++) {
+    bands[link] = Math.min(DISTANCE_BANDS - 1, Math.floor(nearness[link] * bandsPerPc));
+    bandLengths[bands[link]] += lengths[link];
+  }
+  let lastBand = 0;
+  let keptPc = 0;
+  while (keptPc + bandLengths[lastBand] <= budget.lengthPc) {
+    keptPc += bandLengths[lastBand++];
+  }
+  const keptLinks: number[] = [];
+  const boundary: number[] = [];
+  for (let link = 0; link < count; link++) {
+    const band = bands[link];
+    if (band < lastBand) {
+      keptLinks.push(link);
+    } else if (band === lastBand) {
+      boundary.push(link);
+    }
+  }
+  boundary.sort((a, b) => nearness[a] - nearness[b] || a - b);
+  for (const link of boundary) {
+    if (keptPc + lengths[link] > budget.lengthPc) {
+      break;
+    }
+    keptPc += lengths[link];
+    keptLinks.push(link);
+  }
+
+  const kept = new Float32Array(keptLinks.length * 6);
+  keptLinks.forEach((link, at) => kept.set(vertices.subarray(link * 6, link * 6 + 6), at * 6));
+  return kept;
 }

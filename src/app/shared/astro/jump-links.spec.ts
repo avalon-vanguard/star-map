@@ -168,6 +168,30 @@ function linksDrawn(segments: Float32Array, points: readonly StarPoint[]): strin
   return links;
 }
 
+/**
+ * What a budget should keep, worked out the slow way: every link sorted by how near its nearer end
+ * is to the centre, then taken until one does not fit. Lengths and distances as the float32 buffer
+ * holds them.
+ */
+function nearestFirst(points: readonly StarPoint[], rangePc: number, centre: { x: number; y: number; z: number }, lengthPc: number): string[] {
+  const all = jumpLinkSegments(index([...points]), rangePc);
+  const links = Array.from({ length: all.length / 6 }, (_, link) => {
+    const v = Array.from(all.subarray(link * 6, link * 6 + 6));
+    const nearer = Math.fround(Math.sqrt(Math.min((v[0] - centre.x) ** 2 + (v[1] - centre.y) ** 2 + (v[2] - centre.z) ** 2, (v[3] - centre.x) ** 2 + (v[4] - centre.y) ** 2 + (v[5] - centre.z) ** 2)));
+    return { link, nearer, length: Math.fround(Math.hypot(v[3] - v[0], v[4] - v[1], v[5] - v[2])), key: linksDrawn(all.subarray(link * 6, link * 6 + 6), points)[0] };
+  }).sort((a, b) => a.nearer - b.nearer || a.link - b.link);
+  const kept: string[] = [];
+  let total = 0;
+  for (const { length, key } of links) {
+    if (total + length > lengthPc) {
+      break;
+    }
+    total += length;
+    kept.push(key);
+  }
+  return kept;
+}
+
 /** Stars a parsec apart along x, as points, for reading a segment buffer back. */
 function chainPoints(count: number): StarPoint[] {
   return Array.from({ length: count }, (_, i) => ({ id: i, x: i, y: 0, z: 0 }));
@@ -189,6 +213,58 @@ describe('jumpLinkSegments', () => {
 
   it('draws nothing at no range', () => {
     expect(jumpLinkSegments(chain(4), 0)).toHaveLength(0);
+  });
+
+  it('keeps the links nearest the centre first, for as much length as the budget holds', () => {
+    // A parsec apart from 0 to 20, the centre at 10.3. By nearer end: 9-10 and 10-11 (0.3 away),
+    // then 11-12 (0.7), then 8-9 (1.3). Three parsecs of them fit in 3.5; a fourth would not.
+    const budget = { centre: { x: 10.3, y: 0, z: 0 }, lengthPc: 3.5 };
+
+    const segments = jumpLinkSegments(chain(21), 1.5, budget);
+
+    expect(linksDrawn(segments, chainPoints(21)).sort()).toEqual(['10-11', '11-12', '9-10']);
+    expect(segments.buffer.byteLength).toBe(segments.byteLength);
+  });
+
+  it('keeps exactly the links a full nearest-first sort would, without sorting them all', () => {
+    let seed = 7;
+    const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 40 - 20;
+    const points: StarPoint[] = Array.from({ length: 600 }, (_, id) => ({ id, x: random(), y: random(), z: random() }));
+    const centre = { x: 3, y: -2, z: 1 };
+
+    for (const lengthPc of [0, 5, 60, 900, 4000, 1e9]) {
+      expect(linksDrawn(jumpLinkSegments(index(points), 4, { centre, lengthPc }), points).sort()).toEqual(nearestFirst(points, 4, centre, lengthPc).sort());
+    }
+  });
+
+  it('sorts the distance band the budget runs out in, and stops at the first link there that does not fit', () => {
+    // One pair 4 kpc out makes each band about a parsec deep, so dozens of short links near the
+    // centre share the band the budget ends in, in whatever order the grid walks them.
+    let seed = 3;
+    const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+    const points: StarPoint[] = [{ id: 0, x: 4000, y: 0, z: 0 }, { id: 1, x: 4000.03, y: 0, z: 0 }];
+    for (let pair = 0; pair < 40; pair++) {
+      const r = 0.05 + random() * 0.9;
+      const theta = random() * Math.PI * 2;
+      const x = r * Math.cos(theta);
+      const y = r * Math.sin(theta);
+      points.push({ id: 2 + pair * 2, x, y, z: 0 }, { id: 3 + pair * 2, x, y, z: 0.005 + random() * 0.04 });
+    }
+    const centre = { x: 0, y: 0, z: 0 };
+
+    for (const lengthPc of [0.1, 0.3, 0.5]) {
+      expect(linksDrawn(jumpLinkSegments(index(points), 0.05, { centre, lengthPc }), points).sort()).toEqual(nearestFirst(points, 0.05, centre, lengthPc).sort());
+    }
+  });
+
+  it('counts the budget in parsecs of link, not in links', () => {
+    // Stars at 0, 1 and 3: a 2 pc link nearest the centre, then a 1 pc one. Two and a half parsecs
+    // hold the first and not both, though two links would fit a count of two and a half.
+    const points: StarPoint[] = [{ id: 0, x: 0, y: 0, z: 0 }, { id: 1, x: 1, y: 0, z: 0 }, { id: 2, x: 3, y: 0, z: 0 }];
+
+    const segments = jumpLinkSegments(index(points), 2.5, { centre: { x: 3, y: 0, z: 0 }, lengthPc: 2.5 });
+
+    expect(linksDrawn(segments, points)).toEqual(['1-2']);
   });
 
   it('grows past its first buffer without losing a link', () => {

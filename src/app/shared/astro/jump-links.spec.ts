@@ -94,7 +94,7 @@ describe('routeBetween', () => {
     expect(search.gaveUp).toBe(true);
   });
 
-  it('reports a dead end proved with the last star of the budget as a dead end, not a give-up', { timeout: 30_000 }, () => {
+  it('reports a dead end proved with the last star of the budget as a dead end, not a give-up', () => {
     // Exactly the budget's worth of stars reach each other, and the destination is not among them.
     // The search does look everywhere the range reaches, so "no chain" is what it found — but the
     // set is full at the end of it, and a budget read off the settled count says it gave up.
@@ -131,16 +131,18 @@ function knotAndChain(cellSizePc?: number): StarNeighbourhood {
 }
 
 /**
- * Exactly a search's budget of stars that reach one another — 39 999 through the 30 pc cube around
- * the origin, plus the departure — and one at 500 pc that nothing reaches. The dead end is real and
- * the search proves it, with the last star it is allowed.
+ * Exactly a search's budget of stars that reach one another — 40 000 a parsec apart along x, which
+ * a 1.5 pc range walks end to end — and one 500 pc off that line, which nothing reaches. The dead
+ * end is real and the search proves it, with the last star it is allowed.
+ *
+ * A line rather than a crowd because the count has to be exact: a random cloud dense enough to
+ * connect leaves clumps the departure never reaches, and 39 662 of 40 000 settled is a budget that
+ * was never spent.
  */
 const BUDGET_ISLAND = 99_999;
 function budgetExactly(): StarNeighbourhood {
-  let seed = 13;
-  const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 30 - 15;
-  const crowd: StarPoint[] = Array.from({ length: 39_999 }, (_, i) => ({ id: 1000 + i, x: random(), y: random(), z: random() }));
-  return new StarNeighbourhood([{ id: 0, x: 0, y: 0, z: 0 }, ...crowd, { id: BUDGET_ISLAND, x: 500, y: 0, z: 0 }], 1.5);
+  const line: StarPoint[] = Array.from({ length: 40_000 }, (_, i) => ({ id: i, x: i, y: 0, z: 0 }));
+  return new StarNeighbourhood([...line, { id: BUDGET_ISLAND, x: 0, y: 500, z: 0 }], 1.5);
 }
 
 /**

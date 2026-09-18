@@ -65,15 +65,21 @@ const MAX_VISITED = 40000;
 const RANGE_RESOLUTION_PC = 0.05;
 
 /**
- * How many of `minimumRangeBetween`'s probes may give up before it answers with what it has.
+ * How many of `minimumRangeBetween`'s probes may give up, once it has a range of its own, before it
+ * answers with what it has — and how many before it has one.
  *
  * A probe that finds a route is quick — it heads straight for the destination — while one that
  * gives up walks the whole search budget, about two seconds on the real catalogue. Those are also
  * the probes that buy the least: they cannot rule anything out. Two of them is the difference
  * between an answer of 7.96 pc in half a second and 5.76 pc in seventeen, for a star at 236 pc; it
  * lands on 5.97 pc in five.
+ *
+ * Until a probe succeeds there is nothing to answer with but the ceiling route's own longest hop,
+ * which is the control's maximum, so the bound is looser there — but a bound, since the search is
+ * one the panel waits on: five probes, ten seconds, rather than the resolution's own eight.
  */
 const MAX_RANGE_GIVE_UPS = 2;
+const MAX_UNEARNED_GIVE_UPS = 5;
 
 /** A binary min-heap of star ids by priority. Duplicates are allowed; stale ones are skipped on the way out. */
 class Frontier {
@@ -243,9 +249,10 @@ export function routeBetween(index: StarNeighbourhood, fromId: number, toId: num
  * nothing. It is still worth carrying on from — the ranges above it are the ones left to try — but
  * the result is no longer the least range, only a range that works, and `least` says which. The
  * number of steps that may give up is bounded for the same reason: each one walks the whole budget,
- * and 11 s of them for a star at 236 pc bought two decimal places nobody reads. Bounded, but not
- * before the bisection has found a range of its own: until then the only range it could offer is
- * the ceiling's, which is the control's maximum, for crossings that work well below it.
+ * and 11 s of them for a star at 236 pc bought two decimal places nobody reads. Bounded more
+ * loosely before the bisection has found a range of its own, since until then the only range it
+ * could offer is the ceiling's, which is the control's maximum, for crossings that work well below
+ * it. See {@link MAX_RANGE_GIVE_UPS}.
  */
 export function minimumRangeBetween(index: StarNeighbourhood, fromId: number, toId: number, ceilingPc: number): RangeSearch {
   const widest = routeBetween(index, fromId, toId, ceilingPc);
@@ -256,10 +263,11 @@ export function minimumRangeBetween(index: StarNeighbourhood, fromId: number, to
   let unreachable = 0;
   let reachable = ceilingHopPc;
   let giveUps = 0;
-  // The cap cannot fire while `reachable` is still the ceiling route's own longest hop: that is
-  // the question, not an answer the bisection earned, and offering it sends the control to its
-  // maximum for a crossing that works well below — 8.00 pc for a star that routes at 6.
-  while (reachable - unreachable > RANGE_RESOLUTION_PC && (giveUps < MAX_RANGE_GIVE_UPS || reachable === ceilingHopPc)) {
+  // While `reachable` is still the ceiling route's own longest hop the bisection has nothing of its
+  // own to answer with, and that figure sends the control to its maximum for a crossing that works
+  // well below — 8.00 pc for a star that routes at 6. So it is allowed more probes there, not
+  // unlimited ones: the panel is waiting on this.
+  while (reachable - unreachable > RANGE_RESOLUTION_PC && giveUps < (reachable === ceilingHopPc ? MAX_UNEARNED_GIVE_UPS : MAX_RANGE_GIVE_UPS)) {
     const range = (unreachable + reachable) / 2;
     const { route, gaveUp } = routeBetween(index, fromId, toId, range);
     if (route) {

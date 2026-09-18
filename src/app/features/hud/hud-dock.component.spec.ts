@@ -281,6 +281,21 @@ describe('HudDockComponent', () => {
 
     type('from', '');
     expect(plot().disabled).toBe(false);
+
+    // A space is not text that names a star: the field looks empty, the scene offers nothing to
+    // choose for it, and the button going dead would have nothing on screen to explain it.
+    type('from', ' ');
+    expect(plot().disabled).toBe(false);
+
+    // The offer beside a refusal is the same request by another route, so it is held to the same
+    // test: moving the range with nothing to plot leaves the panel contradicting itself.
+    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: 1.8, gaveUp: false });
+    fixture.detectChanges();
+    const offer = () => host().querySelector<HTMLButtonElement>('[data-testid="route-summary"] button')!;
+    expect(offer().disabled).toBe(false);
+
+    type('from', 'Sol');
+    expect(offer().disabled).toBe(true);
   });
 
   it('does not replay the acquire wipe over the Routes panel, whose entries survive the trip', () => {

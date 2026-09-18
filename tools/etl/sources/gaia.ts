@@ -38,9 +38,29 @@ const CATALOGUE_EPOCH = 2000.0;
  * past anything this map draws, so the limit here is a payload decision: the catalogue is baked
  * into a static asset that a browser downloads before the first frame.
  */
-const DISTANCE_CUTOFF_PC = Number(process.env['ETL_GAIA_DISTANCE_PC'] ?? 250);
-const MAGNITUDE_LIMIT = Number(process.env['ETL_GAIA_MAGNITUDE_LIMIT'] ?? 12);
-const ROW_LIMIT = Number(process.env['ETL_GAIA_ROW_LIMIT'] ?? 500000);
+const DEFAULT_DISTANCE_CUTOFF_PC = 250;
+const DEFAULT_MAGNITUDE_LIMIT = 12;
+const DEFAULT_ROW_LIMIT = 500_000;
+const DISTANCE_CUTOFF_PC = Number(process.env['ETL_GAIA_DISTANCE_PC'] ?? DEFAULT_DISTANCE_CUTOFF_PC);
+const MAGNITUDE_LIMIT = Number(process.env['ETL_GAIA_MAGNITUDE_LIMIT'] ?? DEFAULT_MAGNITUDE_LIMIT);
+const ROW_LIMIT = Number(process.env['ETL_GAIA_ROW_LIMIT'] ?? DEFAULT_ROW_LIMIT);
+
+/**
+ * How many rows the scheduled job's own query holds: 412 765, and DR3 is a finished data release,
+ * so that number only moves when the query does.
+ *
+ * Checked because a short answer looks exactly like a complete one. The TAP service truncates on
+ * its own timeout and still serves a well-formed CSV with a 200, and the rows are ordered by
+ * magnitude, so what comes back is the bright half — the half HYG overlaps. The merge gate in
+ * `build.ts` would then see Gaia stars present, fewer HYG survivors and fewer unmerged twins, and
+ * pass a catalogue missing two hundred thousand stars, which the weekly job would publish and the
+ * runner would cache for the weeks after it. Same failure, and same guard, as
+ * {@link MIN_USABLE_HIP_DISTANCES} below.
+ *
+ * Only checked for that query: the environment overrides exist to fetch a smaller slice on purpose.
+ */
+const DEFAULT_QUERY_ROWS = 412_765;
+const MIN_ROW_SHARE = 0.95;
 
 /**
  * Relative parallax error above which a star is dropped: a parallax measured to worse than 20%
@@ -92,6 +112,16 @@ export async function fetchGaiaStars(): Promise<StarRecord[]> {
   // response arrived, not what it answered.
   const csv = await fetchTextCached(url, `gaia-dr3-${createHash('sha1').update(url).digest('hex').slice(0, 8)}.csv`);
   const rows = parseCsvObjects(csv);
+  const jobsQuery = DISTANCE_CUTOFF_PC === DEFAULT_DISTANCE_CUTOFF_PC && MAGNITUDE_LIMIT === DEFAULT_MAGNITUDE_LIMIT && ROW_LIMIT === DEFAULT_ROW_LIMIT;
+  if (jobsQuery && rows.length < DEFAULT_QUERY_ROWS * MIN_ROW_SHARE) {
+    throw new Error(
+      `Gaia returned ${rows.length} rows, not the ~${DEFAULT_QUERY_ROWS} this query holds — the answer was cut short, ` +
+        'or was an error page served with a 200; delete tools/etl/.cache/gaia-dr3-*.csv once the archive answers properly'
+    );
+  }
+  if (rows.length >= ROW_LIMIT) {
+    throw new Error(`Gaia returned the query's own ${ROW_LIMIT}-row limit, so it is the limit deciding what the map holds; raise ETL_GAIA_ROW_LIMIT.`);
+  }
   const stars: StarRecord[] = [];
 
   rows.forEach((row, index) => {

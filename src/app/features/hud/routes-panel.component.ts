@@ -176,8 +176,12 @@ export class RoutesPanelComponent {
   private readonly chosen = signal<Record<Field, RouteStarOption | null>>({ from: null, to: null });
   private readonly typed = signal<Record<Field, string>>({ from: '', to: '' });
 
-  /** Departure falls back to wherever the view already is, so one field is usually enough. */
-  private readonly departure = computed(() => this.chosen().from ?? this.currentStar());
+  /**
+   * Departure falls back to wherever the view already is, so one field is usually enough — but only
+   * while the field is empty. Text left in it that names no chosen star used to fall back all the
+   * same, so the panel read "Sol" and the route left from whatever the view had since flown to.
+   */
+  private readonly departure = computed(() => this.chosen().from ?? (this.typed().from ? null : this.currentStar()));
 
   readonly canPlot = computed(() => this.departure() !== null && this.chosen().to !== null);
   readonly rangeLabel = computed(() => formatParsecs(this.rangePc()));

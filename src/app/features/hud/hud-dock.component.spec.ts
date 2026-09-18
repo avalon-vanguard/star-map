@@ -253,6 +253,50 @@ describe('HudDockComponent', () => {
     expect(tab('Readout').getAttribute('aria-selected')).toBe('true');
   });
 
+  it('will not plot from a departure that was typed but never chosen', () => {
+    setReadout();
+    fixture.componentRef.setInput('routing', true);
+    fixture.componentRef.setInput('currentStar', { id: 3, name: "Barnard's Star", subtitle: '1.8 pc' });
+    fixture.componentRef.setInput('routeOptions', [{ id: 7, name: 'Sirius', subtitle: '2.6 pc' }]);
+    fixture.componentRef.setInput('defaultTab', 'routes');
+    fixture.detectChanges();
+    const plot = () => [...host().querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('Plot route'))!;
+    const type = (field: string, value: string) => {
+      const input = host().querySelector<HTMLInputElement>(`#route-${field}`)!;
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    };
+
+    type('to', 'Sir');
+    host().querySelector<HTMLButtonElement>('#dock-panel-routes ul button')!.click();
+    fixture.detectChanges();
+    // With the departure field empty, the view's own star stands in for it.
+    expect(plot().disabled).toBe(false);
+
+    // Text that names no chosen star is not a departure: plotting from the view's star instead
+    // would name one place and leave from another.
+    type('from', 'Sol');
+    expect(plot().disabled).toBe(true);
+
+    type('from', '');
+    expect(plot().disabled).toBe(false);
+  });
+
+  it('does not replay the acquire wipe over the Routes panel, whose entries survive the trip', () => {
+    setReadout();
+    fixture.componentRef.setInput('routing', true);
+    fixture.componentRef.setInput('display', DEFAULT_HUD_DISPLAY);
+    fixture.componentRef.setInput('defaultTab', 'routes');
+    fixture.detectChanges();
+
+    // The wipe clips its panel for 380 ms, which swallows clicks on entries that are already there.
+    expect(host().querySelector('#dock-panel-routes')?.classList.contains('hud-acquire')).toBe(false);
+    tab('Display').click();
+    fixture.detectChanges();
+    expect(host().querySelector('#dock-panel-display')?.classList.contains('hud-acquire')).toBe(true);
+  });
+
   it('keeps what the Routes panel was set to across a trip to another tab', () => {
     setReadout();
     fixture.componentRef.setInput('routing', true);

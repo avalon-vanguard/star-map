@@ -406,6 +406,11 @@ export class StarFieldRenderer {
    * needed: each star is tested against the size it is actually drawn at, so the hit area matches
    * what the user sees at every zoom level instead of being over-permissive up close and
    * sub-pixel at the far end of the camera's range.
+   *
+   * Only stars on screen can be picked. The hit area is the drawn size plus a slop of
+   * {@link PICK_NDC_SLOP}, and near an edge that slop reaches past the frame: a click in the
+   * last few pixels of the view used to be able to fly into a system whose star was outside it,
+   * with nothing on screen to explain where it had gone.
    */
   pickAt(pointerNdc: THREE.Vector2, camera: SceneCamera, aspect: number): number | undefined {
     // What a unit of angular size is worth on screen. Under perspective the field of view sets

@@ -5,7 +5,6 @@ import { eclipticToEquatorial, OBLIQUITY_J2000_DEG } from '../../shared/astro/co
 import {
   bodyMarkerRadiusAu,
   DEFAULT_STAR_MARKER_RADIUS_AU,
-  starGlowExtentAu,
   starMarkerRadiusAu,
   systemFrameRadiusAu,
   systemFramingDistanceAu,
@@ -113,105 +112,6 @@ describe('systemFramingDistanceAu', () => {
   });
 });
 
-describe('starGlowExtentAu', () => {
-  /** A typical viewport, so a screen-space claim can be made in pixels rather than in ratios. */
-  const REFERENCE_VIEWPORT_HALF_HEIGHT_PX = 450;
-
-  /** The halo's visual radius, in AU, at the distance this system is framed from. */
-  function haloRadiusAu(innermostAu: number, outermostAu: number, glowScale = 1): number {
-    // The sprite's extent is its full width, so half of it is what reaches out from the star.
-    return starGlowExtentAu(starMarkerRadiusAu(innermostAu), frameRadiusFor(outermostAu), glowScale) / 2;
-  }
-
-  function frameRadiusFor(outermostAu: number): number {
-    const rings = systemGridRingsAu(outermostAu);
-    return systemFrameRadiusAu(systemFramingDistanceAu(rings[rings.length - 1]));
-  }
-
-  /** Apparent size on screen, as a fraction of the frame's half-height. */
-  function apparentFraction(innermostAu: number, outermostAu: number, glowScale = 1): number {
-    return haloRadiusAu(innermostAu, outermostAu, glowScale) / frameRadiusFor(outermostAu);
-  }
-
-  function apparentPixels(innermostAu: number, outermostAu: number): number {
-    return apparentFraction(innermostAu, outermostAu) * REFERENCE_VIEWPORT_HALF_HEIGHT_PX;
-  }
-
-  it('scales with the star for a compact system, where the star is already big enough', () => {
-    // A tight frame relative to the star, so the star's own multiple is what decides.
-    const marker = 0.02;
-    const tightFrame = 0.5;
-    expect(starGlowExtentAu(marker, tightFrame)).toBeCloseTo(marker * 3.2, 9);
-    expect(starGlowExtentAu(marker * 2, tightFrame)).toBeCloseTo(marker * 2 * 3.2, 9);
-  });
-
-  it('floors against the frame once the star would otherwise vanish into it', () => {
-    // A star sized against a close-in orbit, framed from far enough out to hold a wide system:
-    // the multiple of the star is nothing, so the frame decides instead.
-    const tinyStar = 0.001;
-    const wideFrame = 56;
-    expect(starGlowExtentAu(tinyStar, wideFrame)).toBeGreaterThan(tinyStar * 3.2 * 100);
-  });
-
-  it('keeps the Sun visible at the distance that frames the solar system', () => {
-    // The case that prompted this: the solar system spans a factor of a hundred from Mercury to
-    // Pluto, so a disc that stays clear of Mercury is about a pixel across once Pluto is in view.
-    expect(apparentPixels(0.387, 39.288)).toBeGreaterThan(4);
-  });
-
-  it('leaves the inner orbits clear of the halo', () => {
-    // The other half of the same trade. Venus and Earth have to stay legible as rings around the
-    // star, which bounds the halo from above just as visibility bounds it from below.
-    const halo = haloRadiusAu(0.387, 39.288);
-    const VENUS_AU = 0.723;
-    const EARTH_AU = 1;
-    expect(halo).toBeLessThan(VENUS_AU);
-    expect(halo).toBeLessThan(EARTH_AU);
-  });
-
-  it('cannot clear Mercury as well, and does not pretend to', () => {
-    // Mercury's orbit is 0.7% of the framed radius — about three pixels — so it is inside any
-    // halo big enough to see. Pinned so the trade is a decision rather than an oversight.
-    expect(haloRadiusAu(0.387, 39.288)).toBeGreaterThan(0.387);
-  });
-
-  it('holds the floor across every system scale the datasets contain', () => {
-    // A compact system's star is genuinely large relative to its own system and keeps the bigger
-    // halo; the floor is not there to equalise them, only to stop the wide ones disappearing.
-    for (const [innermost, outermost] of [
-      [0.387, 39.288],
-      [0.035, 0.204],
-      [0.01154, 0.06189],
-      [1.2, 12.4]
-    ]) {
-      expect(apparentPixels(innermost, outermost)).toBeGreaterThan(4);
-    }
-  });
-
-  it('does not blot out the system it sits in', () => {
-    for (const [innermost, outermost] of [
-      [0.387, 39.288],
-      [0.035, 0.204],
-      [0.01154, 0.06189]
-    ]) {
-      expect(apparentFraction(innermost, outermost)).toBeLessThan(0.2);
-    }
-  });
-
-  it('dims for a star drawn from a colour rather than a photograph, but never below the floor', () => {
-    // Above the floor the multiplier applies...
-    expect(starGlowExtentAu(1, 10, 0.6)).toBeLessThan(starGlowExtentAu(1, 10, 1));
-    // ...and at the floor it cannot dim a star into invisibility.
-    expect(starGlowExtentAu(0.001, 56, 0.6)).toBe(starGlowExtentAu(0.001, 56, 1));
-  });
-
-  it('falls back to the star alone when there is no frame to measure against', () => {
-    for (const frame of [0, -1, Number.NaN]) {
-      expect(starGlowExtentAu(0.2, frame)).toBeCloseTo(0.2 * 3.2, 9);
-    }
-  });
-});
-
 describe('the grid and the framing together', () => {
   /** What the scene actually composes: rings from the orbits, then a distance from the rings. */
   function fit(outermostOrbitAu: number, viewport?: SystemViewport): { ring: number; frame: number } {
@@ -278,53 +178,40 @@ describe('star and framing together', () => {
 
 describe('bodyMarkerRadiusAu', () => {
   const EARTH_RADIUS_KM = 6371;
-  const SOLAR_SPAN_AU = 30.07;
+  const KM_PER_AU = 149597870.7;
 
-  it('scales in proportion to the system span', () => {
-    const wide = bodyMarkerRadiusAu(EARTH_RADIUS_KM, SOLAR_SPAN_AU);
-    const compact = bodyMarkerRadiusAu(EARTH_RADIUS_KM, SOLAR_SPAN_AU / 100);
-
-    expect(compact / wide).toBeCloseTo(0.01, 6);
+  it('draws a body at its true size', () => {
+    expect(bodyMarkerRadiusAu(EARTH_RADIUS_KM)).toBeCloseTo(EARTH_RADIUS_KM / KM_PER_AU, 12);
+    expect(bodyMarkerRadiusAu(696340)).toBeCloseTo(0.00465, 5); // the Sun
   });
 
-  it('keeps a marker far smaller than the orbits it sits on, at any scale', () => {
-    // A fixed 0.09 AU marker inside Gl 357's 0.204 AU system was wider than the orbits, so one
-    // planet swallowed the whole view.
-    for (const span of [0.06, 0.204, 1, 30.07, 800]) {
-      expect(bodyMarkerRadiusAu(EARTH_RADIUS_KM, span)).toBeLessThan(span / 5);
-    }
+  it('keeps a moon smaller than its planet and outside it, which the exaggeration did not', () => {
+    // Jupiter and Ganymede both ran past the old 0.09 AU ceiling and came out one size, so
+    // Ganymede orbited inside Jupiter; Phobos and Triton sat entirely within Mars and Neptune.
+    const jupiter = bodyMarkerRadiusAu(69911);
+    const ganymede = bodyMarkerRadiusAu(2634);
+    const callisto = bodyMarkerRadiusAu(2410);
+    const GANYMEDE_SEMI_MAJOR_AXIS_AU = 0.007155;
+
+    expect(ganymede).toBeLessThan(jupiter);
+    expect(callisto).toBeLessThan(ganymede);
+    expect(jupiter + ganymede).toBeLessThan(GANYMEDE_SEMI_MAJOR_AXIS_AU);
   });
 
-  it('gives compact and wide systems the same apparent marker size', () => {
-    const apparent = (span: number) => bodyMarkerRadiusAu(EARTH_RADIUS_KM, span) / systemFramingDistanceAu(span);
+  it('keeps Phobos outside Mars, where a marker scaled to the system buried it', () => {
+    const PHOBOS_SEMI_MAJOR_AXIS_AU = 0.00006268;
 
-    expect(apparent(0.204)).toBeCloseTo(apparent(10), 6);
+    expect(bodyMarkerRadiusAu(3390) + bodyMarkerRadiusAu(11.27)).toBeLessThan(PHOBOS_SEMI_MAJOR_AXIS_AU);
   });
 
   it('still renders a bigger body as a bigger marker', () => {
-    const jupiter = bodyMarkerRadiusAu(69911, SOLAR_SPAN_AU);
-    const pluto = bodyMarkerRadiusAu(1188, SOLAR_SPAN_AU);
-
-    expect(jupiter).toBeGreaterThan(pluto);
+    expect(bodyMarkerRadiusAu(69911)).toBeGreaterThan(bodyMarkerRadiusAu(1188));
   });
 
-  it('falls back to the smallest marker for a body with no known radius', () => {
-    const unknown = bodyMarkerRadiusAu(undefined, SOLAR_SPAN_AU);
-    const pluto = bodyMarkerRadiusAu(1188, SOLAR_SPAN_AU);
-
-    expect(unknown).toBeGreaterThan(0);
-    expect(unknown).toBeLessThanOrEqual(pluto);
-  });
-
-  it('treats a missing span as the reference scale rather than collapsing to zero', () => {
-    for (const span of [0, -5, Number.NaN]) {
-      expect(bodyMarkerRadiusAu(EARTH_RADIUS_KM, span)).toBeGreaterThan(0);
+  it('falls back to an Earth for a body with no published radius', () => {
+    for (const nothing of [undefined, 0, -1]) {
+      expect(bodyMarkerRadiusAu(nothing as number | undefined)).toBeCloseTo(EARTH_RADIUS_KM / KM_PER_AU, 12);
     }
-  });
-
-  it('leaves the solar system essentially as it was before scaling', () => {
-    // The constants were tuned at this span, so the scale factor here is ~1.
-    expect(bodyMarkerRadiusAu(EARTH_RADIUS_KM, SOLAR_SPAN_AU)).toBeCloseTo(0.09, 2);
   });
 });
 

@@ -18,6 +18,8 @@ export interface SystemMember {
   id: string;
   kind: SystemMemberKind;
   marker: THREE.Object3D;
+  /** For a moon, the id of the body it orbits: what its drawn size is held against. */
+  parentId?: string;
 }
 
 const PLANET_COLOR = new THREE.Color(0.55, 0.75, 1.0);
@@ -126,8 +128,8 @@ function buildOrbitLine(elements: OrbitalElements, kind: SystemMemberKind, frame
  * The texture is tiny (see `MARKER_TEXTURE_WIDTH`): a marker is a few pixels across, so what
  * survives is essentially its average colour, and generating it costs well under a millisecond.
  */
-function buildMarker(kind: SystemMemberKind, radiusKm: number | undefined, systemSpanAu: number, appearance: PlanetAppearance | undefined): THREE.Mesh {
-  const geometry = new THREE.SphereGeometry(bodyMarkerRadiusAu(radiusKm, systemSpanAu), 16, 12);
+function buildMarker(kind: SystemMemberKind, radiusKm: number | undefined, appearance: PlanetAppearance | undefined): THREE.Mesh {
+  const geometry = new THREE.SphereGeometry(bodyMarkerRadiusAu(radiusKm), 16, 12);
   const material = appearance
     ? new THREE.MeshBasicMaterial({ map: planetTexture(appearance, { width: MARKER_TEXTURE_WIDTH, height: MARKER_TEXTURE_HEIGHT }) })
     : new THREE.MeshBasicMaterial({ color: colorForKind(kind) });
@@ -241,7 +243,7 @@ export class SystemOrbitsRenderer {
         continue; // orphaned moon reference; skip rather than crash.
       }
       const moon = this.addMoon(body.id, body.orbit, gmForParent(body.parentBodyId), body.radiusKm, parentTracked, ECLIPTIC_FRAME, appearanceForBody(body, bodies, hostLuminositySolar));
-      members.push({ id: body.id, kind: 'moon', marker: moon.marker });
+      members.push({ id: body.id, kind: 'moon', marker: moon.marker, parentId: parent.id });
     }
 
     // Every exoplanet in a system shares the same line of sight, so the frame is built once.
@@ -374,7 +376,7 @@ export class SystemOrbitsRenderer {
     appearance?: PlanetAppearance
   ): TrackedTopLevelBody {
     const orbitLine = buildOrbitLine(elements, kind, frame);
-    const marker = buildMarker(kind, radiusKm, this.maxTopLevelSemiMajorAxisAu, appearance);
+    const marker = buildMarker(kind, radiusKm, appearance);
     this.object.add(orbitLine, marker);
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);
     this.trackDisposable(marker.geometry, marker.material as THREE.Material);
@@ -395,7 +397,9 @@ export class SystemOrbitsRenderer {
   ): TrackedMoon {
     const pivot = new THREE.Group();
     const orbitLine = buildOrbitLine(elements, 'moon', frame);
-    const marker = buildMarker('moon', radiusKm, this.maxTopLevelSemiMajorAxisAu, appearance);
+    // A moon's own orbit is the thing it must not swallow: drawn at the system's exaggeration it
+    // is the same size as its planet, and every moon here orbits inside one.
+    const marker = buildMarker('moon', radiusKm, appearance);
     pivot.add(orbitLine, marker);
     this.object.add(pivot);
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);

@@ -28,31 +28,6 @@ export const DEFAULT_STAR_MARKER_RADIUS_AU = 0.2;
 const STAR_RADIUS_TO_INNERMOST_ORBIT = 0.45;
 
 /**
- * Halo extent as a multiple of the star's own radius, and the floor on that extent as a
- * fraction of the framed radius.
- *
- * The floor is what keeps a star visible. A system's star is sized against its *innermost*
- * orbit — it must never swallow its closest planet — while the camera is placed to frame the
- * *outermost* ring, and those differ by a factor of a hundred in the solar system. At the
- * distance that fits Pluto in view, a disc that stays clear of Mercury is about one pixel
- * across; there is no radius that satisfies both, because the information genuinely does not
- * fit on one screen at that zoom.
- *
- * The halo resolves it, because light is not a surface: a glow that reaches past the innermost
- * orbit does not claim the star is that large, it claims the star is bright. So the disc stays
- * honest to the orbits and the halo is floored against the frame.
- *
- * The floor is set by what it must not cover. Its visual radius is half the extent, so a floor
- * of `f` puts the halo's edge at `f / 2` of the frame radius — and the orbits it has to leave
- * legible sit at their own fraction of that same radius. In the solar system, framed to hold
- * Pluto, Venus's orbit is at 1.3% of the frame radius and Earth's at 1.8%, so a floor of 2%
- * leaves both of them outside the halo. Mercury's, at 0.7%, is inside it — and would be at any
- * halo large enough to see, since the orbit itself is only a few pixels wide there.
- */
-const STAR_GLOW_TO_MARKER = 3.2;
-const MIN_STAR_GLOW_TO_FRAME = 0.02;
-
-/**
  * Clear space left around the framed radius, as a fraction of it. The camera backs off this
  * much further than the geometry strictly needs, so the outermost ring sits inside the frame
  * with room around it rather than grazing the edge.
@@ -151,20 +126,6 @@ export function systemFrameRadiusAu(distanceAu: number, viewport: SystemViewport
 }
 
 /**
- * Extent (AU) of the star's glow sprite — how wide it is drawn, not its radius.
- *
- * Normally a multiple of the star's own radius, so a compact system keeps the corona it has.
- * Floored against the framed radius, so a star framed from far enough out to hold its whole
- * system still reads as a bright point rather than disappearing into it. `glowScale` lets a
- * caller dim the halo for stars drawn without a real photograph.
- */
-export function starGlowExtentAu(markerRadiusAu: number, frameRadiusAu: number, glowScale = 1): number {
-  const fromStar = markerRadiusAu * STAR_GLOW_TO_MARKER * glowScale;
-  const fromFrame = Number.isFinite(frameRadiusAu) && frameRadiusAu > 0 ? frameRadiusAu * MIN_STAR_GLOW_TO_FRAME : 0;
-  return Math.max(fromStar, fromFrame);
-}
-
-/**
  * Distance (AU) to settle the camera at so that `framedRadiusAu` fits in view with a margin
  * around it.
  *
@@ -223,32 +184,35 @@ export function systemGridRingsAu(outermostOrbitAu: number): number[] {
 }
 
 /**
- * Span of the solar system, in AU, used as the reference every other system's marker sizes are
- * scaled against. The marker constants below were tuned by eye at this scale.
+ * A body is drawn at its true size. Astronomical Unit in kilometres, and what a body with no
+ * published radius is drawn as — Earth, which is the middle of the range for the exoplanets that
+ * reach here without one.
  */
-const REFERENCE_SYSTEM_SPAN_AU = 30;
-
-/** Exaggerated (non-physical) marker sizes at the reference scale, so planets stay visible. */
-const MIN_MARKER_RADIUS_AU = 0.012;
-const MAX_MARKER_RADIUS_AU = 0.09;
-/** Physical radius (km) that maps to one AU of marker radius before clamping. */
-const MARKER_RADIUS_KM_PER_AU = 18000;
+const KM_PER_AU = 149597870.7;
+const DEFAULT_BODY_RADIUS_KM = 6371;
 
 /**
- * Radius (AU) to draw a planet, moon or exoplanet marker at, scaled to the system it sits in.
+ * The Sun's own radius, in AU — the one star whose size this map knows.
  *
- * Marker sizes are deliberately exaggerated — a true-scale Earth would be invisible next to its
- * own orbit — but the exaggeration has to be relative to the system, not absolute. Fixed AU
- * sizes tuned against the solar system's 30 AU span become grotesque in a system a hundredth
- * that size: a marker of 0.09 AU inside a 0.2 AU system is wider than the orbits it sits on, so
- * a single planet swallows the entire view.
- *
- * Scaling by the span keeps every system looking like the solar system does: orbits legible,
- * planets as small dots on them.
+ * Every other star is drawn at {@link starMarkerRadiusAu}, a size derived from its innermost
+ * orbit rather than measured, because no stellar radius reaches the app: the catalogue carries
+ * positions, magnitudes and colours. Gaia publishes `radius_gspphot` for most of what is drawn
+ * here, and until the ETL fetches it, a system's star is the one body in the view that is not
+ * to scale.
  */
-export function bodyMarkerRadiusAu(radiusKm: number | undefined, systemSpanAu: number): number {
-  const span = Number.isFinite(systemSpanAu) && systemSpanAu > 0 ? systemSpanAu : REFERENCE_SYSTEM_SPAN_AU;
-  const atReferenceScale = radiusKm ? clamp(radiusKm / MARKER_RADIUS_KM_PER_AU, MIN_MARKER_RADIUS_AU, MAX_MARKER_RADIUS_AU) : MIN_MARKER_RADIUS_AU;
+export const SUN_RADIUS_AU = 696340 / KM_PER_AU;
 
-  return atReferenceScale * (span / REFERENCE_SYSTEM_SPAN_AU);
+/**
+ * Radius (AU) to draw a planet, moon or exoplanet marker at: its own, unexaggerated.
+ *
+ * Sizes used to be exaggerated and scaled to the system span, which is what made a moon the size
+ * of its planet — Jupiter and Ganymede both ran past the ceiling and were drawn at one radius, so
+ * every moon orbited inside its parent. True scale needs no rule to prevent that: physics already
+ * puts a moon outside the planet it orbits, and the Sun at a hundredth of Mercury’s orbit.
+ *
+ * What true scale costs is visibility at the framing that holds a whole system, where every body
+ * is sub-pixel. That is paid for on screen instead, in pixels, by the scene's `keepMarkersLegible`.
+ */
+export function bodyMarkerRadiusAu(radiusKm: number | undefined): number {
+  return (radiusKm && radiusKm > 0 ? radiusKm : DEFAULT_BODY_RADIUS_KM) / KM_PER_AU;
 }

@@ -16,7 +16,7 @@ import { EngineService, SceneCamera } from '../../core/engine/engine.service';
 import { BodyRecord } from '../../shared/models/body.model';
 import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
-import { applyMilkyWaySkybox, createGlowSprite } from '../../shared/rendering/skybox';
+import { applyMilkyWaySkybox } from '../../shared/rendering/skybox';
 import { loadCachedTexture, MILKY_WAY_SKYBOX_PATH, SUN_TEXTURE_PATH } from '../../shared/rendering/texture-catalog';
 import { isDesignation } from '../../shared/models/star-catalog';
 import { StarRecord } from '../../shared/models/star.model';
@@ -26,7 +26,7 @@ import { CameraRigController } from './camera-rig-controller';
 import { DeepSkyRenderer } from './deep-sky-renderer';
 import { galacticNormal, PolarGridPlane, TetherField } from './grid-plane';
 import { MilkyWayRenderer } from './milky-way-renderer';
-import { starGlowExtentAu, starMarkerRadiusAu, systemFrameRadiusAu, systemFramingDistanceAu, systemViewDirection } from './system-framing';
+import { starMarkerRadiusAu, SUN_RADIUS_AU, systemFrameRadiusAu, systemFramingDistanceAu, systemViewDirection } from './system-framing';
 import { formatAu, formatLuminosity, formatParsecs } from '../../shared/format/quantity';
 import { distanceRings, formatRoundLength, scaleBar, type LengthUnit, type ScaleBar } from '../../shared/format/scale-bar';
 import { BodyDetailViewModel } from '../body-detail/body-detail.model';
@@ -50,8 +50,8 @@ import { SystemOrbitsRenderer } from './system-orbits-renderer';
 
 /** HYG catalog id for the Sun itself — the only star we have a real close-up photo of. */
 const SOL_STAR_ID = 0;
-/** Stars drawn from a colour rather than a photograph get a more restrained halo. */
-const DIM_STAR_GLOW_SCALE = 0.6;
+/** Radius, in CSS pixels, below which a body in the system view is scaled up to be seen at all. */
+const MIN_MARKER_PIXELS = 3;
 
 /**
  * How far from what the camera is looking at a star can be and still be named, as a fraction of
@@ -465,7 +465,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private currentStarId: number | null = null;
   private systemRenderer?: SystemOrbitsRenderer;
   private starMarker?: THREE.Mesh;
-  private starGlow?: THREE.Sprite;
 
   constructor(
     private readonly engine: EngineService,
@@ -513,7 +512,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.labelOverlay?.dispose();
     this.systemRenderer?.dispose();
     (this.starMarker?.material as THREE.Material | undefined)?.dispose();
-    (this.starGlow?.material as THREE.SpriteMaterial | undefined)?.dispose();
     this.starMarkerGeometry?.dispose();
     this.starMarkerMaterial.dispose();
     this.engine.dispose();
@@ -704,10 +702,56 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     if (this.systemGroup.visible) {
       this.systemRenderer?.update(dateToJulianDate());
+      this.keepMarkersLegible(camera);
     }
     this.updateSelectionMark(camera);
     this.updateNeighbourRing(camera);
     this.labelOverlay?.render(camera);
+  }
+
+  /**
+   * Holds every body in the system view to a minimum size on screen, by scaling the markers that
+   * would otherwise be smaller than {@link MIN_MARKER_PIXELS}.
+   *
+   * A system is framed to hold its outermost orbit, and at that distance the bodies on the inner
+   * ones are sub-pixel: at the solar system's arrival distance Jupiter projects to about a pixel
+   * and Earth to less, so the labels and the selection arcs point at nothing. The halo used to
+   * cover the star's half of this — a light that reached past the innermost orbit, claiming
+   * brightness rather than size — but it covered the star only, and at a fixed extent that filled
+   * the screen once the camera closed in.
+   *
+   * Sizing in pixels instead keeps the exaggeration where it is needed and takes it away where it
+   * is not: a body whose true radius already spans more than the floor is drawn at that radius, so
+   * zooming in walks back to the real proportions rather than away from them.
+   */
+  private keepMarkersLegible(camera: SceneCamera): void {
+    const heightPx = this.canvasRef().nativeElement.clientHeight;
+    if (!this.systemRenderer || heightPx === 0) {
+      return;
+    }
+    const world = new THREE.Vector3();
+    const drawnRadiusAu = new Map<string, number>();
+    const radiusOf = (marker: THREE.Object3D): number | undefined => ((marker as THREE.Mesh).geometry as THREE.SphereGeometry | undefined)?.parameters?.radius;
+    const floorFor = (marker: THREE.Object3D): number => {
+      marker.getWorldPosition(world);
+      return MIN_MARKER_PIXELS * ((2 * this.engine.visibleHalfHeight(camera.position.distanceTo(world))) / heightPx);
+    };
+
+    // Parents first: a moon's ceiling is its planet's drawn radius, which has to be known by then.
+    const members = [...this.systemRenderer.members].sort((a, b) => Number(a.kind === 'moon') - Number(b.kind === 'moon'));
+    for (const { id, marker, parentId } of this.starMarker ? [...members, { id: 'star', marker: this.starMarker, parentId: undefined }] : members) {
+      const radiusAu = radiusOf(marker);
+      if (!radiusAu) {
+        continue;
+      }
+      // Lifted to the floor, but never past half of what it orbits: at the arrival framing every
+      // body is sub-pixel, and floored on its own a moon comes out the size of its planet and
+      // sitting on top of it — which is the thing true scale was adopted to stop.
+      const ceiling = parentId !== undefined ? (drawnRadiusAu.get(parentId) ?? Number.POSITIVE_INFINITY) / 2 : Number.POSITIVE_INFINITY;
+      const drawn = Math.min(Math.max(radiusAu, floorFor(marker)), Math.max(radiusAu, ceiling));
+      drawnRadiusAu.set(id, drawn);
+      marker.scale.setScalar(drawn / radiusAu);
+    }
   }
 
   /**
@@ -1811,11 +1855,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       this.systemGroup.remove(this.starMarker);
       (this.starMarker.material as THREE.Material).dispose();
     }
-    if (this.starGlow) {
-      this.systemGroup.remove(this.starGlow);
-      (this.starGlow.material as THREE.SpriteMaterial).dispose();
-      this.starGlow = undefined;
-    }
 
     const systemBodies = this.bodies.filter((body) => body.systemStarId === star.id);
     const systemExoplanets = this.exoplanets.filter((exoplanet) => exoplanet.hostStarId === star.id);
@@ -1838,10 +1877,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const framingCamera = this.engine.getPerspectiveCamera();
     const viewport = { fovDegrees: framingCamera.fov, aspect: framingCamera.aspect };
     const framingDistance = systemFramingDistanceAu(this.systemRenderer.gridOuterRadiusAu, viewport);
-    const frameRadiusAu = systemFrameRadiusAu(framingDistance, viewport);
 
-    // Sized against this system's innermost orbit, so the star never swallows its own planets.
-    const starRadiusAu = starMarkerRadiusAu(this.systemRenderer.minTopLevelSemiMajorAxisAu);
+    // The Sun at its own radius; every other star sized against its innermost orbit, which is all
+    // the catalogue supports, and which at least never lets it swallow its own planets.
+    const starRadiusAu = star.id === SOL_STAR_ID ? SUN_RADIUS_AU : starMarkerRadiusAu(this.systemRenderer.minTopLevelSemiMajorAxisAu);
     this.starMarkerGeometry?.dispose();
     this.starMarkerGeometry = new THREE.SphereGeometry(starRadiusAu, 24, 16);
 
@@ -1852,13 +1891,14 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       // other point in the galaxy view is far too distant to be resolved as a disk.
       starMarkerMaterial.map = loadCachedTexture(SUN_TEXTURE_PATH);
       starMarkerMaterial.color.set(0xffffff);
-      this.starGlow = createGlowSprite(0xfff2c0, starGlowExtentAu(starRadiusAu, frameRadiusAu));
     } else {
       starMarkerMaterial.color.copy(starColor);
-      this.starGlow = createGlowSprite(starColor, starGlowExtentAu(starRadiusAu, frameRadiusAu, DIM_STAR_GLOW_SCALE));
     }
+    // No halo. It was a sprite sized against the arrival frame — 1.12 AU for the Sun — so it
+    // stayed put as the camera closed in and ended up filling the screen with the flat gradient
+    // that was meant to dress the star, over the photograph underneath it.
     this.starMarker = new THREE.Mesh(this.starMarkerGeometry, starMarkerMaterial);
-    this.systemGroup.add(this.starMarker, this.starGlow);
+    this.systemGroup.add(this.starMarker);
 
     this.galaxyGroup.visible = false;
     this.systemGroup.visible = true;

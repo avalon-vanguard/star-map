@@ -372,3 +372,58 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
     });
   });
 });
+
+describe('rotation', () => {
+  /** Earth, near enough: a day of 23.934 h, tipped 23.44 degrees off its orbit. */
+  function spinning(overrides: Partial<BodyRecord> = {}): BodyRecord {
+    return {
+      id: 'earth',
+      systemStarId: 0,
+      name: 'Earth',
+      kind: 'planet',
+      radiusKm: 6371,
+      orbit: { semiMajorAxisAu: 1, eccentricity: 0.0167, inclinationDeg: 0, longitudeOfAscendingNodeDeg: 0, argumentOfPeriapsisDeg: 0, meanAnomalyAtEpochDeg: 0, epochJd: DEFAULT_EPOCH_JD },
+      rotationPeriodHours: 23.934,
+      obliquityDeg: 23.4392911,
+      ...overrides
+    };
+  }
+
+  /** How far the marker has turned about its own axis between two dates, in degrees. */
+  function turnedDegrees(body: BodyRecord, afterDays: number): number {
+    const renderer = new SystemOrbitsRenderer([body], [], undefined, 1);
+    renderer.update(DEFAULT_EPOCH_JD);
+    const start = renderer.members[0].marker.quaternion.clone();
+    renderer.update(DEFAULT_EPOCH_JD + afterDays);
+    const turn = start.invert().multiply(renderer.members[0].marker.quaternion);
+    const axis = new THREE.Vector3();
+    const angle = 2 * Math.acos(Math.min(1, Math.abs(turn.w)));
+    turn.normalize();
+    axis.set(turn.x, turn.y, turn.z);
+    const signed = axis.y >= 0 ? angle : -angle;
+    return (signed * 180) / Math.PI;
+  }
+
+  it('turns a body once per its own sidereal day', () => {
+    // A full turn in 23.934 h, so a quarter of that is a quarter turn.
+    expect(Math.abs(turnedDegrees(spinning(), 23.934 / 96))).toBeCloseTo(90, 1);
+  });
+
+  it('turns a retrograde body the other way', () => {
+    // Venus: its day runs backwards, which the catalogue carries as a negative period.
+    const forward = turnedDegrees(spinning(), 23.934 / 96);
+    const backward = turnedDegrees(spinning({ rotationPeriodHours: -23.934 }), 23.934 / 96);
+
+    expect(Math.sign(backward)).toBe(-Math.sign(forward));
+  });
+
+  it('leaves a body with no published rotation still', () => {
+    // Titan: Horizons states no period for it, and an invented one would be a claim.
+    const renderer = new SystemOrbitsRenderer([spinning({ rotationPeriodHours: undefined })], [], undefined, 1);
+    renderer.update(DEFAULT_EPOCH_JD);
+    const start = renderer.members[0].marker.quaternion.clone();
+    renderer.update(DEFAULT_EPOCH_JD + 40);
+
+    expect(renderer.members[0].marker.quaternion.angleTo(start)).toBe(0);
+  });
+});

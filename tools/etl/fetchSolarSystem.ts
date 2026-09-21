@@ -1,9 +1,13 @@
 import { writeFileSync } from 'node:fs';
 
 import { BodyRecord } from '../../src/app/shared/models/body.model';
+import { gmForParent } from '../../src/app/shared/astro/constants';
+import { orbitalPeriodDays } from '../../src/app/shared/astro/kepler';
 import { SUN_STAR_ID } from '../../src/app/shared/models/star.model';
 import { fetchHorizonsBody } from './lib/horizons';
 import { dataPath, ensureDataDir } from './lib/paths';
+
+const HOURS_PER_DAY = 24;
 
 interface BodySpec {
   id: string;
@@ -56,6 +60,15 @@ export async function fetchSolarSystem(): Promise<BodyRecord[]> {
       console.warn(`  no physical radius found for ${spec.name}; defaulting to 0.`);
     }
 
+    // A tidally locked moon's day is its orbit, which Horizons states as a word rather than a
+    // number: Kepler gives the period from the elements just parsed and the parent it goes round.
+    const rotationPeriodHours = result.tidallyLocked
+      ? orbitalPeriodDays(result.orbit.semiMajorAxisAu, gmForParent(spec.parentBodyId)) * HOURS_PER_DAY
+      : result.rotationPeriodHours;
+    if (rotationPeriodHours === undefined) {
+      console.warn(`  no rotation period found for ${spec.name}; it will not turn.`);
+    }
+
     bodies.push({
       id: spec.id,
       systemStarId: SUN_STAR_ID,
@@ -63,7 +76,9 @@ export async function fetchSolarSystem(): Promise<BodyRecord[]> {
       kind: spec.kind,
       radiusKm: result.radiusKm ?? 0,
       orbit: result.orbit,
-      ...(spec.parentBodyId ? { parentBodyId: spec.parentBodyId } : {})
+      ...(spec.parentBodyId ? { parentBodyId: spec.parentBodyId } : {}),
+      ...(rotationPeriodHours !== undefined ? { rotationPeriodHours } : {}),
+      ...(result.obliquityDeg !== undefined ? { obliquityDeg: result.obliquityDeg } : {})
     });
   }
 

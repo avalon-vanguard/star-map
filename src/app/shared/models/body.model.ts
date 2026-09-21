@@ -29,4 +29,13 @@ export interface BodyRecord {
    * relative to that planet, not heliocentrically. Undefined for planets/dwarfs.
    */
   parentBodyId?: string;
+  /**
+   * How the body turns on its own axis: the sidereal rotation period in hours, negative where it
+   * turns retrograde (Venus, Triton), and the tilt of that axis from its orbital plane.
+   *
+   * Absent where Horizons publishes neither — the view then leaves the body still rather than
+   * spinning it at an invented rate.
+   */
+  rotationPeriodHours?: number;
+  obliquityDeg?: number;
 }

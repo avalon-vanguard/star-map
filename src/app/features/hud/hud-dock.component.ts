@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, ElementRef, HostListener, inject, input, OnInit, output, signal, viewChild } from '@angular/core';
 
 import { Bookmark, BookmarksStore } from '../../shared/state/bookmarks.store';
+import { TIME_RATES, TimeStore } from '../../shared/state/time.store';
 import { BookmarkIconComponent } from '../../shared/ui/bookmark-icon.component';
 import { SearchComponent } from '../search/search.component';
 import { RouteRequest, RouteResult, RoutesPanelComponent, RouteStarOption } from './routes-panel.component';
@@ -180,6 +181,39 @@ function isWideViewport(): boolean {
                   </button>
                 }
               </div>
+
+              <!-- The clock. Orbits and rotations are both functions of a date, so this is the
+                   difference between a still picture and an orrery. -->
+              <p class="type-label mt-4 text-muted">Clock</p>
+              <!-- Radios rather than buttons: the rates are one-of-four, and the native control
+                   carries that to a screen reader and to the arrow keys without any script. -->
+              <div class="mt-2 flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Clock rate">
+                @for (rate of timeRates; track rate.secondsPerSecond) {
+                  <label
+                    class="type-label cursor-pointer border px-3 py-1.5 transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-1 has-[:focus-visible]:-outline-offset-1 has-[:focus-visible]:outline-accent"
+                    [class]="time.rate() === rate.secondsPerSecond ? 'border-accent/60 bg-accent/12 text-accent hover:bg-accent/18' : 'border-border/60 text-muted hover:border-border hover:text-text'"
+                  >
+                    <input
+                      type="radio"
+                      name="clock-rate"
+                      class="sr-only"
+                      [value]="rate.secondsPerSecond"
+                      [checked]="time.rate() === rate.secondsPerSecond"
+                      (change)="time.setRate(rate.secondsPerSecond)"
+                    />
+                    {{ rate.label }}
+                  </label>
+                }
+                @if (time.rate() !== 1) {
+                  <button
+                    type="button"
+                    (click)="time.reset()"
+                    class="type-label border border-border/60 px-3 py-1.5 text-muted transition-colors hover:border-accent/70 hover:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+                  >
+                    Back to now
+                  </button>
+                }
+              </div>
             </section>
           }
         }
@@ -221,8 +255,16 @@ function isWideViewport(): boolean {
             </button>
           }
         </div>
+        <!-- Only while the clock is running faster than the world: at real time the date is
+             today's, which the reader's own machine already says. -->
+        @if (date()) {
+          <p class="ml-auto flex items-baseline gap-2 border-l border-border/40 px-3 py-2 sm:px-4" data-testid="hud-date">
+            <span class="type-label text-muted">Date</span>
+            <span class="text-sm text-accent tabular-nums">{{ date() }}</span>
+          </p>
+        }
         @if (range()) {
-          <p class="ml-auto flex items-baseline gap-2 border-l border-border/40 px-3 py-2 sm:px-4">
+          <p class="flex items-baseline gap-2 border-l border-border/40 px-3 py-2 sm:px-4" [class.ml-auto]="!date()">
             <span class="type-label text-muted">Range</span>
             <span class="text-sm text-accent tabular-nums">{{ range() }}</span>
           </p>
@@ -241,6 +283,8 @@ export class HudDockComponent implements OnInit {
   readonly note = input('');
   /** Camera range, pre-formatted by the scene, which is the only thing that knows the units. */
   readonly range = input('');
+  /** The date the sky is drawn for; empty while the clock runs at real time. */
+  readonly date = input('');
   /** Layer state; `null` means the surface has no layers to toggle and no Display tab. */
   readonly display = input<HudDisplay | null>(null);
   /** Which panel is open on a wide viewport when the dock mounts. */
@@ -277,6 +321,8 @@ export class HudDockComponent implements OnInit {
   readonly activeTab = signal<DockTab | null>(null);
 
   readonly bookmarks = inject(BookmarksStore);
+  readonly time = inject(TimeStore);
+  readonly timeRates = TIME_RATES;
 
   private readonly search = viewChild(SearchComponent);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);

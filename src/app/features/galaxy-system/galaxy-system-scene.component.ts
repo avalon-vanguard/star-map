@@ -1,4 +1,13 @@
-import { AfterViewInit, Component, computed, effect, ElementRef, OnDestroy, signal, viewChild } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  computed,
+  effect,
+  ElementRef,
+  OnDestroy,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import * as THREE from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -8,7 +17,7 @@ import {
   MILKY_WAY_ARMS,
   SUN_GALACTOCENTRIC_RADIUS_PC,
   galacticCentrePositionPc,
-  galacticToEquatorial
+  galacticToEquatorial,
 } from '../../shared/astro/galaxy';
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { EngineService, SceneCamera } from '../../core/engine/engine.service';
@@ -16,7 +25,11 @@ import { BodyRecord } from '../../shared/models/body.model';
 import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { applyMilkyWaySkybox } from '../../shared/rendering/skybox';
-import { loadCachedTexture, MILKY_WAY_SKYBOX_PATH, SUN_TEXTURE_PATH } from '../../shared/rendering/texture-catalog';
+import {
+  loadCachedTexture,
+  MILKY_WAY_SKYBOX_PATH,
+  SUN_TEXTURE_PATH,
+} from '../../shared/rendering/texture-catalog';
 import { isDesignation } from '../../shared/models/star-catalog';
 import { StarRecord } from '../../shared/models/star.model';
 import { Bookmark } from '../../shared/state/bookmarks.store';
@@ -26,18 +39,41 @@ import { CameraRigController } from './camera-rig-controller';
 import { DeepSkyRenderer } from './deep-sky-renderer';
 import { galacticNormal, PolarGridPlane, TetherField } from './grid-plane';
 import { MilkyWayRenderer } from './milky-way-renderer';
-import { starMarkerRadiusAu, SUN_RADIUS_AU, systemFrameRadiusAu, systemFramingDistanceAu, systemViewDirection } from './system-framing';
+import {
+  starMarkerRadiusAu,
+  SUN_RADIUS_AU,
+  systemFrameRadiusAu,
+  systemFramingDistanceAu,
+  systemViewDirection,
+} from './system-framing';
 import { formatAu, formatLuminosity, formatParsecs } from '../../shared/format/quantity';
-import { distanceRings, formatRoundLength, scaleBar, type LengthUnit, type ScaleBar } from '../../shared/format/scale-bar';
+import {
+  distanceRings,
+  formatRoundLength,
+  scaleBar,
+  type LengthUnit,
+  type ScaleBar,
+} from '../../shared/format/scale-bar';
 import { BodyDetailViewModel } from '../body-detail/body-detail.model';
 import { buildBodyViewModel, luminosityOf } from '../body-detail/body-view-model';
-import { DEFAULT_HUD_DISPLAY, HudDisplay, HudDockComponent, HudReadout  } from '../hud/hud-dock.component';
+import {
+  DEFAULT_HUD_DISPLAY,
+  HudDisplay,
+  HudDockComponent,
+  HudReadout,
+} from '../hud/hud-dock.component';
 import { RouteRequest, RouteResult, RouteStarOption } from '../hud/routes-panel.component';
 import { buildSearchIndex, IndexedSearchEntry, rankSearchResults } from '../search/search-ranking';
 import { StarmapHudComponent } from './starmap-hud.component';
 import { SystemObjectCardComponent } from './system-object-card.component';
 import { RoutingClient } from './routing-client';
-import { colorIndexToRgb, FOCUS_RADIUS_PC, StarFieldRenderer, starRenderBudgetFromUrl, VIEW_MARGIN } from './star-field-renderer';
+import {
+  colorIndexToRgb,
+  FOCUS_RADIUS_PC,
+  StarFieldRenderer,
+  starRenderBudgetFromUrl,
+  VIEW_MARGIN,
+} from './star-field-renderer';
 import { BrightnessIndex, brightestWithin, brightnessIndex } from '../../shared/astro/brightest';
 import { LinkBudget } from '../../shared/astro/jump-links';
 import { StarNeighbourhood } from '../../shared/astro/star-neighbourhood';
@@ -99,8 +135,14 @@ function servesTheSame(asked: LinkBudget | undefined, now: LinkBudget | undefine
   if (!asked || !now) {
     return asked === now;
   }
-  const moved = Math.hypot(now.centre.x - asked.centre.x, now.centre.y - asked.centre.y, now.centre.z - asked.centre.z);
-  return Math.abs(now.lengthPc / asked.lengthPc - 1) <= VIEW_MARGIN / 2 && moved <= STAR_FIELD_REFOCUS_PC;
+  const moved = Math.hypot(
+    now.centre.x - asked.centre.x,
+    now.centre.y - asked.centre.y,
+    now.centre.z - asked.centre.z,
+  );
+  return (
+    Math.abs(now.lengthPc / asked.lengthPc - 1) <= VIEW_MARGIN / 2 && moved <= STAR_FIELD_REFOCUS_PC
+  );
 }
 
 /**
@@ -263,7 +305,10 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
   const centre = galacticCentrePositionPc();
   const target = new THREE.Vector3(centre.x, centre.y, centre.z);
   const awayFromCentre = target.clone().negate().normalize();
-  const position = target.clone().add(galacticNormal().multiplyScalar(GALACTIC_OVERVIEW_HEIGHT_PC)).add(awayFromCentre.multiplyScalar(GALACTIC_OVERVIEW_BACK_PC));
+  const position = target
+    .clone()
+    .add(galacticNormal().multiplyScalar(GALACTIC_OVERVIEW_HEIGHT_PC))
+    .add(awayFromCentre.multiplyScalar(GALACTIC_OVERVIEW_BACK_PC));
   return { position, target };
 }
 
@@ -290,12 +335,33 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
       <div #labelHost class="pointer-events-none absolute inset-0 isolate overflow-hidden"></div>
       <!-- Leader from the selected body to its card, drawn in screen space and repositioned in
            the render loop; visibility is toggled there too, so no change detection per frame. -->
-      <svg aria-hidden="true" class="pointer-events-none absolute inset-0 h-full w-full text-accent/60">
-        <line #leader x1="0" y1="0" x2="0" y2="0" stroke="currentColor" stroke-width="1" visibility="hidden" />
+      <svg
+        aria-hidden="true"
+        class="pointer-events-none absolute inset-0 h-full w-full text-accent/60"
+      >
+        <line
+          #leader
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="0"
+          stroke="currentColor"
+          stroke-width="1"
+          visibility="hidden"
+        />
       </svg>
-      <app-starmap-hud [level]="navigationStore.viewLevel()" [title]="hudTitle()" [scale]="hudScale()" (levelSelected)="goToLevel($event)" />
+      <app-starmap-hud
+        [level]="navigationStore.viewLevel()"
+        [title]="hudTitle()"
+        [scale]="hudScale()"
+        (levelSelected)="goToLevel($event)"
+      />
       @if (objectCard(); as card) {
-        <app-system-object-card [body]="card" (dismissed)="dismissObjectCard()" (openRequested)="openObjectDetail(card.id)" />
+        <app-system-object-card
+          [body]="card"
+          (dismissed)="dismissObjectCard()"
+          (openRequested)="openObjectDetail(card.id)"
+        />
       }
       <app-hud-dock
         [eyebrow]="hudEyebrow()"
@@ -321,20 +387,28 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
         (bookmarkChosen)="goToBookmark($event)"
       />
     </div>
-  `
+  `,
 })
 export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private readonly canvasRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
   private readonly labelHostRef = viewChild.required<ElementRef<HTMLDivElement>>('labelHost');
   private readonly leaderRef = viewChild.required<ElementRef<SVGLineElement>>('leader');
-  private readonly objectCardRef = viewChild<SystemObjectCardComponent, ElementRef<HTMLElement>>(SystemObjectCardComponent, { read: ElementRef });
-  private readonly dockRef = viewChild<HudDockComponent, ElementRef<HTMLElement>>(HudDockComponent, { read: ElementRef });
+  private readonly objectCardRef = viewChild<SystemObjectCardComponent, ElementRef<HTMLElement>>(
+    SystemObjectCardComponent,
+    { read: ElementRef },
+  );
+  private readonly dockRef = viewChild<HudDockComponent, ElementRef<HTMLElement>>(
+    HudDockComponent,
+    { read: ElementRef },
+  );
   /**
    * The card's own box, looked up when the card changes rather than in the render loop that
    * draws the leader to it. The host element is a stable wrapper; the panel inside it is what
    * moves, and it is only replaced when a different body is selected.
    */
-  private readonly objectCardElement = computed(() => this.objectCardRef()?.nativeElement.querySelector('[data-testid="object-card"]') ?? null);
+  private readonly objectCardElement = computed(
+    () => this.objectCardRef()?.nativeElement.querySelector('[data-testid="object-card"]') ?? null,
+  );
 
   private readonly raycaster = new THREE.Raycaster();
   private readonly galaxyGroup = new THREE.Group();
@@ -411,7 +485,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       return [];
     }
     return rankSearchResults(index, query, ROUTE_OPTION_COUNT).flatMap((entry) =>
-      entry.starId === undefined ? [] : [{ id: entry.starId, name: entry.name, subtitle: entry.subtitle }]
+      entry.starId === undefined
+        ? []
+        : [{ id: entry.starId, name: entry.name, subtitle: entry.subtitle }],
     );
   });
   private readonly routeQuery = signal('');
@@ -423,7 +499,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private linkRequest = 0;
   private jumpLinkRebuild?: ReturnType<typeof setTimeout>;
   /** The current system's neighbours, resolved on arrival: id, name, distance and bearing. */
-  private neighbours: readonly { star: StarRecord; distancePc: number; direction: THREE.Vector3 }[] = [];
+  private neighbours: readonly {
+    star: StarRecord;
+    distancePc: number;
+    direction: THREE.Vector3;
+  }[] = [];
   /**
    * The HUD boxes the ring prints around, read on the label pass rather than per frame: each
    * read is a forced layout, and the panels move when a tab is switched, not between frames.
@@ -474,7 +554,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     private readonly dataLoader: DataLoaderService,
     private readonly router: Router,
     readonly navigationStore: NavigationStore,
-    readonly time: TimeStore
+    readonly time: TimeStore,
   ) {
     effect(() => {
       const selectedStarId = this.navigationStore.selectedStarId();
@@ -546,7 +626,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     if (!this.rig) {
       return;
     }
-    const pose = level === 'galactic' ? galacticOverviewPose() : { position: GALAXY_OVERVIEW_POSITION.clone(), target: GALAXY_OVERVIEW_TARGET.clone() };
+    const pose =
+      level === 'galactic'
+        ? galacticOverviewPose()
+        : { position: GALAXY_OVERVIEW_POSITION.clone(), target: GALAXY_OVERVIEW_TARGET.clone() };
     // The galactic flight covers four orders of magnitude, so it gets longer than a local hop.
     this.rig.flyTo(pose, level === 'galactic' ? GALACTIC_FLIGHT_SECONDS : RETURN_DURATION_SECONDS);
   }
@@ -593,7 +676,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       this.dataLoader.loadDeepSky().catch((error) => {
         console.error('Failed to load the deep-sky backdrop; continuing without it.', error);
         return [] as DeepSkyRecord[];
-      })
+      }),
     ]);
     this.stars = stars;
     this.starsById = new Map(stars.map((star) => [star.id, star]));
@@ -601,22 +684,47 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.routing = new RoutingClient(stars, positions, this.neighbourhood);
     this.starsByBrightness = brightnessIndex(stars);
     this.starSearchIndex.set(
-      buildSearchIndex(stars.map((star) => ({ kind: 'star' as const, name: star.name, subtitle: star.spectralType, starId: star.id })))
+      buildSearchIndex(
+        stars.map((star) => ({
+          kind: 'star' as const,
+          name: star.name,
+          subtitle: star.spectralType,
+          starId: star.id,
+        })),
+      ),
     );
     this.bodies = bodies;
     this.exoplanets = exoplanets;
     // Which stars can be flown into: those with catalogued bodies of their own, plus the Sun.
-    this.enterableSystems = new Set<number>([...bodies.map((body) => body.systemStarId), ...exoplanets.map((exoplanet) => exoplanet.hostStarId)].filter((id) => id !== null)).size;
+    this.enterableSystems = new Set<number>(
+      [
+        ...bodies.map((body) => body.systemStarId),
+        ...exoplanets.map((exoplanet) => exoplanet.hostStarId),
+      ].filter((id) => id !== null),
+    ).size;
     // Built once rather than per label refresh: it is a scan of every body and exoplanet, and the
     // labels are recomputed whenever the camera moves.
-    this.starIdsWithBodies = new Set([...bodies.map((body) => body.systemStarId), ...exoplanets.map((exoplanet) => exoplanet.hostStarId)].filter(
-      (id): id is number => id !== null && id !== undefined
-    ));
+    this.starIdsWithBodies = new Set(
+      [
+        ...bodies.map((body) => body.systemStarId),
+        ...exoplanets.map((exoplanet) => exoplanet.hostStarId),
+      ].filter((id): id is number => id !== null && id !== undefined),
+    );
 
-    this.starField = new StarFieldRenderer(stars, positions, starRenderBudgetFromUrl(window.location.search), this.starsByBrightness);
-    this.hostStars = Uint8Array.from(stars, (star) => (this.starIdsWithBodies.has(star.id) ? 1 : 0));
+    this.starField = new StarFieldRenderer(
+      stars,
+      positions,
+      starRenderBudgetFromUrl(window.location.search),
+      this.starsByBrightness,
+    );
+    this.hostStars = Uint8Array.from(stars, (star) =>
+      this.starIdsWithBodies.has(star.id) ? 1 : 0,
+    );
     this.galaxyGroup.add(this.starField.object);
-    this.hostRings = new HostStarRings(stars.filter((star) => this.starIdsWithBodies.has(star.id)), HUD_ACCENT);
+    this.hostRings = new HostStarRings(
+      stars.filter((star) => this.starIdsWithBodies.has(star.id)),
+      HUD_ACCENT,
+    );
     this.galaxyGroup.add(this.hostRings.object);
     this.jumpLinks = new JumpLinkRenderer(HUD_ACCENT);
     this.galaxyGroup.add(this.jumpLinks.object);
@@ -628,9 +736,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       ringRadii: GALACTIC_GRID_RINGS_PC,
       spokeCount: GALACTIC_GRID_SPOKES,
       centre: new THREE.Vector3(centre.x, centre.y, centre.z),
-      emphasisRadii: [SUN_GALACTOCENTRIC_RADIUS_PC]
+      emphasisRadii: [SUN_GALACTOCENTRIC_RADIUS_PC],
     });
-    this.setLocalGridRadii(distanceRings(0, GALAXY_OVERVIEW_POSITION.length(), LOCAL_GRID_RING_COUNT, SURVEY_EDGE_PC));
+    this.setLocalGridRadii(
+      distanceRings(0, GALAXY_OVERVIEW_POSITION.length(), LOCAL_GRID_RING_COUNT, SURVEY_EDGE_PC),
+    );
     // A fixed set rather than whatever is currently labelled: a tether that appears and vanishes
     // as the camera drifts reads as a glitch.
     this.tethers = new TetherField(TETHERED_STAR_COUNT);
@@ -639,7 +749,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         .sort((a, b) => a.magnitude - b.magnitude)
         .slice(0, TETHERED_STAR_COUNT)
         .map((star) => new THREE.Vector3(star.x, star.y, star.z)),
-      LOCAL_PLANE_HEIGHT_PC
+      LOCAL_PLANE_HEIGHT_PC,
     );
     this.galaxyGroup.add(this.milkyWay.object, this.galacticGrid.object, this.tethers.object);
 
@@ -651,7 +761,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     // A neighbour's label offers to fly there, and goes through the store like every other way
     // of choosing a star — so a label click, a search hit and an in-scene click are one path.
-    this.labelOverlay = new StarLabelOverlay(scene, (starId) => this.navigationStore.selectStar(starId));
+    this.labelOverlay = new StarLabelOverlay(scene, (starId) =>
+      this.navigationStore.selectStar(starId),
+    );
     this.labelHostRef().nativeElement.appendChild(this.labelOverlay.domElement);
     this.applyDisplay(this.display());
     const { width, height } = canvas.getBoundingClientRect();
@@ -664,7 +776,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     // Asked for per frame rather than captured: the projection can be swapped underneath, and a
     // frame computed against one camera and drawn through the other puts every label off its star.
-    this.unsubscribeTick = this.engine.onTick((deltaSeconds) => this.tick(this.engine.getCamera(), deltaSeconds));
+    this.unsubscribeTick = this.engine.onTick((deltaSeconds) =>
+      this.tick(this.engine.getCamera(), deltaSeconds),
+    );
     this.engine.start();
 
     this.ready = true;
@@ -735,15 +849,23 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
     const world = new THREE.Vector3();
     const drawnRadiusAu = new Map<string, number>();
-    const radiusOf = (marker: THREE.Object3D): number | undefined => ((marker as THREE.Mesh).geometry as THREE.SphereGeometry | undefined)?.parameters?.radius;
+    const radiusOf = (marker: THREE.Object3D): number | undefined =>
+      ((marker as THREE.Mesh).geometry as THREE.SphereGeometry | undefined)?.parameters?.radius;
     const floorFor = (marker: THREE.Object3D): number => {
       marker.getWorldPosition(world);
-      return MIN_MARKER_PIXELS * ((2 * this.engine.visibleHalfHeight(camera.position.distanceTo(world))) / heightPx);
+      return (
+        MIN_MARKER_PIXELS *
+        ((2 * this.engine.visibleHalfHeight(camera.position.distanceTo(world))) / heightPx)
+      );
     };
 
     // Parents first: a moon's ceiling is its planet's drawn radius, which has to be known by then.
-    const members = [...this.systemRenderer.members].sort((a, b) => Number(a.kind === 'moon') - Number(b.kind === 'moon'));
-    for (const { id, marker, parentId } of this.starMarker ? [...members, { id: 'star', marker: this.starMarker, parentId: undefined }] : members) {
+    const members = [...this.systemRenderer.members].sort(
+      (a, b) => Number(a.kind === 'moon') - Number(b.kind === 'moon'),
+    );
+    for (const { id, marker, parentId } of this.starMarker
+      ? [...members, { id: 'star', marker: this.starMarker, parentId: undefined }]
+      : members) {
       const radiusAu = radiusOf(marker);
       if (!radiusAu) {
         continue;
@@ -751,7 +873,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       // Lifted to the floor, but never past half of what it orbits: at the arrival framing every
       // body is sub-pixel, and floored on its own a moon comes out the size of its planet and
       // sitting on top of it — which is the thing true scale was adopted to stop.
-      const ceiling = parentId !== undefined ? (drawnRadiusAu.get(parentId) ?? Number.POSITIVE_INFINITY) / 2 : Number.POSITIVE_INFINITY;
+      const ceiling =
+        parentId !== undefined
+          ? (drawnRadiusAu.get(parentId) ?? Number.POSITIVE_INFINITY) / 2
+          : Number.POSITIVE_INFINITY;
       const drawn = Math.min(Math.max(radiusAu, floorFor(marker)), Math.max(radiusAu, ceiling));
       drawnRadiusAu.set(id, drawn);
       marker.scale.setScalar(drawn / radiusAu);
@@ -792,7 +917,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.engine.getScene().backgroundIntensity = display.sky ? 1 - this.galacticStrength : 0;
 
     this.applyGalaxyDepthRange(distancePc);
-    const level: ViewLevel = this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD ? 'galactic' : 'galaxy';
+    const level: ViewLevel =
+      this.galacticStrength >= GALACTIC_LEVEL_THRESHOLD ? 'galactic' : 'galaxy';
     if (this.navigationStore.viewLevel() !== level && !this.systemGroup.visible) {
       this.navigationStore.setViewLevel(level);
     }
@@ -814,7 +940,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     if (this.engine.currentProjection === 'perspective') {
       return camera.position.length();
     }
-    const halfHeight = this.engine.visibleHalfHeight(camera.position.distanceTo(this.controls?.target ?? GALAXY_OVERVIEW_TARGET));
+    const halfHeight = this.engine.visibleHalfHeight(
+      camera.position.distanceTo(this.controls?.target ?? GALAXY_OVERVIEW_TARGET),
+    );
     return halfHeight / Math.tan((this.engine.getPerspectiveCamera().fov * Math.PI) / 360);
   }
 
@@ -828,7 +956,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const perspective = this.engine.getPerspectiveCamera();
     // Only when it has drifted enough to matter, so a slow zoom isn't rebuilding the projection
     // matrix on every frame of it.
-    if (Math.abs(near - perspective.near) > perspective.near * 0.05 || Math.abs(far - perspective.far) > perspective.far * 0.05) {
+    if (
+      Math.abs(near - perspective.near) > perspective.near * 0.05 ||
+      Math.abs(far - perspective.far) > perspective.far * 0.05
+    ) {
       perspective.near = near;
       perspective.far = far;
       perspective.updateProjectionMatrix();
@@ -841,7 +972,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private setLocalGridRadii(radii: readonly number[]): void {
     this.localGrid?.dispose();
     this.localGridRadii = radii;
-    this.localGrid = new PolarGridPlane({ ringRadii: radii, spokeCount: LOCAL_GRID_SPOKES, emphasisRadii: [SURVEY_EDGE_PC] });
+    this.localGrid = new PolarGridPlane({
+      ringRadii: radii,
+      spokeCount: LOCAL_GRID_SPOKES,
+      emphasisRadii: [SURVEY_EDGE_PC],
+    });
     this.localGrid.setStrength(this.display().grid ? 1 - this.galacticStrength : 0);
     this.galaxyGroup.add(this.localGrid.object);
   }
@@ -853,7 +988,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    */
   private ringLabels(camera: SceneCamera): LabeledPoint[] {
     const normal = galacticNormal();
-    const onPlane = (point: THREE.Vector3) => point.clone().addScaledVector(normal, -point.dot(normal));
+    const onPlane = (point: THREE.Vector3) =>
+      point.clone().addScaledVector(normal, -point.dot(normal));
     const target = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
     // Toward what the view is centred on, when that is out among the rings. Otherwise across the
     // far side of the grid, the part of it in front of the eye (the near side is under the
@@ -869,17 +1005,15 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       return [];
     }
     bearing.normalize();
-    return this.localGridRadii.map(
-      (radius): LabeledPoint => ({
-        id: `ring-${radius}`,
-        name: formatRoundLength(radius, 'pc'),
-        ...(radius === SURVEY_EDGE_PC ? { kind: 'Survey edge' } : {}),
-        tone: 'ghost',
-        x: bearing.x * radius,
-        y: bearing.y * radius,
-        z: bearing.z * radius
-      })
-    );
+    return this.localGridRadii.map((radius): LabeledPoint => ({
+      id: `ring-${radius}`,
+      name: formatRoundLength(radius, 'pc'),
+      ...(radius === SURVEY_EDGE_PC ? { kind: 'Survey edge' } : {}),
+      tone: 'ghost',
+      x: bearing.x * radius,
+      y: bearing.y * radius,
+      z: bearing.z * radius,
+    }));
   }
 
   /** The scale bar for the current zoom, measured at the depth the view is centred on. */
@@ -888,7 +1022,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     if (heightPx === 0) {
       return null;
     }
-    const halfHeight = this.engine.visibleHalfHeight(camera.position.distanceTo(this.controls?.target ?? GALAXY_OVERVIEW_TARGET));
+    const halfHeight = this.engine.visibleHalfHeight(
+      camera.position.distanceTo(this.controls?.target ?? GALAXY_OVERVIEW_TARGET),
+    );
     return scaleBar((2 * halfHeight) / heightPx, SCALE_BAR_MAX_PX, unit);
   }
 
@@ -910,12 +1046,18 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       return;
     }
     const selectedId = this.navigationStore.selectedStarId();
-    const pinnedIds = [...(selectedId === null ? [] : [selectedId]), ...(this.routeResult()?.stars.map((star) => star.id) ?? [])];
+    const pinnedIds = [
+      ...(selectedId === null ? [] : [selectedId]),
+      ...(this.routeResult()?.stars.map((star) => star.id) ?? []),
+    ];
     const pins = pinnedIds.join();
     // By catalogue index, through the lookup the neighbourhood already holds: building a second
     // one of 423 651 entries on the first pin stalled the first flight of a session for 50-140 ms.
     const neighbourhood = this.neighbourhood;
-    const pinned = () => pinnedIds.map((id) => neighbourhood.indexOf(id)).filter((index): index is number => index !== undefined);
+    const pinned = () =>
+      pinnedIds
+        .map((id) => neighbourhood.indexOf(id))
+        .filter((index): index is number => index !== undefined);
 
     const centre = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
     let chose = false;
@@ -955,7 +1097,12 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         // The tick runs before the frame is drawn, so the camera's matrices can still be last frame's.
         camera.updateMatrixWorld();
         this.starFieldView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-        this.starField.refocus({ centre, pinned: pinned(), hosts: this.hostStars, view: this.starFieldView });
+        this.starField.refocus({
+          centre,
+          pinned: pinned(),
+          hosts: this.hostStars,
+          view: this.starFieldView,
+        });
         this.starFieldCamera = camera;
         this.starFieldQuaternion.copy(camera.quaternion);
         this.starFieldFocus.copy(centre);
@@ -988,17 +1135,31 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * against the span the name occupies, with the anchors' own clearance kept for the pair whose
    * text runs the other way.
    */
-  private ringLabelsInTheClear(candidates: readonly LabeledPoint[], camera: SceneCamera, stars: readonly LabeledPoint[]): LabeledPoint[] {
+  private ringLabelsInTheClear(
+    candidates: readonly LabeledPoint[],
+    camera: SceneCamera,
+    stars: readonly LabeledPoint[],
+  ): LabeledPoint[] {
     const projected = new THREE.Vector3();
     const onScreen = (label: LabeledPoint): THREE.Vector2 | null => {
       projected.set(label.x, label.y, label.z).project(camera);
-      const outside = projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1;
+      const outside =
+        projected.z < -1 ||
+        projected.z > 1 ||
+        Math.abs(projected.x) > 1 ||
+        Math.abs(projected.y) > 1;
       return outside ? null : new THREE.Vector2(projected.x * this.viewportAspect(), projected.y);
     };
     const taken = stars
       .map((star) => ({ at: onScreen(star), side: star.side }))
-      .filter((name): name is { at: THREE.Vector2; side: LabelSide | undefined } => name.at !== null)
-      .map(({ at, side }) => ({ at, from: side === 'left' ? at.x - LABEL_REACH_NDC : at.x, to: side === 'left' ? at.x : at.x + LABEL_REACH_NDC }));
+      .filter(
+        (name): name is { at: THREE.Vector2; side: LabelSide | undefined } => name.at !== null,
+      )
+      .map(({ at, side }) => ({
+        at,
+        from: side === 'left' ? at.x - LABEL_REACH_NDC : at.x,
+        to: side === 'left' ? at.x : at.x + LABEL_REACH_NDC,
+      }));
     return candidates.filter((label) => {
       const point = onScreen(label);
       // Ring labels hang right, as `applyPresentation` leaves anything with no side of its own.
@@ -1007,7 +1168,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         !taken.some(
           (name) =>
             name.at.distanceTo(point) < RING_LABEL_CLEARANCE_NDC ||
-            (Math.abs(name.at.y - point.y) < RING_LABEL_CLEARANCE_NDC && name.from < point.x + RING_LABEL_REACH_NDC && point.x < name.to)
+            (Math.abs(name.at.y - point.y) < RING_LABEL_CLEARANCE_NDC &&
+              name.from < point.x + RING_LABEL_REACH_NDC &&
+              point.x < name.to),
         )
       );
     });
@@ -1019,8 +1182,14 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // orbit distance, so a camera-relative rule names the stars closest to the near edge of the
     // view — a ring of labels around the outside of the thing the user is actually looking at.
     const target = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
-    const orbitDistance = (this.controls ? this.effectiveDistance(camera) : GALAXY_OVERVIEW_POSITION.length()) * LABEL_RADIUS_TO_ORBIT_DISTANCE;
-    const labelRadius = THREE.MathUtils.clamp(orbitDistance, MIN_LABEL_RADIUS_PC, MAX_LABEL_RADIUS_PC);
+    const orbitDistance =
+      (this.controls ? this.effectiveDistance(camera) : GALAXY_OVERVIEW_POSITION.length()) *
+      LABEL_RADIUS_TO_ORBIT_DISTANCE;
+    const labelRadius = THREE.MathUtils.clamp(
+      orbitDistance,
+      MIN_LABEL_RADIUS_PC,
+      MAX_LABEL_RADIUS_PC,
+    );
 
     // Individual star names mean nothing once the whole Galaxy is in frame — at that range the
     // entire catalogue is inside one pixel — so the labels hand over to the structural ones.
@@ -1033,19 +1202,28 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // Rebuilt only while the grid is drawn: each new set disposes the old rings and builds every
     // vertex of the new ones, and the set changes on any zoom that crosses a round step.
     if (!isGalactic && this.display().grid) {
-      const orbitPc = this.engine.currentProjection === 'perspective' ? camera.position.distanceTo(target) : this.effectiveDistance(camera);
+      const orbitPc =
+        this.engine.currentProjection === 'perspective'
+          ? camera.position.distanceTo(target)
+          : this.effectiveDistance(camera);
       // Half the frame's diagonal, at the depth it is centred on: how near the Sun the frame
       // reaches, as well as how far. A step sized to the far edge alone is no use to a frame that
       // does not contain the Sun — 20 pc rings for a view of a 19 pc band at 190 pc drew none of
       // them on screen, and the ladder of labels went with them.
-      const frameRadiusPc = this.engine.visibleHalfHeight(orbitPc) * Math.hypot(1, this.viewportAspect());
+      const frameRadiusPc =
+        this.engine.visibleHalfHeight(orbitPc) * Math.hypot(1, this.viewportAspect());
       // Measured in the plane the rings lie in, not through it: a ring of radius r passes within
       // `|r - p|` of the view's centre, where p is how far out the centre is *along the plane*. For
       // a target above it the two differ by its height, which would put the band around a radius no
       // ring has — and `ringLabels` compares its own in-plane bearing against the innermost.
       const normal = galacticNormal();
       const inPlanePc = target.clone().addScaledVector(normal, -target.dot(normal)).length();
-      const radii = distanceRings(Math.max(0, inPlanePc - frameRadiusPc), inPlanePc + orbitPc, LOCAL_GRID_RING_COUNT, SURVEY_EDGE_PC);
+      const radii = distanceRings(
+        Math.max(0, inPlanePc - frameRadiusPc),
+        inPlanePc + orbitPc,
+        LOCAL_GRID_RING_COUNT,
+        SURVEY_EDGE_PC,
+      );
       if (radii.join() !== this.localGridRadii.join()) {
         this.setLocalGridRadii(radii);
       }
@@ -1059,14 +1237,29 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // for anything with catalogued bodies: it is the one distinction the second line can draw that
     // the map cannot otherwise show, since it says which of these points is somewhere you can go.
     const starIdsWithBodies = this.starIdsWithBodies;
-    const candidates = function* (stars: readonly StarRecord[], index: BrightnessIndex): Generator<LabeledPoint> {
+    const candidates = function* (
+      stars: readonly StarRecord[],
+      index: BrightnessIndex,
+    ): Generator<LabeledPoint> {
       for (const star of brightestWithin(stars, index, target, labelRadius, selectedId)) {
-        yield { id: star.id, name: star.name, kind: starIdsWithBodies.has(star.id) ? 'System' : 'Star', x: star.x, y: star.y, z: star.z };
+        yield {
+          id: star.id,
+          name: star.name,
+          kind: starIdsWithBodies.has(star.id) ? 'System' : 'Star',
+          x: star.x,
+          y: star.y,
+          z: star.z,
+        };
       }
     };
-    const starLabels: LabeledPoint[] = isGalactic ? [] : this.spreadLabels(candidates(this.stars, this.starsByBrightness), camera, selectedId);
+    const starLabels: LabeledPoint[] = isGalactic
+      ? []
+      : this.spreadLabels(candidates(this.stars, this.starsByBrightness), camera, selectedId);
     const backdropLabels = isGalactic ? this.galacticLabels : this.deepSkyLabels;
-    const ringLabels = isGalactic || !this.display().grid ? [] : this.ringLabelsInTheClear(this.ringLabels(camera), camera, starLabels);
+    const ringLabels =
+      isGalactic || !this.display().grid
+        ? []
+        : this.ringLabelsInTheClear(this.ringLabels(camera), camera, starLabels);
     this.labelOverlay?.update([...starLabels, ...ringLabels, ...backdropLabels]);
   }
 
@@ -1089,7 +1282,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     return canvas.clientHeight > 0 ? canvas.clientWidth / canvas.clientHeight : 1;
   }
 
-  private spreadLabels(candidates: Iterable<LabeledPoint>, camera: SceneCamera, keepId: number | string | null): LabeledPoint[] {
+  private spreadLabels(
+    candidates: Iterable<LabeledPoint>,
+    camera: SceneCamera,
+    keepId: number | string | null,
+  ): LabeledPoint[] {
     const placed: THREE.Vector2[] = [];
     const chosen: LabeledPoint[] = [];
     const projected = new THREE.Vector3();
@@ -1098,7 +1295,13 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       projected.set(candidate.x, candidate.y, candidate.z).project(camera);
       const isKept = candidate.id === keepId;
       // Offscreen or behind the camera.
-      if (!isKept && (projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1)) {
+      if (
+        !isKept &&
+        (projected.z < -1 ||
+          projected.z > 1 ||
+          Math.abs(projected.x) > 1 ||
+          Math.abs(projected.y) > 1)
+      ) {
         continue;
       }
 
@@ -1112,12 +1315,18 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       // is off the view. A crowded centre still gets right-hand labels — the separation test
       // above already keeps them apart.
       const crowdedRight = placed.some(
-        (other) => other.x > point.x && other.x - point.x < LABEL_REACH_NDC && Math.abs(other.y - point.y) < LABEL_MIN_SEPARATION_NDC
+        (other) =>
+          other.x > point.x &&
+          other.x - point.x < LABEL_REACH_NDC &&
+          Math.abs(other.y - point.y) < LABEL_MIN_SEPARATION_NDC,
       );
       // The body the card is about hangs its label on the left regardless: the leader line to
       // the card leaves its right, and would otherwise run straight through the text.
       const side: LabelSide =
-        candidate.id === this.cardBodyId || ((projected.x > LABEL_EDGE_NDC || crowdedRight) && projected.x > -LABEL_EDGE_NDC) ? 'left' : 'right';
+        candidate.id === this.cardBodyId ||
+        ((projected.x > LABEL_EDGE_NDC || crowdedRight) && projected.x > -LABEL_EDGE_NDC)
+          ? 'left'
+          : 'right';
 
       placed.push(point);
       chosen.push({ ...candidate, side });
@@ -1138,7 +1347,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    */
   private updateSelectionMark(camera: SceneCamera): void {
     const leader = this.leaderRef().nativeElement;
-    const member = this.systemGroup.visible && this.cardBodyId !== null ? this.systemRenderer?.members.find((candidate) => candidate.id === this.cardBodyId) : undefined;
+    const member =
+      this.systemGroup.visible && this.cardBodyId !== null
+        ? this.systemRenderer?.members.find((candidate) => candidate.id === this.cardBodyId)
+        : undefined;
     if (!member) {
       this.labelOverlay?.setSelection(null);
       leader.setAttribute('visibility', 'hidden');
@@ -1161,7 +1373,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const fromY = ((1 - projected.y) / 2) * canvas.clientHeight;
     // The card is top-right: meet its left edge, at the body's height where the edge allows.
     const toX = cardRect.left - canvasRect.left;
-    const toY = Math.min(Math.max(fromY, cardRect.top - canvasRect.top + 12), cardRect.bottom - canvasRect.top - 12);
+    const toY = Math.min(
+      Math.max(fromY, cardRect.top - canvasRect.top + 12),
+      cardRect.bottom - canvasRect.top - 12,
+    );
     const dx = toX - fromX;
     const dy = toY - fromY;
     const length = Math.hypot(dx, dy);
@@ -1208,8 +1423,12 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
                 distancePc: neighbour.distancePc,
                 // A unit vector in the catalogue's parsec frame, which is the same direction in
                 // the system's AU frame: only the scale between the two differs.
-                direction: new THREE.Vector3(star.x - origin.x, star.y - origin.y, star.z - origin.z).normalize()
-              }
+                direction: new THREE.Vector3(
+                  star.x - origin.x,
+                  star.y - origin.y,
+                  star.z - origin.z,
+                ).normalize(),
+              },
             ]
           : [];
       });
@@ -1221,14 +1440,21 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const panels = [
       this.dockRef()?.nativeElement.querySelector('[role="tabpanel"]'),
       this.dockRef()?.nativeElement.querySelector('[role="tablist"]')?.parentElement,
-      this.objectCardRef()?.nativeElement.querySelector('[data-testid="object-card"]')
+      this.objectCardRef()?.nativeElement.querySelector('[data-testid="object-card"]'),
     ];
     this.reserved = panels.flatMap((panel) => {
       if (!panel) {
         return [];
       }
       const box = panel.getBoundingClientRect();
-      return [{ left: box.left - canvas.left, top: box.top - canvas.top, right: box.right - canvas.left, bottom: box.bottom - canvas.top }];
+      return [
+        {
+          left: box.left - canvas.left,
+          top: box.top - canvas.top,
+          right: box.right - canvas.left,
+          bottom: box.bottom - canvas.top,
+        },
+      ];
     });
   }
 
@@ -1237,13 +1463,23 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * moved along the ring where a HUD panel already holds that place. `null` where the whole
    * neighbourhood of that bearing is covered.
    */
-  private neighbourRingPosition(camera: SceneCamera, direction: THREE.Vector3): THREE.Vector3 | null {
-    const bearing = this.ringBearing.copy(direction).applyQuaternion(this.ringInverse.copy(camera.quaternion).invert());
+  private neighbourRingPosition(
+    camera: SceneCamera,
+    direction: THREE.Vector3,
+  ): THREE.Vector3 | null {
+    const bearing = this.ringBearing
+      .copy(direction)
+      .applyQuaternion(this.ringInverse.copy(camera.quaternion).invert());
     // A neighbour behind the camera keeps the side it is on, which is still the way to turn to
     // bring it round.
     const angle = Math.atan2(bearing.y, bearing.x);
     const canvas = this.canvasRef().nativeElement;
-    const placed = ringPlacement(angle, NEIGHBOUR_RING_NDC, { width: canvas.clientWidth, height: canvas.clientHeight }, this.reserved);
+    const placed = ringPlacement(
+      angle,
+      NEIGHBOUR_RING_NDC,
+      { width: canvas.clientWidth, height: canvas.clientHeight },
+      this.reserved,
+    );
     if (!placed) {
       return null;
     }
@@ -1254,7 +1490,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       // unprojected point is already where the name goes.
       return this.ringPoint.set(placed.x, placed.y, 0).unproject(camera);
     }
-    const along = this.ringPoint.set(placed.x, placed.y, 0.5).unproject(camera).sub(camera.position).normalize();
+    const along = this.ringPoint
+      .set(placed.x, placed.y, 0.5)
+      .unproject(camera)
+      .sub(camera.position)
+      .normalize();
     return along.multiplyScalar(NEIGHBOUR_DEPTH_AU).add(camera.position);
   }
 
@@ -1279,18 +1519,20 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       if (!position) {
         return [];
       }
-      return [{
-        // Namespaced, so a star's ghost and the same star's own label in the galaxy view are
-        // never the one DOM node being asked to be two different things.
-        id: `neighbour:${star.id}`,
-        name: star.name,
-        kind: formatParsecs(distancePc),
-        tone: 'ghost' as const,
-        selectStarId: star.id,
-        x: position.x,
-        y: position.y,
-        z: position.z
-      }];
+      return [
+        {
+          // Namespaced, so a star's ghost and the same star's own label in the galaxy view are
+          // never the one DOM node being asked to be two different things.
+          id: `neighbour:${star.id}`,
+          name: star.name,
+          kind: formatParsecs(distancePc),
+          tone: 'ghost' as const,
+          selectStarId: star.id,
+          x: position.x,
+          y: position.y,
+          z: position.z,
+        },
+      ];
     });
   }
 
@@ -1332,12 +1574,12 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const records = new Map<string, { name: string; semiMajorAxisAu: number }>([
       ...this.bodies.map((body): [string, { name: string; semiMajorAxisAu: number }] => [
         body.id,
-        { name: body.name, semiMajorAxisAu: body.orbit.semiMajorAxisAu }
+        { name: body.name, semiMajorAxisAu: body.orbit.semiMajorAxisAu },
       ]),
       ...this.exoplanets.map((exoplanet): [string, { name: string; semiMajorAxisAu: number }] => [
         exoplanet.id,
-        { name: exoplanet.name, semiMajorAxisAu: exoplanet.orbit?.semiMajorAxisAu ?? 0 }
-      ])
+        { name: exoplanet.name, semiMajorAxisAu: exoplanet.orbit?.semiMajorAxisAu ?? 0 },
+      ]),
     ]);
     const position = new THREE.Vector3();
 
@@ -1351,18 +1593,25 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       points.push({
         id: member.id,
         name: record?.name ?? member.id,
-        kind: member.kind === 'exoplanet' ? 'Exoplanet' : member.kind === 'dwarf' ? 'Dwarf Planet' : 'Planet',
+        kind:
+          member.kind === 'exoplanet'
+            ? 'Exoplanet'
+            : member.kind === 'dwarf'
+              ? 'Dwarf Planet'
+              : 'Planet',
         semiMajorAxisAu: record?.semiMajorAxisAu ?? 0,
         x: position.x,
         y: position.y,
-        z: position.z
+        z: position.z,
       });
     }
 
     points.sort((a, b) => b.semiMajorAxisAu - a.semiMajorAxisAu);
     // Bodies first, so a neighbour's name never takes the space one of this system's own would
     // have had: `spreadLabels` keeps whichever candidate it reaches first.
-    this.labelOverlay?.update(this.spreadLabels([...points, ...this.neighbourLabels(camera)], camera, null));
+    this.labelOverlay?.update(
+      this.spreadLabels([...points, ...this.neighbourLabels(camera)], camera, null),
+    );
   }
 
   /** Refreshes the readout panel for whichever scale the view is currently at. */
@@ -1417,7 +1666,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * so the plan is where a plan view starts, not a cage.
    */
   private applyProjection(plan: boolean): void {
-    if (!this.controls || !this.rig || this.engine.currentProjection === (plan ? 'orthographic' : 'perspective')) {
+    if (
+      !this.controls ||
+      !this.rig ||
+      this.engine.currentProjection === (plan ? 'orthographic' : 'perspective')
+    ) {
       return;
     }
     const camera = this.engine.getCamera();
@@ -1483,23 +1736,38 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.hudDate.set(this.time.rate() === 1 ? '' : this.time.date().toISOString().slice(0, 10));
 
     if (this.systemGroup.visible && star) {
-      const planetCount = this.bodies.filter((body) => body.systemStarId === star.id && !body.parentBodyId).length + this.exoplanets.filter((exoplanet) => exoplanet.hostStarId === star.id).length;
-      const moonCount = this.bodies.filter((body) => body.systemStarId === star.id && body.parentBodyId).length;
+      const planetCount =
+        this.bodies.filter((body) => body.systemStarId === star.id && !body.parentBodyId).length +
+        this.exoplanets.filter((exoplanet) => exoplanet.hostStarId === star.id).length;
+      const moonCount = this.bodies.filter(
+        (body) => body.systemStarId === star.id && body.parentBodyId,
+      ).length;
       const distancePc = Math.hypot(star.x, star.y, star.z);
       const luminosity = luminosityOf(star);
       this.hudEyebrow.set('System');
       this.hudTitle.set(star.name);
       this.hudSubtitle.set(star.spectralType ? `Spectral type ${star.spectralType}` : '');
       this.hudReadouts.set([
-        { label: 'Bodies', value: moonCount > 0 ? `${planetCount} + ${moonCount} moons` : `${planetCount}` },
+        {
+          label: 'Bodies',
+          value: moonCount > 0 ? `${planetCount} + ${moonCount} moons` : `${planetCount}`,
+        },
         // Suppressed for the Sun rather than printed as `0.00 pc`, which is arithmetically right
         // and reads as a bug: the distance from here to here is not a measurement.
         ...(distancePc > 0 ? [{ label: 'Distance', value: formatParsecs(distancePc) }] : []),
         { label: 'Magnitude', value: star.magnitude.toFixed(2) },
-        ...(luminosity !== null ? [{ label: 'Luminosity', value: formatLuminosity(luminosity), derived: true }] : [])
+        ...(luminosity !== null
+          ? [{ label: 'Luminosity', value: formatLuminosity(luminosity), derived: true }]
+          : []),
       ]);
       this.hudNote.set('Orbits propagated from published elements to the current date.');
-      this.hudRange.set(formatAu(this.engine.visibleHalfHeight(camera.position.distanceTo(this.controls?.target ?? GALAXY_OVERVIEW_TARGET)) / Math.tan((this.engine.getPerspectiveCamera().fov * Math.PI) / 360)));
+      this.hudRange.set(
+        formatAu(
+          this.engine.visibleHalfHeight(
+            camera.position.distanceTo(this.controls?.target ?? GALAXY_OVERVIEW_TARGET),
+          ) / Math.tan((this.engine.getPerspectiveCamera().fov * Math.PI) / 360),
+        ),
+      );
       this.hudScale.set(this.scaleBarFor(camera, 'AU'));
       return;
     }
@@ -1512,12 +1780,17 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       this.hudTitle.set('Milky Way');
       this.hudSubtitle.set('Barred spiral galaxy · our own');
       this.hudReadouts.set([
-        { label: 'Sun to centre', value: `${(SUN_GALACTOCENTRIC_RADIUS_PC / 1000).toFixed(2)} kpc` },
+        {
+          label: 'Sun to centre',
+          value: `${(SUN_GALACTOCENTRIC_RADIUS_PC / 1000).toFixed(2)} kpc`,
+        },
         { label: 'Arms modelled', value: `${MILKY_WAY_ARMS.length}` },
-        { label: 'Catalogued', value: `${this.stars.length} stars` }
+        { label: 'Catalogued', value: `${this.stars.length} stars` },
       ]);
       // Quotes the catalogue's own reach rather than a figure that has already been raised once.
-      this.hudNote.set(`Galactic structure is an illustrative model built on measured arm geometry — no catalogue holds the Galaxy’s stars. The ${this.stars.length} catalogued stars are real.`);
+      this.hudNote.set(
+        `Galactic structure is an illustrative model built on measured arm geometry — no catalogue holds the Galaxy’s stars. The ${this.stars.length} catalogued stars are real.`,
+      );
       return;
     }
 
@@ -1527,15 +1800,23 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.hudReadouts.set([
       // Both numbers, because they differ: the catalogue is what the map knows and the first is
       // what it draws. See `STAR_RENDER_BUDGET`.
-      { label: 'Stars', value: this.starField && this.starField.drawnCount < this.stars.length ? `${this.starField.drawnCount} / ${this.stars.length}` : `${this.stars.length}` },
+      {
+        label: 'Stars',
+        value:
+          this.starField && this.starField.drawnCount < this.stars.length
+            ? `${this.starField.drawnCount} / ${this.stars.length}`
+            : `${this.stars.length}`,
+      },
       // The radius Gaia is surveyed to, not the edge of the map: the Hipparcos stars Gaia places
       // further out are drawn where it places them.
       { label: 'Survey radius', value: `${SURVEY_EDGE_PC} pc` },
       { label: 'Exoplanets', value: `${this.exoplanets.length}` },
       // The one thing the field itself cannot show: which of those points can be flown into.
-      { label: 'Systems', value: `${this.enterableSystems}` }
+      { label: 'Systems', value: `${this.enterableSystems}` },
     ]);
-    this.hudNote.set('Positions from measured parallaxes. Grid marks the galactic plane through the Sun.');
+    this.hudNote.set(
+      'Positions from measured parallaxes. Grid marks the galactic plane through the Sun.',
+    );
   }
 
   /** Where the current press started, so a drag can be told apart from a click. */
@@ -1553,14 +1834,20 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // star would launch a camera flight into its system.
     const pressedAt = this.pointerDownAt;
     this.pointerDownAt = null;
-    if (pressedAt && Math.hypot(event.clientX - pressedAt.x, event.clientY - pressedAt.y) > CLICK_DRAG_SLOP_PX) {
+    if (
+      pressedAt &&
+      Math.hypot(event.clientX - pressedAt.x, event.clientY - pressedAt.y) > CLICK_DRAG_SLOP_PX
+    ) {
       return;
     }
 
     const canvas = this.canvasRef().nativeElement;
     const camera = this.engine.getCamera();
     const rect = canvas.getBoundingClientRect();
-    const pointerNdc = new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+    const pointerNdc = new THREE.Vector2(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1,
+    );
     this.raycaster.setFromCamera(pointerNdc, camera);
 
     if (this.currentStarId === null) {
@@ -1617,11 +1904,15 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
     const canvas = this.canvasRef().nativeElement;
     const rect = canvas.getBoundingClientRect();
-    const pointerNdc = new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+    const pointerNdc = new THREE.Vector2(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1,
+    );
     this.raycaster.setFromCamera(pointerNdc, this.engine.getCamera());
 
     const [hit] = this.raycaster.intersectObjects(this.systemRenderer.pickableObjects);
-    const hoveredId = (hit ? this.systemRenderer.memberForObject(hit.object) : undefined)?.id ?? null;
+    const hoveredId =
+      (hit ? this.systemRenderer.memberForObject(hit.object) : undefined)?.id ?? null;
     if (hoveredId === this.hoveredBodyId) {
       return;
     }
@@ -1660,11 +1951,13 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         }
         this.routePending.set(false);
         this.routeResult.set({
-          stars: route ? route.stars.map((id) => ({ id, name: this.starsById.get(id)?.name ?? `Star ${id}` })) : [],
+          stars: route
+            ? route.stars.map((id) => ({ id, name: this.starsById.get(id)?.name ?? `Star ${id}` }))
+            : [],
           totalPc: route?.totalPc ?? 0,
           neededRangePc,
           gaveUp,
-          least
+          least,
         });
         this.jumpLinks?.setRoute(route?.stars ?? [], (id) => this.starsById.get(id));
       },
@@ -1676,7 +1969,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         // Released rather than left saying "Plotting…" with the button held, so it can be tried again.
         this.routePending.set(false);
         console.error('Route could not be plotted.', error);
-      }
+      },
     );
   }
 
@@ -1720,7 +2013,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
     const drawn = this.starField.drawnStars;
     const budget = this.jumpLinkBudget();
-    if (this.drawnJumpRangePc === rangePc && this.linkedStars === drawn && servesTheSame(this.linkedBudget, budget)) {
+    if (
+      this.drawnJumpRangePc === rangePc &&
+      this.linkedStars === drawn &&
+      servesTheSame(this.linkedBudget, budget)
+    ) {
       return;
     }
     this.drawnJumpRangePc = rangePc;
@@ -1742,7 +2039,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
           this.linkedStars = null;
           this.linkedBudget = undefined;
         }
-      }
+      },
     );
   }
 
@@ -1752,20 +2049,34 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    */
   private jumpLinkBudget(): LinkBudget | undefined {
     // In the pixels the lines are drawn in, not in CSS pixels: a scaled or HiDPI screen draws more of them.
-    const heightPx = this.canvasRef().nativeElement.clientHeight * this.engine.getRenderer().getPixelRatio();
+    const heightPx =
+      this.canvasRef().nativeElement.clientHeight * this.engine.getRenderer().getPixelRatio();
     if (heightPx === 0) {
       return undefined;
     }
     const centre = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
-    const halfHeight = this.engine.visibleHalfHeight(this.engine.getCamera().position.distanceTo(centre));
-    return { centre: { x: centre.x, y: centre.y, z: centre.z }, lengthPc: (JUMP_LINK_PIXEL_BUDGET * 2 * halfHeight) / heightPx };
+    const halfHeight = this.engine.visibleHalfHeight(
+      this.engine.getCamera().position.distanceTo(centre),
+    );
+    return {
+      centre: { x: centre.x, y: centre.y, z: centre.z },
+      lengthPc: (JUMP_LINK_PIXEL_BUDGET * 2 * halfHeight) / heightPx,
+    };
   }
 
   /** A pinned body wins over a hovered one, so the card does not change under the pointer. */
   private refreshObjectCard(): void {
     const id = this.pinnedBodyId ?? this.hoveredBodyId;
     this.cardBodyId = id;
-    this.objectCard.set(id === null ? undefined : buildBodyViewModel(id, { bodies: this.bodies, exoplanets: this.exoplanets, stars: this.stars }));
+    this.objectCard.set(
+      id === null
+        ? undefined
+        : buildBodyViewModel(id, {
+            bodies: this.bodies,
+            exoplanets: this.exoplanets,
+            stars: this.stars,
+          }),
+    );
   }
 
   /** Clears the card and everything that would bring it straight back. */
@@ -1818,7 +2129,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       this.enterSystem(selectedStarId, () => this.finishTransition());
     } else {
       // Star-to-star: exit the current system (short outward hop) then fly into the new one.
-      this.exitToGalaxy(() => this.enterSystem(selectedStarId, () => this.finishTransition()), true);
+      this.exitToGalaxy(
+        () => this.enterSystem(selectedStarId, () => this.finishTransition()),
+        true,
+      );
     }
   }
 
@@ -1849,13 +2163,23 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       direction.set(0, 0.3, 1).normalize();
     }
 
-    const approachPosition = starPc.clone().add(direction.clone().multiplyScalar(GALAXY_APPROACH_DISTANCE_PC));
-    this.rig.flyTo({ position: approachPosition, target: starPc }, APPROACH_DURATION_SECONDS, () => {
-      this.swapToSystemSpace(star, direction, onComplete);
-    });
+    const approachPosition = starPc
+      .clone()
+      .add(direction.clone().multiplyScalar(GALAXY_APPROACH_DISTANCE_PC));
+    this.rig.flyTo(
+      { position: approachPosition, target: starPc },
+      APPROACH_DURATION_SECONDS,
+      () => {
+        this.swapToSystemSpace(star, direction, onComplete);
+      },
+    );
   }
 
-  private swapToSystemSpace(star: StarRecord, direction: THREE.Vector3, onComplete: () => void): void {
+  private swapToSystemSpace(
+    star: StarRecord,
+    direction: THREE.Vector3,
+    onComplete: () => void,
+  ): void {
     const camera = this.engine.getCamera();
 
     this.systemRenderer?.dispose();
@@ -1865,14 +2189,21 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
 
     const systemBodies = this.bodies.filter((body) => body.systemStarId === star.id);
-    const systemExoplanets = this.exoplanets.filter((exoplanet) => exoplanet.hostStarId === star.id);
+    const systemExoplanets = this.exoplanets.filter(
+      (exoplanet) => exoplanet.hostStarId === star.id,
+    );
     // The star's own position is the line of sight to it, which is the plane the archive
     // measures exoplanet inclinations against. The Sun sits at the origin and has no
     // exoplanets, so it has no meaningful direction and the renderer falls back.
     // The star's luminosity, derived from its own catalogued magnitude and distance, is what
     // decides how hot each body in the system is — and so what each of them looks like.
     const hostLuminosity = luminosityOf(star);
-    this.systemRenderer = new SystemOrbitsRenderer(systemBodies, systemExoplanets, { x: star.x, y: star.y, z: star.z }, hostLuminosity);
+    this.systemRenderer = new SystemOrbitsRenderer(
+      systemBodies,
+      systemExoplanets,
+      { x: star.x, y: star.y, z: star.z },
+      hostLuminosity,
+    );
     this.systemGroup.add(this.systemRenderer.object);
     this.applyDisplay(this.display());
 
@@ -1884,11 +2215,17 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // the orthographic frustum is then sized from, so both projections show the same extent.
     const framingCamera = this.engine.getPerspectiveCamera();
     const viewport = { fovDegrees: framingCamera.fov, aspect: framingCamera.aspect };
-    const framingDistance = systemFramingDistanceAu(this.systemRenderer.gridOuterRadiusAu, viewport);
+    const framingDistance = systemFramingDistanceAu(
+      this.systemRenderer.gridOuterRadiusAu,
+      viewport,
+    );
 
     // The Sun at its own radius; every other star sized against its innermost orbit, which is all
     // the catalogue supports, and which at least never lets it swallow its own planets.
-    const starRadiusAu = star.id === SOL_STAR_ID ? SUN_RADIUS_AU : starMarkerRadiusAu(this.systemRenderer.minTopLevelSemiMajorAxisAu);
+    const starRadiusAu =
+      star.id === SOL_STAR_ID
+        ? SUN_RADIUS_AU
+        : starMarkerRadiusAu(this.systemRenderer.minTopLevelSemiMajorAxisAu);
     this.starMarkerGeometry?.dispose();
     this.starMarkerGeometry = new THREE.SphereGeometry(starRadiusAu, 24, 16);
 
@@ -1926,19 +2263,29 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.controls!.maxDistance = SYSTEM_MAX_DISTANCE_AU;
 
     this.resetZoom();
-    this.rig!.setImmediate({ position: direction.clone().multiplyScalar(SYSTEM_ENTRY_DISTANCE_AU), target: new THREE.Vector3(0, 0, 0) });
+    this.rig!.setImmediate({
+      position: direction.clone().multiplyScalar(SYSTEM_ENTRY_DISTANCE_AU),
+      target: new THREE.Vector3(0, 0, 0),
+    });
 
     // Arrives along whichever direction the approach came from, then swings round to look down
     // on this system's own orbital plane as it settles — so the swap stays continuous but the
     // system is not presented edge-on. See `systemViewDirection`.
     const viewDirection = systemViewDirection(this.systemRenderer.referenceFrame);
 
-    this.rig!.flyTo({ position: viewDirection.multiplyScalar(framingDistance), target: new THREE.Vector3(0, 0, 0) }, SETTLE_DURATION_SECONDS, () => {
-      this.currentStarId = star.id;
-      this.resolveNeighbours();
-      this.navigationStore.setViewLevel('system');
-      onComplete();
-    });
+    this.rig!.flyTo(
+      {
+        position: viewDirection.multiplyScalar(framingDistance),
+        target: new THREE.Vector3(0, 0, 0),
+      },
+      SETTLE_DURATION_SECONDS,
+      () => {
+        this.currentStarId = star.id;
+        this.resolveNeighbours();
+        this.navigationStore.setViewLevel('system');
+        onComplete();
+      },
+    );
   }
 
   private exitToGalaxy(onComplete: () => void, isSwitchingSystems = false): void {
@@ -1954,15 +2301,29 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
     const exitingStarId = this.currentStarId;
 
-    this.rig.flyTo({ position: direction.clone().multiplyScalar(SYSTEM_EXIT_DISTANCE_AU), target: new THREE.Vector3(0, 0, 0) }, EXIT_DURATION_SECONDS, () => {
-      this.swapToGalaxySpace(exitingStarId, direction, isSwitchingSystems, onComplete);
-    });
+    this.rig.flyTo(
+      {
+        position: direction.clone().multiplyScalar(SYSTEM_EXIT_DISTANCE_AU),
+        target: new THREE.Vector3(0, 0, 0),
+      },
+      EXIT_DURATION_SECONDS,
+      () => {
+        this.swapToGalaxySpace(exitingStarId, direction, isSwitchingSystems, onComplete);
+      },
+    );
   }
 
-  private swapToGalaxySpace(exitingStarId: number, direction: THREE.Vector3, isSwitchingSystems: boolean, onComplete: () => void): void {
+  private swapToGalaxySpace(
+    exitingStarId: number,
+    direction: THREE.Vector3,
+    isSwitchingSystems: boolean,
+    onComplete: () => void,
+  ): void {
     const camera = this.engine.getCamera();
     const star = this.starsById.get(exitingStarId);
-    const starPc = star ? new THREE.Vector3(star.x, star.y, star.z) : GALAXY_OVERVIEW_TARGET.clone();
+    const starPc = star
+      ? new THREE.Vector3(star.x, star.y, star.z)
+      : GALAXY_OVERVIEW_TARGET.clone();
 
     this.systemGroup.visible = false;
     this.galaxyGroup.visible = true;
@@ -1981,7 +2342,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.controls!.maxDistance = GALAXY_MAX_DISTANCE_PC;
 
     this.resetZoom();
-    this.rig!.setImmediate({ position: starPc.clone().add(direction.clone().multiplyScalar(GALAXY_APPROACH_DISTANCE_PC)), target: starPc });
+    this.rig!.setImmediate({
+      position: starPc.clone().add(direction.clone().multiplyScalar(GALAXY_APPROACH_DISTANCE_PC)),
+      target: starPc,
+    });
 
     if (isSwitchingSystems) {
       this.currentStarId = null;
@@ -1990,12 +2354,16 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    this.rig!.flyTo({ position: GALAXY_OVERVIEW_POSITION.clone(), target: GALAXY_OVERVIEW_TARGET.clone() }, RETURN_DURATION_SECONDS, () => {
-      this.currentStarId = null;
-      this.resolveNeighbours();
-      this.navigationStore.setViewLevel('galaxy');
-      onComplete();
-    });
+    this.rig!.flyTo(
+      { position: GALAXY_OVERVIEW_POSITION.clone(), target: GALAXY_OVERVIEW_TARGET.clone() },
+      RETURN_DURATION_SECONDS,
+      () => {
+        this.currentStarId = null;
+        this.resolveNeighbours();
+        this.navigationStore.setViewLevel('galaxy');
+        onComplete();
+      },
+    );
   }
 
   private observeResize(canvas: HTMLCanvasElement): void {

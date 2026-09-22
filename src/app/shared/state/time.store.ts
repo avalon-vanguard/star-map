@@ -19,7 +19,7 @@ export const TIME_RATES = [
   { label: 'Real time', secondsPerSecond: 1 },
   { label: '1 h/s', secondsPerSecond: 3600 },
   { label: '1 d/s', secondsPerSecond: 86_400 },
-  { label: '1 mo/s', secondsPerSecond: 2_629_800 }
+  { label: '1 mo/s', secondsPerSecond: 2_629_800 },
 ] as const;
 
 const MS_PER_DAY = 86_400_000;

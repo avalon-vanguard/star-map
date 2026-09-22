@@ -3,7 +3,8 @@ import * as THREE from 'three/webgpu';
 import { appearanceForBody, appearanceForExoplanet } from '../../shared/astro/body-appearance';
 import { gmForParent } from '../../shared/astro/constants';
 import { PlanetAppearance } from '../../shared/astro/planet-appearance';
-import { MARKER_TEXTURE_HEIGHT, MARKER_TEXTURE_WIDTH, planetTexture } from '../../shared/rendering/procedural-planet-texture';
+import { planetTexture } from '../../shared/rendering/procedural-planet-texture';
+import { bodyTexturePath, loadCachedTexture } from '../../shared/rendering/texture-catalog';
 import { isPropagatableOrbit, orbitEllipsePoints, propagateOrbit, resolveGravitationalParameter, resolveOrbitalElements } from '../../shared/astro/kepler';
 import { CartesianCoordinates, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
 import { BodyRecord, OrbitalElements } from '../../shared/models/body.model';
@@ -121,19 +122,44 @@ function buildOrbitLine(elements: OrbitalElements, kind: SystemMemberKind, frame
 }
 
 /**
- * A marker sphere, surfaced with the body's own derived appearance rather than a flat category
- * colour — so a system reads as a set of distinct worlds at a glance, and the colour of each is
- * a consequence of its measurements rather than of which list it came from.
+ * A marker sphere, surfaced with the body's own photograph where one has ever been taken, and
+ * with a texture derived from its measurements where none has — and lit by its star either way,
+ * so a world shows the day and night it actually has.
  *
- * The texture is tiny (see `MARKER_TEXTURE_WIDTH`): a marker is a few pixels across, so what
- * survives is essentially its average colour, and generating it costs well under a millisecond.
+ * The photographs were already in the repository, used only by the detail page: the system view
+ * drew every body from a 32 by 16 pixel procedural texture instead, which at a few pixels across
+ * was indistinguishable from its average colour and, once the camera closed in, was a blur. A
+ * marker can now fill the frame, so it takes the real image at the size the detail page uses.
  */
-function buildMarker(kind: SystemMemberKind, radiusKm: number | undefined, appearance: PlanetAppearance | undefined): THREE.Mesh {
-  const geometry = new THREE.SphereGeometry(bodyMarkerRadiusAu(radiusKm), 16, 12);
-  const material = appearance
-    ? new THREE.MeshBasicMaterial({ map: planetTexture(appearance, { width: MARKER_TEXTURE_WIDTH, height: MARKER_TEXTURE_HEIGHT }) })
-    : new THREE.MeshBasicMaterial({ color: colorForKind(kind) });
+function buildMarker(id: string | undefined, kind: SystemMemberKind, radiusKm: number | undefined, appearance: PlanetAppearance | undefined): THREE.Mesh {
+  // 32 by 24 rather than 16 by 12: at true scale a body is drawn as small as a pixel and as large
+  // as the screen, and the silhouette of the old sphere was visibly faceted at the near end.
+  const geometry = new THREE.SphereGeometry(bodyMarkerRadiusAu(radiusKm), 32, 24);
+  const photograph = id ? bodyTexturePath(id) : undefined;
+  const map = photograph ? loadCachedTexture(photograph) : appearance ? planetTexture(appearance) : undefined;
+  const material = new THREE.MeshStandardMaterial({
+    map,
+    color: map ? 0xffffff : colorForKind(kind),
+    roughness: 1,
+    metalness: 0
+  });
   return new THREE.Mesh(geometry, material);
+}
+
+/**
+ * The star's own light, at the centre of the system it lights.
+ *
+ * `decay` is 0, which is not what light does: a point source falls off with the square of the
+ * distance, and under that law Neptune receives a thousandth of what Mercury does and reads as
+ * black. The map is a set of worlds to look at rather than a light meter, so each is lit as a
+ * photograph of it would be — the same concession the pixel floor makes for size. What the light
+ * does carry truthfully is *direction*: every body shows its day side toward the star and its
+ * night side away from it, and the terminator falls where it really falls.
+ */
+function starLight(): THREE.PointLight {
+  const light = new THREE.PointLight(0xfff4e0, 2.2, 0, 0);
+  light.position.set(0, 0, 0);
+  return light;
 }
 
 
@@ -336,6 +362,9 @@ export class SystemOrbitsRenderer {
 
       this.object.add(this.grid.object, this.tethers.object);
     }
+    // The star lights its own system. The star marker itself is unlit — it is the source, not a
+    // surface — so nothing here changes how it is drawn.
+    this.object.add(starLight());
   }
 
   /** Recomputes every marker's position for the given Julian date. Call once per tick. */
@@ -418,7 +447,7 @@ export class SystemOrbitsRenderer {
     rotation?: { periodHours?: number; obliquityDeg?: number }
   ): TrackedTopLevelBody {
     const orbitLine = buildOrbitLine(elements, kind, frame);
-    const marker = buildMarker(kind, radiusKm, appearance);
+    const marker = buildMarker(id, kind, radiusKm, appearance);
     this.object.add(orbitLine, marker);
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);
     this.trackDisposable(marker.geometry, marker.material as THREE.Material);
@@ -442,7 +471,7 @@ export class SystemOrbitsRenderer {
     const orbitLine = buildOrbitLine(elements, 'moon', frame);
     // A moon's own orbit is the thing it must not swallow: drawn at the system's exaggeration it
     // is the same size as its planet, and every moon here orbits inside one.
-    const marker = buildMarker('moon', radiusKm, appearance);
+    const marker = buildMarker(id, 'moon', radiusKm, appearance);
     pivot.add(orbitLine, marker);
     this.object.add(pivot);
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);

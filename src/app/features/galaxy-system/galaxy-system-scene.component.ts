@@ -3,7 +3,6 @@ import { Router } from '@angular/router';
 import * as THREE from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-import { dateToJulianDate } from '../../shared/astro/constants';
 import {
   GALACTIC_BASIS_EQUATORIAL,
   MILKY_WAY_ARMS,
@@ -22,6 +21,7 @@ import { isDesignation } from '../../shared/models/star-catalog';
 import { StarRecord } from '../../shared/models/star.model';
 import { Bookmark } from '../../shared/state/bookmarks.store';
 import { NavigationStore, ViewLevel } from '../../shared/state/navigation.store';
+import { TimeStore } from '../../shared/state/time.store';
 import { CameraRigController } from './camera-rig-controller';
 import { DeepSkyRenderer } from './deep-sky-renderer';
 import { galacticNormal, PolarGridPlane, TetherField } from './grid-plane';
@@ -304,6 +304,7 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
         [readouts]="hudReadouts()"
         [note]="hudNote()"
         [range]="hudRange()"
+        [date]="hudDate()"
         [display]="display()"
         [routing]="true"
         [routeResult]="routeResult()"
@@ -350,6 +351,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   readonly hudNote = signal('');
   readonly hudRange = signal('');
   readonly hudScale = signal<ScaleBar | null>(null);
+  /** The date the sky is drawn for — worth printing once the clock is no longer the world's. */
+  readonly hudDate = signal('');
   /** Which layers are drawn, as toggled from the dock. Applied by `applyDisplay`. */
   readonly display = signal<HudDisplay>(DEFAULT_HUD_DISPLAY);
 
@@ -470,7 +473,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     private readonly engine: EngineService,
     private readonly dataLoader: DataLoaderService,
     private readonly router: Router,
-    readonly navigationStore: NavigationStore
+    readonly navigationStore: NavigationStore,
+    readonly time: TimeStore
   ) {
     effect(() => {
       const selectedStarId = this.navigationStore.selectedStarId();
@@ -701,7 +705,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
 
     if (this.systemGroup.visible) {
-      this.systemRenderer?.update(dateToJulianDate());
+      this.systemRenderer?.update(this.time.julianDate());
       this.keepMarkersLegible(camera);
     }
     this.updateSelectionMark(camera);
@@ -1473,6 +1477,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
   private updateHud(camera: SceneCamera): void {
     const star = this.currentStarId === null ? undefined : this.starsById.get(this.currentStarId);
+    // On the label cadence rather than per frame: at a month a second the date changes faster
+    // than anyone can read it, and the HUD does not need to re-render sixty times a second to
+    // say so.
+    this.hudDate.set(this.time.rate() === 1 ? '' : this.time.date().toISOString().slice(0, 10));
 
     if (this.systemGroup.visible && star) {
       const planetCount = this.bodies.filter((body) => body.systemStarId === star.id && !body.parentBodyId).length + this.exoplanets.filter((exoplanet) => exoplanet.hostStarId === star.id).length;

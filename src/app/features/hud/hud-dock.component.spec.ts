@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { BookmarksStore } from '../../shared/state/bookmarks.store';
+import { TimeStore } from '../../shared/state/time.store';
 import { DEFAULT_HUD_DISPLAY, HudDisplay, HudDockComponent } from './hud-dock.component';
 
 class EmptyDataLoaderService {
@@ -141,7 +142,7 @@ describe('HudDockComponent', () => {
     fixture.componentRef.setInput('defaultTab', 'display');
     fixture.detectChanges();
     const pressed = [...host().querySelectorAll('[aria-pressed]')].map((b) => `${b.textContent?.trim()}=${b.getAttribute('aria-pressed')}`);
-    expect(pressed).toEqual(['Labels=true', 'Orbits=true', 'Grid=false', 'Deep sky=true', 'Sky=true', 'Systems=true', 'Jump links=false', 'Plan view=false']);
+    expect(pressed).toEqual(['Labels=true', 'Orbits=true', 'Grid=false', 'Deep sky=true', 'Sky=true', 'Systems=true', 'Jump links=false', 'Plan view=false', 'Backwards=false']);
   });
 
   it('says how to keep a place, rather than showing an empty list', () => {
@@ -365,5 +366,70 @@ describe('HudDockComponent', () => {
     expect(host().querySelector<HTMLElement>('#dock-panel-routes')!.hidden).toBe(false);
     expect(host().querySelector<HTMLInputElement>('#route-to')!.value).toBe('Sirius');
     expect(host().querySelector<HTMLInputElement>('#route-range')!.value).toBe('6');
+  });
+
+  describe('clock', () => {
+    let time: TimeStore;
+
+    beforeEach(() => {
+      time = TestBed.inject(TimeStore);
+      fixture.componentRef.setInput('display', DEFAULT_HUD_DISPLAY);
+      fixture.componentRef.setInput('defaultTab', 'display');
+      fixture.detectChanges();
+    });
+
+    function button(name: string): HTMLButtonElement {
+      return [...host().querySelectorAll<HTMLButtonElement>('#dock-panel-display button')].find((b) => b.textContent?.trim() === name)!;
+    }
+
+    function radio(name: string): HTMLInputElement {
+      return [...host().querySelectorAll('#dock-panel-display label')].find((l) => l.textContent?.trim() === name)!.querySelector('input')!;
+    }
+
+    it('runs the same rates backwards, and keeps the direction when the rate changes', () => {
+      button('Backwards').click();
+      fixture.detectChanges();
+      expect(time.rate()).toBe(-1);
+      expect(button('Backwards').getAttribute('aria-pressed')).toBe('true');
+      // Still real time: the direction is not a fifth rate.
+      expect(radio('Real time').checked).toBe(true);
+
+      radio('1 d/s').click();
+      fixture.detectChanges();
+      expect(time.rate()).toBe(-86_400);
+      expect(radio('1 d/s').checked).toBe(true);
+
+      button('Backwards').click();
+      fixture.detectChanges();
+      expect(time.rate()).toBe(86_400);
+      expect(button('Backwards').getAttribute('aria-pressed')).toBe('false');
+    });
+
+    it('opens the date field on the clock’s date, named and held to the window the elements hold for', () => {
+      const field = host().querySelector<HTMLInputElement>('#clock-date')!;
+
+      expect(field.type).toBe('datetime-local');
+      expect(field.value).toBe(time.date().toISOString().slice(0, 16));
+      expect(host().querySelector('label[for="clock-date"]')?.textContent?.trim()).toBe('Date (UTC)');
+      expect(field.min).toBe('0001-01-01T00:00');
+      expect(field.max).toBe('3000-01-01T00:00');
+      expect(host().querySelector(`#${field.getAttribute('aria-describedby')}`)?.textContent).toContain('AD 1 to AD 3000');
+    });
+
+    it('jumps the clock to the date submitted, read as UTC', () => {
+      const field = host().querySelector<HTMLInputElement>('#clock-date')!;
+      field.value = '2020-12-21T18:00';
+      button('Go').click();
+      fixture.detectChanges();
+
+      expect(time.date().toISOString().slice(0, 16)).toBe('2020-12-21T18:00');
+      expect(time.atNow()).toBe(false);
+
+      // Back to now puts the field back on the present too, not on the date left behind.
+      button('Back to now').click();
+      fixture.detectChanges();
+      expect(time.atNow()).toBe(true);
+      expect(host().querySelector<HTMLInputElement>('#clock-date')!.value).toBe(time.date().toISOString().slice(0, 16));
+    });
   });
 });

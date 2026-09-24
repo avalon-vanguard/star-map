@@ -1763,7 +1763,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       // Where the orbits come from, and for the Sun how far from the present they hold: each
       // body's card names its own source and epoch.
       const source = this.bodies.some((body) => body.systemStarId === star.id) ? 'JPL mean elements, the planets’ fit for 3000 BC to AD 3000, and the SBDB’s osculating ones for Ceres, Eris, Haumea and Makemake,' : 'published elements';
-      this.hudNote.set(`Orbits propagated from ${source} to ${this.time.atNow() ? 'the current date' : 'the date on the clock'}.`);
+      // Named to the minute, in UTC like the date field: a jump to 18:00 on a given day is a
+      // question about that hour, and the note is where the answer says which sky it is.
+      const drawnFor = `${this.time.date().toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+      this.hudNote.set(`Orbits propagated from ${source} to ${this.time.atNow() ? 'now, ' : ''}${drawnFor}.`);
       this.hudRange.set(
         formatAu(
           this.engine.visibleHalfHeight(

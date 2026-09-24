@@ -26,6 +26,22 @@ const MS_PER_DAY = 86_400_000;
 const JULIAN_DATE_AT_EPOCH = 2440587.5;
 
 /**
+ * The dates the clock can be set to, as `datetime-local` values read as UTC.
+ *
+ * The end is where Standish's Table 2, the mean elements that carry the planets, stops being
+ * fitted: it covers 3000 BC to AD 3000, and every planet was within 0.29 degrees of Horizons at
+ * each date measured out to 3000. The start is not the fit's but the date input's, which cannot
+ * go before 0001-01-01. Both are proleptic Gregorian, as a `Date` is, so before 1582 they run
+ * ahead of the Julian-calendar dates history gives: two days at AD 1, ten by 1582. The moons and
+ * dwarf planets hold for far less of it: Phobos is 11 degrees out by 2100, Ceres 11.6 by 2200.
+ */
+export const CLOCK_WINDOW = { min: '0001-01-01T00:00', max: '3000-01-01T00:00' } as const;
+const WINDOW_MS = {
+  min: Date.parse(`${CLOCK_WINDOW.min}Z`),
+  max: Date.parse(`${CLOCK_WINDOW.max}Z`),
+};
+
+/**
  * The date the map is drawn for.
  *
  * Read every frame rather than held in a signal: it changes continuously, and a signal that
@@ -33,7 +49,9 @@ const JULIAN_DATE_AT_EPOCH = 2440587.5;
  * watching. The rate *is* a signal, since a reader sets it and the controls read it back.
  *
  * Changing the rate re-anchors instead of rewinding: the date carries on from where it had got
- * to, so speeding up and slowing down never jumps the sky.
+ * to, so speeding up and slowing down never jumps the sky. A negative rate runs the same clock
+ * backwards: every orbit and every rotation is a function of the date, so going back is the same
+ * sum with the sign turned.
  */
 @Injectable({ providedIn: 'root' })
 export class TimeStore {
@@ -70,6 +88,23 @@ export class TimeStore {
     if (secondsPerSecond !== 1) {
       this.atNow.set(false);
     }
+  }
+
+  /**
+   * Jumps the clock to a date, from which it carries on at whatever rate it was running at.
+   * Refuses one outside {@link CLOCK_WINDOW}, rather than draw planets where elements that were
+   * never fitted there put them.
+   */
+  setDate(date: Date): boolean {
+    const ms = date.getTime();
+    // Written so that NaN, an unparsable field, fails it too.
+    if (!(ms >= WINDOW_MS.min && ms <= WINDOW_MS.max)) {
+      return false;
+    }
+    this.anchorJd = dateToJulianDate(date);
+    this.anchorWallMs = Date.now();
+    this.atNow.set(false);
+    return true;
   }
 
   /** Back to now, at real time — the state the map opens in. */

@@ -83,7 +83,7 @@ import { JumpLinkRenderer } from './jump-link-renderer';
 import { ReservedBox, ringPlacement } from './label-ring';
 import { LabeledPoint, LabelSide, StarLabelOverlay } from './star-label-overlay';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
-import { catalogueCensus, starReadouts } from './star-readouts';
+import { catalogueCensus, starReadouts, starSubtitle } from './star-readouts';
 
 /** HYG catalog id for the Sun itself — the only star we have a real close-up photo of. */
 const SOL_STAR_ID = 0;
@@ -1748,7 +1748,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       ).length;
       this.hudEyebrow.set('System');
       this.hudTitle.set(star.name);
-      this.hudSubtitle.set(star.spectralType ? `Spectral type ${star.spectralType}` : '');
+      this.hudSubtitle.set(starSubtitle(star));
       this.hudReadouts.set([
         {
           label: 'Bodies',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseSpectralClass, SPECTRAL_CLASSES, spectralTypeToColorIndex, temperatureToColorIndex } from './spectral';
+import { parseSpectralClass, SPECTRAL_CLASSES, spectralTypeFromColor, spectralTypeToColorIndex, temperatureToColorIndex } from './spectral';
 
 describe('parseSpectralClass', () => {
   it('reads a clean class and subclass', () => {
@@ -98,5 +98,33 @@ describe('temperatureToColorIndex', () => {
   it('has no answer for a temperature that is not one', () => {
     expect(temperatureToColorIndex(0)).toBeNull();
     expect(temperatureToColorIndex(Number.NaN)).toBeNull();
+  });
+});
+
+describe('spectralTypeFromColor', () => {
+  it("reads the Sun's type off either colour", () => {
+    expect(spectralTypeFromColor(0.65, 'B-V')).toBe('G2');
+    expect(spectralTypeFromColor(0.82, 'BP-RP')).toBe('G2');
+  });
+
+  it('reads a red dwarf the way it was classified', () => {
+    // TRAPPIST-1 is M8 V, and Gaia has it at BP−RP 4.90; Proxima is M5.5 Ve at B−V 1.81.
+    expect(spectralTypeFromColor(4.902, 'BP-RP')).toBe('M8');
+    expect(spectralTypeFromColor(1.807, 'B-V')).toBe('M5');
+  });
+
+  it('does not read one colour as the other', () => {
+    // 1.43 is a K5 dwarf in BP−RP and an M0 in B−V.
+    expect(spectralTypeFromColor(1.43, 'BP-RP')).toBe('K5');
+    expect(spectralTypeFromColor(1.43, 'B-V')).toBe('M0');
+    expect(spectralTypeFromColor(1.43)).toBe('M0');
+  });
+
+  it('has no answer past either end of the table, nor without a colour', () => {
+    expect(spectralTypeFromColor(-0.35, 'B-V')).toBeNull();
+    expect(spectralTypeFromColor(-0.15, 'BP-RP')).toBeNull();
+    expect(spectralTypeFromColor(5.5, 'BP-RP')).toBeNull();
+    expect(spectralTypeFromColor(null, 'B-V')).toBeNull();
+    expect(spectralTypeFromColor(-0.301, 'B-V')).toBe('B0');
   });
 });

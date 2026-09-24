@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { StarRecord } from '../../shared/models/star.model';
-import { catalogueCensus, describingCatalogue, starReadouts } from './star-readouts';
+import { catalogueCensus, describingCatalogue, starReadouts, starSubtitle } from './star-readouts';
 
 /** Three kinds of star the catalogue holds, each as the decoder gives it back. */
 const HYG_STAR: StarRecord = {
@@ -69,6 +69,21 @@ describe('starReadouts', () => {
 
   it('marks the luminosity as derived', () => {
     expect(starReadouts(HYG_STAR, 25.4).find((readout) => readout.label === 'Luminosity')).toEqual({ label: 'Luminosity', value: '25.40 L☉', derived: true });
+  });
+});
+
+describe('starSubtitle', () => {
+  it("prints the catalogue's classification where it has one", () => {
+    expect(starSubtitle(HYG_STAR)).toBe('Spectral type A0m');
+  });
+
+  it("estimates one from the colour otherwise, in the colour's own system, and says so", () => {
+    // 1.43 is a K5 dwarf in BP−RP; read as B−V it would be an M0.
+    expect(starSubtitle(GAIA_STAR)).toBe('Spectral type ~K5, from colour');
+  });
+
+  it('prints nothing rather than "Unknown" when there is neither', () => {
+    expect(starSubtitle({ ...GAIA_STAR, colorIndex: null, colorSystem: undefined })).toBe('');
   });
 });
 

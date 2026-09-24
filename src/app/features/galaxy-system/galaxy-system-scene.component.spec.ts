@@ -836,7 +836,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     navigationStore.selectStar(SUN.id);
     await flushAsync();
     await advanceFrames(engine, 2.5);
-    expect(note()).toBe('Orbits propagated from JPL mean elements, the planets’ fit for 3000 BC to AD 3000, to the current date.');
+    expect(note()).toBe('Orbits propagated from JPL mean elements, the planets’ fit for 3000 BC to AD 3000, and the SBDB’s osculating ones for Ceres, Eris, Haumea and Makemake, to the current date.');
 
     navigationStore.selectStar(ALPHA_CENTAURI.id);
     await flushAsync();

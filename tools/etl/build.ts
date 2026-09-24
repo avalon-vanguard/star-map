@@ -8,7 +8,7 @@ import { ExoplanetRecord } from '../../src/app/shared/models/exoplanet.model';
 import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model';
 import { fetchDeepSky } from './fetchDeepSky';
 import { fetchExoplanets } from './fetchExoplanets';
-import { fetchSolarSystem } from './fetchSolarSystem';
+import { fetchSolarSystem, FREELY_SPINNING_MOONS } from './fetchSolarSystem';
 import { BYTES_PER_STAR_META, BYTES_PER_STAR_POSITION, decodeStarCatalog, encodeStarCatalog } from '../../src/app/shared/models/star-catalog';
 import { fetchStars } from './fetchStars';
 import { describeSources } from './sources/registry';
@@ -145,6 +145,23 @@ function validateMerge(stars: StarRecord[]): void {
  */
 const MAX_PLANET_OFFSET_DEG = 0.25;
 const MAX_MOON_OFFSET_DEG = 2.5;
+const KM_PER_AU = 149597870.7;
+
+/**
+ * The moons whose table row cannot come within that, each for a reason no mean ellipse carries,
+ * with a ceiling just above its worst offset from Horizons at twelve dates from 1980 to 2100:
+ *
+ * - Mimas, 44.7 degrees: its resonance with Tethys swings its mean longitude 44 degrees either
+ *   way over 70.8 years, and the table has no column for it (Tethys, on the other end, swings 2).
+ * - Hyperion, 20.2: held in a 4:3 resonance by Titan; the row's eccentricity, 0.0232, is less than
+ *   a quarter of the 0.105 JPL's current table gives.
+ * - Iapetus, 10.1: the row sits 9.4 degrees behind Horizons at its own epoch, 2000 Jan 1.5, and
+ *   keeps that offset; its plane agrees with Horizons' to 0.07 degrees and its period to 0.001 per
+ *   cent, so the fault is in the row's longitude, which this has no second source to correct.
+ * - Nereid, 2.6: an eccentricity of 0.75, the largest here, which a mean ellipse follows least
+ *   well: under 0.9 degrees in every year measured but 2025 and 2030 (2.6 and 2.3) and 2100 (1.7).
+ */
+const MOON_OFFSET_CEILINGS_DEG: Record<string, number> = { mimas: 46, hyperion: 21, iapetus: 11, nereid: 3 };
 
 function angleBetweenDeg(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }): number {
   const cosine = (a.x * b.x + a.y * b.y + a.z * b.z) / (Math.hypot(a.x, a.y, a.z) * Math.hypot(b.x, b.y, b.z));
@@ -169,28 +186,52 @@ function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, Orbita
     const truth = eclipticToEquatorial(positionAtEpoch(horizons!));
     const mean = positionAtEpoch(meanElementsAt(body.orbit, body.rates, horizons!.epochJd));
     const offset = angleBetweenDeg(body.laplacePole ? laplacePlaneToEquatorial(mean, body.laplacePole) : eclipticToEquatorial(mean), truth);
-    const ceiling = body.kind === 'moon' ? MAX_MOON_OFFSET_DEG : MAX_PLANET_OFFSET_DEG;
+    const ceiling = body.kind === 'moon' ? (MOON_OFFSET_CEILINGS_DEG[body.id] ?? MAX_MOON_OFFSET_DEG) : MAX_PLANET_OFFSET_DEG;
     assertCondition(
       offset <= ceiling,
       `${body.name}'s mean elements put it ${offset.toFixed(2)} degrees from where Horizons has it (at most ${ceiling} expected) — the elements were read wrongly.`
     );
     offsets.push(`${body.id} ${offset.toFixed(3)}`);
 
+    // A radius of 0 is what a page whose radius no pattern reads comes out as — Charon's did.
+    assertCondition(body.radiusKm > 0, `Body ${body.id} has no radius; its page states it in a form the ETL does not read.`);
+
     if (body.kind === 'moon') {
-      assertCondition(!!body.parentBodyId && ids.has(body.parentBodyId), `Moon ${body.id} has no valid parentBodyId.`);
-      // Every moon here is tidally locked: its day is its orbit, from the same mean motion that
-      // carries it round, or its face turns away from its planet: the Kepler period of the
-      // osculating orbit this used to take would turn the Moon's five degrees an orbit.
+      const parent = bodies.find((candidate) => candidate.id === body.parentBodyId);
+      assertCondition(parent !== undefined, `Moon ${body.id} has no valid parentBodyId.`);
       const orbitHours = (360 / body.rates.meanMotionDegPerDay) * 24;
-      assertCondition(
-        body.rotationPeriodHours !== undefined && Math.abs(body.rotationPeriodHours - orbitHours) <= orbitHours * 1e-9,
-        `Moon ${body.id} turns once in ${body.rotationPeriodHours} hours but goes round in ${orbitHours} — it will not keep one face to its planet.`
-      );
+      if (FREELY_SPINNING_MOONS.has(body.id)) {
+        // Hyperion tumbles and Nereid's page gives no spin, so they have none; Phoebe turns in
+        // 9.27 hours against a 550-day orbit. A lock here would be the rule below misapplied.
+        assertCondition(
+          body.rotationPeriodHours === undefined || Math.abs(body.rotationPeriodHours - orbitHours) > orbitHours * 0.1,
+          `Moon ${body.id} does not keep one face to its planet, yet turns once in ${body.rotationPeriodHours} hours against an orbit of ${orbitHours}.`
+        );
+      } else {
+        // Every other moon here is tidally locked: its day is its orbit, from the same mean motion
+        // that carries it round, or its face turns away from its planet: the Kepler period of the
+        // osculating orbit this used to take would turn the Moon's five degrees an orbit.
+        assertCondition(
+          body.rotationPeriodHours !== undefined && Math.abs(body.rotationPeriodHours - orbitHours) <= orbitHours * 1e-9,
+          `Moon ${body.id} turns once in ${body.rotationPeriodHours} hours but goes round in ${orbitHours} — it will not keep one face to its planet.`
+        );
+      }
+      if (body.massRatio !== undefined) {
+        // The pair's barycentre, which the planet's elements place, must lie outside the planet —
+        // that is why the two are drawn going round it — and nearer the planet than the moon.
+        const offsetKm = (body.orbit.semiMajorAxisAu * KM_PER_AU * body.massRatio) / (1 + body.massRatio);
+        assertCondition(
+          body.massRatio > 0 && body.massRatio < 1 && offsetKm > parent!.radiusKm,
+          `${body.name}'s mass ratio ${body.massRatio} puts its barycentre ${offsetKm.toFixed(0)} km from ${parent!.name}'s centre, which is not between its surface, ${parent!.radiusKm} km out, and the moon.`
+        );
+      }
     }
   }
 
   const planetCount = bodies.filter((body) => body.kind === 'planet').length;
   assertCondition(planetCount === 8, `Expected 8 planets, found ${planetCount}.`);
+  const dwarfCount = bodies.filter((body) => body.kind === 'dwarf').length;
+  assertCondition(dwarfCount === 5, `Expected the IAU's 5 dwarf planets, found ${dwarfCount}.`);
   console.log(`  mean elements against Horizons, degrees: ${offsets.join(', ')}.`);
 }
 

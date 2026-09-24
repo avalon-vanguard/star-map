@@ -79,6 +79,32 @@ describe('isSameStar', () => {
     expect(isSameStar(companion, at(43109, 131.69 + arcsecOfRa(2.7, 6.42), 6.42, 40, { name: 'Ashlesha', magnitude: 3.38 }))).toBe(false);
   });
 
+  // GJ 1035 and GJ 3052 as HYG has them from Gliese, against their Gaia entries: 21″ away at
+  // about the same distance, and 6.6″ away at half Gaia's distance. Their motions agree to 2 and 3 %.
+  it('matches a Gliese entry to the Gaia entry moving with it, a minute of arc away or at another distance', () => {
+    const gj1035 = at(1, 19.9245, 84.1612, 14.4, { magnitude: 13.1, source: 'gaia', pmRaMasYr: -981.9, pmDecMasYr: 475.6 });
+    const gliese1035 = at(118058, 19.9245 + arcsecOfRa(21.2, 84.1612), 84.1612, 13.7, { name: 'GJ 1035', magnitude: 14.77, pmRaMasYr: -978.0, pmDecMasYr: 458.1 });
+    expect(isSameStar(gj1035, gliese1035)).toBe(true);
+    expect(isSameStar(gj1035, { ...gliese1035, pmRaMasYr: undefined, pmDecMasYr: undefined })).toBe(false);
+
+    const gj3052 = at(2, 11.0897, 9.1262, 25.0, { magnitude: 12.6, source: 'gaia', pmRaMasYr: 813.1, pmDecMasYr: -2.6 });
+    const gliese3052 = at(118014, 11.0897 + arcsecOfRa(6.6, 9.1262), 9.1262, 12.3, { name: 'GJ 3052', magnitude: 13.8, pmRaMasYr: 799.7, pmDecMasYr: -20.9 });
+    expect(isSameStar(gj3052, gliese3052)).toBe(true);
+  });
+
+  it('does not match two entries moving differently past fifteen arcseconds, nor co-moving ones past a minute', () => {
+    const kept = at(1, 120, 30, 10, { magnitude: 12, source: 'gaia', pmRaMasYr: 1000, pmDecMasYr: 0 });
+    expect(isSameStar(kept, at(2, 120 + arcsecOfRa(20, 30), 30, 10, { magnitude: 13, pmRaMasYr: 750, pmDecMasYr: 0 }))).toBe(false);
+    expect(isSameStar(kept, at(2, 120 + arcsecOfRa(20, 30), 30, 10, { magnitude: 13, pmRaMasYr: 850, pmDecMasYr: 0 }))).toBe(true);
+    expect(isSameStar(kept, at(2, 120 + arcsecOfRa(65, 30), 30, 10, { magnitude: 13, pmRaMasYr: 1000, pmDecMasYr: 0 }))).toBe(false);
+  });
+
+  it("keeps a co-moving primary out of its companion's entry", () => {
+    // A binary shares its motion, so only the brightness tells GJ 9160 from its companion 13.5″ away.
+    const companion = at(1, 69.54, -14.3, 24.4, { magnitude: 15.1, source: 'gaia', pmRaMasYr: -78.5, pmDecMasYr: -150.8 });
+    expect(isSameStar(companion, at(2, 69.54 + arcsecOfRa(13.5, -14.3), -14.3, 24.4, { magnitude: 7.3, pmRaMasYr: -78.5, pmDecMasYr: -150.8 }))).toBe(false);
+  });
+
   it('matches on direction rather than on 3D proximity', () => {
     // The distinction the merge rests on. These two are 60 pc apart in space and are the same
     // star; a 3D-proximity test would have to be so loose it swallowed real neighbours.

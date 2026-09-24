@@ -26,6 +26,13 @@ export interface StarRecord {
    * the better-measured parallax wins.
    */
   source?: string;
+  /**
+   * Proper motion in milliarcseconds a year, in right ascension (times cos δ) and declination,
+   * where the source measured one. Only the ETL sets these, for `star-merge.ts` to recognise two
+   * entries of one star whose positions disagree; the assets do not carry them.
+   */
+  pmRaMasYr?: number;
+  pmDecMasYr?: number;
 }
 
 /** HYG id used for the Sun itself, so solar-system bodies can reference their host star. */

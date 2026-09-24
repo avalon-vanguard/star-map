@@ -71,6 +71,37 @@ function buildQuery(): string {
 }
 
 /**
+ * The nearby complement of the query above: every source it leaves out for being fainter than its
+ * magnitude limit, or for having no G at all, out to 50 pc.
+ *
+ * The limit took a quarter of what lies within 10 pc — 84 of the 312 sources the Gaia Catalogue of
+ * Nearby Stars (GCNS; Gaia Collaboration, Smart et al. 2021, A&A 649, A6) has there, Teegarden's
+ * Star among them — and 28 012 within 50 pc: the red, brown and white dwarfs most of the Sun's
+ * neighbourhood is made of, which the map only had where Gliese happened to list them. Further out
+ * the same band is far too many rows to ship (G 12–13 alone is 188 408 within 250 pc).
+ *
+ * Only sources the GCNS keeps. Its classifier rejects 11 752 of the 39 764 that pass this parallax
+ * floor, and the parallax error the main query filters on would keep all but 13 of them: they are
+ * spurious parallaxes — median G 20.2 and 5.4 mas of astrometric excess noise, against 0.15 mas for
+ * the ones it keeps; 6 933 of them toward the crowded Galactic centre. GCNS was built on EDR3,
+ * whose astrometry and source ids DR3 carries unchanged. The error cut is kept for consistency; it
+ * costs no GCNS source here, brown dwarfs included.
+ */
+const NEARBY_DISTANCE_PC = 50;
+
+function buildNearbyQuery(): string {
+  return [
+    `select top ${ROW_LIMIT}`,
+    'g.source_id, g.ra, g.dec, g.pmra, g.pmdec, g.parallax, g.parallax_error, g.phot_g_mean_mag, g.bp_rp',
+    'from gaiadr3.gaia_source g join external.gaiaedr3_gcns_main_1 n on n.source_id = g.source_id',
+    `where g.parallax > ${parallaxFloorMas(NEARBY_DISTANCE_PC).toFixed(6)}`,
+    `and g.parallax_over_error > ${(1 / MAX_PARALLAX_ERROR_RATIO).toFixed(1)}`,
+    `and (g.phot_g_mean_mag >= ${MAGNITUDE_LIMIT} or g.phot_g_mean_mag is null)`,
+    'order by g.phot_g_mean_mag asc, g.source_id asc'
+  ].join(' ');
+}
+
+/**
  * How many rows the query above holds when nothing is overridden: 412 765, and DR3 is a finished
  * data release, so that number only moves when the query does. It lives here, under the query, so
  * that an edit to any of its filters is made with the count it invalidates in view.
@@ -87,6 +118,8 @@ function buildQuery(): string {
  * slice on purpose.
  */
 const DEFAULT_QUERY_ROWS = 412_765;
+/** The same count for the nearby query, which the same truncation would cut from its faint end. */
+const DEFAULT_NEARBY_QUERY_ROWS = 28_012;
 const MIN_ROW_SHARE = 0.95;
 
 /**
@@ -113,31 +146,54 @@ const UNKNOWN_SPECTRAL_TYPE = 'Unknown';
  * the real identifier in the name.
  */
 const GAIA_ID_BASE = 1_000_000_000;
+/**
+ * Where the nearby query's ids start: fifty million past the main query's, and under 2^30, the
+ * largest integer V8 keeps unboxed. The Int32 id column would take up to 2^31, but every id past
+ * 2^30 is a heap number in the app: starting these at 2 000 000 000 made the boot task that
+ * indexes the catalogue 230 ms longer (1.41 s against 1.18, medians of five interleaved runs).
+ */
+const NEARBY_ID_BASE = 1_050_000_000;
 
 export async function fetchGaiaStars(): Promise<StarRecord[]> {
-  const query = buildQuery();
-  const url = `${GAIA_TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=${encodeURIComponent(query)}`;
+  const unchanged = MAGNITUDE_LIMIT === DEFAULT_MAGNITUDE_LIMIT && ROW_LIMIT === DEFAULT_ROW_LIMIT;
   console.log(`Fetching Gaia DR3 (within ${DISTANCE_CUTOFF_PC} pc, G < ${MAGNITUDE_LIMIT}, at most ${ROW_LIMIT} rows)...`);
+  const rows = await fetchQueryRows(buildQuery(), unchanged && DISTANCE_CUTOFF_PC === DEFAULT_DISTANCE_CUTOFF_PC ? DEFAULT_QUERY_ROWS : undefined);
+  console.log(`Fetching Gaia DR3's nearby complement (within ${NEARBY_DISTANCE_PC} pc, G >= ${MAGNITUDE_LIMIT} or none, kept by the GCNS)...`);
+  const nearbyRows = await fetchQueryRows(buildNearbyQuery(), unchanged ? DEFAULT_NEARBY_QUERY_ROWS : undefined);
 
+  const stars = [...rowsToStars(rows, GAIA_ID_BASE), ...rowsToStars(nearbyRows, NEARBY_ID_BASE)];
+  console.log(`  kept ${stars.length} Gaia stars (of ${rows.length} + ${nearbyRows.length} rows).`);
+  return stars;
+}
+
+/**
+ * One query's rows, refused when there are fewer than `expectedRows` — see
+ * {@link DEFAULT_QUERY_ROWS} — or as many as the row limit.
+ */
+async function fetchQueryRows(query: string, expectedRows: number | undefined): Promise<Record<string, string>[]> {
+  const url = `${GAIA_TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=${encodeURIComponent(query)}`;
   // Keyed by the whole request, so a response cached for other columns, another order, or
   // another endpoint can never be mistaken for this one — the cache records only that some
   // response arrived, not what it answered.
   const cacheKey = `gaia-dr3-${createHash('sha1').update(url).digest('hex').slice(0, 8)}.csv`;
-  const csv = await fetchTextCached(url, cacheKey);
-  const rows = parseCsvObjects(csv);
-  const jobsQuery = DISTANCE_CUTOFF_PC === DEFAULT_DISTANCE_CUTOFF_PC && MAGNITUDE_LIMIT === DEFAULT_MAGNITUDE_LIMIT && ROW_LIMIT === DEFAULT_ROW_LIMIT;
-  if (jobsQuery && rows.length < DEFAULT_QUERY_ROWS * MIN_ROW_SHARE) {
+  const rows = parseCsvObjects(await fetchTextCached(url, cacheKey));
+  if (expectedRows !== undefined && rows.length < expectedRows * MIN_ROW_SHARE) {
     throw new GaiaAnswerError(
-      `Gaia returned ${rows.length} rows, not the ~${DEFAULT_QUERY_ROWS} this query holds — the answer was cut short, it was an error page ` +
-        `served with a 200, or the query was edited without updating DEFAULT_QUERY_ROWS; delete tools/etl/.cache/${cacheKey} once the archive answers properly`
+      `Gaia returned ${rows.length} rows, not the ~${expectedRows} this query holds — the answer was cut short, it was an error page ` +
+        `served with a 200, or the query was edited without updating its row count; delete tools/etl/.cache/${cacheKey} once the archive answers properly`
     );
   }
-  // Not gated on `jobsQuery` like the floor above it: the only ways to reach this cap are the
-  // overrides that *widen* the query, and they are exactly when it is worth saying. What it must
-  // not fire on is a deliberately smaller slice, where filling the limit is the whole point.
+  // Not gated like the floor above it: the only ways to reach this cap are the overrides that
+  // *widen* the query, and they are exactly when it is worth saying. What it must not fire on is
+  // a deliberately smaller slice, where filling the limit is the whole point.
   if (ROW_LIMIT >= DEFAULT_ROW_LIMIT && rows.length >= ROW_LIMIT) {
     throw new GaiaAnswerError(`Gaia returned the query's own ${ROW_LIMIT}-row limit, so it is the limit deciding what the map holds; raise ETL_GAIA_ROW_LIMIT.`);
   }
+  return rows;
+}
+
+/** Places each row at J2000.0, numbering them from `idBase` in the query's own order. */
+function rowsToStars(rows: readonly Record<string, string>[], idBase: number): StarRecord[] {
   const stars: StarRecord[] = [];
 
   rows.forEach((row, index) => {
@@ -153,22 +209,28 @@ export async function fetchGaiaStars(): Promise<StarRecord[]> {
       return;
     }
 
-    const j2000 = propagateProperMotion(raDeg, decDeg, parseOptionalNumber(row['pmra']) ?? 0, parseOptionalNumber(row['pmdec']) ?? 0, CATALOGUE_EPOCH - GAIA_DR3_EPOCH);
+    const pmRaMasYr = parseOptionalNumber(row['pmra']);
+    const pmDecMasYr = parseOptionalNumber(row['pmdec']);
+    const j2000 = propagateProperMotion(raDeg, decDeg, pmRaMasYr ?? 0, pmDecMasYr ?? 0, CATALOGUE_EPOCH - GAIA_DR3_EPOCH);
     const { x, y, z } = raDegDecDistanceToXyz(j2000.raDeg, j2000.decDeg, distancePc);
     stars.push({
-      id: GAIA_ID_BASE + index,
+      id: idBase + index,
       name: `Gaia DR3 ${row['source_id']}`,
       x,
       y,
       z,
+      // Only the nearby query has sources without a G, 45 of them, and they are given its limit.
+      // That errs bright: 26 of the 31 that 2MASS measured are at J 12.6–15.7, fainter still in G
+      // for stars this red, and 5 at J 7–8.
       magnitude: parseOptionalNumber(row['phot_g_mean_mag']) ?? MAGNITUDE_LIMIT,
       spectralType: UNKNOWN_SPECTRAL_TYPE,
       colorIndex: parseOptionalNumber(row['bp_rp']) ?? null,
-      source: 'gaia'
+      source: 'gaia',
+      pmRaMasYr,
+      pmDecMasYr
     });
   });
 
-  console.log(`  kept ${stars.length} Gaia stars (of ${rows.length} rows).`);
   return stars;
 }
 

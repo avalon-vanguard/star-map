@@ -48,6 +48,22 @@ export const MERGE_ANGULAR_TOLERANCE_DEG = 15 / 3600;
 export const MERGE_CERTAIN_ANGULAR_TOLERANCE_DEG = 3 / 3600;
 
 /**
+ * Angular separation, in degrees, within which two entries that cross the sky together are one
+ * star, and how closely their proper motions must agree (as a fraction of the kept entry's) to
+ * say so. Past fifteen arcseconds, and past a distance conflict, a Gliese-only entry is still
+ * often the same star: its position is off by up to a minute of arc and its distance is
+ * photometric — GJ 1035 sits 21″ from its Gaia entry, GJ 3052 at half Gaia's distance. What
+ * gives them away is their motion, which Gliese measured well: a few per cent from Gaia's.
+ *
+ * Once the nearby faint Gaia stars joined, 253 of the 602 Gliese-only stars left without a
+ * counterpart had a Gaia entry within a minute of arc moving within a fifth of their own motion;
+ * shifted a quarter of a degree, none did. Brightness still has its say, so a co-moving companion
+ * is not folded into its primary, and `fetchStars` gives HYG's motions only to those rows.
+ */
+export const MERGE_COMOVING_ANGULAR_TOLERANCE_DEG = 60 / 3600;
+export const MERGE_PROPER_MOTION_TOLERANCE = 0.2;
+
+/**
  * How much fainter, and how much brighter, an entry may be than the one it is folded into and
  * still be the same star. Bands differ, and not symmetrically: a red dwarf is three magnitudes
  * fainter in HYG's V than in Gaia's G, so the folded entry may be up to five fainter. A star is
@@ -159,10 +175,19 @@ export function directionCosine(a: StarRecord, b: StarRecord): number {
   return Math.max(-1, Math.min(1, ax * bx + ay * by + az * bz));
 }
 
+/** Whether both entries have a proper motion and `entry`'s is within tolerance of `kept`'s. */
+function movesWith(kept: StarRecord, entry: StarRecord): boolean {
+  if (kept.pmRaMasYr === undefined || kept.pmDecMasYr === undefined || entry.pmRaMasYr === undefined || entry.pmDecMasYr === undefined) {
+    return false;
+  }
+  const difference = Math.hypot(entry.pmRaMasYr - kept.pmRaMasYr, entry.pmDecMasYr - kept.pmDecMasYr);
+  return difference < MERGE_PROPER_MOTION_TOLERANCE * Math.hypot(kept.pmRaMasYr, kept.pmDecMasYr);
+}
+
 /**
  * Whether `entry` describes the star already `kept`: the same direction, the brightness not in
- * conflict and — unless the directions agree closely enough to settle it — the distance not in
- * conflict either.
+ * conflict and — unless the directions agree closely enough to settle it, or the two move
+ * together — the distance not in conflict either.
  */
 export function isSameStar(kept: StarRecord, entry: StarRecord): boolean {
   const [near, far] = [distanceOf(kept), distanceOf(entry)].sort((p, q) => p - q);
@@ -175,7 +200,8 @@ export function isSameStar(kept: StarRecord, entry: StarRecord): boolean {
   }
 
   const separationDeg = Math.acos(directionCosine(kept, entry)) / DEG_TO_RAD;
-  if (separationDeg > MERGE_ANGULAR_TOLERANCE_DEG) {
+  const comoving = movesWith(kept, entry);
+  if (separationDeg > (comoving ? MERGE_COMOVING_ANGULAR_TOLERANCE_DEG : MERGE_ANGULAR_TOLERANCE_DEG)) {
     return false;
   }
   const fainterBy = entry.magnitude - kept.magnitude;
@@ -183,7 +209,7 @@ export function isSameStar(kept: StarRecord, entry: StarRecord): boolean {
     return false;
   }
 
-  if (separationDeg <= MERGE_CERTAIN_ANGULAR_TOLERANCE_DEG) {
+  if (comoving || separationDeg <= MERGE_CERTAIN_ANGULAR_TOLERANCE_DEG) {
     return true;
   }
 

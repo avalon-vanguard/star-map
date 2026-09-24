@@ -26,6 +26,9 @@ function validateStars(stars: StarRecord[]): void {
   const ids = new Set<number>();
   for (const star of stars) {
     assertCondition(Number.isFinite(star.id), `Star has a non-numeric id: ${JSON.stringify(star)}`);
+    // Under 2^30, which V8 keeps unboxed; past it every id is a heap number, and the app's boot
+    // task grew by 230 ms when the nearby Gaia stars were numbered from 2 000 000 000.
+    assertCondition(star.id >= 0 && star.id < 2 ** 30, `Star ${star.id} has an id outside 0 to 2^30.`);
     assertCondition(!ids.has(star.id), `Duplicate star id: ${star.id}`);
     ids.add(star.id);
     assertCondition(!!star.name, `Star ${star.id} has no name.`);
@@ -59,26 +62,28 @@ function validateStars(stars: StarRecord[]): void {
  *
  * A star kept twice leaves its two entries near each other on the sky, from *different* sources —
  * one catalogue does not list a star twice. Under an arcsecond that is never two stars at this
- * depth, so every such pair is a miss. Nineteen survive today, all of them a second HYG row
- * wanting a Gaia entry that already absorbed one (Gliese lists some doubles twice); the merge
- * that trusted a Hipparcos parallax over direction left 1 112.
+ * depth, so every such pair is a miss. Twenty-three survive today; the nineteen first counted were
+ * all a second HYG row wanting a Gaia entry that already absorbed one (Gliese lists some doubles
+ * twice), and the merge that trusted a Hipparcos parallax over direction left 1 112.
  *
  * The other failure leaves no close pair at all, because proper motion had already carried the
  * two entries tens of arcseconds apart — the 2026-08-24 refresh, where HYG sat at epoch 2000.0
  * and Gaia at J2016.0. What it does leave is HYG rows that found no counterpart: 36 056 of them
- * against the 12 352 today, and no counterpart was possible for most of those. 8 301 of them are
+ * against the 11 554 today, and no counterpart was possible for most of those. 8 301 of them are
  * every star in the published catalogue beyond 250 pc, which the main query never downloads: 6 835
  * that Gaia's parallax puts past `ETL_GAIA_DISTANCE_PC` while Hipparcos put them inside
- * `ETL_STAR_DISTANCE_PC`, and 1 466 naked-eye stars kept at any distance. The rest are what Gaia
- * genuinely lacks: bright stars it saturates on, red dwarfs past its magnitude cut. So the headroom
- * left to the ceiling tracks the gap between those two cutoffs as much as Gaia's completeness.
+ * `ETL_STAR_DISTANCE_PC`, and 1 466 naked-eye stars kept at any distance. The other 3 252 are what
+ * Gaia genuinely lacks: 1 194 brighter than V 8, which it saturates on or measures poorly, 1 832
+ * between 8 and 12, and 226 fainter, 184 of them Gliese stars within 50 pc that neither of its
+ * queries holds. So the headroom left to the ceiling tracks the gap between those two cutoffs as
+ * much as Gaia's completeness.
  *
  * This bounds a merge that went wrong, and — loosely — a Gaia download that came back short: a
  * truncated answer leaves the HYG rows whose counterpart it dropped without one, so survivors go
- * *up*, not down. Measured before the naked-eye stars joined, which add about 1 466 to each
- * figure: 10 886, 11 004 at nine tenths of the rows, 12 711 at half, 16 258 at a third. So this
- * ceiling only catches a deep truncation, and `fetchGaiaStars` catches the shallower ones with its
- * own row floor.
+ * *up*, not down. Measured on the main query when it was the only one, with 10 886 survivors
+ * against today's 11 554: 11 004 at nine tenths of its rows, 12 711 at half, 16 258 at a third. So
+ * this ceiling only catches a deep truncation, and `fetchGaiaStars` catches the shallower ones
+ * with a row floor on each query.
  */
 const MAX_UNMERGED_TWINS = 100;
 const MAX_HYG_SURVIVORS = 15_000;

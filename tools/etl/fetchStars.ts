@@ -61,6 +61,15 @@ function resolveName(row: Record<string, string>): string {
 }
 
 /**
+ * HYG's spectral type, without the `...` that 2 127 of the map's stars end in, all of them
+ * Hipparcos stars: the Hipparcos catalogue's mark for a classification it does not print in full
+ * (Sirius is "A0m..."). On the map it read as text the app had cut short.
+ */
+function spectralTypeOf(row: Record<string, string>): string {
+  return (row['spect'] ?? '').replace(/\.\.\.$/, '') || 'Unknown';
+}
+
+/**
  * Downloads the HYG (Hipparcos/Yale/Gliese) stellar database, places each star along its
  * equatorial direction (epoch J2000.0) at the better of its Hipparcos and Gaia distances, keeps
  * the ones either survey puts within range, unions the other positional sources, and writes
@@ -135,7 +144,7 @@ export async function fetchStars(): Promise<StarRecord[]> {
       z: z * scale,
       magnitude,
       ...(magnitudeV === undefined ? {} : { magnitudeBand: 'V' as const }),
-      spectralType: row['spect'] || 'Unknown',
+      spectralType: spectralTypeOf(row),
       colorIndex: colorIndex ?? null,
       ...(colorIndex === undefined ? {} : { colorSystem: 'B-V' as const }),
       ...(distanceError === undefined ? {} : { distanceError }),

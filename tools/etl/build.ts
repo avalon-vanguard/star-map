@@ -80,6 +80,11 @@ function validateStars(stars: StarRecord[]): void {
     `${withoutError} stars have no distance error (at most ${MAX_STARS_WITHOUT_DISTANCE_ERROR} expected) — the parallax errors are being lost.`
   );
   console.log(`  ${withoutBand} stars with a stand-in magnitude; ${withoutError} distances without a published error.`);
+
+  // Hipparcos's mark on a classification it does not print in full reached the card as "Spectral
+  // type A0m...", for Sirius and 2 126 other stars, which reads as text the app cut short.
+  const dotted = stars.filter((star) => star.spectralType.endsWith('...')).length;
+  assertCondition(dotted === 0, `${dotted} spectral types end in "..." — fetchStars no longer trims Hipparcos's mark from them.`);
 }
 
 /**

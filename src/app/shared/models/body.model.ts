@@ -86,4 +86,34 @@ export interface BodyRecord {
    */
   rotationPeriodHours?: number;
   obliquityDeg?: number;
+  /**
+   * Where the body's pole points and which way its prime meridian faces at any date, from the IAU
+   * WGCCRE 2015 report (Archinal et al. 2018) as NAIF's `pck00011.tpc` carries it. Where present
+   * it alone sets how the body is drawn, and the ETL checks the period and obliquity above against
+   * it. Absent where the report gives none: Hyperion tumbles, and Nereid, Eris, Haumea and
+   * Makemake have no model.
+   */
+  rotationalElements?: RotationalElements;
+}
+
+/**
+ * The IAU's rotational elements for one body: polynomials in time, plus periodic terms.
+ *
+ * The pole's right ascension and declination are in degrees in the ICRF, `[c0, c1, c2]` for
+ * `c0 + c1 T + c2 T²`, T in Julian centuries from J2000.0 TDB. The prime meridian W is the angle
+ * along the body's equator, anticlockwise seen from above that pole, from where the equator rises
+ * through the ICRF equator to the body's longitude 0, `c0 + c1 d + c2 d²` with d in days. A
+ * negative rate turns the body clockwise about the pole the IAU names: Venus, Uranus and its
+ * moons, Triton.
+ */
+export interface RotationalElements {
+  poleRaDeg: number[];
+  poleDecDeg: number[];
+  primeMeridianDeg: number[];
+  /**
+   * Each adds `ra sin θ` to the right ascension, `dec cos θ` to the declination and `pm sin θ` to
+   * W, θ being `angleDeg[0] + angleDeg[1] T + angleDeg[2] T²`. The smallest are left out; see
+   * `parsePckRotationalElements`.
+   */
+  terms?: Array<{ angleDeg: number[]; ra: number; dec: number; pm: number }>;
 }

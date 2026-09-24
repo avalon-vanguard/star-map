@@ -1,8 +1,9 @@
 import { statSync } from 'node:fs';
 
 import { BodyRecord, OrbitalElements } from '../../src/app/shared/models/body.model';
-import { eclipticToEquatorial, laplacePlaneToEquatorial } from '../../src/app/shared/astro/coordinates';
+import { eclipticToEquatorial, laplacePlaneToEquatorial, raDecToUnitVector } from '../../src/app/shared/astro/coordinates';
 import { meanElementsAt, positionAtEpoch } from '../../src/app/shared/astro/kepler';
+import { orientationAt } from '../../src/app/shared/astro/rotational-elements';
 import { DeepSkyRecord } from '../../src/app/shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../src/app/shared/models/exoplanet.model';
 import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model';
@@ -146,6 +147,7 @@ function validateMerge(stars: StarRecord[]): void {
 const MAX_PLANET_OFFSET_DEG = 0.25;
 const MAX_MOON_OFFSET_DEG = 2.5;
 const KM_PER_AU = 149597870.7;
+const DEG_TO_RAD = Math.PI / 180;
 
 /**
  * The moons whose table row cannot come within that, each for a reason no mean ellipse carries,
@@ -163,6 +165,33 @@ const KM_PER_AU = 149597870.7;
  */
 const MOON_OFFSET_CEILINGS_DEG: Record<string, number> = { mimas: 46, hyperion: 21, iapetus: 11, nereid: 3 };
 
+/**
+ * The bodies the IAU WGCCRE 2015 report gives no rotational elements for: Hyperion tumbles, and
+ * Nereid, Eris, Haumea and Makemake have no model. Every other body must carry them, or the
+ * kernel was read wrongly and the body would be drawn on an invented pole.
+ */
+const WITHOUT_ROTATIONAL_ELEMENTS = new Set(['hyperion', 'nereid', 'eris', 'haumea', 'makemake']);
+
+/**
+ * How far the IAU's day, 360 degrees over W's rate, may be from the one Horizons states, as a
+ * fraction of it. Measured on this catalogue: at most 1.8e-5 (Jupiter's System III, 9.92492 hours
+ * against 9.92510). Neptune is 0.89 per cent out, because the report takes 15.9663 hours from the
+ * cloud features Karkoschka (2011) tracked, where Horizons keeps Voyager's radio period, 16.11. What
+ * this catches is a rate read in the wrong unit or for the wrong body: Oberon's day for Titania's is
+ * 55 per cent out.
+ */
+const MAX_DAY_OFFSET = 1e-4;
+const DAY_OFFSET_CEILINGS: Record<string, number> = { neptune: 0.01 };
+
+/**
+ * How far the tilt of the IAU's spin axis from the orbit may be from the obliquity Horizons
+ * states. The axis is the IAU's pole, turned end for end where W runs backwards: the report names
+ * a planet's north pole by the side of the solar system it lies on, whichever way the planet turns.
+ * Measured on this catalogue: at most 0.058 degrees (Venus, 177.358 against 177.3). Taken as the
+ * pole alone, Venus comes out at 2.6 degrees and Uranus at 82.2, which is what this catches.
+ */
+const MAX_OBLIQUITY_OFFSET_DEG = 0.1;
+
 function angleBetweenDeg(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }): number {
   const cosine = (a.x * b.x + a.y * b.y + a.z * b.z) / (Math.hypot(a.x, a.y, a.z) * Math.hypot(b.x, b.y, b.z));
   return (Math.acos(Math.min(1, Math.max(-1, cosine))) * 180) / Math.PI;
@@ -175,6 +204,7 @@ function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, Orbita
   assertCondition(ids.size === bodies.length, 'Duplicate body ids were found.');
 
   const offsets: string[] = [];
+  const spins: string[] = [];
   for (const body of bodies) {
     const orbitValues = Object.values(body.orbit);
     assertCondition(orbitValues.every(Number.isFinite), `Body ${body.id} has non-finite orbital elements.`);
@@ -195,6 +225,39 @@ function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, Orbita
 
     // A radius of 0 is what a page whose radius no pattern reads comes out as — Charon's did.
     assertCondition(body.radiusKm > 0, `Body ${body.id} has no radius; its page states it in a form the ETL does not read.`);
+
+    const rotation = body.rotationalElements;
+    assertCondition(
+      (rotation === undefined) === WITHOUT_ROTATIONAL_ELEMENTS.has(body.id),
+      `Body ${body.id} ${rotation ? 'has' : 'has no'} IAU rotational elements, which the report ${rotation ? 'does not give' : 'gives'} for it.`
+    );
+    if (rotation) {
+      const rate = rotation.primeMeridianDeg[1];
+      if (body.rotationPeriodHours !== undefined) {
+        const dayOffset = Math.abs(((360 / Math.abs(rate)) * 24) / Math.abs(body.rotationPeriodHours) - 1);
+        const dayCeiling = DAY_OFFSET_CEILINGS[body.id] ?? MAX_DAY_OFFSET;
+        assertCondition(
+          dayOffset <= dayCeiling,
+          `${body.name}'s IAU day, ${((360 / Math.abs(rate)) * 24).toFixed(5)} hours, is ${dayOffset.toExponential(2)} of its length from Horizons' ${Math.abs(body.rotationPeriodHours).toFixed(5)} (at most ${dayCeiling} expected).`
+        );
+        spins.push(`${body.id} day ${dayOffset.toExponential(1)}`);
+      }
+      if (body.obliquityDeg !== undefined) {
+        const pole = orientationAt(rotation, horizons!.epochJd);
+        const pointing = raDecToUnitVector(pole.poleRaDeg / 15, pole.poleDecDeg);
+        const axis = { x: Math.sign(rate) * pointing.x, y: Math.sign(rate) * pointing.y, z: Math.sign(rate) * pointing.z };
+        const { inclinationDeg, longitudeOfAscendingNodeDeg } = meanElementsAt(body.orbit, body.rates, horizons!.epochJd);
+        const tilt = inclinationDeg * DEG_TO_RAD;
+        const node = longitudeOfAscendingNodeDeg * DEG_TO_RAD;
+        const normal = { x: Math.sin(tilt) * Math.sin(node), y: -Math.sin(tilt) * Math.cos(node), z: Math.cos(tilt) };
+        const obliquity = angleBetweenDeg(axis, body.laplacePole ? laplacePlaneToEquatorial(normal, body.laplacePole) : eclipticToEquatorial(normal));
+        assertCondition(
+          Math.abs(obliquity - body.obliquityDeg) <= MAX_OBLIQUITY_OFFSET_DEG,
+          `${body.name}'s IAU spin axis is ${obliquity.toFixed(3)} degrees from its orbit's pole, where Horizons gives an obliquity of ${body.obliquityDeg} (at most ${MAX_OBLIQUITY_OFFSET_DEG} apart expected) — the pole or the sense of W was read wrongly.`
+        );
+        spins.push(`${body.id} tilt ${obliquity.toFixed(3)}`);
+      }
+    }
 
     if (body.kind === 'moon') {
       const parent = bodies.find((candidate) => candidate.id === body.parentBodyId);
@@ -233,6 +296,7 @@ function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, Orbita
   const dwarfCount = bodies.filter((body) => body.kind === 'dwarf').length;
   assertCondition(dwarfCount === 5, `Expected the IAU's 5 dwarf planets, found ${dwarfCount}.`);
   console.log(`  mean elements against Horizons, degrees: ${offsets.join(', ')}.`);
+  console.log(`  IAU rotation against Horizons (day as a fraction of it, tilt in degrees): ${spins.join(', ')}.`);
 }
 
 function validateExoplanets(exoplanets: ExoplanetRecord[], starIds: Set<number>): void {

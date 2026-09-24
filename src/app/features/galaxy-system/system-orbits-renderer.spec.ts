@@ -453,6 +453,31 @@ describe('rotation', () => {
   });
 });
 
+describe('derived surfaces', () => {
+  const maps = (renderer: SystemOrbitsRenderer): Array<THREE.Texture | null> =>
+    renderer.members.map((member) => ((member.marker as THREE.Mesh).material as THREE.MeshStandardMaterial).map);
+  const nextTask = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+  const twoPlanets = (): SystemOrbitsRenderer =>
+    new SystemOrbitsRenderer([], [exoplanet({ radiusEarth: 1.1 }), exoplanet({ id: 'TRAPPIST-1 c', name: 'TRAPPIST-1 c', radiusEarth: 1.0 })], undefined, 1);
+
+  it('paints them after the system is built, one a task, so entering a system is not held up', async () => {
+    const renderer = twoPlanets();
+    expect(maps(renderer)).toEqual([null, null]);
+    await nextTask();
+    expect(maps(renderer).filter(Boolean)).toHaveLength(1);
+    await nextTask();
+    expect(maps(renderer).every(Boolean)).toBe(true);
+    renderer.dispose();
+  });
+
+  it('paints nothing once the system is left', async () => {
+    const renderer = twoPlanets();
+    renderer.dispose();
+    await nextTask();
+    expect(maps(renderer)).toEqual([null, null]);
+  });
+});
+
 describe('exoplanet size without a measured radius', () => {
   const radiusOf = (overrides: Partial<ExoplanetRecord>): number => {
     const renderer = new SystemOrbitsRenderer([], [exoplanet(overrides)], undefined, 1);

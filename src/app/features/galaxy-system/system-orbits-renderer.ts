@@ -170,20 +170,37 @@ function buildOrbitLine(elements: OrbitalElements, kind: SystemMemberKind, frame
  * drew every body from a 32 by 16 pixel procedural texture instead, which at a few pixels across
  * was indistinguishable from its average colour and, once the camera closed in, was a blur. A
  * marker can now fill the frame, so it takes the real image at the size the detail page uses.
+ *
+ * A derived texture is not painted here but handed to `deferSurface`, which paints it after the
+ * system is built: at about 4.4 ms each, the twenty bodies the solar system gained with its dwarf
+ * planets and smaller moons lengthened the task that enters it from 78-94 ms to 177-228. Until
+ * then the body is its kind's flat colour.
  */
-function buildMarker(id: string | undefined, kind: SystemMemberKind, radiusKm: number | undefined, appearance: PlanetAppearance | undefined): THREE.Mesh {
+function buildMarker(
+  id: string | undefined,
+  kind: SystemMemberKind,
+  radiusKm: number | undefined,
+  appearance: PlanetAppearance | undefined,
+  deferSurface: (paint: () => void) => void
+): THREE.Mesh {
   const geometry = new THREE.SphereGeometry(bodyMarkerRadiusAu(radiusKm), MARKER_WIDTH_SEGMENTS, MARKER_HEIGHT_SEGMENTS);
   const photograph = id ? bodyTexturePath(id) : undefined;
-  // 128 by 64 for the derived texture, not the detail page's 512 by 256: that size costs about
-  // 60 ms a body on the main thread, 360 ms on entering a six-planet system, for a disc that is a
-  // few pixels across until the camera is on top of it.
-  const map = photograph ? loadCachedTexture(photograph) : appearance ? planetTexture(appearance, { width: 128, height: 64 }) : undefined;
+  const map = photograph ? loadCachedTexture(photograph) : undefined;
   const material = new THREE.MeshStandardMaterial({
     map,
     color: map ? 0xffffff : colorForKind(kind),
     roughness: 1,
     metalness: 0
   });
+  if (!photograph && appearance) {
+    deferSurface(() => {
+      // 128 by 64, not the detail page's 512 by 256: that size costs about 60 ms a body on the
+      // main thread, for a disc that is a few pixels across until the camera is on top of it.
+      material.map = planetTexture(appearance, { width: 128, height: 64 });
+      material.color.set(0xffffff);
+      material.needsUpdate = true;
+    });
+  }
   return new THREE.Mesh(geometry, material);
 }
 
@@ -335,6 +352,17 @@ export class SystemOrbitsRenderer {
    * following them each tick costs no allocation at all.
    */
   private tetherPoints: readonly THREE.Vector3[] = [];
+  /** Derived surfaces still to paint, one a task, once the constructor is done; see `buildMarker`. */
+  private readonly surfacesToPaint: Array<() => void> = [];
+  private surfaceTimer?: ReturnType<typeof setTimeout>;
+  private readonly deferSurface = (paint: () => void): void => {
+    this.surfacesToPaint.push(paint);
+    this.surfaceTimer ??= setTimeout(this.paintNextSurface, 0);
+  };
+  private readonly paintNextSurface = (): void => {
+    this.surfacesToPaint.shift()?.();
+    this.surfaceTimer = this.surfacesToPaint.length > 0 ? setTimeout(this.paintNextSurface, 0) : undefined;
+  };
 
   constructor(
     bodies: readonly BodyRecord[],
@@ -515,6 +543,8 @@ export class SystemOrbitsRenderer {
   }
 
   dispose(): void {
+    clearTimeout(this.surfaceTimer);
+    this.surfacesToPaint.length = 0;
     this.grid?.dispose();
     this.tethers?.dispose();
     for (const { geometry, material } of this.disposables) {
@@ -540,7 +570,7 @@ export class SystemOrbitsRenderer {
     rotation?: { periodHours?: number; obliquityDeg?: number }
   ): TrackedTopLevelBody {
     const orbitLine = buildOrbitLine(elements, kind, frame);
-    const marker = buildMarker(id, kind, radiusKm, appearance);
+    const marker = buildMarker(id, kind, radiusKm, appearance, this.deferSurface);
     this.object.add(orbitLine, marker);
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);
     this.trackDisposable(marker.geometry, marker.material as THREE.Material);
@@ -563,7 +593,7 @@ export class SystemOrbitsRenderer {
   ): TrackedMoon {
     const pivot = new THREE.Group();
     const orbitLine = buildOrbitLine(elements, 'moon', frame);
-    const marker = buildMarker(id, 'moon', radiusKm, appearance);
+    const marker = buildMarker(id, 'moon', radiusKm, appearance, this.deferSurface);
     pivot.add(orbitLine, marker);
     this.object.add(pivot);
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);

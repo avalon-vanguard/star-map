@@ -38,6 +38,11 @@ const JULIAN_DATE_AT_EPOCH = 2440587.5;
 @Injectable({ providedIn: 'root' })
 export class TimeStore {
   readonly rate = signal<number>(TIME_RATES[0].secondsPerSecond);
+  /**
+   * Whether the map is drawn for the present. Not the same as a rate of one: after an excursion at
+   * a month a second, real time carries on from months ahead, and the map is still away from now.
+   */
+  readonly atNow = signal(true);
 
   private anchorJd = dateToJulianDate();
   private anchorWallMs = Date.now();
@@ -62,6 +67,9 @@ export class TimeStore {
     this.anchorJd = this.julianDate();
     this.anchorWallMs = Date.now();
     this.rate.set(secondsPerSecond);
+    if (secondsPerSecond !== 1) {
+      this.atNow.set(false);
+    }
   }
 
   /** Back to now, at real time — the state the map opens in. */
@@ -69,5 +77,6 @@ export class TimeStore {
     this.anchorJd = dateToJulianDate();
     this.anchorWallMs = Date.now();
     this.rate.set(TIME_RATES[0].secondsPerSecond);
+    this.atNow.set(true);
   }
 }

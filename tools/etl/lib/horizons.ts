@@ -21,8 +21,9 @@ export interface HorizonsResult {
   radiusKm?: number;
   orbit: OrbitalElements;
   /**
-   * Sidereal rotation period in hours, negative where the body turns retrograde — Venus, whose
-   * day runs backwards, and Triton. Absent where the page publishes none.
+   * Sidereal rotation period in hours, negative where the page gives a negative rate —
+   * Venus and Uranus. Absent where the page publishes none. The same pages also give an obliquity
+   * past 90 degrees for those two, which says the same thing again; see the renderer's spinFor.
    */
   rotationPeriodHours?: number;
   /** Tilt of the rotation axis from the body's own orbital plane, in degrees. */
@@ -43,10 +44,10 @@ const RADIUS_PATTERNS = [
  * How each page states how fast the body turns, in the order they are tried.
  *
  * The rate in radians per second is preferred wherever it appears: it is unambiguous and it is
- * signed, which is how Venus and Triton are known to turn backwards. A period in hours or days
- * comes next, then the sexagesimal form the giant planets use, and finally the word every major
- * moon here carries instead of a number — tidally locked, so its day is its year, which the
- * caller supplies from the orbit it has already parsed.
+ * signed: Venus and Uranus carry a negative one. A period in hours or days
+ * comes next, then the sexagesimal form the giant planets use, and finally the word most moons carry
+ * instead of a number, Synchronous. Not all do — the Moon's page gives a rate, Titan's nothing —
+ * so the caller treats every moon it lists as locked whatever its page says.
  */
 const ROTATION_RATE_PATTERN = /Rot(?:ational)?\.?\s*Rate\s*[(,]\s*rad\/s\s*\)?\s*=\s*(-?[\d.]+)/i;
 const ROTATION_PERIOD_PATTERNS = [
@@ -63,7 +64,7 @@ const SECONDS_PER_HOUR = 3600;
 
 /**
  * True where the page gives no number because the body keeps one face to its parent, so its day
- * is its orbit — every major moon here. The period itself is then Kepler's, which the caller
+ * is its orbit. The period itself is then Kepler's, which the caller
  * works out from the elements above and the parent's mass.
  */
 export function isTidallyLocked(text: string): boolean {

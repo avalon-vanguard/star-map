@@ -323,7 +323,7 @@ function isWideViewport(): boolean {
                     {{ rate.label }}
                   </label>
                 }
-                @if (time.rate() !== 1) {
+                @if (!time.atNow()) {
                   <button
                     type="button"
                     (click)="time.reset()"
@@ -384,7 +384,7 @@ function isWideViewport(): boolean {
             </button>
           }
         </div>
-        <!-- Only while the clock is running faster than the world: at real time the date is
+        <!-- Only while the map is away from the present: at the present the date is
              today's, which the reader's own machine already says. -->
         @if (date()) {
           <p
@@ -418,7 +418,7 @@ export class HudDockComponent implements OnInit {
   readonly note = input('');
   /** Camera range, pre-formatted by the scene, which is the only thing that knows the units. */
   readonly range = input('');
-  /** The date the sky is drawn for; empty while the clock runs at real time. */
+  /** The date the sky is drawn for; empty while the map is drawn for the present. */
   readonly date = input('');
   /** Layer state; `null` means the surface has no layers to toggle and no Display tab. */
   readonly display = input<HudDisplay | null>(null);

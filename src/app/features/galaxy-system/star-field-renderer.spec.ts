@@ -180,11 +180,13 @@ describe('StarFieldRenderer', () => {
       const centre = new THREE.Vector3(0, 0, -10).project(camera);
       expect(renderer.pickAt(new THREE.Vector2(centre.x, centre.y), camera, camera.aspect)).toBe(9);
 
-      // The same star, now a hair outside the top of the frame.
-      const above = [star({ id: 9, x: 0, y: 10 * Math.tan((camera.fov * Math.PI) / 360) * 1.02, z: -10, magnitude: -2 })];
+      // The same star, just outside the top of the frame: its centre at NDC 1.01, its disc ending at
+      // 1.0033. A click at 0.995 is within its hit radius (0.0167) — so without the frame test this
+      // picks it — while none of the star is on screen.
+      const above = [star({ id: 9, x: 0, y: 10 * Math.tan((camera.fov * Math.PI) / 360) * 1.01, z: -10, magnitude: -2 })];
       const outside = new StarFieldRenderer(above, packPositions(above));
 
-      expect(outside.pickAt(new THREE.Vector2(0, 0.99), camera, camera.aspect)).toBeUndefined();
+      expect(outside.pickAt(new THREE.Vector2(0, 0.995), camera, camera.aspect)).toBeUndefined();
       renderer.dispose();
       outside.dispose();
     });

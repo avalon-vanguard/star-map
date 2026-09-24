@@ -7,7 +7,7 @@ import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model'
 import { fetchDeepSky } from './fetchDeepSky';
 import { fetchExoplanets } from './fetchExoplanets';
 import { fetchSolarSystem } from './fetchSolarSystem';
-import { BYTES_PER_STAR_META, BYTES_PER_STAR_POSITION, decodeStarCatalog, encodeStarCatalog } from '../../src/app/shared/models/star-catalog';
+import { BYTES_PER_STAR_META, BYTES_PER_STAR_POSITION, decodeStarCatalog, encodeStarCatalog, isDesignation } from '../../src/app/shared/models/star-catalog';
 import { fetchStars } from './fetchStars';
 import { describeSources } from './sources/registry';
 import { dataPath } from './lib/paths';
@@ -155,14 +155,19 @@ function validateBodies(bodies: BodyRecord[]): void {
   assertCondition(planetCount === 8, `Expected 8 planets, found ${planetCount}.`);
 }
 
-function validateExoplanets(exoplanets: ExoplanetRecord[], starIds: Set<number>): void {
+function validateExoplanets(exoplanets: ExoplanetRecord[], stars: StarRecord[]): void {
   assertCondition(exoplanets.length > 0, 'No exoplanets were produced.');
+  const starsById = new Map(stars.map((star) => [star.id, star]));
 
   let crossReferenced = 0;
   for (const exoplanet of exoplanets) {
     assertCondition(!!exoplanet.name, `Exoplanet ${exoplanet.id} has no name.`);
     if (exoplanet.hostStarId !== null) {
-      assertCondition(starIds.has(exoplanet.hostStarId), `Exoplanet ${exoplanet.id} references unknown star id ${exoplanet.hostStarId}.`);
+      const host = starsById.get(exoplanet.hostStarId);
+      assertCondition(host !== undefined, `Exoplanet ${exoplanet.id} references unknown star id ${exoplanet.hostStarId}.`);
+      // A host known only as "Gaia DR3 2635476908753563008" cannot be found by searching for
+      // TRAPPIST-1; fetchExoplanets names it after its host, and 575 were renamed.
+      assertCondition(!isDesignation(host!), `Exoplanet ${exoplanet.id}'s host is only a designation, ${host!.name}, not named after ${exoplanet.hostStarName}.`);
       // The Sun has no exoplanets, so any match to it is a matching failure — historically a
       // blank distance column parsing as 0, which puts the host at the origin and matches Sol
       // exactly. Free, permanent tripwire for that whole class of bug.
@@ -183,7 +188,7 @@ function validateExoplanets(exoplanets: ExoplanetRecord[], starIds: Set<number>)
     );
   }
 
-  console.log(`  ${crossReferenced}/${exoplanets.length} exoplanets cross-referenced to a HYG host star.`);
+  console.log(`  ${crossReferenced}/${exoplanets.length} exoplanets have a host star on the map.`);
 
   // How many can be propagated at their real rate rather than as if the host were the Sun.
   const withPeriod = exoplanets.filter((exoplanet) => exoplanet.periodDays !== undefined).length;
@@ -257,11 +262,12 @@ async function build(): Promise<void> {
   console.log(describeSources());
   console.log();
 
-  const stars = await fetchStars();
+  const catalogueStars = await fetchStars();
   console.log();
   const bodies = await fetchSolarSystem();
   console.log();
-  const exoplanets = await fetchExoplanets(stars);
+  // Names the Gaia designations that host planets, so it is this list, not the one above, that is published.
+  const { exoplanets, stars } = await fetchExoplanets(catalogueStars);
   console.log();
   const deepSky = await fetchDeepSky();
   console.log();
@@ -270,7 +276,7 @@ async function build(): Promise<void> {
   validateStars(stars);
   validateMerge(stars);
   validateBodies(bodies);
-  validateExoplanets(exoplanets, new Set(stars.map((star) => star.id)));
+  validateExoplanets(exoplanets, stars);
   validateDeepSky(deepSky);
 
   console.log('\nETL completed successfully:');

@@ -189,7 +189,7 @@ async function mergeWithOtherSources(hygStars: StarRecord[]): Promise<StarRecord
   return stars;
 }
 
-function writeStarAssets(stars: StarRecord[]): void {
+export function writeStarAssets(stars: StarRecord[]): void {
   ensureDataDir();
 
   // The layout lives in `star-catalog.ts`, which the app decodes with — one definition, so the

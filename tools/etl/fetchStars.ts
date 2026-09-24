@@ -127,7 +127,11 @@ export async function fetchStars(): Promise<StarRecord[]> {
       z: z * scale,
       magnitude,
       spectralType: row['spect'] || 'Unknown',
-      colorIndex: parseOptionalNumber(row['ci']) ?? null
+      colorIndex: parseOptionalNumber(row['ci']) ?? null,
+      // Only for the Gliese-only rows, whose positions are what the merge needs the motion to see
+      // past. A Hipparcos position is good to under an arcsecond; given its motion too, 15 stars
+      // took their co-moving companion's Gaia entry, and the companion was kept twice.
+      ...(row['hip'] ? {} : { pmRaMasYr: parseOptionalNumber(row['pmra']), pmDecMasYr: parseOptionalNumber(row['pmdec']) })
     });
   }
 

@@ -4,9 +4,11 @@ import { GM_SUN_AU3_PER_DAY2, DEFAULT_EPOCH_JD } from './constants';
 import {
   gravitationalParameterFromPeriod,
   isPropagatableOrbit,
+  meanElementsAt,
   meanMotionRadPerDay,
   orbitEllipsePoints,
   orbitalPeriodDays,
+  positionAtEpoch,
   positionAtTrueAnomaly,
   propagateOrbit,
   resolveGravitationalParameter,
@@ -128,6 +130,46 @@ describe('propagateOrbit', () => {
     expect(afterOneOrbit.x).toBeCloseTo(start.x, 6);
     expect(afterOneOrbit.y).toBeCloseTo(start.y, 6);
     expect(afterOneOrbit.z).toBeCloseTo(start.z, 6);
+  });
+});
+
+describe('meanElementsAt', () => {
+  /** A circle in the reference plane, prograde (0) or retrograde (180), whose node turns. */
+  function circle(inclinationDeg: number) {
+    return { semiMajorAxisAu: 1, eccentricity: 0, inclinationDeg, longitudeOfAscendingNodeDeg: 0, argumentOfPeriapsisDeg: 0, meanAnomalyAtEpochDeg: 0, epochJd: DEFAULT_EPOCH_JD };
+  }
+  const RATES = { meanMotionDegPerDay: 10, longitudeOfAscendingNodeDegPerDay: 0.5, argumentOfPeriapsisDegPerDay: 0.2 };
+
+  /** Longitude in the reference plane a day on, in degrees, signed. */
+  function longitudeAfterOneDay(inclinationDeg: number): number {
+    const { x, y } = positionAtEpoch(meanElementsAt(circle(inclinationDeg), RATES, DEFAULT_EPOCH_JD + 1));
+    return (Math.atan2(y, x) * 180) / Math.PI;
+  }
+
+  it('goes round at its mean motion however its node and periapsis turn', () => {
+    expect(longitudeAfterOneDay(0)).toBeCloseTo(10, 9);
+  });
+
+  it('goes round a retrograde orbit backwards at the same rate, the node’s turning added back', () => {
+    // Taking the node off as for a prograde orbit made this 9 degrees, and Triton drifted a
+    // degree a year from where Horizons has it.
+    expect(longitudeAfterOneDay(180)).toBeCloseTo(-10, 9);
+  });
+
+  it('turns the node and periapsis at their own rates, and dates the result', () => {
+    const later = meanElementsAt(circle(0), RATES, DEFAULT_EPOCH_JD + 4);
+    expect(later.longitudeOfAscendingNodeDeg).toBeCloseTo(2, 12);
+    expect(later.argumentOfPeriapsisDeg).toBeCloseTo(0.8, 12);
+    expect(later.epochJd).toBe(DEFAULT_EPOCH_JD + 4);
+  });
+
+  it('adds Standish’s b T² + c cos(fT) + s sin(fT) to the mean anomaly', () => {
+    const terms = { b: -0.00012452, c: 0.0606406, s: -0.35635438, f: 38.35125 };
+    const T = 0.7;
+    const withTerms = meanElementsAt(circle(0), { ...RATES, meanAnomalyTerms: terms }, DEFAULT_EPOCH_JD + T * 36525);
+    const without = meanElementsAt(circle(0), RATES, DEFAULT_EPOCH_JD + T * 36525);
+    const f = (terms.f * T * Math.PI) / 180;
+    expect(withTerms.meanAnomalyAtEpochDeg - without.meanAnomalyAtEpochDeg).toBeCloseTo(terms.b * T * T + terms.c * Math.cos(f) + terms.s * Math.sin(f), 9);
   });
 });
 

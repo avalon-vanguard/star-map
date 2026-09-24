@@ -34,6 +34,9 @@ const earth: BodyRecord = {
   kind: 'planet',
   radiusKm: 6371,
   orbit: orbit(),
+  // Standish's mean longitude rate, 35 999.373 degrees a century.
+  rates: { meanMotionDegPerDay: 35999.37306329 / 36525, longitudeOfAscendingNodeDegPerDay: 0, argumentOfPeriapsisDegPerDay: 0 },
+  orbitSource: 'JPL approximate mean elements (Standish), fit for 3000 BC to AD 3000',
 };
 const luna: BodyRecord = {
   id: 'luna',
@@ -43,6 +46,9 @@ const luna: BodyRecord = {
   radiusKm: 1737,
   parentBodyId: 'earth',
   orbit: orbit({ semiMajorAxisAu: 0.00257 }),
+  // JPL SSD's sidereal mean motion for the Moon.
+  rates: { meanMotionDegPerDay: 13.176358, longitudeOfAscendingNodeDegPerDay: -0.05299, argumentOfPeriapsisDegPerDay: 0.16435 },
+  orbitSource: 'JPL SSD satellite mean elements, epoch 2000 Jan 1',
 };
 
 describe('heliocentricPeriodDays', () => {

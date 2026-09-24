@@ -21,7 +21,8 @@ const UNKNOWN_MAGNITUDE = 15;
 
 /**
  * Stars either survey places within this distance (parsecs) of the Sun are kept for the galaxy
- * view; `placementDistancePc` decides which distance a kept star is drawn at.
+ * view, and every naked-eye star wherever it is; `placementDistancePc` decides which distance a
+ * kept star is drawn at.
  *
  * Set at the range Hipparcos's own measurements reach rather than at a round number: its
  * parallaxes are good to roughly a milliarcsecond, so at 250 pc (4 mas) a distance is uncertain
@@ -87,7 +88,8 @@ export async function fetchStars(): Promise<StarRecord[]> {
     const hygPc = Number(row['dist']);
     const hipparcosPc = Number.isFinite(hygPc) && hygPc > 0 && hygPc < HYG_UNKNOWN_DISTANCE_PC ? hygPc : undefined;
     const gaiaPc = row['hip'] ? gaiaPcByHip.get(Number(row['hip'])) : undefined;
-    const distancePc = placementDistancePc(hipparcosPc, gaiaPc, DISTANCE_CUTOFF_PC);
+    const magnitude = parseOptionalNumber(row['mag']) ?? UNKNOWN_MAGNITUDE;
+    const distancePc = placementDistancePc(hipparcosPc, gaiaPc, magnitude, DISTANCE_CUTOFF_PC);
     if (distancePc === null) {
       continue;
     }
@@ -123,7 +125,7 @@ export async function fetchStars(): Promise<StarRecord[]> {
       x: x * scale,
       y: y * scale,
       z: z * scale,
-      magnitude: parseOptionalNumber(row['mag']) ?? UNKNOWN_MAGNITUDE,
+      magnitude,
       spectralType: row['spect'] || 'Unknown',
       colorIndex: parseOptionalNumber(row['ci']) ?? null
     });

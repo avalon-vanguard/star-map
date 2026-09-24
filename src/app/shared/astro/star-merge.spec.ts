@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { raDegDecDistanceToXyz } from './coordinates';
 import { StarRecord } from '../models/star.model';
-import { directionCosine, isSameStar, MERGE_ANGULAR_TOLERANCE_DEG, mergeStarCatalogues, placementDistancePc } from './star-merge';
+import { directionCosine, isSameStar, MERGE_ANGULAR_TOLERANCE_DEG, mergeStarCatalogues, NAKED_EYE_MAGNITUDE, placementDistancePc } from './star-merge';
 
 /** A star at a given sky position and distance, which is how catalogues actually report them. */
 function at(id: number, raDeg: number, decDeg: number, distancePc: number, overrides: Partial<StarRecord> = {}): StarRecord {
@@ -240,32 +240,44 @@ describe('mergeStarCatalogues', () => {
 
 describe('placementDistancePc', () => {
   it("draws a star both surveys measured at Gaia's distance", () => {
-    expect(placementDistancePc(120, 118.4, 250)).toBe(118.4);
+    expect(placementDistancePc(120, 118.4, 8, 250)).toBe(118.4);
   });
 
   // The case the old cut got wrong: Hipparcos inside, Gaia outside. Kept, at the distance Gaia
   // gives, rather than at one a third short or dropped for having been misplaced.
   it('keeps a star Hipparcos put inside the cutoff, where Gaia puts it, even past the cutoff', () => {
-    expect(placementDistancePc(200, 306, 250)).toBe(306);
+    expect(placementDistancePc(200, 306, 8, 250)).toBe(306);
   });
 
   // The mirror image: Hipparcos outside, Gaia inside. The Gaia download already holds the star,
   // and keeping the HYG row is what lets the merge give that entry its name.
   it('keeps a star only Gaia puts inside the cutoff', () => {
-    expect(placementDistancePc(262, 241, 250)).toBe(241);
+    expect(placementDistancePc(262, 241, 8, 250)).toBe(241);
   });
 
   it('keeps a star Gaia measured and Hipparcos gave no distance for', () => {
-    expect(placementDistancePc(undefined, 180, 250)).toBe(180);
+    expect(placementDistancePc(undefined, 180, 8, 250)).toBe(180);
   });
 
   it('falls back to Hipparcos where Gaia has no usable distance', () => {
-    expect(placementDistancePc(90, undefined, 250)).toBe(90);
+    expect(placementDistancePc(90, undefined, 8, 250)).toBe(90);
   });
 
   it('drops a star both surveys put outside, or neither measured', () => {
-    expect(placementDistancePc(300, 410, 250)).toBeNull();
-    expect(placementDistancePc(300, undefined, 250)).toBeNull();
-    expect(placementDistancePc(undefined, undefined, 250)).toBeNull();
+    expect(placementDistancePc(300, 410, 8, 250)).toBeNull();
+    expect(placementDistancePc(300, undefined, 8, 250)).toBeNull();
+    expect(placementDistancePc(undefined, undefined, 8, 250)).toBeNull();
+  });
+
+  // Rigel: Hipparcos 265 pc, and no Gaia distance, since Gaia saturates on it. The cutoff bounds a
+  // download, not what the sky shows, and a map without the middle of Orion's belt is not the sky.
+  it('keeps a star the naked eye sees at any distance, at the better one', () => {
+    expect(placementDistancePc(265, undefined, 0.18, 250)).toBe(265);
+    expect(placementDistancePc(433, 802, NAKED_EYE_MAGNITUDE, 250)).toBe(802);
+    expect(placementDistancePc(433, 802, NAKED_EYE_MAGNITUDE + 0.01, 250)).toBeNull();
+  });
+
+  it('still drops a naked-eye star no survey gives a distance for', () => {
+    expect(placementDistancePc(undefined, undefined, 3.3, 250)).toBeNull();
   });
 });

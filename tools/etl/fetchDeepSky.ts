@@ -8,6 +8,12 @@ import { fetchTextCached } from './lib/http';
 import { dataPath, ensureDataDir } from './lib/paths';
 
 const OPENNGC_CSV_URL = 'https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv';
+/**
+ * OpenNGC's second file, with the same columns, for the objects no NGC or IC number covers:
+ * the Pleiades, the Hyades, the Large Magellanic Cloud, the Horsehead, the Coalsack. Without
+ * it the brightest deep-sky object in the sky is missing while the Small Cloud is drawn.
+ */
+const OPENNGC_ADDENDUM_CSV_URL = 'https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/addendum.csv';
 /** OpenNGC publishes semicolon-separated files, not comma-separated. */
 const OPENNGC_DELIMITER = ';';
 
@@ -64,8 +70,10 @@ function resolveName(commonName: string | null, messier: string | null, designat
  */
 export async function fetchDeepSky(): Promise<DeepSkyRecord[]> {
   console.log('Fetching OpenNGC deep-sky catalog...');
-  const csv = await fetchTextCached(OPENNGC_CSV_URL, 'openngc.csv');
-  const rows = parseCsvObjects(csv, OPENNGC_DELIMITER);
+  const rows = [
+    ...parseCsvObjects(await fetchTextCached(OPENNGC_CSV_URL, 'openngc.csv'), OPENNGC_DELIMITER),
+    ...parseCsvObjects(await fetchTextCached(OPENNGC_ADDENDUM_CSV_URL, 'openngc-addendum.csv'), OPENNGC_DELIMITER)
+  ];
 
   const records: DeepSkyRecord[] = [];
   let skippedUnclassified = 0;

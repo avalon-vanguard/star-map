@@ -193,6 +193,19 @@ function validateExoplanets(exoplanets: ExoplanetRecord[], starIds: Set<number>)
 
 const UNIT_VECTOR_TOLERANCE = 1e-6;
 
+/**
+ * Objects the backdrop cannot ship without, two from each of OpenNGC's files: the Andromeda
+ * Galaxy and the Small Magellanic Cloud from NGC.csv, the Large Magellanic Cloud and the
+ * Pleiades from addendum.csv. The addendum went unread for as long as the ETL has existed,
+ * because 463 objects without the brightest deep-sky object in the sky validated cleanly.
+ */
+const REQUIRED_DEEP_SKY_IDS = ['NGC0224', 'NGC0292', 'ESO056-115', 'Mel022'];
+/**
+ * 107 of the 110 Messier objects. OpenNGC types the other three as what they are: M40 a double
+ * star, M73 an asterism and M102 a duplicate of M101, none of them a deep-sky object to draw.
+ */
+const MIN_MESSIER_OBJECTS = 107;
+
 function validateDeepSky(objects: DeepSkyRecord[]): void {
   assertCondition(objects.length > 0, 'No deep-sky objects were produced.');
 
@@ -222,6 +235,12 @@ function validateDeepSky(objects: DeepSkyRecord[]): void {
   for (const kind of ['galaxy', 'nebula', 'cluster'] as const) {
     assertCondition(kinds.has(kind), `No deep-sky objects of kind "${kind}" were produced.`);
   }
+
+  for (const id of REQUIRED_DEEP_SKY_IDS) {
+    assertCondition(ids.has(id), `Deep-sky object ${id} is missing — one of OpenNGC's two files was not read.`);
+  }
+  const messier = new Set(objects.map((object) => object.messier).filter((designation) => designation !== null)).size;
+  assertCondition(messier >= MIN_MESSIER_OBJECTS, `Only ${messier} Messier objects were produced (at least ${MIN_MESSIER_OBJECTS} expected).`);
 
   const withDistance = objects.filter((object) => object.distancePc !== null).length;
   console.log(`  ${withDistance}/${objects.length} deep-sky objects have a derived distance.`);

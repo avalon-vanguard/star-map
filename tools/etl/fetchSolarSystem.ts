@@ -5,6 +5,8 @@ import { SUN_STAR_ID } from '../../src/app/shared/models/star.model';
 import { fetchHorizonsBody } from './lib/horizons';
 import { MeanOrbit, parsePlanetMeanElements, parseSatelliteMeanElements, parseSmallBodyElements } from '../../src/app/shared/astro/mean-elements';
 import { fetchPlanetMeanElementsText, fetchSatelliteMeanElementsHtml, fetchSmallBodyAnswer } from './lib/mean-elements';
+import { MIN_PERIODIC_TERM_DEG, parsePckRotationalElements } from '../../src/app/shared/astro/rotational-elements';
+import { fetchPckText } from './lib/pck';
 import { dataPath, ensureDataDir } from './lib/paths';
 
 const HOURS_PER_DAY = 24;
@@ -123,15 +125,17 @@ export const FREELY_SPINNING_MOONS = new Set(BODY_SPECS.filter((spec) => spec.sp
  * Writes `bodies.json` for the major planets, the five dwarf planets, and every moon in JPL's
  * mean-element table more than 100 km in mean radius — Phoebe, at 106.6, the smallest: JPL's
  * mean orbital elements for where they go, or the SBDB's osculating ones where there are none,
- * and JPL Horizons for their size and spin. Horizons' osculating elements for the same date come
- * back alongside, for `build.ts` to check the mean ones against.
+ * JPL Horizons for their size and spin, and the IAU's rotational elements for where their poles
+ * point and which face is where. Horizons' osculating elements for the same date come back
+ * alongside, for `build.ts` to check the mean ones against.
  */
 export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizonsOrbits: Map<string, OrbitalElements> }> {
-  console.log(`Fetching ${BODY_SPECS.length} solar-system bodies from JPL (mean elements, Horizons)...`);
+  console.log(`Fetching ${BODY_SPECS.length} solar-system bodies from JPL (mean elements, Horizons, NAIF's PCK)...`);
   const bodies: BodyRecord[] = [];
   const horizonsOrbits = new Map<string, OrbitalElements>();
   const planetElements = await fetchPlanetMeanElementsText();
   const satelliteElements = await fetchSatelliteMeanElementsHtml();
+  const pck = await fetchPckText();
   const gmById = new Map<string, number | undefined>();
 
   for (const spec of BODY_SPECS) {
@@ -183,6 +187,14 @@ export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizo
     if (rotationPeriodHours === undefined) {
       console.warn(`  no rotation period found for ${spec.name}; it will not turn.`);
     }
+    // NAIF numbers a small body 2 000 000 past its catalogue number: Ceres, "1;" to Horizons, is 2000001.
+    const naifId = spec.horizonsCommand.endsWith(';') ? 2_000_000 + Number.parseInt(spec.horizonsCommand, 10) : Number(spec.horizonsCommand);
+    const rotation = parsePckRotationalElements(pck, naifId);
+    if (!rotation) {
+      console.warn(`  no IAU rotational elements for ${spec.name}; its pole and meridian are not known.`);
+    } else if (rotation.skippedDeg.length > 0) {
+      console.log(`  ${spec.name}: ${rotation.skippedDeg.length} periodic terms under ${MIN_PERIODIC_TERM_DEG} degrees left out, the largest ${Math.max(...rotation.skippedDeg)}.`);
+    }
 
     bodies.push({
       id: spec.id,
@@ -197,7 +209,8 @@ export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizo
       ...(spec.parentBodyId ? { parentBodyId: spec.parentBodyId } : {}),
       ...(parentGm !== undefined ? { massRatio: result.gmKm3PerS2! / parentGm } : {}),
       ...(rotationPeriodHours !== undefined ? { rotationPeriodHours } : {}),
-      ...((result.obliquityDeg ?? spec.obliquityDeg) !== undefined ? { obliquityDeg: result.obliquityDeg ?? spec.obliquityDeg } : {})
+      ...((result.obliquityDeg ?? spec.obliquityDeg) !== undefined ? { obliquityDeg: result.obliquityDeg ?? spec.obliquityDeg } : {}),
+      ...(rotation ? { rotationalElements: rotation.elements } : {})
     });
   }
 

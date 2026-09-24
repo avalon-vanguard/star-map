@@ -281,8 +281,8 @@ So deep-sky records store a **unit direction** on the celestial sphere rather th
 the line of sight is always known precisely, and the objects are drawn as a fixed-radius
 backdrop shell where true distance would be unusable anyway. `distancePc` is optional metadata,
 derived from parallax for galactic objects or the Hubble law for genuinely distant galaxies,
-and left `null` — with its `distanceMethod` — whenever neither is trustworthy. Roughly 330 of
-the 463 cataloged objects get a distance; the rest honestly report none.
+and left `null` — with its `distanceMethod` — whenever neither is trustworthy. 340 of
+the 490 cataloged objects get a distance; the rest honestly report none.
 
 ## Layout
 

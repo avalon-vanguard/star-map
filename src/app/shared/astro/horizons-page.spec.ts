@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { extractGmKm3PerS2, extractRadiusKm, extractRotationPeriodHours, isTidallyLocked } from './horizons-page';
+import { extractGmKm3PerS2, extractObliquityDeg, extractRadiusKm, extractRotationPeriodHours, isTidallyLocked } from './horizons-page';
 
 // Lines as the Horizons pages print them.
 const JUPITER = `  Vol. Mean Radius (km) = 69911+-6          Flattening            = 0.06487
@@ -55,5 +55,12 @@ describe('Horizons page GM', () => {
     expect(extractGmKm3PerS2(CHARON)).toBe(106.1);
     expect(extractGmKm3PerS2(PLUTO)).toBe(869.326);
     expect(extractGmKm3PerS2(HYPERION)).toBeUndefined();
+  });
+});
+
+describe('Horizons page obliquity', () => {
+  it('reads the arcminutes Mercury gives its tilt in, and the degrees every other page uses', () => {
+    expect(extractObliquityDeg("  Obliquity to orbit[1] =  2.11' +/- 0.1' Hill's sphere rad. Rp = 94.4 ")).toBeCloseTo(2.11 / 60, 9);
+    expect(extractObliquityDeg('  Obliquity to orbit    =   25.19 deg     Max. angular diam.    =  17.9"')).toBe(25.19);
   });
 });

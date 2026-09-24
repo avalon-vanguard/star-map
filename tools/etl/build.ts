@@ -155,6 +155,14 @@ function validateBodies(bodies: BodyRecord[]): void {
   assertCondition(planetCount === 8, `Expected 8 planets, found ${planetCount}.`);
 }
 
+/**
+ * The share of planets that must have a star on the map: 6 327 of 6 354 did when the ETL began
+ * adding the hosts the catalogue lacks from the archive's own figures, up from 2 071. The other
+ * 27 have no distance in either archive table, so nothing can place them; the floor leaves room
+ * for a few more of those, not for the matching or the additions to stop working.
+ */
+const MIN_HOSTED_SHARE = 0.995;
+
 function validateExoplanets(exoplanets: ExoplanetRecord[], stars: StarRecord[]): void {
   assertCondition(exoplanets.length > 0, 'No exoplanets were produced.');
   const starsById = new Map(stars.map((star) => [star.id, star]));
@@ -189,6 +197,10 @@ function validateExoplanets(exoplanets: ExoplanetRecord[], stars: StarRecord[]):
   }
 
   console.log(`  ${crossReferenced}/${exoplanets.length} exoplanets have a host star on the map.`);
+  assertCondition(
+    crossReferenced >= exoplanets.length * MIN_HOSTED_SHARE,
+    `Only ${crossReferenced} of ${exoplanets.length} exoplanets have a host star (at least ${MIN_HOSTED_SHARE * 100} % expected) — hosts are no longer being matched or added.`
+  );
 
   // How many can be propagated at their real rate rather than as if the host were the Sun.
   const withPeriod = exoplanets.filter((exoplanet) => exoplanet.periodDays !== undefined).length;
@@ -266,7 +278,7 @@ async function build(): Promise<void> {
   console.log();
   const bodies = await fetchSolarSystem();
   console.log();
-  // Names the Gaia designations that host planets, so it is this list, not the one above, that is published.
+  // Adds the hosts the catalogue lacks, so it is this list, not the one above, that is published.
   const { exoplanets, stars } = await fetchExoplanets(catalogueStars);
   console.log();
   const deepSky = await fetchDeepSky();

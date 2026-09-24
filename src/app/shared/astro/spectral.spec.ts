@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseSpectralClass, SPECTRAL_CLASSES, spectralTypeToColorIndex } from './spectral';
+import { parseSpectralClass, SPECTRAL_CLASSES, spectralTypeToColorIndex, temperatureToColorIndex } from './spectral';
 
 describe('parseSpectralClass', () => {
   it('reads a clean class and subclass', () => {
@@ -81,5 +81,22 @@ describe('spectralTypeToColorIndex', () => {
   it('returns null for an unclassified star', () => {
     expect(spectralTypeToColorIndex('Unknown')).toBeNull();
     expect(spectralTypeToColorIndex('')).toBeNull();
+  });
+});
+
+describe('temperatureToColorIndex', () => {
+  it("puts the Sun's temperature at its own B-V and a cool dwarf redder", () => {
+    expect(temperatureToColorIndex(5772)).toBeCloseTo(0.65, 2);
+    expect(temperatureToColorIndex(3400)).toBeCloseTo(1.79, 2);
+  });
+
+  it('stays inside the range the spectral classes span', () => {
+    expect(temperatureToColorIndex(2566)).toBe(2);
+    expect(temperatureToColorIndex(50000)).toBe(-0.33);
+  });
+
+  it('has no answer for a temperature that is not one', () => {
+    expect(temperatureToColorIndex(0)).toBeNull();
+    expect(temperatureToColorIndex(Number.NaN)).toBeNull();
   });
 });

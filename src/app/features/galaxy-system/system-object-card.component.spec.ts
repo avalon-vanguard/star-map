@@ -83,6 +83,16 @@ describe('SystemObjectCardComponent', () => {
     expect(render(bare).textContent).not.toContain('Measured');
   });
 
+  it('wraps a long designation rather than cutting off the digits that tell it apart', () => {
+    const host = render({ ...earth, name: '2MASS J21252752-8138278 b', hostStarName: '2MASS J21252752-8138278' });
+    const name = host.querySelector('[data-testid="object-card-name"]')!;
+    expect(name.textContent?.trim()).toBe('2MASS J21252752-8138278 b');
+    for (const line of [name, name.nextElementSibling!]) {
+      expect(line.classList).not.toContain('truncate');
+      expect(line.classList).toContain('wrap-break-word');
+    }
+  });
+
   it('says a photographed surface is a photograph', () => {
     expect(render(earth).textContent).toContain('photography');
   });

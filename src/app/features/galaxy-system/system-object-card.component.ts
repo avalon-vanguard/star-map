@@ -35,8 +35,10 @@ import { ChevronIconComponent } from '../../shared/ui/chevron-icon.component';
       <div data-testid="object-card" class="hud-brackets hud-acquire hud-surface font-body text-text">
         <div class="flex items-start justify-between gap-3 px-4 pt-4 pb-3">
           <header class="min-w-0">
-            <p class="truncate text-lg leading-tight font-bold tracking-[0.04em] text-text uppercase">{{ body().name }}</p>
-            <p class="type-eyebrow mt-1 truncate text-accent">{{ readouts().kindLabel }} · {{ body().hostStarName }}</p>
+            <!-- Wrapped, not truncated, as on the detail page: a designation's last digits are the
+                 ones that tell it from its neighbours. -->
+            <p data-testid="object-card-name" class="text-lg leading-tight font-bold tracking-[0.04em] wrap-break-word text-text uppercase">{{ body().name }}</p>
+            <p class="type-eyebrow mt-1 wrap-break-word text-accent">{{ readouts().kindLabel }} · {{ body().hostStarName }}</p>
           </header>
           <button
             type="button"

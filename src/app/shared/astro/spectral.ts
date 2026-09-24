@@ -87,3 +87,23 @@ export function spectralTypeToColorIndex(spectralType: string | null | undefined
 
   return from + (to - from) * (subclass / 10);
 }
+
+/**
+ * B-V colour index for an effective temperature, for stars the Exoplanet Archive gives a
+ * temperature but no B magnitude. Inverts Ballesteros (2012), T = 4600 K · (1 / (0.92 (B-V) +
+ * 1.7) + 1 / (0.92 (B-V) + 0.62)), a blackbody fit good to a few per cent from A to early M: it
+ * puts the Sun's 5 772 K at 0.65, which is the Sun's own. Clamped to the range the class anchors
+ * above span, because the fit runs on past it — TRAPPIST-1's 2 566 K would come out at 2.7.
+ */
+export function temperatureToColorIndex(temperatureK: number): number | null {
+  if (!Number.isFinite(temperatureK) || temperatureK <= 0) {
+    return null;
+  }
+  // With x = 0.92 (B-V) and k = T / 4600 the fit is k x² + (2.32 k - 2) x + (1.054 k - 2.32) = 0,
+  // whose larger root is the physical one.
+  const k = temperatureK / 4600;
+  const b = 2.32 * k - 2;
+  const c = 1.054 * k - 2.32;
+  const x = (-b + Math.sqrt(b * b - 4 * k * c)) / (2 * k);
+  return Math.min(BEYOND_M, Math.max(COLOR_INDEX_ANCHORS.O, x / 0.92));
+}

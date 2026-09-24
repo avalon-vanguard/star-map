@@ -7,7 +7,9 @@ import { OrbitalElements } from './body.model';
 export interface ExoplanetRecord {
   id: string;
   /**
-   * The host's star-catalogue id, the HYG or Gaia star it was matched to; null when none is.
+   * The host's star-catalogue id: a HYG or Gaia star it was matched to, or else a star the ETL
+   * added from the archive's own figures. Null only when the archive gives no position and
+   * distance to place one with.
    */
   hostStarId: number | null;
   hostStarName: string;

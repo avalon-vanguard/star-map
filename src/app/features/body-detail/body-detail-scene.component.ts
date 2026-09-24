@@ -6,6 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { EngineService } from '../../core/engine/engine.service';
+import { bodyPageView } from '../../shared/rendering/body-orientation';
 import { planetTexture } from '../../shared/rendering/procedural-planet-texture';
 import { applyMilkyWaySkybox, createGlowSprite } from '../../shared/rendering/skybox';
 import { atmosphereColorFor, bodyTexturePath, loadCachedTexture, MILKY_WAY_SKYBOX_PATH, SATURN_RING_TEXTURE_PATH } from '../../shared/rendering/texture-catalog';
@@ -14,6 +15,7 @@ import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
 import { Bookmark } from '../../shared/state/bookmarks.store';
 import { NavigationStore } from '../../shared/state/navigation.store';
+import { TimeStore } from '../../shared/state/time.store';
 import { ChevronIconComponent } from '../../shared/ui/chevron-icon.component';
 import { HudDockComponent } from '../hud/hud-dock.component';
 import { BodyDetailViewModel } from './body-detail.model';
@@ -24,6 +26,8 @@ import { InfoPanelComponent } from './info-panel.component';
 const GAS_GIANT_IDS = new Set(['jupiter', 'saturn', 'uranus', 'neptune']);
 /** The body is drawn at unit radius here, so the halo's extent is its multiple directly. */
 const GLOW_SCALE = 2.6;
+/** Where the page's light stands, and the Sun with it wherever the body's real one is known. */
+const SUN_LIGHT_POSITION = new THREE.Vector3(4, 3, 5);
 
 /**
  * Separate, focused route for inspecting a single planet/moon/exoplanet: its own scene/camera
@@ -81,6 +85,9 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
   private scene?: THREE.Scene;
   private planet?: THREE.Mesh;
   private planetMaterial?: THREE.MeshStandardMaterial;
+  private sunLight?: THREE.DirectionalLight;
+  /** The solar-system record behind the body shown, which is what can be turned by its real pole. */
+  private body?: BodyRecord;
   private ring?: THREE.Mesh;
   private glow?: THREE.Sprite;
   private resizeObserver?: ResizeObserver;
@@ -100,7 +107,8 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     private readonly dataLoader: DataLoaderService,
     private readonly route: ActivatedRoute,
     private readonly router: Router,
-    private readonly navigationStore: NavigationStore
+    private readonly navigationStore: NavigationStore,
+    private readonly time: TimeStore
   ) {}
 
   ngAfterViewInit(): void {
@@ -176,6 +184,10 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     // A fluid envelope scatters light more evenly than a solid surface does.
     this.planetMaterial.roughness = GAS_GIANT_IDS.has(viewModel.id) || viewModel.appearance.palette.structure === 'banded' ? 0.55 : 0.85;
     this.planetMaterial.needsUpdate = true;
+    // Back to the page's own light and a sphere at rest; `tick` turns both where the IAU says how.
+    this.body = this.bodies.find((body) => body.id === viewModel.id);
+    this.planet?.rotation.set(0, 0, 0);
+    this.sunLight?.position.copy(SUN_LIGHT_POSITION);
 
     this.disposeRing();
     this.disposeGlow();
@@ -219,7 +231,9 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     });
 
     const ring = new THREE.Mesh(geometry, material);
-    ring.rotation.x = Math.PI / 2 - THREE.MathUtils.degToRad(17);
+    // Flat in Saturn's equator, which is the page's horizontal: the planet is drawn pole up. The
+    // 17 degrees they used to lean put them out of the equator they orbit in.
+    ring.rotation.x = Math.PI / 2;
     return ring;
   }
 
@@ -268,9 +282,9 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     this.controls.maxDistance = 12;
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.35));
-    const sunLight = new THREE.DirectionalLight(0xfff4e0, 1.6);
-    sunLight.position.set(4, 3, 5);
-    scene.add(sunLight);
+    this.sunLight = new THREE.DirectionalLight(0xfff4e0, 1.6);
+    this.sunLight.position.copy(SUN_LIGHT_POSITION);
+    scene.add(this.sunLight);
 
     const geometry = new THREE.SphereGeometry(1, 64, 48);
     const viewModel = this.viewModel();
@@ -289,9 +303,20 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     this.engine.start();
   }
 
+  /**
+   * A body the IAU gives rotational elements for is turned as it is at the map's date, under its
+   * real Sun, at the rate the map's clock runs (see `bodyPageView`). Any other — an exoplanet, or
+   * Eris, Haumea or Makemake — turns slowly for show, as the page always turned them.
+   */
   private tick(deltaSeconds: number): void {
     this.controls?.update();
-    if (this.planet) {
+    if (!this.planet) {
+      return;
+    }
+    const sunAzimuth = Math.atan2(SUN_LIGHT_POSITION.x, SUN_LIGHT_POSITION.z);
+    if (this.body && this.sunLight && bodyPageView(this.body, this.bodies, this.time.julianDate(), sunAzimuth, this.planet.quaternion, this.sunLight.position)) {
+      this.sunLight.position.multiplyScalar(SUN_LIGHT_POSITION.length());
+    } else {
       this.planet.rotation.y += deltaSeconds * 0.08;
     }
   }

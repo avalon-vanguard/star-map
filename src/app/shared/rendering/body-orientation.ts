@@ -1,11 +1,13 @@
 import * as THREE from 'three/webgpu';
 
 import { TT_MINUS_UTC_DAYS } from '../astro/constants';
-import { laplacePlaneToEquatorial } from '../astro/coordinates';
+import { CartesianCoordinates, eclipticToEquatorial, laplacePlaneToEquatorial } from '../astro/coordinates';
+import { meanElementsAt, positionAtEpoch } from '../astro/kepler';
 import { orientationAt } from '../astro/rotational-elements';
-import { RotationalElements } from '../models/body.model';
+import { BodyRecord, RotationalElements } from '../models/body.model';
 
 const DEG_TO_RAD = Math.PI / 180;
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
 
 /**
@@ -58,3 +60,45 @@ export function bodyOrientation(elements: RotationalElements, jdUtc: number, tar
     .multiply(MAP_TO_BODY);
 }
 
+/** Where a body is from the Sun at a date, in the ICRF, AU: a moon's planet's place plus its own. */
+function heliocentricPosition(body: BodyRecord, bodies: readonly BodyRecord[], jdUtc: number): CartesianCoordinates {
+  const own = positionAtEpoch(meanElementsAt(body.orbit, body.rates, jdUtc));
+  const parent = body.parentBodyId ? bodies.find((candidate) => candidate.id === body.parentBodyId) : undefined;
+  if (!parent) {
+    return eclipticToEquatorial(own);
+  }
+  const offset = body.laplacePole ? laplacePlaneToEquatorial(own, body.laplacePole) : eclipticToEquatorial(own);
+  const centre = eclipticToEquatorial(positionAtEpoch(meanElementsAt(parent.orbit, parent.rates, jdUtc)));
+  return { x: centre.x + offset.x, y: centre.y + offset.y, z: centre.z + offset.z };
+}
+
+const scratchPage = new THREE.Quaternion();
+const scratchPageTurn = new THREE.Quaternion();
+const scratchBody = new THREE.Quaternion();
+
+/**
+ * How the body page shows a body the IAU gives elements for: pole up, as the page has always
+ * drawn it, turned as it really is at the map's date against a Sun held at `sunAzimuthRad` round
+ * that pole — where the page's light has always stood, so the camera still opens on the day side.
+ * The Sun's height above the equator is its real one, and the face it lights is the real one:
+ * seen from the body, the Sun sits over the same point of its map as in the system view. What the
+ * page gives up is the stars, which do not turn with the body.
+ *
+ * Sets `planet` to the sphere's rotation and `sun` to the unit direction of the Sun in the page's
+ * frame. Returns false, touching neither, for a body without elements.
+ */
+export function bodyPageView(body: BodyRecord, bodies: readonly BodyRecord[], jdUtc: number, sunAzimuthRad: number, planet: THREE.Quaternion, sun: THREE.Vector3): boolean {
+  const elements = body.rotationalElements;
+  if (!elements) {
+    return false;
+  }
+  const { poleRaDeg, poleDecDeg } = orientationAt(elements, jdUtc + TT_MINUS_UTC_DAYS);
+  // From the ICRF into the body's frame with its pole on +Y, before the turn about that pole.
+  const toPage = poleFrame({ raDeg: poleRaDeg, decDeg: poleDecDeg }, scratchPage).multiply(MAP_TO_BODY).invert();
+  const position = heliocentricPosition(body, bodies, jdUtc);
+  sun.set(-position.x, -position.y, -position.z).normalize().applyQuaternion(toPage);
+  const turn = scratchPageTurn.setFromAxisAngle(Y_AXIS, sunAzimuthRad - Math.atan2(sun.x, sun.z));
+  sun.applyQuaternion(turn);
+  planet.copy(turn).multiply(toPage).multiply(bodyOrientation(elements, jdUtc, scratchBody));
+  return true;
+}

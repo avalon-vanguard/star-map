@@ -1,4 +1,5 @@
-import { fetchTextCached } from './http';
+import { SbdbAnswer } from '../../../src/app/shared/astro/mean-elements';
+import { fetchJsonCached, fetchTextCached } from './http';
 
 /**
  * Standish's "Keplerian Elements for Approximate Positions of the Major Planets", Table 2a/2b:
@@ -28,4 +29,13 @@ export async function fetchPlanetMeanElementsText(): Promise<string> {
 
 export async function fetchSatelliteMeanElementsHtml(): Promise<string> {
   return fetchTextCached(SATELLITE_ELEMENTS_URL, 'jpl-satellite-mean-elements.html');
+}
+
+/**
+ * A small body's answer from JPL's Small-Body Database: osculating elements to full precision
+ * (without `full-prec` they come rounded to three figures: Ceres's n as 0.214 degrees a day for
+ * 0.2143045, which is 1.1 degrees out within a decade) and its physical parameters.
+ */
+export async function fetchSmallBodyAnswer(designation: string, cacheKey: string): Promise<SbdbAnswer> {
+  return fetchJsonCached<SbdbAnswer>(`https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=${encodeURIComponent(designation)}&phys-par=1&full-prec=1`, cacheKey);
 }

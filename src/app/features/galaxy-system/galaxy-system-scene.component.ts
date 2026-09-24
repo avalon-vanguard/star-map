@@ -1733,7 +1733,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // On the label cadence rather than per frame: at a month a second the date changes faster
     // than anyone can read it, and the HUD does not need to re-render sixty times a second to
     // say so.
-    this.hudDate.set(this.time.rate() === 1 ? '' : this.time.date().toISOString().slice(0, 10));
+    this.hudDate.set(this.time.atNow() ? '' : this.time.date().toISOString().slice(0, 10));
 
     if (this.systemGroup.visible && star) {
       const planetCount =
@@ -1760,7 +1760,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
           ? [{ label: 'Luminosity', value: formatLuminosity(luminosity), derived: true }]
           : []),
       ]);
-      this.hudNote.set('Orbits propagated from published elements to the current date.');
+      this.hudNote.set(this.time.atNow() ? 'Orbits propagated from published elements to the current date.' : 'Orbits propagated from published elements to the date on the clock.');
       this.hudRange.set(
         formatAu(
           this.engine.visibleHalfHeight(
@@ -2227,7 +2227,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         ? SUN_RADIUS_AU
         : starMarkerRadiusAu(this.systemRenderer.minTopLevelSemiMajorAxisAu);
     this.starMarkerGeometry?.dispose();
-    this.starMarkerGeometry = new THREE.SphereGeometry(starRadiusAu, 24, 16);
+    this.starMarkerGeometry = new THREE.SphereGeometry(starRadiusAu, 64, 32);
 
     const starMarkerMaterial = this.starMarkerMaterial.clone();
     const starColor = colorIndexToRgb(star.colorIndex, star.spectralType);

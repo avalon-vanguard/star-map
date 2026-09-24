@@ -409,12 +409,32 @@ describe('rotation', () => {
     expect(Math.abs(turnedDegrees(spinning(), 23.934 / 96))).toBeCloseTo(90, 1);
   });
 
-  it('turns a retrograde body the other way', () => {
-    // Venus: its day runs backwards, which the catalogue carries as a negative period.
-    const forward = turnedDegrees(spinning(), 23.934 / 96);
-    const backward = turnedDegrees(spinning({ rotationPeriodHours: -23.934 }), 23.934 / 96);
+  /**
+   * Which way a body spins in the world: its angular velocity projected on its orbit's normal.
+   * Positive is prograde, turning the same way it goes round; negative is retrograde.
+   */
+  function spinSense(body: BodyRecord): number {
+    const renderer = new SystemOrbitsRenderer([body], [], undefined, 1);
+    renderer.update(DEFAULT_EPOCH_JD);
+    const start = renderer.members[0].marker.quaternion.clone();
+    renderer.update(DEFAULT_EPOCH_JD + 0.01);
+    const turn = renderer.members[0].marker.quaternion.clone().multiply(start.invert());
+    const axis = new THREE.Vector3(turn.x, turn.y, turn.z).multiplyScalar(Math.sign(turn.w));
+    return axis.normalize().dot(new THREE.Vector3(0, 0, 1).applyQuaternion(renderer.referenceFrame));
+  }
 
-    expect(Math.sign(backward)).toBe(-Math.sign(forward));
+  it('turns Venus backwards, as Horizons gives it: a negative rate and an obliquity past 90', () => {
+    // Both say retrograde, in two conventions. Applied together they cancelled into a forward
+    // turn, which is how Venus and Uranus used to be drawn.
+    const venus = spinning({ id: 'venus', rotationPeriodHours: -5832.54, obliquityDeg: 177.3 });
+
+    expect(spinSense(spinning())).toBeGreaterThan(0.9);
+    expect(spinSense(venus)).toBeLessThan(-0.9);
+  });
+
+  it('reads the sign of the period only where no obliquity says which way the pole points', () => {
+    expect(spinSense(spinning({ rotationPeriodHours: -23.934, obliquityDeg: undefined }))).toBeLessThan(-0.9);
+    expect(spinSense(spinning({ rotationPeriodHours: 23.934, obliquityDeg: undefined }))).toBeGreaterThan(0.9);
   });
 
   it('leaves a body with no published rotation still', () => {
@@ -425,5 +445,22 @@ describe('rotation', () => {
     renderer.update(DEFAULT_EPOCH_JD + 40);
 
     expect(renderer.members[0].marker.quaternion.angleTo(start)).toBe(0);
+  });
+});
+
+describe('exoplanet size without a measured radius', () => {
+  const radiusOf = (overrides: Partial<ExoplanetRecord>): number => {
+    const renderer = new SystemOrbitsRenderer([], [exoplanet(overrides)], undefined, 1);
+    return ((renderer.members[0].marker as THREE.Mesh).geometry as THREE.SphereGeometry).parameters.radius;
+  };
+  const EARTH_AU = 6371 / 149597870.7;
+
+  it('draws a giant known only by its mass at about Jupiter’s size, not at an Earth', () => {
+    // 14 Her b: 2 829 Earth masses, no radius. It used to come out the size of the Earth.
+    expect(radiusOf({ radiusEarth: undefined, massEarth: 2829 }) / EARTH_AU).toBeCloseTo(11.2, 1);
+  });
+
+  it('keeps a measured radius over any estimate', () => {
+    expect(radiusOf({ radiusEarth: 1.88, massEarth: 2829 }) / EARTH_AU).toBeCloseTo(1.88, 2);
   });
 });

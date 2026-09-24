@@ -184,9 +184,9 @@ export function systemGridRingsAu(outermostOrbitAu: number): number[] {
 }
 
 /**
- * A body is drawn at its true size. Astronomical Unit in kilometres, and what a body with no
- * published radius is drawn as — Earth, which is the middle of the range for the exoplanets that
- * reach here without one.
+ * A body is drawn at its true size. Astronomical Unit in kilometres, and what a body with neither
+ * a radius nor a mass to estimate one from is drawn as: an Earth, for want of anything better —
+ * exoplanets with a mass and no radius get an estimate from their mass before they reach here.
  */
 const KM_PER_AU = 149597870.7;
 const DEFAULT_BODY_RADIUS_KM = 6371;

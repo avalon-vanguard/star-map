@@ -48,6 +48,18 @@ describe('TimeStore', () => {
     expect(time.julianDate() - afterTwoDays).toBeLessThan(1 / 24);
   });
 
+  it('knows the map is away from now even once it is back at real time', () => {
+    expect(time.atNow()).toBe(true);
+    time.setRate(2_629_800);
+    vi.advanceTimersByTime(5000);
+    time.setRate(1);
+
+    // Real time, months ahead: the rate says nothing about where the clock stands.
+    expect(time.atNow()).toBe(false);
+    time.reset();
+    expect(time.atNow()).toBe(true);
+  });
+
   it('comes back to now, at real time', () => {
     time.setRate(2_629_800);
     vi.advanceTimersByTime(5000); // months away

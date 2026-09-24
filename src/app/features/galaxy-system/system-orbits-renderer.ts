@@ -132,11 +132,12 @@ function buildOrbitLine(elements: OrbitalElements, kind: SystemMemberKind, frame
  * marker can now fill the frame, so it takes the real image at the size the detail page uses.
  */
 function buildMarker(id: string | undefined, kind: SystemMemberKind, radiusKm: number | undefined, appearance: PlanetAppearance | undefined): THREE.Mesh {
-  // 32 by 24 rather than 16 by 12: at true scale a body is drawn as small as a pixel and as large
-  // as the screen, and the silhouette of the old sphere was visibly faceted at the near end.
-  const geometry = new THREE.SphereGeometry(bodyMarkerRadiusAu(radiusKm), 32, 24);
+  const geometry = new THREE.SphereGeometry(bodyMarkerRadiusAu(radiusKm), MARKER_WIDTH_SEGMENTS, MARKER_HEIGHT_SEGMENTS);
   const photograph = id ? bodyTexturePath(id) : undefined;
-  const map = photograph ? loadCachedTexture(photograph) : appearance ? planetTexture(appearance) : undefined;
+  // 128 by 64 for the derived texture, not the detail page's 512 by 256: that size costs about
+  // 60 ms a body on the main thread, 360 ms on entering a six-planet system, for a disc that is a
+  // few pixels across until the camera is on top of it.
+  const map = photograph ? loadCachedTexture(photograph) : appearance ? planetTexture(appearance, { width: 128, height: 64 }) : undefined;
   const material = new THREE.MeshStandardMaterial({
     map,
     color: map ? 0xffffff : colorForKind(kind),
@@ -150,18 +151,45 @@ function buildMarker(id: string | undefined, kind: SystemMemberKind, radiusKm: n
  * The star's own light, at the centre of the system it lights.
  *
  * `decay` is 0, which is not what light does: a point source falls off with the square of the
- * distance, and under that law Neptune receives a thousandth of what Mercury does and reads as
- * black. The map is a set of worlds to look at rather than a light meter, so each is lit as a
- * photograph of it would be — the same concession the pixel floor makes for size. What the light
- * does carry truthfully is *direction*: every body shows its day side toward the star and its
- * night side away from it, and the terminator falls where it really falls.
+ * distance, and under that law Neptune, at 30.2 AU, receives about a six-thousandth of what
+ * Mercury does at 0.39 AU and reads as black. The map is a set of worlds to look at rather than a
+ * light meter, so each is lit as a photograph of it would be — the same concession the pixel
+ * floor makes for size. What the light does carry truthfully is which side is day: every body
+ * shows its lit face toward the star, and the terminator falls where it really falls.
+ *
+ * White, at π: a Lambertian surface returns intensity / π of its texture where the light falls
+ * square on it, so π gives back the photograph itself at the point facing the star, and less
+ * towards the limb. A warm tint or a smaller figure darkened the photographs below what they are.
  */
 function starLight(): THREE.PointLight {
-  const light = new THREE.PointLight(0xfff4e0, 2.2, 0, 0);
+  const light = new THREE.PointLight(0xffffff, Math.PI, 0, 0);
   light.position.set(0, 0, 0);
   return light;
 }
 
+/**
+ * Sphere segments. On a UV sphere the silhouette seen down the pole is the ring of width segments
+ * and the one seen from the side is the meridian profile, so height at half the width makes the
+ * error the same from every direction: at 64 by 32 a body filling the screen — Jupiter reaches
+ * 641 px of radius in the plan view — strays under a pixel from its true circle.
+ */
+const MARKER_WIDTH_SEGMENTS = 64;
+const MARKER_HEIGHT_SEGMENTS = 32;
+
+/**
+ * A drawn radius, in Earth radii, for an exoplanet that has a mass and no measured radius — 1 076
+ * of the 1 692 drawn, most of them found by radial velocity, and most of those giants: their
+ * median is 315 Earth masses. Drawn at an Earth, as they were, a nine-Jupiter-mass planet came out
+ * smaller than its system's super-Earth.
+ *
+ * A rough power law, capped at Jupiter's radius: giants from a third of a Jupiter mass to ten are
+ * all about Jupiter's size, since past that point added mass compresses rather than inflates. It
+ * sets a size to draw, not a figure to print — the readout still says the radius is unknown.
+ */
+function radiusFromMassEarth(massEarth: number | null | undefined): number | undefined {
+  return massEarth && massEarth > 0 ? Math.min(JUPITER_RADIUS_EARTH, massEarth ** 0.55) : undefined;
+}
+const JUPITER_RADIUS_EARTH = 11.2;
 
 /** Local axis a sphere is built around, and what the spin is applied about. */
 const SPIN_AXIS = new THREE.Vector3(0, 1, 0);
@@ -170,23 +198,29 @@ const HOURS_PER_DAY = 24;
 /**
  * How a body is turned at a given date: its own sidereal rotation, about its own axis.
  *
- * The axis is the orbit normal tilted by the obliquity, about the orbit’s ascending node —
- * which is where an obliquity is measured from, and the only line in the orbit the elements
- * name. The phase at the epoch is not published for any of these bodies, so a body is drawn
- * with its prime meridian toward the node at J2000 and turned from there: the rate and the
- * direction are real, where the face pointed at the camera is not.
+ * The obliquity fixes how far the pole leans from the orbit normal, and nothing more: which way
+ * it leans needs the pole's right ascension, which the Horizons pages this reads do not carry. The
+ * lean is taken about the orbit's ascending node because that is the one line the elements name,
+ * not because the data says so — so the tilt is real and its azimuth is not. Likewise the phase:
+ * each body starts at its elements' epoch (2025-01-01 here) in an arbitrary orientation, the
+ * shortest rotation of +Y onto its axis, and turns from there. The rate and the sense are real;
+ * the face towards the camera is not.
  *
- * A negative period is retrograde — Venus, and Uranus by the IAU’s convention — and comes
- * out of the arithmetic without a special case.
+ * Horizons states a retrograde spin twice over, in two conventions: an obliquity past 90 degrees
+ * (Venus 177.3, Uranus 97.8) and a negative rate. Either one alone turns the body backwards, and
+ * both together cancel into a forward turn — which is how Venus and Uranus were drawn. Where an
+ * obliquity is given it carries the sense, and the period is taken as a magnitude; the sign of the
+ * period is only read for a body with no obliquity at all.
  */
-function spinFor(elements: OrbitalElements, frame: THREE.Quaternion, rotationPeriodHours: number, obliquityDeg: number, epochJd: number): THREE.Quaternion {
+function spinFor(elements: OrbitalElements, frame: THREE.Quaternion, rotationPeriodHours: number, obliquityDeg: number | undefined, epochJd: number): THREE.Quaternion {
   const node = elements.longitudeOfAscendingNodeDeg * DEG_TO_RAD;
   const inclination = elements.inclinationDeg * DEG_TO_RAD;
   const nodeDirection = new THREE.Vector3(Math.cos(node), Math.sin(node), 0);
   const axis = new THREE.Vector3(Math.sin(inclination) * Math.sin(node), -Math.sin(inclination) * Math.cos(node), Math.cos(inclination))
-    .applyAxisAngle(nodeDirection, obliquityDeg * DEG_TO_RAD)
+    .applyAxisAngle(nodeDirection, (obliquityDeg ?? 0) * DEG_TO_RAD)
     .applyQuaternion(frame);
-  const turns = ((epochJd - elements.epochJd) * HOURS_PER_DAY) / rotationPeriodHours;
+  const period = obliquityDeg === undefined ? rotationPeriodHours : Math.abs(rotationPeriodHours);
+  const turns = ((epochJd - elements.epochJd) * HOURS_PER_DAY) / period;
   return new THREE.Quaternion()
     .setFromUnitVectors(SPIN_AXIS, axis)
     .multiply(new THREE.Quaternion().setFromAxisAngle(SPIN_AXIS, turns * 2 * Math.PI));
@@ -269,8 +303,6 @@ export class SystemOrbitsRenderer {
     const members: SystemMember[] = [];
     const topLevelBodiesById = new Map<string, BodyRecord>();
 
-    // Measured before anything is built, because marker sizes are scaled against the span and
-    // the markers are created as the bodies are added.
     const topLevelAxes = [
       ...bodies.filter((body) => !body.parentBodyId).map((body) => body.orbit.semiMajorAxisAu),
       ...exoplanets.filter((exoplanet) => isPropagatableOrbit(exoplanet.orbit)).map((exoplanet) => exoplanet.orbit.semiMajorAxisAu!)
@@ -319,7 +351,8 @@ export class SystemOrbitsRenderer {
         continue;
       }
       const elements = resolveOrbitalElements(exoplanet.orbit);
-      const radiusKm = exoplanet.radiusEarth ? exoplanet.radiusEarth * EARTH_RADIUS_KM : undefined;
+      const radiusEarth = exoplanet.radiusEarth ?? radiusFromMassEarth(exoplanet.massEarth);
+      const radiusKm = radiusEarth ? radiusEarth * EARTH_RADIUS_KM : undefined;
       // Not `gmForParent(undefined)`: that assumes a solar-mass host for every system, and
       // most exoplanet hosts are red dwarfs a fraction of the Sun's mass.
       const gm = resolveGravitationalParameter({
@@ -374,7 +407,7 @@ export class SystemOrbitsRenderer {
       body.position.set(orbital.x, orbital.y, orbital.z).applyQuaternion(body.frame);
       body.marker.position.copy(body.position);
       if (body.rotationPeriodHours) {
-        body.marker.quaternion.copy(spinFor(body.elements, body.frame, body.rotationPeriodHours, body.obliquityDeg ?? 0, epochJd));
+        body.marker.quaternion.copy(spinFor(body.elements, body.frame, body.rotationPeriodHours, body.obliquityDeg, epochJd));
       }
     }
 
@@ -387,7 +420,7 @@ export class SystemOrbitsRenderer {
       const orbital = propagateOrbit(moon.elements, moon.gmAu3PerDay2, epochJd);
       moon.marker.position.set(orbital.x, orbital.y, orbital.z).applyQuaternion(moon.frame);
       if (moon.rotationPeriodHours) {
-        moon.marker.quaternion.copy(spinFor(moon.elements, moon.frame, moon.rotationPeriodHours, moon.obliquityDeg ?? 0, epochJd));
+        moon.marker.quaternion.copy(spinFor(moon.elements, moon.frame, moon.rotationPeriodHours, moon.obliquityDeg, epochJd));
       }
     }
 
@@ -469,8 +502,6 @@ export class SystemOrbitsRenderer {
   ): TrackedMoon {
     const pivot = new THREE.Group();
     const orbitLine = buildOrbitLine(elements, 'moon', frame);
-    // A moon's own orbit is the thing it must not swallow: drawn at the system's exaggeration it
-    // is the same size as its planet, and every moon here orbits inside one.
     const marker = buildMarker(id, 'moon', radiusKm, appearance);
     pivot.add(orbitLine, marker);
     this.object.add(pivot);

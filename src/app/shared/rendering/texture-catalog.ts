@@ -4,18 +4,21 @@ import * as THREE from 'three/webgpu';
  * Real NASA/ESA/USGS photography baked into `src/assets/textures/bodies/` at build time,
  * keyed by the same ids used in `bodies.json`.
  *
- * This map is the whole of what has actually been photographed. Everything else — every
- * exoplanet, since not one has ever been imaged, and the moons no probe returned a usable map
- * of — falls through to `procedural-planet-texture.ts`, which derives a surface from the body's
- * own measured size, mass, orbit and host star instead.
+ * Only surface *maps* belong here: equirectangular images, twice as wide as tall, that wrap a
+ * sphere. Everything else — every exoplanet, since not one has ever been imaged, and every moon
+ * or dwarf planet with no such map in the repository — falls through to
+ * `procedural-planet-texture.ts`, which derives a surface from the body's own measured size,
+ * mass, orbit and host star instead.
  *
- * Provenance (all public domain NASA/JPL or CC BY 4.0 Solar System Scope, via Wikimedia
- * Commons — see each file's Commons page for the original credit line):
- * mercury/venus/earth/mars/saturn/uranus/neptune/moon/sun/saturn-ring/skybox — Solar System
- * Scope texture pack (CC BY 4.0); jupiter — Solar System Scope 8k pack (CC BY 4.0); pluto —
- * NASA/JHUAPL/SwRI New Horizons true-color mosaic; deimos — NASA/JPL/University of Arizona
- * MRO HiRISE; io — NASA/JPL Galileo highest-resolution true-color mosaic; titan — NASA/JPL
- * Cassini true-color view.
+ * Io, Pluto, Titan and Deimos used to be listed with the square photographs of them in
+ * `assets/textures/bodies/`: pictures of a lit disc against black sky, not maps. Wrapped round a
+ * sphere they put black sky on a fifth to a third of the surface, in a band up to 57 degrees wide
+ * across the equator that the spin then swept past the camera. They are left out until a real map
+ * of each is added.
+ *
+ * Provenance (CC BY 4.0 Solar System Scope, via Wikimedia Commons — see each file's Commons page
+ * for the original credit line): mercury/venus/earth/mars/saturn/uranus/neptune/moon/sun/
+ * saturn-ring/skybox — Solar System Scope texture pack; jupiter — Solar System Scope 8k pack.
  */
 const BODY_TEXTURE_PATHS: Record<string, string> = {
   mercury: 'assets/textures/bodies/mercury.jpg',
@@ -26,11 +29,7 @@ const BODY_TEXTURE_PATHS: Record<string, string> = {
   saturn: 'assets/textures/bodies/saturn.jpg',
   uranus: 'assets/textures/bodies/uranus.jpg',
   neptune: 'assets/textures/bodies/neptune.jpg',
-  pluto: 'assets/textures/bodies/pluto.jpg',
-  moon: 'assets/textures/bodies/moon.jpg',
-  deimos: 'assets/textures/bodies/deimos.jpg',
-  io: 'assets/textures/bodies/io.jpg',
-  titan: 'assets/textures/bodies/titan.jpg'
+  moon: 'assets/textures/bodies/moon.jpg'
 };
 
 /** The Sun isn't a `BodyRecord` (it's the system's star marker), so it's looked up separately. */

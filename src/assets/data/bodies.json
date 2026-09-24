@@ -158,7 +158,8 @@
       "meanAnomalyAtEpochDeg": 51.93655343727463,
       "epochJd": 2460676.5
     },
-    "rotationPeriodHours": 153.29335198
+    "rotationPeriodHours": 153.29335198,
+    "obliquityDeg": 119.6
   },
   {
     "id": "moon",
@@ -176,7 +177,7 @@
       "epochJd": 2460676.5
     },
     "parentBodyId": "earth",
-    "rotationPeriodHours": 655.7197475276438,
+    "rotationPeriodHours": 664.8546956215548,
     "obliquityDeg": 6.67
   },
   {
@@ -302,7 +303,8 @@
       "meanAnomalyAtEpochDeg": 32.18862839469676,
       "epochJd": 2460676.5
     },
-    "parentBodyId": "saturn"
+    "parentBodyId": "saturn",
+    "rotationPeriodHours": 382.87527117206236
   },
   {
     "id": "triton",

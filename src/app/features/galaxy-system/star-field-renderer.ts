@@ -434,10 +434,16 @@ export class StarFieldRenderer {
       if (projected.z < -1 || projected.z > 1) {
         continue;
       }
-
       // A sprite square in view space projects to an ellipse in NDC: the same half-extent in y,
       // divided by the aspect ratio in x. Scaling dx by the aspect makes the comparison circular.
-      const ndcRadius = (0.5 * sizes[index]) / tanHalfFov + PICK_NDC_SLOP;
+      const drawnRadius = (0.5 * sizes[index]) / tanHalfFov;
+      // Off screen if no part of the drawn disc is inside the frame. Tested before the slop is
+      // added: the slop is forgiveness for an imprecise click on a star you can see, not a reach
+      // past the edge to one you cannot.
+      if (Math.abs(projected.x) - drawnRadius / aspect > 1 || Math.abs(projected.y) - drawnRadius > 1) {
+        continue;
+      }
+      const ndcRadius = drawnRadius + PICK_NDC_SLOP;
       const dx = (projected.x - pointerNdc.x) * aspect;
       const dy = projected.y - pointerNdc.y;
       const score = Math.hypot(dx, dy) / ndcRadius;

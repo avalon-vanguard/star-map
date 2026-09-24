@@ -16,7 +16,8 @@ export interface BodyCatalogues {
 
 /**
  * Bolometric luminosity of a star in solar units, from what the catalogue measured: apparent
- * magnitude, parallax distance, and a bolometric correction read off the spectral type.
+ * magnitude in its band, parallax distance, and a bolometric correction read off the colour, or
+ * off the spectral type where there is no colour.
  */
 export function luminosityOf(star: StarRecord | undefined): number | null {
   if (!star) {
@@ -26,6 +27,9 @@ export function luminosityOf(star: StarRecord | undefined): number | null {
     magnitude: star.magnitude,
     distancePc: Math.hypot(star.x, star.y, star.z),
     spectralType: star.spectralType,
+    magnitudeBand: star.magnitudeBand,
+    colorIndex: star.colorIndex,
+    colorSystem: star.colorSystem,
   });
 }
 

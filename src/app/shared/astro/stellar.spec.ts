@@ -96,6 +96,22 @@ describe('luminositySolar', () => {
     expect(luminositySolar(PROXIMA)!).toBeGreaterThan(uncorrected * 5);
   });
 
+  it('reads the correction off the colour where the catalogue has no type', () => {
+    // Barnard's Star, 0.0035 L☉ (Dawson & De Robertis 2004), as a star no one classified: the
+    // Sun's correction left it at an eighth of that.
+    const derived = luminositySolar({ magnitude: 9.54, distancePc: 1.8266, spectralType: 'Unknown', magnitudeBand: 'V', colorIndex: 1.57, colorSystem: 'B-V' })!;
+    expect(derived / 0.0035).toBeGreaterThan(1 / 1.5);
+    expect(derived / 0.0035).toBeLessThan(1.5);
+  });
+
+  it('carries a Gaia G magnitude to V before correcting it', () => {
+    // TRAPPIST-1 as Gaia has it, 5.53e-4 L☉ (Agol et al. 2021). Read as V its G is 3.1
+    // magnitudes too bright, and its luminosity comes out seventeen times too high.
+    const derived = luminositySolar({ magnitude: 15.6226, distancePc: 12.467, spectralType: 'Unknown', magnitudeBand: 'G', colorIndex: 4.902, colorSystem: 'BP-RP' })!;
+    expect(derived / 5.53e-4).toBeGreaterThan(1 / 1.5);
+    expect(derived / 5.53e-4).toBeLessThan(1.5);
+  });
+
   it('clamps a pathological record instead of producing an absurd luminosity', () => {
     const absurd = luminositySolar({ magnitude: -40, distancePc: 5000, spectralType: 'O5V' })!;
     expect(Number.isFinite(absurd)).toBe(true);

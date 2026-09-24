@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseSpectralClass, SPECTRAL_CLASSES, spectralTypeFromColor, spectralTypeToColorIndex, temperatureToColorIndex } from './spectral';
+import { dwarfSequenceAtColor, parseSpectralClass, SPECTRAL_CLASSES, spectralTypeFromColor, spectralTypeToColorIndex, temperatureToColorIndex } from './spectral';
 
 describe('parseSpectralClass', () => {
   it('reads a clean class and subclass', () => {
@@ -126,5 +126,30 @@ describe('spectralTypeFromColor', () => {
     expect(spectralTypeFromColor(5.5, 'BP-RP')).toBeNull();
     expect(spectralTypeFromColor(null, 'B-V')).toBeNull();
     expect(spectralTypeFromColor(-0.301, 'B-V')).toBe('B0');
+  });
+});
+
+describe('dwarfSequenceAtColor', () => {
+  it("puts the Sun's colour in either system at the Sun's temperature and correction", () => {
+    for (const [colour, system] of [[0.65, 'B-V'], [0.823, 'BP-RP']] as const) {
+      const point = dwarfSequenceAtColor(colour, system)!;
+      expect(point.temperatureK).toBeCloseTo(5770, 0);
+      expect(point.bolometricCorrectionV).toBeCloseTo(-0.085, 3);
+      expect(point.gMinusV).toBeCloseTo(-0.165, 3);
+    }
+  });
+
+  it('interpolates between the two types a colour falls between', () => {
+    // Halfway from M1.5 (B−V 1.495, 3 620 K, −1.50) to M2 (1.505, 3 560 K, −1.62).
+    const point = dwarfSequenceAtColor(1.5, 'B-V')!;
+    expect(point.temperatureK).toBeCloseTo(3590, 6);
+    expect(point.bolometricCorrectionV).toBeCloseTo(-1.56, 6);
+  });
+
+  it('has no answer past either end of the table, and no G−V where none is tabulated', () => {
+    expect(dwarfSequenceAtColor(2.2, 'B-V')).toBeNull();
+    expect(dwarfSequenceAtColor(-0.15, 'BP-RP')).toBeNull();
+    expect(dwarfSequenceAtColor(null)).toBeNull();
+    expect(dwarfSequenceAtColor(-0.29, 'B-V')!.gMinusV).toBeNull();
   });
 });

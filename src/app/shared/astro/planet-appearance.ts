@@ -88,6 +88,9 @@ export function bulkDensityGramsPerCm3(massEarth: number | undefined, radiusEart
   return EARTH_DENSITY_G_PER_CM3 * (massEarth / Math.pow(radiusEarth, 3));
 }
 
+/** The cosmic microwave background's temperature today (Fixsen 2009, ApJ 707, 916). */
+const CMB_TEMPERATURE_K = 2.7255;
+
 /**
  * Equilibrium temperature in kelvin: the temperature at which a body re-radiates exactly the
  * starlight it absorbs.
@@ -97,6 +100,10 @@ export function bulkDensityGramsPerCm3(massEarth: number | undefined, radiusEart
  * push the real surface warmer — Venus's surface is 737 K against an equilibrium 232 K. It is
  * nonetheless the right quantity here, because it is what decides the *state* of the material a
  * world is made of, which is what its surface looks like.
+ *
+ * The body also absorbs the cosmic microwave background, added as a second source in the same
+ * balance. It is nothing beside any star inside a few hundred AU, and it is why nothing in space is
+ * colder than 2.7 K: by starlight alone, the planet 7 493 AU from 2MASS J21252752-8138278 read 1 K.
  */
 export function equilibriumTemperatureK(
   luminositySolar: number | null | undefined,
@@ -106,7 +113,8 @@ export function equilibriumTemperatureK(
   if (!luminositySolar || !semiMajorAxisAu || luminositySolar <= 0 || semiMajorAxisAu <= 0) {
     return null;
   }
-  return SOLAR_EQUILIBRIUM_TEMPERATURE_K * Math.pow(luminositySolar, 0.25) * Math.pow(semiMajorAxisAu, -0.5) * Math.pow(1 - bondAlbedo, 0.25);
+  const starlit = SOLAR_EQUILIBRIUM_TEMPERATURE_K * Math.pow(luminositySolar, 0.25) * Math.pow(semiMajorAxisAu, -0.5) * Math.pow(1 - bondAlbedo, 0.25);
+  return Math.pow(starlit ** 4 + CMB_TEMPERATURE_K ** 4, 0.25);
 }
 
 /**

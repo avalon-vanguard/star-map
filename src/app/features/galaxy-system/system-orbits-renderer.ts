@@ -3,7 +3,8 @@ import * as THREE from 'three/webgpu';
 import { appearanceForBody, appearanceForExoplanet } from '../../shared/astro/body-appearance';
 import { gmForParent } from '../../shared/astro/constants';
 import { PlanetAppearance } from '../../shared/astro/planet-appearance';
-import { MARKER_TEXTURE_HEIGHT, MARKER_TEXTURE_WIDTH, planetTexture } from '../../shared/rendering/procedural-planet-texture';
+import { planetTexture } from '../../shared/rendering/procedural-planet-texture';
+import { bodyTexturePath, loadCachedTexture } from '../../shared/rendering/texture-catalog';
 import { isPropagatableOrbit, orbitEllipsePoints, propagateOrbit, resolveGravitationalParameter, resolveOrbitalElements } from '../../shared/astro/kepler';
 import { CartesianCoordinates, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
 import { BodyRecord, OrbitalElements } from '../../shared/models/body.model';
@@ -18,6 +19,8 @@ export interface SystemMember {
   id: string;
   kind: SystemMemberKind;
   marker: THREE.Object3D;
+  /** For a moon, the id of the body it orbits: what its drawn size is held against. */
+  parentId?: string;
 }
 
 const PLANET_COLOR = new THREE.Color(0.55, 0.75, 1.0);
@@ -119,19 +122,108 @@ function buildOrbitLine(elements: OrbitalElements, kind: SystemMemberKind, frame
 }
 
 /**
- * A marker sphere, surfaced with the body's own derived appearance rather than a flat category
- * colour — so a system reads as a set of distinct worlds at a glance, and the colour of each is
- * a consequence of its measurements rather than of which list it came from.
+ * A marker sphere, surfaced with the body's own photograph where one has ever been taken, and
+ * with a texture derived from its measurements where none has — and lit by its star either way,
+ * so a world shows the day and night it actually has.
  *
- * The texture is tiny (see `MARKER_TEXTURE_WIDTH`): a marker is a few pixels across, so what
- * survives is essentially its average colour, and generating it costs well under a millisecond.
+ * The photographs were already in the repository, used only by the detail page: the system view
+ * drew every body from a 32 by 16 pixel procedural texture instead, which at a few pixels across
+ * was indistinguishable from its average colour and, once the camera closed in, was a blur. A
+ * marker can now fill the frame, so it takes the real image at the size the detail page uses.
  */
-function buildMarker(kind: SystemMemberKind, radiusKm: number | undefined, systemSpanAu: number, appearance: PlanetAppearance | undefined): THREE.Mesh {
-  const geometry = new THREE.SphereGeometry(bodyMarkerRadiusAu(radiusKm, systemSpanAu), 16, 12);
-  const material = appearance
-    ? new THREE.MeshBasicMaterial({ map: planetTexture(appearance, { width: MARKER_TEXTURE_WIDTH, height: MARKER_TEXTURE_HEIGHT }) })
-    : new THREE.MeshBasicMaterial({ color: colorForKind(kind) });
+function buildMarker(id: string | undefined, kind: SystemMemberKind, radiusKm: number | undefined, appearance: PlanetAppearance | undefined): THREE.Mesh {
+  const geometry = new THREE.SphereGeometry(bodyMarkerRadiusAu(radiusKm), MARKER_WIDTH_SEGMENTS, MARKER_HEIGHT_SEGMENTS);
+  const photograph = id ? bodyTexturePath(id) : undefined;
+  // 128 by 64 for the derived texture, not the detail page's 512 by 256: that size costs about
+  // 60 ms a body on the main thread, 360 ms on entering a six-planet system, for a disc that is a
+  // few pixels across until the camera is on top of it.
+  const map = photograph ? loadCachedTexture(photograph) : appearance ? planetTexture(appearance, { width: 128, height: 64 }) : undefined;
+  const material = new THREE.MeshStandardMaterial({
+    map,
+    color: map ? 0xffffff : colorForKind(kind),
+    roughness: 1,
+    metalness: 0
+  });
   return new THREE.Mesh(geometry, material);
+}
+
+/**
+ * The star's own light, at the centre of the system it lights.
+ *
+ * `decay` is 0, which is not what light does: a point source falls off with the square of the
+ * distance, and under that law Neptune, at 30.2 AU, receives about a six-thousandth of what
+ * Mercury does at 0.39 AU and reads as black. The map is a set of worlds to look at rather than a
+ * light meter, so each is lit as a photograph of it would be — the same concession the pixel
+ * floor makes for size. What the light does carry truthfully is which side is day: every body
+ * shows its lit face toward the star, and the terminator falls where it really falls.
+ *
+ * White, at π: a Lambertian surface returns intensity / π of its texture where the light falls
+ * square on it, so π gives back the photograph itself at the point facing the star, and less
+ * towards the limb. A warm tint or a smaller figure darkened the photographs below what they are.
+ */
+function starLight(): THREE.PointLight {
+  const light = new THREE.PointLight(0xffffff, Math.PI, 0, 0);
+  light.position.set(0, 0, 0);
+  return light;
+}
+
+/**
+ * Sphere segments. On a UV sphere the silhouette seen down the pole is the ring of width segments
+ * and the one seen from the side is the meridian profile, so height at half the width makes the
+ * error the same from every direction: at 64 by 32 a body filling the screen — Jupiter reaches
+ * 641 px of radius in the plan view — strays under a pixel from its true circle.
+ */
+const MARKER_WIDTH_SEGMENTS = 64;
+const MARKER_HEIGHT_SEGMENTS = 32;
+
+/**
+ * A drawn radius, in Earth radii, for an exoplanet that has a mass and no measured radius — 1 076
+ * of the 1 692 drawn, most of them found by radial velocity, and most of those giants: their
+ * median is 315 Earth masses. Drawn at an Earth, as they were, a nine-Jupiter-mass planet came out
+ * smaller than its system's super-Earth.
+ *
+ * A rough power law, capped at Jupiter's radius: giants from a third of a Jupiter mass to ten are
+ * all about Jupiter's size, since past that point added mass compresses rather than inflates. It
+ * sets a size to draw, not a figure to print — the readout still says the radius is unknown.
+ */
+function radiusFromMassEarth(massEarth: number | null | undefined): number | undefined {
+  return massEarth && massEarth > 0 ? Math.min(JUPITER_RADIUS_EARTH, massEarth ** 0.55) : undefined;
+}
+const JUPITER_RADIUS_EARTH = 11.2;
+
+/** Local axis a sphere is built around, and what the spin is applied about. */
+const SPIN_AXIS = new THREE.Vector3(0, 1, 0);
+const HOURS_PER_DAY = 24;
+
+/**
+ * How a body is turned at a given date: its own sidereal rotation, about its own axis.
+ *
+ * The obliquity fixes how far the pole leans from the orbit normal, and nothing more: which way
+ * it leans needs the pole's right ascension, which the Horizons pages this reads do not carry. The
+ * lean is taken about the orbit's ascending node because that is the one line the elements name,
+ * not because the data says so — so the tilt is real and its azimuth is not. Likewise the phase:
+ * each body starts at its elements' epoch (2025-01-01 here) in an arbitrary orientation, the
+ * shortest rotation of +Y onto its axis, and turns from there. The rate and the sense are real;
+ * the face towards the camera is not.
+ *
+ * Horizons states a retrograde spin twice over, in two conventions: an obliquity past 90 degrees
+ * (Venus 177.3, Uranus 97.8) and a negative rate. Either one alone turns the body backwards, and
+ * both together cancel into a forward turn — which is how Venus and Uranus were drawn. Where an
+ * obliquity is given it carries the sense, and the period is taken as a magnitude; the sign of the
+ * period is only read for a body with no obliquity at all.
+ */
+function spinFor(elements: OrbitalElements, frame: THREE.Quaternion, rotationPeriodHours: number, obliquityDeg: number | undefined, epochJd: number): THREE.Quaternion {
+  const node = elements.longitudeOfAscendingNodeDeg * DEG_TO_RAD;
+  const inclination = elements.inclinationDeg * DEG_TO_RAD;
+  const nodeDirection = new THREE.Vector3(Math.cos(node), Math.sin(node), 0);
+  const axis = new THREE.Vector3(Math.sin(inclination) * Math.sin(node), -Math.sin(inclination) * Math.cos(node), Math.cos(inclination))
+    .applyAxisAngle(nodeDirection, (obliquityDeg ?? 0) * DEG_TO_RAD)
+    .applyQuaternion(frame);
+  const period = obliquityDeg === undefined ? rotationPeriodHours : Math.abs(rotationPeriodHours);
+  const turns = ((epochJd - elements.epochJd) * HOURS_PER_DAY) / period;
+  return new THREE.Quaternion()
+    .setFromUnitVectors(SPIN_AXIS, axis)
+    .multiply(new THREE.Quaternion().setFromAxisAngle(SPIN_AXIS, turns * 2 * Math.PI));
 }
 
 interface TrackedTopLevelBody {
@@ -144,6 +236,9 @@ interface TrackedTopLevelBody {
   frame: THREE.Quaternion;
   /** AU position last computed for this body; moons read their parent's here. */
   position: THREE.Vector3;
+  /** Sidereal rotation, where the catalogue publishes one; negative is retrograde. */
+  rotationPeriodHours?: number;
+  obliquityDeg?: number;
 }
 
 interface TrackedMoon {
@@ -154,6 +249,8 @@ interface TrackedMoon {
   frame: THREE.Quaternion;
   pivot: THREE.Group;
   parentId: string;
+  rotationPeriodHours?: number;
+  obliquityDeg?: number;
 }
 
 /**
@@ -206,8 +303,6 @@ export class SystemOrbitsRenderer {
     const members: SystemMember[] = [];
     const topLevelBodiesById = new Map<string, BodyRecord>();
 
-    // Measured before anything is built, because marker sizes are scaled against the span and
-    // the markers are created as the bodies are added.
     const topLevelAxes = [
       ...bodies.filter((body) => !body.parentBodyId).map((body) => body.orbit.semiMajorAxisAu),
       ...exoplanets.filter((exoplanet) => isPropagatableOrbit(exoplanet.orbit)).map((exoplanet) => exoplanet.orbit.semiMajorAxisAu!)
@@ -227,7 +322,7 @@ export class SystemOrbitsRenderer {
       }
       // A body reaches here only when it has no parentBodyId, so `kind` is 'planet' or 'dwarf'.
       const kind: SystemMemberKind = body.kind;
-      const tracked = this.addTopLevelBody(body.id, kind, body.orbit, gmForParent(undefined), body.radiusKm, ECLIPTIC_FRAME, appearanceForBody(body, bodies, hostLuminositySolar));
+      const tracked = this.addTopLevelBody(body.id, kind, body.orbit, gmForParent(undefined), body.radiusKm, ECLIPTIC_FRAME, appearanceForBody(body, bodies, hostLuminositySolar), { periodHours: body.rotationPeriodHours, obliquityDeg: body.obliquityDeg });
       members.push({ id: body.id, kind, marker: tracked.marker });
     }
 
@@ -240,8 +335,8 @@ export class SystemOrbitsRenderer {
       if (!parentTracked) {
         continue; // orphaned moon reference; skip rather than crash.
       }
-      const moon = this.addMoon(body.id, body.orbit, gmForParent(body.parentBodyId), body.radiusKm, parentTracked, ECLIPTIC_FRAME, appearanceForBody(body, bodies, hostLuminositySolar));
-      members.push({ id: body.id, kind: 'moon', marker: moon.marker });
+      const moon = this.addMoon(body.id, body.orbit, gmForParent(body.parentBodyId), body.radiusKm, parentTracked, ECLIPTIC_FRAME, appearanceForBody(body, bodies, hostLuminositySolar), { periodHours: body.rotationPeriodHours, obliquityDeg: body.obliquityDeg });
+      members.push({ id: body.id, kind: 'moon', marker: moon.marker, parentId: parent.id });
     }
 
     // Every exoplanet in a system shares the same line of sight, so the frame is built once.
@@ -256,7 +351,8 @@ export class SystemOrbitsRenderer {
         continue;
       }
       const elements = resolveOrbitalElements(exoplanet.orbit);
-      const radiusKm = exoplanet.radiusEarth ? exoplanet.radiusEarth * EARTH_RADIUS_KM : undefined;
+      const radiusEarth = exoplanet.radiusEarth ?? radiusFromMassEarth(exoplanet.massEarth);
+      const radiusKm = radiusEarth ? radiusEarth * EARTH_RADIUS_KM : undefined;
       // Not `gmForParent(undefined)`: that assumes a solar-mass host for every system, and
       // most exoplanet hosts are red dwarfs a fraction of the Sun's mass.
       const gm = resolveGravitationalParameter({
@@ -299,6 +395,9 @@ export class SystemOrbitsRenderer {
 
       this.object.add(this.grid.object, this.tethers.object);
     }
+    // The star lights its own system. The star marker itself is unlit — it is the source, not a
+    // surface — so nothing here changes how it is drawn.
+    this.object.add(starLight());
   }
 
   /** Recomputes every marker's position for the given Julian date. Call once per tick. */
@@ -307,6 +406,9 @@ export class SystemOrbitsRenderer {
       const orbital = propagateOrbit(body.elements, body.gmAu3PerDay2, epochJd);
       body.position.set(orbital.x, orbital.y, orbital.z).applyQuaternion(body.frame);
       body.marker.position.copy(body.position);
+      if (body.rotationPeriodHours) {
+        body.marker.quaternion.copy(spinFor(body.elements, body.frame, body.rotationPeriodHours, body.obliquityDeg, epochJd));
+      }
     }
 
     for (const moon of this.moons) {
@@ -317,6 +419,9 @@ export class SystemOrbitsRenderer {
       moon.pivot.position.copy(parent.position);
       const orbital = propagateOrbit(moon.elements, moon.gmAu3PerDay2, epochJd);
       moon.marker.position.set(orbital.x, orbital.y, orbital.z).applyQuaternion(moon.frame);
+      if (moon.rotationPeriodHours) {
+        moon.marker.quaternion.copy(spinFor(moon.elements, moon.frame, moon.rotationPeriodHours, moon.obliquityDeg, epochJd));
+      }
     }
 
     // Moons are left out: their tether would land within a marker's width of their planet's and
@@ -371,15 +476,16 @@ export class SystemOrbitsRenderer {
     gmAu3PerDay2: number,
     radiusKm: number | undefined,
     frame: THREE.Quaternion,
-    appearance?: PlanetAppearance
+    appearance?: PlanetAppearance,
+    rotation?: { periodHours?: number; obliquityDeg?: number }
   ): TrackedTopLevelBody {
     const orbitLine = buildOrbitLine(elements, kind, frame);
-    const marker = buildMarker(kind, radiusKm, this.maxTopLevelSemiMajorAxisAu, appearance);
+    const marker = buildMarker(id, kind, radiusKm, appearance);
     this.object.add(orbitLine, marker);
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);
     this.trackDisposable(marker.geometry, marker.material as THREE.Material);
 
-    const tracked: TrackedTopLevelBody = { id, kind, elements, gmAu3PerDay2, marker, frame, position: new THREE.Vector3() };
+    const tracked: TrackedTopLevelBody = { id, kind, elements, gmAu3PerDay2, marker, frame, position: new THREE.Vector3(), rotationPeriodHours: rotation?.periodHours, obliquityDeg: rotation?.obliquityDeg };
     this.topLevelBodies.push(tracked);
     return tracked;
   }
@@ -391,17 +497,18 @@ export class SystemOrbitsRenderer {
     radiusKm: number | undefined,
     parent: TrackedTopLevelBody,
     frame: THREE.Quaternion,
-    appearance?: PlanetAppearance
+    appearance?: PlanetAppearance,
+    rotation?: { periodHours?: number; obliquityDeg?: number }
   ): TrackedMoon {
     const pivot = new THREE.Group();
     const orbitLine = buildOrbitLine(elements, 'moon', frame);
-    const marker = buildMarker('moon', radiusKm, this.maxTopLevelSemiMajorAxisAu, appearance);
+    const marker = buildMarker(id, 'moon', radiusKm, appearance);
     pivot.add(orbitLine, marker);
     this.object.add(pivot);
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);
     this.trackDisposable(marker.geometry, marker.material as THREE.Material);
 
-    const moon: TrackedMoon = { id, elements, gmAu3PerDay2, marker, frame, pivot, parentId: parent.id };
+    const moon: TrackedMoon = { id, elements, gmAu3PerDay2, marker, frame, pivot, parentId: parent.id, rotationPeriodHours: rotation?.periodHours, obliquityDeg: rotation?.obliquityDeg };
     this.moons.push(moon);
     return moon;
   }

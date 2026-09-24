@@ -13,7 +13,9 @@
       "argumentOfPeriapsisDeg": 29.19561108948743,
       "meanAnomalyAtEpochDeg": 103.9465145977117,
       "epochJd": 2460676.5
-    }
+    },
+    "rotationPeriodHours": 1407.512239412851,
+    "obliquityDeg": 2.11
   },
   {
     "id": "venus",
@@ -29,7 +31,9 @@
       "argumentOfPeriapsisDeg": 55.15075425343929,
       "meanAnomalyAtEpochDeg": 280.0749102629981,
       "epochJd": 2460676.5
-    }
+    },
+    "rotationPeriodHours": -5832.539941165383,
+    "obliquityDeg": 177.3
   },
   {
     "id": "earth",
@@ -45,7 +49,9 @@
       "argumentOfPeriapsisDeg": 272.9783142442708,
       "meanAnomalyAtEpochDeg": 357.4122246804211,
       "epochJd": 2460676.5
-    }
+    },
+    "rotationPeriodHours": 23.934472399219285,
+    "obliquityDeg": 23.4392911
   },
   {
     "id": "mars",
@@ -61,7 +67,9 @@
       "argumentOfPeriapsisDeg": 286.7114828288203,
       "meanAnomalyAtEpochDeg": 124.444888195349,
       "epochJd": 2460676.5
-    }
+    },
+    "rotationPeriodHours": 24.622955438662025,
+    "obliquityDeg": 25.19
   },
   {
     "id": "jupiter",
@@ -77,7 +85,9 @@
       "argumentOfPeriapsisDeg": 273.6090683600047,
       "meanAnomalyAtEpochDeg": 58.98282567286461,
       "epochJd": 2460676.5
-    }
+    },
+    "rotationPeriodHours": 9.925102371306965,
+    "obliquityDeg": 3.13
   },
   {
     "id": "saturn",
@@ -93,7 +103,9 @@
       "argumentOfPeriapsisDeg": 337.1663598259115,
       "meanAnomalyAtEpochDeg": 264.9877650588944,
       "epochJd": 2460676.5
-    }
+    },
+    "rotationPeriodHours": 10.656221583138441,
+    "obliquityDeg": 26.73
   },
   {
     "id": "uranus",
@@ -109,7 +121,9 @@
       "argumentOfPeriapsisDeg": 90.49593456147204,
       "meanAnomalyAtEpochDeg": 255.8822481742851,
       "epochJd": 2460676.5
-    }
+    },
+    "rotationPeriodHours": -17.24003330792427,
+    "obliquityDeg": 97.77
   },
   {
     "id": "neptune",
@@ -125,7 +139,9 @@
       "argumentOfPeriapsisDeg": 268.1146665565159,
       "meanAnomalyAtEpochDeg": 319.6858384317641,
       "epochJd": 2460676.5
-    }
+    },
+    "rotationPeriodHours": 16.110037586020876,
+    "obliquityDeg": 28.32
   },
   {
     "id": "pluto",
@@ -141,7 +157,9 @@
       "argumentOfPeriapsisDeg": 113.5754868232679,
       "meanAnomalyAtEpochDeg": 51.93655343727463,
       "epochJd": 2460676.5
-    }
+    },
+    "rotationPeriodHours": 153.29335198,
+    "obliquityDeg": 119.6
   },
   {
     "id": "moon",
@@ -158,7 +176,9 @@
       "meanAnomalyAtEpochDeg": 290.7825171697369,
       "epochJd": 2460676.5
     },
-    "parentBodyId": "earth"
+    "parentBodyId": "earth",
+    "rotationPeriodHours": 664.8546956215548,
+    "obliquityDeg": 6.67
   },
   {
     "id": "phobos",
@@ -175,7 +195,8 @@
       "meanAnomalyAtEpochDeg": 342.6005509941174,
       "epochJd": 2460676.5
     },
-    "parentBodyId": "mars"
+    "parentBodyId": "mars",
+    "rotationPeriodHours": 7.660212212136228
   },
   {
     "id": "deimos",
@@ -192,7 +213,8 @@
       "meanAnomalyAtEpochDeg": 273.8943716897566,
       "epochJd": 2460676.5
     },
-    "parentBodyId": "mars"
+    "parentBodyId": "mars",
+    "rotationPeriodHours": 30.304279685850094
   },
   {
     "id": "io",
@@ -209,7 +231,8 @@
       "meanAnomalyAtEpochDeg": 74.88524962049125,
       "epochJd": 2460676.5
     },
-    "parentBodyId": "jupiter"
+    "parentBodyId": "jupiter",
+    "rotationPeriodHours": 42.51537583211252
   },
   {
     "id": "europa",
@@ -226,7 +249,8 @@
       "meanAnomalyAtEpochDeg": 40.72575250295771,
       "epochJd": 2460676.5
     },
-    "parentBodyId": "jupiter"
+    "parentBodyId": "jupiter",
+    "rotationPeriodHours": 85.27848729079142
   },
   {
     "id": "ganymede",
@@ -243,7 +267,8 @@
       "meanAnomalyAtEpochDeg": 355.7249344187845,
       "epochJd": 2460676.5
     },
-    "parentBodyId": "jupiter"
+    "parentBodyId": "jupiter",
+    "rotationPeriodHours": 171.78271980469088
   },
   {
     "id": "callisto",
@@ -260,7 +285,8 @@
       "meanAnomalyAtEpochDeg": 126.0198540648681,
       "epochJd": 2460676.5
     },
-    "parentBodyId": "jupiter"
+    "parentBodyId": "jupiter",
+    "rotationPeriodHours": 400.52470451330635
   },
   {
     "id": "titan",
@@ -277,7 +303,8 @@
       "meanAnomalyAtEpochDeg": 32.18862839469676,
       "epochJd": 2460676.5
     },
-    "parentBodyId": "saturn"
+    "parentBodyId": "saturn",
+    "rotationPeriodHours": 382.87527117206236
   },
   {
     "id": "triton",
@@ -294,6 +321,7 @@
       "meanAnomalyAtEpochDeg": 273.1157438944629,
       "epochJd": 2460676.5
     },
-    "parentBodyId": "neptune"
+    "parentBodyId": "neptune",
+    "rotationPeriodHours": 141.05626027628523
   }
 ]

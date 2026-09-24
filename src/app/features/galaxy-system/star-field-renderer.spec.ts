@@ -172,6 +172,25 @@ describe('StarFieldRenderer', () => {
       renderer.dispose();
     });
 
+    it('ignores a star just outside the frame, however close the pointer gets to the edge', () => {
+      // Its hit area is the drawn size plus a slop, so near an edge that area reaches past the
+      // frame — and a system nobody can see is not one a click should fly into.
+      const offScreen = [star({ id: 9, x: 0, y: 0, z: -10, magnitude: -2 })];
+      const renderer = new StarFieldRenderer(offScreen, packPositions(offScreen));
+      const centre = new THREE.Vector3(0, 0, -10).project(camera);
+      expect(renderer.pickAt(new THREE.Vector2(centre.x, centre.y), camera, camera.aspect)).toBe(9);
+
+      // The same star, just outside the top of the frame: its centre at NDC 1.01, its disc ending at
+      // 1.0033. A click at 0.995 is within its hit radius (0.0167) — so without the frame test this
+      // picks it — while none of the star is on screen.
+      const above = [star({ id: 9, x: 0, y: 10 * Math.tan((camera.fov * Math.PI) / 360) * 1.01, z: -10, magnitude: -2 })];
+      const outside = new StarFieldRenderer(above, packPositions(above));
+
+      expect(outside.pickAt(new THREE.Vector2(0, 0.995), camera, camera.aspect)).toBeUndefined();
+      renderer.dispose();
+      outside.dispose();
+    });
+
     it('picks the star nearest the pointer when several are in view', () => {
       const spread = [
         star({ id: 1, x: 0, y: 0, z: -10 }),

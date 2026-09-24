@@ -20,6 +20,16 @@ export interface HorizonsQuery {
 export interface HorizonsResult {
   radiusKm?: number;
   orbit: OrbitalElements;
+  /**
+   * Sidereal rotation period in hours, negative where the page gives a negative rate —
+   * Venus and Uranus. Absent where the page publishes none. The same pages also give an obliquity
+   * past 90 degrees for those two, which says the same thing again; see the renderer's spinFor.
+   */
+  rotationPeriodHours?: number;
+  /** Tilt of the rotation axis from the body's own orbital plane, in degrees. */
+  obliquityDeg?: number;
+  /** The page says "Synchronous" instead of a period: its day is its orbit. */
+  tidallyLocked: boolean;
 }
 
 const RADIUS_PATTERNS = [
@@ -31,9 +41,65 @@ const RADIUS_PATTERNS = [
 ];
 
 /**
+ * How each page states how fast the body turns, in the order they are tried.
+ *
+ * The rate in radians per second is preferred wherever it appears: it is unambiguous and it is
+ * signed: Venus and Uranus carry a negative one. A period in hours or days
+ * comes next, then the sexagesimal form the giant planets use, and finally the word most moons carry
+ * instead of a number, Synchronous. Not all do — the Moon's page gives a rate, Titan's nothing —
+ * so the caller treats every moon it lists as locked whatever its page says.
+ */
+const ROTATION_RATE_PATTERN = /Rot(?:ational)?\.?\s*Rate\s*[(,]\s*rad\/s\s*\)?\s*=\s*(-?[\d.]+)/i;
+const ROTATION_PERIOD_PATTERNS = [
+  /Sid(?:ereal|\.)?\s*rot\.?\s*period[^=]*=\s*(-?[\d.]+)(?:\+-[\d.]+)?\s*(h|hr|hrs|d|day|days)\b/i,
+  /Rotation(?:al)?\s*period[^=]*=\s*(-?[\d.]+)\s*(h|hr|hrs|d|day|days)\b/i
+];
+/** `9h 55m 29.711 s`, as Jupiter and Saturn state it. */
+const SEXAGESIMAL_ROTATION_PATTERN = /Sid(?:ereal|\.)?\s*rot\.?\s*period[^=]*=\s*(\d+)\s*h\s*(\d+)\s*m\s*([\d.]+)\s*s/i;
+const SYNCHRONOUS_PATTERN = /Rotation(?:al)?\s*period\s*=?\s*:?\s*Synchronous/i;
+const OBLIQUITY_PATTERN = /Obliquity\s*to\s*orbit[^=]*=\s*(-?[\d.]+)/i;
+
+const HOURS_PER_DAY = 24;
+const SECONDS_PER_HOUR = 3600;
+
+/**
+ * True where the page gives no number because the body keeps one face to its parent, so its day
+ * is its orbit. The period itself is then Kepler's, which the caller
+ * works out from the elements above and the parent's mass.
+ */
+export function isTidallyLocked(text: string): boolean {
+  return SYNCHRONOUS_PATTERN.test(text);
+}
+
+/** Sidereal rotation period, in hours, from whichever form the page states it in. */
+export function extractRotationPeriodHours(text: string): number | undefined {
+  const rate = text.match(ROTATION_RATE_PATTERN);
+  if (rate && Number(rate[1]) !== 0) {
+    return (2 * Math.PI) / (Number(rate[1]) * SECONDS_PER_HOUR);
+  }
+  const sexagesimal = text.match(SEXAGESIMAL_ROTATION_PATTERN);
+  if (sexagesimal) {
+    return Number(sexagesimal[1]) + Number(sexagesimal[2]) / 60 + Number(sexagesimal[3]) / SECONDS_PER_HOUR;
+  }
+  for (const pattern of ROTATION_PERIOD_PATTERNS) {
+    const match = text.match(pattern);
+    if (match) {
+      const hours = Number(match[1]) * (match[2].toLowerCase().startsWith('d') ? HOURS_PER_DAY : 1);
+      return Number.isFinite(hours) && hours !== 0 ? hours : undefined;
+    }
+  }
+  return undefined;
+}
+
+export function extractObliquityDeg(text: string): number | undefined {
+  const match = text.match(OBLIQUITY_PATTERN);
+  return match ? Number(match[1]) : undefined;
+}
+
+/**
  * Queries JPL Horizons for a body's heliocentric (or planetocentric, for moons) osculating
- * orbital elements plus, when available, its mean physical radius — both in a single
- * request (`OBJ_DATA=YES` + `EPHEM_TYPE=ELEMENTS`).
+ * orbital elements plus, when available, its mean physical radius and how it turns — all in a
+ * single request (`OBJ_DATA=YES` + `EPHEM_TYPE=ELEMENTS`).
  */
 export async function fetchHorizonsBody(query: HorizonsQuery): Promise<HorizonsResult> {
   const url =
@@ -44,7 +110,10 @@ export async function fetchHorizonsBody(query: HorizonsQuery): Promise<HorizonsR
   const text = await fetchTextCached(url, query.cacheKey);
   return {
     radiusKm: extractRadiusKm(text),
-    orbit: extractOrbitalElements(text)
+    orbit: extractOrbitalElements(text),
+    rotationPeriodHours: extractRotationPeriodHours(text),
+    obliquityDeg: extractObliquityDeg(text),
+    tidallyLocked: isTidallyLocked(text)
   };
 }
 

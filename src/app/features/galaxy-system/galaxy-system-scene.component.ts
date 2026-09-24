@@ -1760,7 +1760,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
           ? [{ label: 'Luminosity', value: formatLuminosity(luminosity), derived: true }]
           : []),
       ]);
-      this.hudNote.set(this.time.atNow() ? 'Orbits propagated from published elements to the current date.' : 'Orbits propagated from published elements to the date on the clock.');
+      // Where the orbits come from, and for the Sun how far from the present they hold: each
+      // body's card names its own source and epoch.
+      const source = this.bodies.some((body) => body.systemStarId === star.id) ? 'JPL mean elements, the planets’ fit for 3000 BC to AD 3000,' : 'published elements';
+      this.hudNote.set(`Orbits propagated from ${source} to ${this.time.atNow() ? 'the current date' : 'the date on the clock'}.`);
       this.hudRange.set(
         formatAu(
           this.engine.visibleHalfHeight(

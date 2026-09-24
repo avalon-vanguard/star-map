@@ -831,6 +831,19 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(navigationStore.viewLevel()).toBe('system');
   });
 
+  it('says where a system’s orbits come from, and for the Sun how long they hold', async () => {
+    const note = (): string => (fixture.componentInstance as unknown as { hudNote: () => string }).hudNote();
+    navigationStore.selectStar(SUN.id);
+    await flushAsync();
+    await advanceFrames(engine, 2.5);
+    expect(note()).toBe('Orbits propagated from JPL mean elements, the planets’ fit for 3000 BC to AD 3000, to the current date.');
+
+    navigationStore.selectStar(ALPHA_CENTAURI.id);
+    await flushAsync();
+    await advanceFrames(engine, 5);
+    expect(note()).toBe('Orbits propagated from published elements to the current date.');
+  });
+
   it('performs the floating-origin recenter: the camera lands close to the AU-space origin, not out at parsec-scale coordinates', async () => {
     navigationStore.selectStar(ALPHA_CENTAURI.id);
     await flushAsync();

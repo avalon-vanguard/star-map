@@ -33,9 +33,8 @@ export interface BodyDetailViewModel {
   /** True when a real photograph is being shown rather than the derived surface. */
   hasPhotography: boolean;
   /**
-   * Sidereal orbital period. Measured where the archive published one; otherwise derived from the
-   * semi-major axis for heliocentric orbits, where the central mass is known exactly. Undefined
-   * when neither applies — see `heliocentricPeriodDays`.
+   * Sidereal orbital period. For a solar-system body, 360 degrees over JPL's published mean
+   * motion; for an exoplanet, the archive's period where it published one, and undefined where not.
    */
   orbitalPeriodDays?: number;
   /**
@@ -44,4 +43,6 @@ export interface BodyDetailViewModel {
    * derived surface as a photograph.
    */
   orbitalPeriodSource?: 'measured' | 'derived';
+  /** Where the orbit comes from and the span it holds over; see `BodyRecord.orbitSource`. */
+  orbitSource?: string;
 }

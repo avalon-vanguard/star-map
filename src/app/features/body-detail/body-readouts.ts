@@ -65,7 +65,8 @@ export function bodyReadouts(body: BodyDetailViewModel): BodyReadouts {
     derived.push({ label: 'Bulk density', value: formatDensity(body.appearance.bulkDensityGramsPerCm3) });
   }
 
-  return { kindLabel: KIND_LABELS[body.kind], measured, derived, provenance: provenanceFor(body) };
+  const provenance = body.orbitSource ? `${provenanceFor(body)} Orbit: ${body.orbitSource}.` : provenanceFor(body);
+  return { kindLabel: KIND_LABELS[body.kind], measured, derived, provenance };
 }
 
 /**

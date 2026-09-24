@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parsePlanetMeanElements, parseSatelliteMeanElements } from './mean-elements';
+import { parsePlanetMeanElements, parseSatelliteMeanElements, parseSmallBodyElements, SbdbAnswer } from './mean-elements';
 
 /** Standish's p_elem_t2.txt, cut to the lines that matter here, as JPL published them. */
 const TABLE_2 = `Keplerian elements and their rates, with respect to the mean ecliptic and equinox of J2000,
@@ -47,7 +47,41 @@ Epoch 2000 Jan.  1.50 TT<BR>
 <TD>61.2572638</TD><TD>5.877</TD><TD>386.371</TD><TD>687.446</TD>
 <TD>299.456</TD><TD>43.414</TD><TD>0.010</TD>
 <TD ALIGN=right><A HREF="#ref54">54</A></TD></TR>
+<td align="left" nowrap><b>Satellites of Uranus</b></td>
+<td align="right" nowrap><b>jump to:</b> <a href="#earth">Earth</a>, <a href="#mars">Mars</a></td>
+<H3>Mean equatorial orbital elements</H3>
+Epoch 1980 Jan. 1.0 TT<BR>
+<TR ALIGN=right><TD ALIGN=left>Titania</TD><TD>436300.</TD><TD>0.0011</TD>
+<TD>284.400</TD><TD>24.614</TD><TD>0.079</TD><TD>99.771</TD><TD>41.3514246</TD>
+<TD>8.706</TD><TD>161.525</TD><TD>195.369</TD>
+<TD ALIGN=right><A HREF="#ref10">10</A></TD></TR>
 `;
+
+/** Ceres as the SBDB API answers `sstr=Ceres&phys-par=1&full-prec=1`, cut to what is read. */
+const CERES: SbdbAnswer = {
+  orbit: {
+    epoch: '2461200.5',
+    elements: [
+      { name: 'e', value: '.07969229514816586' },
+      { name: 'a', value: '2.765552595034094' },
+      { name: 'q', value: '2.545159361382861' },
+      { name: 'i', value: '10.58802780183462' },
+      { name: 'om', value: '80.24862682043221' },
+      { name: 'w', value: '73.29421453021587' },
+      { name: 'ma', value: '274.4193463761342' },
+      { name: 'tp', value: '2461599.841466614066' },
+      { name: 'per', value: '1679.853119758983' },
+      { name: 'n', value: '.21430445064843' },
+      { name: 'ad', value: '2.985945828685327' }
+    ]
+  },
+  phys_par: [
+    { name: 'H', value: '3.34' },
+    { name: 'diameter', value: '939.4' },
+    { name: 'GM', value: '62.6284' },
+    { name: 'rot_per', value: '9.074170' }
+  ]
+};
 
 describe('parsePlanetMeanElements', () => {
   it('turns Standish’s longitudes into the argument of periapsis and mean anomaly', () => {
@@ -103,8 +137,50 @@ describe('parseSatelliteMeanElements', () => {
     expect(rates.longitudeOfAscendingNodeDegPerDay).toBeCloseTo(360 / (687.446 * 365.25), 9);
   });
 
+  it('reads a section referred to the planet’s equator against the pole it is given', () => {
+    const pole = { raDeg: 77.311, decDeg: 15.175 };
+    const titania = parseSatelliteMeanElements(SATELLITES, 'Uranus', 'Titania', false, pole);
+    expect(titania.laplacePole).toEqual(pole);
+    expect(titania.orbit.epochJd).toBe(2444239.5);
+    expect(titania.rates.meanMotionDegPerDay).toBe(41.3514246);
+    // Read as ecliptic elements, which is what a missing pole would mean, Titania is 88 degrees
+    // from Horizons on 2025-01-01.
+    expect(() => parseSatelliteMeanElements(SATELLITES, 'Uranus', 'Titania', false)).toThrow(/equator/);
+    expect(() => parseSatelliteMeanElements(SATELLITES, 'Jupiter', 'Io', true, pole)).toThrow(/equator/);
+  });
+
   it('turns the periapsis backwards where a resonance holds it', () => {
     const { rates } = parseSatelliteMeanElements(SATELLITES, 'Jupiter', 'Io', true);
     expect(rates.argumentOfPeriapsisDegPerDay).toBeCloseTo(-360 / (1.625 * 365.25), 9);
+  });
+});
+
+describe('parseSmallBodyElements', () => {
+  it('carries a dwarf planet on its osculating elements at their own mean motion', () => {
+    const ceres = parseSmallBodyElements(CERES);
+    expect(ceres.orbit).toEqual({
+      semiMajorAxisAu: 2.765552595034094,
+      eccentricity: 0.07969229514816586,
+      inclinationDeg: 10.58802780183462,
+      longitudeOfAscendingNodeDeg: 80.24862682043221,
+      argumentOfPeriapsisDeg: 73.29421453021587,
+      meanAnomalyAtEpochDeg: 274.4193463761342,
+      epochJd: 2461200.5
+    });
+    expect(ceres.rates).toEqual({ meanMotionDegPerDay: 0.21430445064843, longitudeOfAscendingNodeDegPerDay: 0, argumentOfPeriapsisDegPerDay: 0 });
+    expect(ceres.laplacePole).toBeUndefined();
+    expect(ceres.orbitSource).toBe('JPL SBDB osculating elements, epoch 2026 Jun 9');
+  });
+
+  it('takes half the diameter as the radius, and the rotation period in hours', () => {
+    const ceres = parseSmallBodyElements(CERES);
+    expect(ceres.radiusKm).toBe(469.7);
+    expect(ceres.rotationPeriodHours).toBe(9.07417);
+  });
+
+  it('leaves out what the answer does not publish', () => {
+    const eris = parseSmallBodyElements({ ...CERES, phys_par: [{ name: 'rot_per', value: '25.9' }] });
+    expect(eris.radiusKm).toBeUndefined();
+    expect(eris.rotationPeriodHours).toBe(25.9);
   });
 });

@@ -103,8 +103,18 @@ function julianDate(year: number, month: string, day: number): number {
  * the line of their conjunctions, which turns backwards at 2 n(Europa) - n(Io) = 0.74 degrees a
  * day, and that is exactly the 1.625- and 1.394-year periods the table gives for them. Read as
  * advancing, Io was 0.9 degrees out and Europa 2.1.
+ *
+ * Uranus's and Pluto's sections are referred to the planet's equator instead, and the page does
+ * not print its pole, so the caller passes it as `equatorPole`: the elements are then read
+ * against that pole exactly as against a Laplace plane's.
  */
-export function parseSatelliteMeanElements(html: string, planetName: string, moonName: string, apsidesRegress: boolean): MeanOrbit {
+export function parseSatelliteMeanElements(
+  html: string,
+  planetName: string,
+  moonName: string,
+  apsidesRegress: boolean,
+  equatorPole?: { raDeg: number; decDeg: number }
+): MeanOrbit {
   const text = html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
   const section = text.indexOf(`Satellites of ${planetName} jump to`);
   if (section < 0) {
@@ -119,7 +129,14 @@ export function parseSatelliteMeanElements(html: string, planetName: string, moo
   if (!epoch) {
     throw new Error(`No epoch above ${moonName}'s row.`);
   }
-  const laplace = before.lastIndexOf('Laplace plane') > before.lastIndexOf('Mean ecliptic');
+  // The nearest heading above the row says which plane its section is referred to; the ecliptic
+  // where there is none.
+  const [plane] = ['Mean ecliptic', 'Laplace plane', 'Mean equatorial'].sort((x, y) => before.lastIndexOf(y) - before.lastIndexOf(x));
+  const laplace = plane === 'Laplace plane';
+  const equatorial = plane === 'Mean equatorial';
+  if (equatorial !== (equatorPole !== undefined)) {
+    throw new Error(`${moonName}'s elements are ${equatorial ? '' : 'not '}referred to ${planetName}'s equator, and its pole was ${equatorPole ? '' : 'not '}given.`);
+  }
   const values = numbers(row[1]);
   const expected = laplace ? 14 : 11;
   if (values.length !== expected || !values.every(Number.isFinite)) {
@@ -145,7 +162,62 @@ export function parseSatelliteMeanElements(html: string, planetName: string, moo
       longitudeOfAscendingNodeDegPerDay: nodeSense * perDay(nodePeriodYears),
       argumentOfPeriapsisDegPerDay: periapsisSense * perDay(periapsisPeriodYears)
     },
-    ...(laplace ? { laplacePole: { raDeg, decDeg } } : {}),
+    ...(laplace ? { laplacePole: { raDeg, decDeg } } : equatorPole ? { laplacePole: equatorPole } : {}),
     orbitSource: `JPL SSD satellite mean elements, epoch ${epoch[1]} ${epoch[2]} ${Math.floor(Number(epoch[3]))}`
+  };
+}
+
+/** What this reads of a JPL Small-Body Database answer (`sbdb.api?sstr=…&phys-par=1&full-prec=1`). */
+export interface SbdbAnswer {
+  orbit: { epoch: string; elements: Array<{ name: string; value: string | null }> };
+  phys_par?: Array<{ name: string; value: string | null }>;
+}
+
+export interface SmallBody extends MeanOrbit {
+  radiusKm?: number;
+  rotationPeriodHours?: number;
+}
+
+/**
+ * A dwarf planet from the Small-Body Database: its osculating heliocentric elements against the
+ * J2000 ecliptic, the frame Standish's are in, carried round at their own mean motion n with
+ * nothing turning. Standish's tables stop at Pluto and JPL publishes no mean elements for the
+ * others, so these are exact on their epoch and drift from it — for Ceres, whose orbit Jupiter
+ * pulls on, by degrees within decades; see the ETL's check against Horizons.
+ *
+ * Radius and spin come from the same answer where it has them: half the published diameter, and
+ * the rotation period, in hours.
+ */
+export function parseSmallBodyElements(answer: SbdbAnswer): SmallBody {
+  const element = (name: string): number => {
+    const value = Number(answer.orbit.elements.find((candidate) => candidate.name === name)?.value ?? NaN);
+    if (!Number.isFinite(value)) {
+      throw new Error(`The SBDB answer has no element ${name}.`);
+    }
+    return value;
+  };
+  const physical = (name: string): number | undefined => {
+    const value = Number(answer.phys_par?.find((candidate) => candidate.name === name)?.value ?? NaN);
+    return Number.isFinite(value) ? value : undefined;
+  };
+  const epochJd = Number(answer.orbit.epoch);
+  const epoch = new Date((epochJd - 2440587.5) * 86400000);
+  const diameterKm = physical('diameter');
+  const rotationPeriodHours = physical('rot_per');
+
+  return {
+    orbit: {
+      semiMajorAxisAu: element('a'),
+      eccentricity: element('e'),
+      inclinationDeg: element('i'),
+      longitudeOfAscendingNodeDeg: element('om'),
+      argumentOfPeriapsisDeg: element('w'),
+      meanAnomalyAtEpochDeg: element('ma'),
+      epochJd
+    },
+    rates: { meanMotionDegPerDay: element('n'), longitudeOfAscendingNodeDegPerDay: 0, argumentOfPeriapsisDegPerDay: 0 },
+    orbitSource: `JPL SBDB osculating elements, epoch ${epoch.getUTCFullYear()} ${MONTHS[epoch.getUTCMonth()]} ${epoch.getUTCDate()}`,
+    ...(diameterKm !== undefined ? { radiusKm: diameterKm / 2 } : {}),
+    ...(rotationPeriodHours !== undefined ? { rotationPeriodHours } : {})
   };
 }

@@ -24,7 +24,7 @@
     },
     "orbitSource": "JPL approximate mean elements (Standish), fit for 3000 BC to AD 3000",
     "rotationPeriodHours": 1407.512239412851,
-    "obliquityDeg": 2.11
+    "obliquityDeg": 0.035166666666666666
   },
   {
     "id": "venus",

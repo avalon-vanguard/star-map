@@ -38,7 +38,8 @@ const ROTATION_PERIOD_PATTERNS = [
   /Rotation(?:al)?\s*period[^=]*=\s*(-?[\d.]+)\s*(h|hr|hrs|d|day|days)\b/i
 ];
 const SYNCHRONOUS_PATTERN = /Rotation(?:al)?\s*period\s*=?\s*:?\s*Synchronous/i;
-const OBLIQUITY_PATTERN = /Obliquity\s*to\s*orbit[^=]*=\s*(-?[\d.]+)/i;
+/** `25.19 deg` on most pages, `2.11' +/- 0.1'` in arcminutes on Mercury's. */
+const OBLIQUITY_PATTERN = /Obliquity\s*to\s*orbit[^=]*=\s*(-?[\d.]+)\s*(')?/i;
 /** `GM (km^3/s^2) = 106.10` on a moon's page, `GM (planet) km^3/s^2 = 869.326` on Pluto's. */
 const GM_PATTERN = /GM\s*(?:\(planet\)\s*)?,?\s*\(?km\^3\/s\^2\)?\s*=\s*([\d.]+)/i;
 
@@ -74,9 +75,13 @@ export function extractRotationPeriodHours(text: string): number | undefined {
   return undefined;
 }
 
+/**
+ * Tilt of the rotation axis from the orbit, in degrees. Mercury's page gives its tilt in
+ * arcminutes, which read as degrees made it 2.11 where the IAU's pole puts it at 0.034.
+ */
 export function extractObliquityDeg(text: string): number | undefined {
   const match = text.match(OBLIQUITY_PATTERN);
-  return match ? Number(match[1]) : undefined;
+  return match ? Number(match[1]) / (match[2] ? 60 : 1) : undefined;
 }
 
 /**

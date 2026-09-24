@@ -5,8 +5,9 @@ import { PlanetAppearance } from '../../shared/astro/planet-appearance';
 import { planetTexture } from '../../shared/rendering/procedural-planet-texture';
 import { bodyTexturePath, loadCachedTexture } from '../../shared/rendering/texture-catalog';
 import { isPropagatableOrbit, keplerRates, meanElementsAt, orbitEllipsePoints, positionAtEpoch, resolveGravitationalParameter, resolveOrbitalElements } from '../../shared/astro/kepler';
-import { CartesianCoordinates, laplacePlaneToEquatorial, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
-import { BodyRecord, MeanElementRates, OrbitalElements } from '../../shared/models/body.model';
+import { CartesianCoordinates, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
+import { BodyRecord, MeanElementRates, OrbitalElements, RotationalElements } from '../../shared/models/body.model';
+import { bodyOrientation, poleFrame } from '../../shared/rendering/body-orientation';
 import { bodyMarkerRadiusAu, systemGridRingsAu } from './system-framing';
 import { PolarGridPlane, TetherField } from './grid-plane';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
@@ -51,19 +52,12 @@ const ECLIPTIC_FRAME = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3
 
 /**
  * Rotation carrying a moon's element frame into the scene: its local Laplace plane where JPL
- * gives one, the ecliptic otherwise. Built from the three axes {@link laplacePlaneToEquatorial}
- * sends, so the scene and the ETL's check against Horizons share the one conversion.
+ * gives one, the ecliptic otherwise. {@link poleFrame} builds it from the axes
+ * `laplacePlaneToEquatorial` sends, so the scene and the ETL's check against Horizons share the
+ * one conversion.
  */
 function moonFrame(body: BodyRecord): THREE.Quaternion {
-  const pole = body.laplacePole;
-  if (!pole) {
-    return ECLIPTIC_FRAME.clone();
-  }
-  const axis = (x: number, y: number, z: number): THREE.Vector3 => {
-    const turned = laplacePlaneToEquatorial({ x, y, z }, pole);
-    return new THREE.Vector3(turned.x, turned.y, turned.z);
-  };
-  return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(axis(1, 0, 0), axis(0, 1, 0), axis(0, 0, 1)));
+  return body.laplacePole ? poleFrame(body.laplacePole) : ECLIPTIC_FRAME.clone();
 }
 
 const X_AXIS = new THREE.Vector3(1, 0, 0);
@@ -253,32 +247,20 @@ const SPIN_AXIS = new THREE.Vector3(0, 1, 0);
 const HOURS_PER_DAY = 24;
 
 /**
- * How a body is turned at a given date: its own sidereal rotation, about its own axis.
+ * How a body the IAU gives no rotational elements for is turned at a given date — Eris, Haumea
+ * and Makemake, whose periods are known and whose poles are not: at its own sidereal rate, about
+ * its orbit's normal, backwards for a negative period. None of them has an obliquity, so none is
+ * applied. The phase is arbitrary: each body starts at its elements' epoch in the shortest
+ * rotation of +Y onto its axis, and turns from there. Exoplanets have no published rotation at
+ * all, and are left still.
  *
- * The obliquity fixes how far the pole leans from the orbit normal, and nothing more: which way
- * it leans needs the pole's right ascension, which the Horizons pages this reads do not carry. The
- * lean is taken about the orbit's ascending node because that is the one line the elements name,
- * not because the data says so — so the tilt is real and its azimuth is not. It is the node on the
- * date drawn, so the lean follows the orbit as the node turns. Likewise the phase: each body
- * starts at its elements' epoch (J2000 for the planets) in an arbitrary orientation, the
- * shortest rotation of +Y onto its axis, and turns from there. The rate and the sense are real;
- * the face towards the camera is not.
- *
- * Horizons states a retrograde spin twice over, in two conventions: an obliquity past 90 degrees
- * (Venus 177.3, Uranus 97.8) and a negative rate. Either one alone turns the body backwards, and
- * both together cancel into a forward turn — which is how Venus and Uranus were drawn. Where an
- * obliquity is given it carries the sense, and the period is taken as a magnitude; the sign of the
- * period is only read for a body with no obliquity at all.
+ * Every other body is turned by {@link bodyOrientation}.
  */
-function spinFor(elements: OrbitalElements, frame: THREE.Quaternion, rotationPeriodHours: number, obliquityDeg: number | undefined, daysSinceEpoch: number): THREE.Quaternion {
+function spinFor(elements: OrbitalElements, frame: THREE.Quaternion, rotationPeriodHours: number, daysSinceEpoch: number): THREE.Quaternion {
   const node = elements.longitudeOfAscendingNodeDeg * DEG_TO_RAD;
   const inclination = elements.inclinationDeg * DEG_TO_RAD;
-  const nodeDirection = new THREE.Vector3(Math.cos(node), Math.sin(node), 0);
-  const axis = new THREE.Vector3(Math.sin(inclination) * Math.sin(node), -Math.sin(inclination) * Math.cos(node), Math.cos(inclination))
-    .applyAxisAngle(nodeDirection, (obliquityDeg ?? 0) * DEG_TO_RAD)
-    .applyQuaternion(frame);
-  const period = obliquityDeg === undefined ? rotationPeriodHours : Math.abs(rotationPeriodHours);
-  const turns = (daysSinceEpoch * HOURS_PER_DAY) / period;
+  const axis = new THREE.Vector3(Math.sin(inclination) * Math.sin(node), -Math.sin(inclination) * Math.cos(node), Math.cos(inclination)).applyQuaternion(frame);
+  const turns = (daysSinceEpoch * HOURS_PER_DAY) / rotationPeriodHours;
   return new THREE.Quaternion()
     .setFromUnitVectors(SPIN_AXIS, axis)
     .multiply(new THREE.Quaternion().setFromAxisAngle(SPIN_AXIS, turns * 2 * Math.PI));
@@ -297,7 +279,7 @@ interface TrackedTopLevelBody {
   position: THREE.Vector3;
   /** Sidereal rotation, where the catalogue publishes one; negative is retrograde. */
   rotationPeriodHours?: number;
-  obliquityDeg?: number;
+  rotationalElements?: RotationalElements;
 }
 
 interface TrackedMoon {
@@ -310,7 +292,7 @@ interface TrackedMoon {
   pivot: THREE.Group;
   parentId: string;
   rotationPeriodHours?: number;
-  obliquityDeg?: number;
+  rotationalElements?: RotationalElements;
   /**
    * Where the moon and its planet go round a barycentre outside the planet (Charon): the moon's
    * mass over the planet's, and the planet's own small orbit round that point.
@@ -398,7 +380,7 @@ export class SystemOrbitsRenderer {
       }
       // A body reaches here only when it has no parentBodyId, so `kind` is 'planet' or 'dwarf'.
       const kind: SystemMemberKind = body.kind;
-      const tracked = this.addTopLevelBody(body.id, kind, body.orbit, body.rates, body.radiusKm, ECLIPTIC_FRAME, appearanceForBody(body, bodies, hostLuminositySolar), { periodHours: body.rotationPeriodHours, obliquityDeg: body.obliquityDeg });
+      const tracked = this.addTopLevelBody(body.id, kind, body.orbit, body.rates, body.radiusKm, ECLIPTIC_FRAME, appearanceForBody(body, bodies, hostLuminositySolar), { periodHours: body.rotationPeriodHours, elements: body.rotationalElements });
       members.push({ id: body.id, kind, marker: tracked.marker });
     }
 
@@ -411,7 +393,7 @@ export class SystemOrbitsRenderer {
       if (!parentTracked) {
         continue; // orphaned moon reference; skip rather than crash.
       }
-      const moon = this.addMoon(body.id, body.orbit, body.rates, body.radiusKm, parentTracked, moonFrame(body), appearanceForBody(body, bodies, hostLuminositySolar), { periodHours: body.rotationPeriodHours, obliquityDeg: body.obliquityDeg }, body.massRatio);
+      const moon = this.addMoon(body.id, body.orbit, body.rates, body.radiusKm, parentTracked, moonFrame(body), appearanceForBody(body, bodies, hostLuminositySolar), { periodHours: body.rotationPeriodHours, elements: body.rotationalElements }, body.massRatio);
       members.push({ id: body.id, kind: 'moon', marker: moon.marker, parentId: parent.id });
     }
 
@@ -484,8 +466,10 @@ export class SystemOrbitsRenderer {
       body.position.set(orbital.x, orbital.y, orbital.z).applyQuaternion(body.frame);
       body.marker.position.copy(body.position);
       orientOrbit(body.orbitLine.quaternion, current, body.frame);
-      if (body.rotationPeriodHours) {
-        body.marker.quaternion.copy(spinFor(current, body.frame, body.rotationPeriodHours, body.obliquityDeg, epochJd - body.elements.epochJd));
+      if (body.rotationalElements) {
+        bodyOrientation(body.rotationalElements, epochJd, body.marker.quaternion);
+      } else if (body.rotationPeriodHours) {
+        body.marker.quaternion.copy(spinFor(current, body.frame, body.rotationPeriodHours, epochJd - body.elements.epochJd));
       }
     }
 
@@ -507,8 +491,10 @@ export class SystemOrbitsRenderer {
         moon.marker.position.multiplyScalar(1 / (1 + massRatio));
         parentOrbitLine.quaternion.copy(moon.orbitLine.quaternion);
       }
-      if (moon.rotationPeriodHours) {
-        moon.marker.quaternion.copy(spinFor(current, moon.frame, moon.rotationPeriodHours, moon.obliquityDeg, epochJd - moon.elements.epochJd));
+      if (moon.rotationalElements) {
+        bodyOrientation(moon.rotationalElements, epochJd, moon.marker.quaternion);
+      } else if (moon.rotationPeriodHours) {
+        moon.marker.quaternion.copy(spinFor(current, moon.frame, moon.rotationPeriodHours, epochJd - moon.elements.epochJd));
       }
     }
 
@@ -567,7 +553,7 @@ export class SystemOrbitsRenderer {
     radiusKm: number | undefined,
     frame: THREE.Quaternion,
     appearance?: PlanetAppearance,
-    rotation?: { periodHours?: number; obliquityDeg?: number }
+    rotation?: { periodHours?: number; elements?: RotationalElements }
   ): TrackedTopLevelBody {
     const orbitLine = buildOrbitLine(elements, kind, frame);
     const marker = buildMarker(id, kind, radiusKm, appearance, this.deferSurface);
@@ -575,7 +561,7 @@ export class SystemOrbitsRenderer {
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);
     this.trackDisposable(marker.geometry, marker.material as THREE.Material);
 
-    const tracked: TrackedTopLevelBody = { id, kind, elements, rates, marker, orbitLine, frame, position: new THREE.Vector3(), rotationPeriodHours: rotation?.periodHours, obliquityDeg: rotation?.obliquityDeg };
+    const tracked: TrackedTopLevelBody = { id, kind, elements, rates, marker, orbitLine, frame, position: new THREE.Vector3(), rotationPeriodHours: rotation?.periodHours, rotationalElements: rotation?.elements };
     this.topLevelBodies.push(tracked);
     return tracked;
   }
@@ -588,7 +574,7 @@ export class SystemOrbitsRenderer {
     parent: TrackedTopLevelBody,
     frame: THREE.Quaternion,
     appearance?: PlanetAppearance,
-    rotation?: { periodHours?: number; obliquityDeg?: number },
+    rotation?: { periodHours?: number; elements?: RotationalElements },
     massRatio?: number
   ): TrackedMoon {
     const pivot = new THREE.Group();
@@ -612,7 +598,7 @@ export class SystemOrbitsRenderer {
       barycentre = { massRatio, parentOrbitLine };
     }
 
-    const moon: TrackedMoon = { id, elements, rates, marker, orbitLine, frame, pivot, parentId: parent.id, rotationPeriodHours: rotation?.periodHours, obliquityDeg: rotation?.obliquityDeg, barycentre };
+    const moon: TrackedMoon = { id, elements, rates, marker, orbitLine, frame, pivot, parentId: parent.id, rotationPeriodHours: rotation?.periodHours, rotationalElements: rotation?.elements, barycentre };
     this.moons.push(moon);
     return moon;
   }

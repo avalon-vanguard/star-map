@@ -12,6 +12,13 @@ prime meridian (W) then turns longitude 0 to where it belongs at any date.
 and the skybox come from the Solar System Scope texture pack, and `jupiter` from its 8k pack, via
 Wikimedia Commons. See each file's Commons page for the original credit line.
 
+`saturn_ring.png` is a 1 280 by 78 px strip. Its x axis runs straight out from Saturn: read off its
+alpha, the C ring's inner edge (74 490 km) is at px 91, the B ring's inner and outer edges (92 000
+and 117 580 km) at 404.5 and 860, the A ring's outer edge (136 775 km) at 1 204 and the F ring
+(140 180 km) at 1 267.5, all within 1.8 px of 55.9 km a pixel. So its left edge stands for
+69 400 km and its right edge for 141 000 km (`SATURN_RING_INNER_KM`, `SATURN_RING_OUTER_KM`). The
+Cassini Division's outer edge (122 170 km) is drawn 30 px (1 700 km) too far in.
+
 ## Mission mosaics (public domain)
 
 Each was downloaded from the URL below and processed the same way (script:

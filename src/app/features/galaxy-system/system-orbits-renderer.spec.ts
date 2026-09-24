@@ -513,6 +513,7 @@ describe('solar-system bodies against Horizons', () => {
     earth: {poleRaDeg: [0, -0.641, 0], poleDecDeg: [90, -0.557, 0], primeMeridianDeg: [190.147, 360.9856235, 0]},
     mars: {poleRaDeg: [317.269202, -0.10927547, 0], poleDecDeg: [54.432516, -0.05827105, 0], primeMeridianDeg: [176.049863, 350.891982443297, 0], terms: [{angleDeg: [79.398797, 0.5042615, 0], ra: 0.419057, dec: 0, pm: 0}, {angleDeg: [166.325722, 0.5042615, 0], ra: 0, dec: 1.591274, pm: 0}, {angleDeg: [95.391654, 0.5042615, 0], ra: 0, dec: 0, pm: 0.584542}]},
     jupiter: {poleRaDeg: [268.056595, -0.006499, 0], poleDecDeg: [64.495303, 0.002413, 0], primeMeridianDeg: [284.95, 870.536, 0]},
+    saturn: {poleRaDeg: [40.589, -0.036, 0], poleDecDeg: [83.537, -0.004, 0], primeMeridianDeg: [38.9, 810.7939024, 0]},
     uranus: {poleRaDeg: [257.311, 0, 0], poleDecDeg: [-15.175, 0, 0], primeMeridianDeg: [203.81, -501.1600928, 0]},
     pluto: {poleRaDeg: [132.993, 0, 0], poleDecDeg: [-6.163, 0, 0], primeMeridianDeg: [302.695, 56.3625225, 0]},
     moon: {poleRaDeg: [269.9949, 0.0031, 0], poleDecDeg: [66.5392, 0.013, 0], primeMeridianDeg: [38.3213, 13.17635815, -1.4e-12], terms: [{angleDeg: [125.045, -1935.5364525], ra: -3.8787, dec: 1.5419, pm: 3.561}, {angleDeg: [250.089, -3871.072905], ra: -0.1204, dec: 0.0239, pm: 0.1208}, {angleDeg: [260.008, 475263.3328725], ra: 0.07, dec: -0.0278, pm: -0.0642}, {angleDeg: [176.625, 487269.629985], ra: -0.0172, dec: 0.0068, pm: 0.0158}, {angleDeg: [357.529, 35999.0509575], ra: 0, dec: 0, pm: 0.0252}]},
@@ -649,6 +650,48 @@ describe('solar-system bodies against Horizons', () => {
     // and the drawn sphere has it over 0.43 W.
     renderer.update(JUNE_1_2025_NOON_UTC);
     expect(Math.abs(facing('earth', new THREE.Vector3()).eastDeg)).toBeLessThan(4);
+  });
+
+  // Horizons' sub-Earth latitude on Saturn (observer quantity 14, from Earth's centre), which is
+  // planetodetic: taken back to planetocentric through the flattening, it is the angle the rings are
+  // opened to Earth by. Measured: 26.963, 0.075 and -7.764 degrees drawn, against 26.966, 0.042 and
+  // -7.813.
+  const SATURN_FLATTENING = 0.09796;
+  const RING_OPENING: Array<[date: string, jd: number, planetodeticDeg: number]> = [
+    ['16 October 2017, near their widest', 2458042.5, 32.017423],
+    ['23 March 2025, as Earth crossed their plane', 2460757.5, 0.051359],
+    ['24 September 2026, the south face turned to Earth', 2461307.5, -9.571756]
+  ];
+
+  const saturnRingMesh = (): THREE.Mesh => renderer.members.find((member) => member.id === 'saturn')!.marker.children[0] as THREE.Mesh;
+
+  /** The ring's face normal in the scene, read off its own geometry rather than its transform. */
+  function ringNormal(ring: THREE.Mesh): THREE.Vector3 {
+    ring.updateWorldMatrix(true, false);
+    return new THREE.Vector3().fromBufferAttribute(ring.geometry.attributes['normal'], 0).transformDirection(ring.matrixWorld);
+  }
+
+  for (const [date, jd, planetodeticDeg] of RING_OPENING) {
+    it(`opens Saturn's rings to Earth as far as Horizons has them on ${date}`, () => {
+      renderer.update(jd);
+      const normal = ringNormal(saturnRingMesh());
+      const toEarth = worldPosition('earth').sub(worldPosition('saturn')).normalize();
+      const openingDeg = (Math.asin(normal.dot(toEarth)) * 180) / Math.PI;
+      const expectedDeg = (Math.atan((1 - SATURN_FLATTENING) ** 2 * Math.tan((planetodeticDeg * Math.PI) / 180)) * 180) / Math.PI;
+      expect(Math.abs(openingDeg - expectedDeg)).toBeLessThan(0.1);
+    });
+  }
+
+  it('picks Saturn through its rings', () => {
+    renderer.update(JUNE_1_2025_NOON_UTC);
+    const ring = saturnRingMesh();
+    const normal = ringNormal(ring);
+    const inRingPlane = new THREE.Vector3().fromBufferAttribute(ring.geometry.attributes['position'], 0).transformDirection(ring.matrixWorld);
+    // Straight down onto the B ring, 100 000 km out: nowhere near the planet itself.
+    const onRing = worldPosition('saturn').addScaledVector(inRingPlane, 100000 / 149597870.7);
+    const [hit] = new THREE.Raycaster(onRing.clone().addScaledVector(normal, 0.01), normal.clone().negate()).intersectObjects(renderer.pickableObjects);
+    expect(hit.object).toBe(ring);
+    expect(renderer.memberForObject(hit.object)?.id).toBe('saturn');
   });
 
   // Horizons' observer quantities 14 and 15 at 2025-06-01 12:00 UTC, from Earth's centre (from the

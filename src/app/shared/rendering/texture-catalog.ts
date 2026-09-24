@@ -79,6 +79,54 @@ export function atmosphereColorFor(id: string): THREE.ColorRepresentation | unde
   return ATMOSPHERE_BY_ID[id];
 }
 
+/**
+ * The radii, in km from Saturn's centre, that `saturn_ring.png`'s left and right edges stand for.
+ *
+ * The strip runs straight out from its left edge to its right, and read off its alpha the ring
+ * edges fall where one scale puts them: the C ring's inner edge (74 490 km) at 91 of its 1 280 px,
+ * the B ring's inner edge (92 000) at 404.5 and outer (117 580) at 860, the A ring's outer edge
+ * (136 775) at 1 204 and the F ring (140 180) at 1 267.5 — all within 1.8 px of 55.9 km a pixel.
+ * The one miss is the Cassini Division's outer edge (122 170), which the strip draws 30 px (1 700
+ * km) too far in. The edges are not the 74 500 and 140 220 km of the C ring and the F ring: sized to
+ * those, the B ring's inner edge would sit 3 300 km out.
+ */
+export const SATURN_RING_INNER_KM = 69_400;
+export const SATURN_RING_OUTER_KM = 141_000;
+
+/**
+ * Saturn's rings, flat in the equator of a sphere built round +Y — its XZ plane — and sized
+ * against the planet as drawn: `drawnRadius` for Saturn's `planetRadiusKm`, so the rings keep their
+ * true proportion to the planet wherever it is drawn and however it is scaled.
+ *
+ * `RingGeometry`'s own UVs wrap round the angle, so u is set to the distance from the centre instead,
+ * which is the way the strip runs. Lit, from both faces: the face turned to the Sun is lit by the
+ * height of the Sun above the ring plane, and the other falls dark. Nothing in the app casts a
+ * shadow, so neither the planet on the rings nor the rings on the planet do.
+ */
+export function saturnRing(planetRadiusKm: number, drawnRadius: number): THREE.Mesh {
+  const unitsPerKm = drawnRadius / planetRadiusKm;
+  const inner = SATURN_RING_INNER_KM * unitsPerKm;
+  const outer = SATURN_RING_OUTER_KM * unitsPerKm;
+  const geometry = new THREE.RingGeometry(inner, outer, 128, 1).rotateX(-Math.PI / 2);
+  const position = geometry.attributes['position'];
+  const uv = geometry.attributes['uv'];
+  const vertex = new THREE.Vector3();
+  for (let i = 0; i < position.count; i++) {
+    vertex.fromBufferAttribute(position, i);
+    uv.setXY(i, THREE.MathUtils.clamp((vertex.length() - inner) / (outer - inner), 0, 1), 1);
+  }
+  // The strip's own alpha is the rings' opacity: dense in the B ring, thin in the C ring.
+  const material = new THREE.MeshStandardMaterial({
+    map: loadCachedTexture(SATURN_RING_TEXTURE_PATH),
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    roughness: 1,
+    metalness: 0
+  });
+  return new THREE.Mesh(geometry, material);
+}
+
 const textureLoader = new THREE.TextureLoader();
 const loadedTextures = new Map<string, THREE.Texture>();
 

@@ -64,8 +64,8 @@ const SECONDS_PER_HOUR = 3600;
 
 /**
  * True where the page gives no number because the body keeps one face to its parent, so its day
- * is its orbit. The period itself is then Kepler's, which the caller
- * works out from the elements above and the parent's mass.
+ * is its orbit. The period itself is then the orbit's, which the caller takes from the body's
+ * mean motion.
  */
 export function isTidallyLocked(text: string): boolean {
   return SYNCHRONOUS_PATTERN.test(text);

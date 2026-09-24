@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, MockInstance, vi } from 'v
 import { DataLoaderService, StarField } from '../../core/data/data-loader.service';
 import { EngineService, EngineTickCallback } from '../../core/engine/engine.service';
 import { BodyRecord } from '../../shared/models/body.model';
+import { GM_SUN_AU3_PER_DAY2 } from '../../shared/astro/constants';
+import { keplerRates } from '../../shared/astro/kepler';
 import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
@@ -63,7 +65,8 @@ const EARTH: BodyRecord = {
     argumentOfPeriapsisDeg: 0,
     meanAnomalyAtEpochDeg: 0,
     epochJd: 2451545.0
-  }
+  },
+  rates: keplerRates(1, GM_SUN_AU3_PER_DAY2), orbitSource: 'test'
 };
 
 /** Minimal stand-in for `EngineService` that skips real WebGPU/WebGL initialization entirely,

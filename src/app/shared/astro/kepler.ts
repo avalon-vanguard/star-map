@@ -1,9 +1,10 @@
 import { CartesianCoordinates } from './coordinates';
 import { DEFAULT_EPOCH_JD, GM_SUN_AU3_PER_DAY2 } from './constants';
-import { OrbitalElements } from '../models/body.model';
+import { MeanElementRates, OrbitalElements } from '../models/body.model';
 
 const DEG_TO_RAD = Math.PI / 180;
 const TWO_PI = Math.PI * 2;
+const DAYS_PER_JULIAN_CENTURY = 36525;
 
 /**
  * Fills in the elements the Kepler propagator needs but that some sources (e.g. exoplanets,
@@ -208,17 +209,63 @@ export function positionAtTrueAnomaly(elements: OrbitalElements, trueAnomalyRad:
 }
 
 /**
- * Propagates `elements` to Julian date `epochJdEval`, returning the body's position (AU)
- * relative to its central body. This is the app's "current epoch" evaluation used for live
- * (and future time-scrubbable) positions, as opposed to {@link orbitEllipsePoints} which
+ * The rates of an orbit that only goes round: Kepler's mean motion from the central mass, with
+ * nothing turning. What an exoplanet has, since the archive publishes no precession.
+ */
+export function keplerRates(semiMajorAxisAu: number, gmAu3PerDay2: number): MeanElementRates {
+  return {
+    meanMotionDegPerDay: meanMotionRadPerDay(semiMajorAxisAu, gmAu3PerDay2) / DEG_TO_RAD,
+    longitudeOfAscendingNodeDegPerDay: 0,
+    argumentOfPeriapsisDegPerDay: 0
+  };
+}
+
+/**
+ * The elements at `epochJdEval`, each moved from its epoch at its own rate, and returned with that
+ * date as their epoch — so {@link positionAtEpoch} places the body, and the node and periapsis
+ * say where to draw the orbit it is on.
+ *
+ * The mean anomaly is what is left of the body's motion once the node and periapsis have turned:
+ * `meanMotionDegPerDay` is how fast it goes round in space, and a periapsis that has moved on is
+ * that much further to reach. On a retrograde orbit, past 90 degrees, the body runs against the
+ * direction the node is counted in, so the node's turning is added back rather than taken off.
+ * Taken off, Triton — whose node turns half a degree a year — drifted a degree a year from where
+ * Horizons has it, 105 degrees by 2100.
+ */
+export function meanElementsAt(elements: OrbitalElements, rates: MeanElementRates, epochJdEval: number): OrbitalElements {
+  const days = epochJdEval - elements.epochJd;
+  const node = rates.longitudeOfAscendingNodeDegPerDay * days;
+  const periapsis = rates.argumentOfPeriapsisDegPerDay * days;
+  const nodeAlongOrbit = elements.inclinationDeg > 90 ? -node : node;
+  const terms = rates.meanAnomalyTerms;
+  const centuries = days / DAYS_PER_JULIAN_CENTURY;
+  const extra = terms
+    ? terms.b * centuries * centuries + terms.c * Math.cos(terms.f * centuries * DEG_TO_RAD) + terms.s * Math.sin(terms.f * centuries * DEG_TO_RAD)
+    : 0;
+  return {
+    semiMajorAxisAu: elements.semiMajorAxisAu + (rates.semiMajorAxisAuPerDay ?? 0) * days,
+    eccentricity: elements.eccentricity + (rates.eccentricityPerDay ?? 0) * days,
+    inclinationDeg: elements.inclinationDeg + (rates.inclinationDegPerDay ?? 0) * days,
+    longitudeOfAscendingNodeDeg: elements.longitudeOfAscendingNodeDeg + node,
+    argumentOfPeriapsisDeg: elements.argumentOfPeriapsisDeg + periapsis,
+    meanAnomalyAtEpochDeg: elements.meanAnomalyAtEpochDeg + rates.meanMotionDegPerDay * days - periapsis - nodeAlongOrbit + extra,
+    epochJd: epochJdEval
+  };
+}
+
+/** Where `elements` put the body at their own epoch (AU, relative to the central body). */
+export function positionAtEpoch(elements: OrbitalElements): CartesianCoordinates {
+  const eccentricAnomalyRad = solveEccentricAnomaly(elements.meanAnomalyAtEpochDeg * DEG_TO_RAD, elements.eccentricity);
+  return positionAtTrueAnomaly(elements, trueAnomalyFromEccentricAnomaly(eccentricAnomalyRad, elements.eccentricity));
+}
+
+/**
+ * Propagates `elements` to Julian date `epochJdEval` around a central mass, returning the body's
+ * position (AU) relative to its central body, as opposed to {@link orbitEllipsePoints} which
  * samples the fixed orbit shape independent of time.
  */
 export function propagateOrbit(elements: OrbitalElements, gmAu3PerDay2: number, epochJdEval: number): CartesianCoordinates {
-  const meanMotion = meanMotionRadPerDay(elements.semiMajorAxisAu, gmAu3PerDay2);
-  const meanAnomalyRad = elements.meanAnomalyAtEpochDeg * DEG_TO_RAD + meanMotion * (epochJdEval - elements.epochJd);
-  const eccentricAnomalyRad = solveEccentricAnomaly(meanAnomalyRad, elements.eccentricity);
-  const trueAnomalyRad = trueAnomalyFromEccentricAnomaly(eccentricAnomalyRad, elements.eccentricity);
-  return positionAtTrueAnomaly(elements, trueAnomalyRad);
+  return positionAtEpoch(meanElementsAt(elements, keplerRates(elements.semiMajorAxisAu, gmAu3PerDay2), epochJdEval));
 }
 
 /**

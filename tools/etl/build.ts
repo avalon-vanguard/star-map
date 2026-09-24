@@ -1,6 +1,8 @@
 import { statSync } from 'node:fs';
 
-import { BodyRecord } from '../../src/app/shared/models/body.model';
+import { BodyRecord, OrbitalElements } from '../../src/app/shared/models/body.model';
+import { eclipticToEquatorial, laplacePlaneToEquatorial } from '../../src/app/shared/astro/coordinates';
+import { meanElementsAt, positionAtEpoch } from '../../src/app/shared/astro/kepler';
 import { DeepSkyRecord } from '../../src/app/shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../src/app/shared/models/exoplanet.model';
 import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model';
@@ -130,23 +132,66 @@ function validateMerge(stars: StarRecord[]): void {
   console.log(`  ${survivors} HYG stars have no Gaia counterpart; ${twins} unmerged cross-catalogue pairs within an arcsecond.`);
 }
 
-function validateBodies(bodies: BodyRecord[]): void {
+/**
+ * How far a body's mean elements may put it from where Horizons has it, on the one date the ETL
+ * asks Horizons about (2025-01-01), seen from the Sun for a planet and from its planet for a moon.
+ *
+ * Measured on this catalogue: the planets at most 0.10 degrees (Uranus; Standish's own stated
+ * error for his fit is 2 000 arcseconds, 0.56 degrees), the moons at most 1.41 (the Moon, whose
+ * evection and variation, 1.27 and 0.66 degrees, no mean ellipse has). What this catches is a
+ * table read wrongly: a moon read against the ecliptic instead of its Laplace plane, a precession
+ * run the wrong way, or a column taken for its neighbour, which put Triton 26 degrees out and Io
+ * 0.9.
+ */
+const MAX_PLANET_OFFSET_DEG = 0.25;
+const MAX_MOON_OFFSET_DEG = 2.5;
+
+function angleBetweenDeg(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }): number {
+  const cosine = (a.x * b.x + a.y * b.y + a.z * b.z) / (Math.hypot(a.x, a.y, a.z) * Math.hypot(b.x, b.y, b.z));
+  return (Math.acos(Math.min(1, Math.max(-1, cosine))) * 180) / Math.PI;
+}
+
+function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, OrbitalElements>): void {
   assertCondition(bodies.length > 0, 'No solar-system bodies were produced.');
 
   const ids = new Set(bodies.map((body) => body.id));
   assertCondition(ids.size === bodies.length, 'Duplicate body ids were found.');
 
+  const offsets: string[] = [];
   for (const body of bodies) {
     const orbitValues = Object.values(body.orbit);
     assertCondition(orbitValues.every(Number.isFinite), `Body ${body.id} has non-finite orbital elements.`);
+    assertCondition(body.rates.meanMotionDegPerDay > 0, `Body ${body.id} has no mean motion.`);
+
+    // Horizons' elements are osculating, exact at their own epoch; both sets are placed there.
+    const horizons = horizonsOrbits.get(body.id);
+    assertCondition(horizons !== undefined, `Body ${body.id} has no Horizons elements to be checked against.`);
+    const truth = eclipticToEquatorial(positionAtEpoch(horizons!));
+    const mean = positionAtEpoch(meanElementsAt(body.orbit, body.rates, horizons!.epochJd));
+    const offset = angleBetweenDeg(body.laplacePole ? laplacePlaneToEquatorial(mean, body.laplacePole) : eclipticToEquatorial(mean), truth);
+    const ceiling = body.kind === 'moon' ? MAX_MOON_OFFSET_DEG : MAX_PLANET_OFFSET_DEG;
+    assertCondition(
+      offset <= ceiling,
+      `${body.name}'s mean elements put it ${offset.toFixed(2)} degrees from where Horizons has it (at most ${ceiling} expected) — the elements were read wrongly.`
+    );
+    offsets.push(`${body.id} ${offset.toFixed(3)}`);
 
     if (body.kind === 'moon') {
       assertCondition(!!body.parentBodyId && ids.has(body.parentBodyId), `Moon ${body.id} has no valid parentBodyId.`);
+      // Every moon here is tidally locked: its day is its orbit, from the same mean motion that
+      // carries it round, or its face turns away from its planet: the Kepler period of the
+      // osculating orbit this used to take would turn the Moon's five degrees an orbit.
+      const orbitHours = (360 / body.rates.meanMotionDegPerDay) * 24;
+      assertCondition(
+        body.rotationPeriodHours !== undefined && Math.abs(body.rotationPeriodHours - orbitHours) <= orbitHours * 1e-9,
+        `Moon ${body.id} turns once in ${body.rotationPeriodHours} hours but goes round in ${orbitHours} — it will not keep one face to its planet.`
+      );
     }
   }
 
   const planetCount = bodies.filter((body) => body.kind === 'planet').length;
   assertCondition(planetCount === 8, `Expected 8 planets, found ${planetCount}.`);
+  console.log(`  mean elements against Horizons, degrees: ${offsets.join(', ')}.`);
 }
 
 function validateExoplanets(exoplanets: ExoplanetRecord[], starIds: Set<number>): void {
@@ -234,7 +279,7 @@ async function build(): Promise<void> {
 
   const stars = await fetchStars();
   console.log();
-  const bodies = await fetchSolarSystem();
+  const { bodies, horizonsOrbits } = await fetchSolarSystem();
   console.log();
   const exoplanets = await fetchExoplanets(stars);
   console.log();
@@ -244,7 +289,7 @@ async function build(): Promise<void> {
   console.log('Validating output...');
   validateStars(stars);
   validateMerge(stars);
-  validateBodies(bodies);
+  validateBodies(bodies, horizonsOrbits);
   validateExoplanets(exoplanets, new Set(stars.map((star) => star.id)));
   validateDeepSky(deepSky);
 

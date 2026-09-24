@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_EPOCH_JD, GM_SUN_AU3_PER_DAY2 } from '../../shared/astro/constants';
 import { keplerRates } from '../../shared/astro/kepler';
 import { eclipticToEquatorial, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
-import { BodyRecord } from '../../shared/models/body.model';
+import { BodyRecord, RotationalElements } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
 
@@ -377,8 +377,8 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
   });
 });
 
-describe('rotation', () => {
-  /** Earth, near enough: a day of 23.934 h, tipped 23.44 degrees off its orbit. */
+describe('rotation without IAU elements', () => {
+  /** A body with a day of 23.934 h and no pole: Eris, Haumea and Makemake are drawn this way. */
   function spinning(overrides: Partial<BodyRecord> = {}): BodyRecord {
     return {
       id: 'earth',
@@ -389,7 +389,6 @@ describe('rotation', () => {
       orbit: { semiMajorAxisAu: 1, eccentricity: 0.0167, inclinationDeg: 0, longitudeOfAscendingNodeDeg: 0, argumentOfPeriapsisDeg: 0, meanAnomalyAtEpochDeg: 0, epochJd: DEFAULT_EPOCH_JD },
       rates: keplerRates(1, GM_SUN_AU3_PER_DAY2), orbitSource: 'test',
       rotationPeriodHours: 23.934,
-      obliquityDeg: 23.4392911,
       ...overrides
     };
   }
@@ -428,18 +427,9 @@ describe('rotation', () => {
     return axis.normalize().dot(new THREE.Vector3(0, 0, 1).applyQuaternion(renderer.referenceFrame));
   }
 
-  it('turns Venus backwards, as Horizons gives it: a negative rate and an obliquity past 90', () => {
-    // Both say retrograde, in two conventions. Applied together they cancelled into a forward
-    // turn, which is how Venus and Uranus used to be drawn.
-    const venus = spinning({ id: 'venus', rotationPeriodHours: -5832.54, obliquityDeg: 177.3 });
-
-    expect(spinSense(spinning())).toBeGreaterThan(0.9);
-    expect(spinSense(venus)).toBeLessThan(-0.9);
-  });
-
-  it('reads the sign of the period only where no obliquity says which way the pole points', () => {
-    expect(spinSense(spinning({ rotationPeriodHours: -23.934, obliquityDeg: undefined }))).toBeLessThan(-0.9);
-    expect(spinSense(spinning({ rotationPeriodHours: 23.934, obliquityDeg: undefined }))).toBeGreaterThan(0.9);
+  it('turns it about its orbit’s normal, backwards for a negative period', () => {
+    expect(spinSense(spinning({ rotationPeriodHours: -23.934 }))).toBeLessThan(-0.99);
+    expect(spinSense(spinning({ rotationPeriodHours: 23.934 }))).toBeGreaterThan(0.99);
   });
 
   it('leaves a body with no published rotation still', () => {
@@ -514,6 +504,18 @@ describe('solar-system bodies against Horizons', () => {
     uranus: {kind: 'planet', orbit: {semiMajorAxisAu: 19.18797948, eccentricity: 0.0468574, inclinationDeg: 0.77298127, longitudeOfAscendingNodeDeg: 73.96250215, argumentOfPeriapsisDeg: 98.47154226, meanAnomalyAtEpochDeg: 141.76872184, epochJd: 2451545}, rates: {meanMotionDegPerDay: 0.011731557178644764, longitudeOfAscendingNodeDegPerDay: 0.0000015714439425051334, argumentOfPeriapsisDegPerDay: 9.65718275154004e-7, semiMajorAxisAuPerDay: -5.600273785078713e-9, eccentricityPerDay: -4.2436687200547574e-10, inclinationDegPerDay: -4.932375085557837e-8, meanAnomalyTerms: {b: 0.00058331, c: -0.97731848, s: 0.17689245, f: 7.67025}}},
     titania: {kind: 'moon', orbit: {semiMajorAxisAu: 0.002916485361445723, eccentricity: 0.0011, inclinationDeg: 0.079, longitudeOfAscendingNodeDeg: 279.771, argumentOfPeriapsisDeg: 284.4, meanAnomalyAtEpochDeg: 24.614, epochJd: 2444239.5}, rates: {meanMotionDegPerDay: 41.3514246, longitudeOfAscendingNodeDegPerDay: -0.005044947168524978, argumentOfPeriapsisDegPerDay: 0.006102004540272753}, laplacePole: {raDeg: 77.311, decDeg: 15.175}, parentBodyId: 'uranus'},
     charon: {kind: 'moon', orbit: {semiMajorAxisAu: 0.00013095774631236113, eccentricity: 0.0002, inclinationDeg: 0.08, longitudeOfAscendingNodeDeg: 26.928, argumentOfPeriapsisDeg: 146.106, meanAnomalyAtEpochDeg: 131.07, epochJd: 2451545}, rates: {meanMotionDegPerDay: 56.362521, longitudeOfAscendingNodeDegPerDay: -0.00010926638529337138, argumentOfPeriapsisDegPerDay: 0.00009683851540842405}, laplacePole: {raDeg: 132.993, decDeg: -6.163}, parentBodyId: 'pluto', massRatio: 0.1220485755631374},
+    venus: {kind: 'planet', orbit: {semiMajorAxisAu: 0.72332102, eccentricity: 0.00676399, inclinationDeg: 3.39777545, longitudeOfAscendingNodeDeg: 76.67261496, argumentOfPeriapsisDeg: 55.094942169999996, meanAnomalyAtEpochDeg: 50.21215136999999, epochJd: 2451545}, rates: {meanMotionDegPerDay: 1.6021304750882956, longitudeOfAscendingNodeDegPerDay: -0.000007467261875427789, argumentOfPeriapsisDegPerDay: 0.000009022264750171116, semiMajorAxisAuPerDay: -7.118412046543463e-12, eccentricityPerDay: -1.398220396988364e-9, inclinationDegPerDay: 1.1908008213552361e-8}},
+    mars: {kind: 'planet', orbit: {semiMajorAxisAu: 1.52371243, eccentricity: 0.09336511, inclinationDeg: 1.85181869, longitudeOfAscendingNodeDeg: 49.71320984, argumentOfPeriapsisDeg: -73.63065768, meanAnomalyAtEpochDeg: 19.3493162, epochJd: 2451545}, rates: {meanMotionDegPerDay: 0.5240328362061601, longitudeOfAscendingNodeDegPerDay: -0.000007351794934976044, argumentOfPeriapsisDegPerDay: 0.00001973334866529774, semiMajorAxisAuPerDay: 2.6557152635181385e-11, eccentricityPerDay: 2.5048596851471597e-9, inclinationDegPerDay: -1.9842765229295004e-7}},
+  };
+  // The IAU WGCCRE 2015 rotational elements bodies.json carries for them, from pck00011.tpc.
+  const ROTATION: Record<string, RotationalElements> = {
+    venus: {poleRaDeg: [272.76, 0, 0], poleDecDeg: [67.16, 0, 0], primeMeridianDeg: [160.2, -1.4813688, 0]},
+    earth: {poleRaDeg: [0, -0.641, 0], poleDecDeg: [90, -0.557, 0], primeMeridianDeg: [190.147, 360.9856235, 0]},
+    mars: {poleRaDeg: [317.269202, -0.10927547, 0], poleDecDeg: [54.432516, -0.05827105, 0], primeMeridianDeg: [176.049863, 350.891982443297, 0], terms: [{angleDeg: [79.398797, 0.5042615, 0], ra: 0.419057, dec: 0, pm: 0}, {angleDeg: [166.325722, 0.5042615, 0], ra: 0, dec: 1.591274, pm: 0}, {angleDeg: [95.391654, 0.5042615, 0], ra: 0, dec: 0, pm: 0.584542}]},
+    jupiter: {poleRaDeg: [268.056595, -0.006499, 0], poleDecDeg: [64.495303, 0.002413, 0], primeMeridianDeg: [284.95, 870.536, 0]},
+    uranus: {poleRaDeg: [257.311, 0, 0], poleDecDeg: [-15.175, 0, 0], primeMeridianDeg: [203.81, -501.1600928, 0]},
+    pluto: {poleRaDeg: [132.993, 0, 0], poleDecDeg: [-6.163, 0, 0], primeMeridianDeg: [302.695, 56.3625225, 0]},
+    moon: {poleRaDeg: [269.9949, 0.0031, 0], poleDecDeg: [66.5392, 0.013, 0], primeMeridianDeg: [38.3213, 13.17635815, -1.4e-12], terms: [{angleDeg: [125.045, -1935.5364525], ra: -3.8787, dec: 1.5419, pm: 3.561}, {angleDeg: [250.089, -3871.072905], ra: -0.1204, dec: 0.0239, pm: 0.1208}, {angleDeg: [260.008, 475263.3328725], ra: 0.07, dec: -0.0278, pm: -0.0642}, {angleDeg: [176.625, 487269.629985], ra: -0.0172, dec: 0.0068, pm: 0.0158}, {angleDeg: [357.529, 35999.0509575], ra: 0, dec: 0, pm: 0.0252}]},
   };
   // Each ceiling sits just above what these elements measure on that date: Earth 0.003 degrees,
   // Jupiter 0.063, Saturn 0.164, Pluto 0.054, the Moon 0.72 (no mean ellipse has its evection or
@@ -534,7 +536,7 @@ describe('solar-system bodies against Horizons', () => {
   ];
 
   function record(id: string): BodyRecord {
-    return { id, systemStarId: 0, name: id, radiusKm: 1000, orbitSource: 'test', ...RECORDS[id] };
+    return { id, systemStarId: 0, name: id, radiusKm: 1000, orbitSource: 'test', ...RECORDS[id], rotationalElements: ROTATION[id] };
   }
 
   const renderer = new SystemOrbitsRenderer(Object.keys(RECORDS).map(record), []);
@@ -589,4 +591,95 @@ describe('solar-system bodies against Horizons', () => {
       expect(Math.abs(moon.position.clone().normalize().dot(normal))).toBeLessThan(1e-9);
     }
   });
+
+  const JUNE_1_2025_NOON_UTC = 2460828.0;
+
+  /**
+   * The tilt of a body's drawn spin from the orbit it is drawn going round, in degrees: its angular
+   * velocity, read off the sphere a quarter of an hour apart, against its orbit line's normal. Past
+   * 90 is a body turning backwards against its orbit.
+   */
+  function drawnObliquity(id: string): number {
+    const marker = renderer.members.find((member) => member.id === id)!.marker;
+    const line = renderer.object.children[renderer.object.children.indexOf(marker) - 1];
+    expect(line.name).toBe('orbit-line');
+    renderer.update(JUNE_1_2025_NOON_UTC);
+    const start = marker.quaternion.clone();
+    renderer.update(JUNE_1_2025_NOON_UTC + 0.01);
+    const turn = marker.quaternion.clone().multiply(start.invert());
+    const spin = new THREE.Vector3(turn.x, turn.y, turn.z).multiplyScalar(Math.sign(turn.w));
+    return (spin.angleTo(new THREE.Vector3(0, 0, 1).applyQuaternion(line.quaternion)) * 180) / Math.PI;
+  }
+
+  it('turns Venus, Uranus and Pluto backwards against their orbits, at the tilts Horizons gives', () => {
+    // The IAU names a planet's north pole by the side of the solar system it lies on, so Venus's W
+    // and Uranus's run backwards; Pluto's pole follows the right-hand rule instead, and points
+    // south. Either way the spin read off the drawn sphere is past 90 degrees from the orbit's pole.
+    expect(drawnObliquity('venus')).toBeCloseTo(177.3, 0);
+    expect(drawnObliquity('uranus')).toBeCloseTo(97.77, 0);
+    expect(drawnObliquity('pluto')).toBeCloseTo(119.6, 0);
+    expect(drawnObliquity('earth')).toBeCloseTo(23.44, 0);
+  });
+
+  /**
+   * Where on its drawn sphere a body faces a point, as east longitude and latitude on its map: read
+   * from the texture coordinates where a ray from that point meets the sphere, so the map's own
+   * convention is part of what is measured.
+   */
+  function facing(id: string, point: THREE.Vector3): { eastDeg: number; latDeg: number } {
+    const marker = renderer.members.find((member) => member.id === id)!.marker as THREE.Mesh;
+    const centre = worldPosition(id);
+    const towards = point.clone().sub(centre).normalize();
+    const radius = (marker.geometry as THREE.SphereGeometry).parameters.radius;
+    const hit = new THREE.Raycaster(centre.clone().addScaledVector(towards, radius * 4), towards.clone().negate()).intersectObject(marker)[0];
+    return { eastDeg: (hit.uv!.x - 0.5) * 360, latDeg: (hit.uv!.y - 0.5) * 180 };
+  }
+
+  function worldPosition(id: string): THREE.Vector3 {
+    const marker = renderer.members.find((member) => member.id === id)!.marker;
+    marker.updateWorldMatrix(true, false);
+    return marker.getWorldPosition(new THREE.Vector3());
+  }
+
+  /** Degrees between two longitudes, the short way round. */
+  const apart = (a: number, b: number): number => Math.abs(((((a - b) % 360) + 540) % 360) - 180);
+
+  it('lights Earth where the Sun really stands: within 4 degrees of Greenwich at noon UTC', () => {
+    // The equation of time is all that separates them: on 1 June 2025 it puts the Sun over 0.53 W,
+    // and the drawn sphere has it over 0.43 W.
+    renderer.update(JUNE_1_2025_NOON_UTC);
+    expect(Math.abs(facing('earth', new THREE.Vector3()).eastDeg)).toBeLessThan(4);
+  });
+
+  // Horizons' observer quantities 14 and 15 at 2025-06-01 12:00 UTC, from Earth's centre (from the
+  // Sun's, for Earth): the sub-observer and sub-solar longitude and latitude, east-positive for
+  // Earth and the Moon and west-positive for Mars and Jupiter, as each is printed. Horizons gives
+  // each body as it was when the light now arriving left it, so it is drawn that much earlier. Its
+  // latitudes are planetodetic, on the body's flattened figure, which a sphere does not have, so the
+  // drawn latitude is put on that figure before they are compared: without it they differ by what
+  // the flattening makes of them, 0.14 degrees on Earth, 0.26 on Mars and 0.33 on Jupiter.
+  //
+  // Measured: every longitude within 0.09 degrees and every latitude within 0.03, but for the
+  // Moon's face towards Earth, 0.70 and 0.09 out because its mean orbit is (its evection alone is
+  // 1.27 degrees); its face towards the Sun is within 0.002.
+  const SUB_POINTS: Array<[id: string, observer: string | undefined, lightMinutes: number, west: boolean, flattening: number, observerLon: number, observerLat: number, sunLon: number, sunLat: number, maxObserverDeg: number]> = [
+    ['earth', undefined, 8.43351424, false, 1 / 298.257, 1.5855, 22.261204, 1.579501, 22.260426, 0.1],
+    ['mars', 'earth', 14.13295841, true, 1 - 3376.2 / 3396.19, 307.365389, 21.27653, 269.287887, 25.451264, 0.1],
+    ['moon', 'earth', 0.02150549, false, 0, 7.256763, -3.462104, 116.285934, 1.503004, 0.8],
+    ['jupiter', 'earth', 50.70337676, true, 1 - 66854 / 71492, 251.139846, 2.58787, 247.855871, 2.572658, 0.1]
+  ];
+
+  for (const [id, observer, lightMinutes, west, flattening, observerLon, observerLat, sunLon, sunLat, maxObserverDeg] of SUB_POINTS) {
+    it(`faces ${observer ?? 'the Sun'} and the Sun with the points Horizons gives on ${id}`, () => {
+      renderer.update(JUNE_1_2025_NOON_UTC - lightMinutes / 1440);
+      const seen = facing(id, observer ? worldPosition(observer) : new THREE.Vector3());
+      const lit = facing(id, new THREE.Vector3());
+      const east = (longitude: number): number => (west ? -longitude : longitude);
+      const planetodetic = (latDeg: number): number => (Math.atan(Math.tan((latDeg * Math.PI) / 180) / (1 - flattening) ** 2) * 180) / Math.PI;
+      expect(apart(seen.eastDeg, east(observerLon))).toBeLessThan(maxObserverDeg);
+      expect(Math.abs(planetodetic(seen.latDeg) - observerLat)).toBeLessThan(maxObserverDeg);
+      expect(apart(lit.eastDeg, east(sunLon))).toBeLessThan(0.1);
+      expect(Math.abs(planetodetic(lit.latDeg) - sunLat)).toBeLessThan(0.05);
+    });
+  }
 });

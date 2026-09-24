@@ -15,6 +15,21 @@ export interface HostStarQuery {
   /** μα·cos δ in mas/yr, as the archive publishes it (`sy_pmra`); missing means unknown. */
   pmRaMasPerYear?: number;
   pmDecMasPerYear?: number;
+  /**
+   * The archive's parallax in mas (`sy_plx`), a second distance the ratio test accepts. Its
+   * `sy_dist` comes from TICv8 and contradicts its own parallax past the tolerance for 47 of the
+   * 5 959 systems that publish both — Lalande 21185 at 5.68 pc for 392 mas (2.55 pc), Luyten's
+   * Star at 5.92 for 263 mas, Struve 2398 B at 6.84 for 285 — and those three are in the
+   * catalogue, 0.1″ to 9″ from the archive's direction. A second chance rather than a
+   * replacement: past a few hundred parsecs the inverse of a low-S/N parallax is the worse
+   * estimate (K2-238, 538 pc by `sy_dist`, would be 6 779).
+   */
+  parallaxMas?: number;
+}
+
+function distancesAgree(a: number, b: number): boolean {
+  const [near, far] = a < b ? [a, b] : [b, a];
+  return (far - near) / near <= MERGE_DISTANCE_RATIO_TOLERANCE;
 }
 
 /**
@@ -129,6 +144,7 @@ export function resolveHostStarId(
   );
   const carried = raDegDecDistanceToXyz(carriedBack.raDeg, carriedBack.decDeg, 1);
 
+  const parallaxPc = query.parallaxMas !== undefined && query.parallaxMas > 0 ? 1000 / query.parallaxMas : Number.NaN;
   const minCosine = Math.cos(Math.min(Math.PI, HOST_TRANSVERSE_TOLERANCE_PC / query.distancePc));
   let best: StarRecord | null = null;
   let bestCosine = -2;
@@ -146,8 +162,7 @@ export function resolveHostStarId(
     if (cosine < minCosine || cosine <= bestCosine) {
       continue;
     }
-    const [near, far] = query.distancePc < starDistance ? [query.distancePc, starDistance] : [starDistance, query.distancePc];
-    if ((far - near) / near > MERGE_DISTANCE_RATIO_TOLERANCE) {
+    if (!distancesAgree(query.distancePc, starDistance) && !(parallaxPc > 0 && distancesAgree(parallaxPc, starDistance))) {
       continue;
     }
     best = star;

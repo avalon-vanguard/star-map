@@ -2,11 +2,14 @@ import { OrbitalElements } from './body.model';
 
 /**
  * A confirmed exoplanet from the NASA Exoplanet Archive (`Planetary Systems` TAP table),
- * cross-referenced to its host star in the HYG index where possible.
+ * cross-referenced to its host star in the star catalogue.
  */
 export interface ExoplanetRecord {
   id: string;
-  hostStarId: number | null; // null if the host star could not be cross-referenced to HYG
+  /**
+   * The host's star-catalogue id, the HYG or Gaia star it was matched to; null when none is.
+   */
+  hostStarId: number | null;
   hostStarName: string;
   name: string;
   radiusEarth?: number;
@@ -20,6 +23,15 @@ export interface ExoplanetRecord {
   periodDays?: number;
   /** Host star mass in solar masses (`st_mass`); the fallback when no period is published. */
   hostStarMassSolar?: number;
+  /**
+   * The host's radius in solar radii (`st_rad`), effective temperature in kelvin (`st_teff`) and
+   * luminosity in solar luminosities (10^`st_lum`), where the archive gives them: the planet's
+   * default row first, then the composite table, whose columns may each come from a different
+   * reference. Measured, where `stellar.ts` otherwise derives a luminosity from V and distance.
+   */
+  hostStarRadiusSolar?: number;
+  hostStarTemperatureK?: number;
+  hostStarLuminositySolar?: number;
   /**
    * The host star's own published astrometry (`ra`, `dec`, `sy_dist`, `sy_pmra`, `sy_pmdec`) —
    * everything the cross-reference above was resolved from.

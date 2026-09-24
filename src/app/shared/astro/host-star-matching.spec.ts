@@ -109,6 +109,17 @@ describe('resolveHostStarId', () => {
       expect(id).toBeNull();
     });
 
+    // The archive's 5.92 pc is TICv8's; its own parallax, 263.26 mas, says 3.80 pc, which is the
+    // star's. With the parallax given, the same query is Luyten's Star — and a parallax that
+    // contradicts the star as well rescues nothing.
+    it("accepts the archive's parallax where its sy_dist contradicts the star", () => {
+      const luytens = star(100, "Luyten's Star", 111.8496, 5.2258, 3.79);
+      const query = { hostname: 'GJ 273', raDeg: 111.8496, decDeg: 5.2258, distancePc: 5.921535 };
+
+      expect(resolveHostStarId({ ...query, parallaxMas: 263.26 }, [luytens])).toBe(100);
+      expect(resolveHostStarId({ ...query, parallaxMas: 168.9 }, [luytens])).toBeNull();
+    });
+
     // The tolerance is transverse — parsecs on the sky, not an angle — so the same 15″ offset
     // is a match at 50 pc and a stranger at 200 pc.
     it('scales the angular tolerance with the host distance', () => {

@@ -10,15 +10,20 @@ import * as THREE from 'three/webgpu';
  * `procedural-planet-texture.ts`, which derives a surface from the body's own measured size,
  * mass, orbit and host star instead.
  *
- * Io, Pluto, Titan and Deimos used to be listed with the square photographs of them in
- * `assets/textures/bodies/`: pictures of a lit disc against black sky, not maps. Wrapped round a
- * sphere they put black sky on a fifth to a third of the surface, in a band up to 57 degrees wide
- * across the equator that the spin then swept past the camera. They are left out until a real map
- * of each is added.
+ * Io, Pluto, Titan and Deimos used to be listed with square photographs of them: pictures of a
+ * lit disc against black sky, not maps, which wrapped round a sphere put black sky on a fifth to a
+ * third of the surface. Io's, Pluto's and Titan's are now the global mosaics the moons below are
+ * drawn from; Deimos's photograph is still in the folder, unlisted, for want of a map whose
+ * longitudes could be checked.
  *
  * Provenance (CC BY 4.0 Solar System Scope, via Wikimedia Commons — see each file's Commons page
  * for the original credit line): mercury/venus/earth/mars/saturn/uranus/neptune/moon/sun/
  * saturn-ring/skybox — Solar System Scope texture pack; jupiter — Solar System Scope 8k pack.
+ *
+ * The moons', Ceres's and Pluto's are public-domain mission mosaics from USGS Astrogeology and the
+ * PDS, each put in the same frame — longitude 0 in the middle, east to the right — and each
+ * measured, in `assets/textures/README.md`. Where a probe saw only part of a body (Pluto, Charon,
+ * Triton, Phoebe, the Galilean poles), the rest is a flat grey, never invented terrain.
  */
 const BODY_TEXTURE_PATHS: Record<string, string> = {
   mercury: 'assets/textures/bodies/mercury.jpg',
@@ -29,7 +34,24 @@ const BODY_TEXTURE_PATHS: Record<string, string> = {
   saturn: 'assets/textures/bodies/saturn.jpg',
   uranus: 'assets/textures/bodies/uranus.jpg',
   neptune: 'assets/textures/bodies/neptune.jpg',
-  moon: 'assets/textures/bodies/moon.jpg'
+  moon: 'assets/textures/bodies/moon.jpg',
+  phobos: 'assets/textures/bodies/phobos.jpg',
+  io: 'assets/textures/bodies/io.jpg',
+  europa: 'assets/textures/bodies/europa.jpg',
+  ganymede: 'assets/textures/bodies/ganymede.jpg',
+  callisto: 'assets/textures/bodies/callisto.jpg',
+  mimas: 'assets/textures/bodies/mimas.jpg',
+  enceladus: 'assets/textures/bodies/enceladus.jpg',
+  tethys: 'assets/textures/bodies/tethys.jpg',
+  dione: 'assets/textures/bodies/dione.jpg',
+  rhea: 'assets/textures/bodies/rhea.jpg',
+  titan: 'assets/textures/bodies/titan.jpg',
+  iapetus: 'assets/textures/bodies/iapetus.jpg',
+  phoebe: 'assets/textures/bodies/phoebe.jpg',
+  triton: 'assets/textures/bodies/triton.jpg',
+  ceres: 'assets/textures/bodies/ceres.jpg',
+  pluto: 'assets/textures/bodies/pluto.jpg',
+  charon: 'assets/textures/bodies/charon.jpg'
 };
 
 /** The Sun isn't a `BodyRecord` (it's the system's star marker), so it's looked up separately. */

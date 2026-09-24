@@ -134,9 +134,11 @@ its own readout, so a stale image is visible as one.
 
 ### On surfaces that were never photographed
 
-Fifteen bodies here have a real photograph. Everything else does not, and never will on current
-instruments: no exoplanet's surface has ever been imaged, and a few of the solar system's own
-moons have no usable map in this asset set either.
+Twenty-seven bodies here are wrapped in real photography: the Sun, the eight planets and the Moon,
+and seventeen moons and dwarf planets in mission mosaics, grey where no probe has seen them
+(`src/assets/textures/README.md`). Everything else is not, and no exoplanet ever will be on
+current instruments: none has had its surface imaged. Deimos, the five large moons of Uranus and
+a few small bodies have no map in this asset set either.
 
 Those bodies get a surface reasoned from what *has* been measured, in a chain that is worth
 following because every link is standard:
@@ -327,4 +329,4 @@ Star catalogue: [HYG database](https://github.com/astronexus/HYG-Database) (Hipp
 Bright Star, Gliese) — 68 388 stars within 250 pc. Solar-system ephemerides: NASA/JPL Horizons. Exoplanets: NASA Exoplanet
 Archive. Deep-sky objects: [OpenNGC](https://github.com/mattiaverga/OpenNGC). Body and skybox
 imagery: NASA/JPL/USGS public domain and Solar System Scope (CC BY 4.0) — per-file provenance
-is recorded in `src/app/shared/rendering/texture-catalog.ts`.
+is recorded in `src/assets/textures/README.md`.

@@ -12,6 +12,7 @@ import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
 import { NavigationStore } from '../../shared/state/navigation.store';
+import { TimeStore } from '../../shared/state/time.store';
 import { LinkBudget } from '../../shared/astro/jump-links';
 import { HudDisplay } from '../hud/hud-dock.component';
 import { GalaxySystemSceneComponent } from './galaxy-system-scene.component';
@@ -836,12 +837,22 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     navigationStore.selectStar(SUN.id);
     await flushAsync();
     await advanceFrames(engine, 2.5);
-    expect(note()).toBe('Orbits propagated from JPL mean elements, the planets’ fit for 3000 BC to AD 3000, and the SBDB’s osculating ones for Ceres, Eris, Haumea and Makemake, to the current date.');
+    expect(note()).toMatch(/^Orbits propagated from JPL mean elements, the planets’ fit for 3000 BC to AD 3000, and the SBDB’s osculating ones for Ceres, Eris, Haumea and Makemake, to now, \d{4}-\d\d-\d\d \d\d:\d\d UTC\.$/);
 
     navigationStore.selectStar(ALPHA_CENTAURI.id);
     await flushAsync();
     await advanceFrames(engine, 5);
-    expect(note()).toBe('Orbits propagated from published elements to the current date.');
+    expect(note()).toMatch(/^Orbits propagated from published elements to now, \d{4}-\d\d-\d\d \d\d:\d\d UTC\.$/);
+  });
+
+  it('names the date the system is drawn for once the clock is set to one', async () => {
+    const note = (): string => (fixture.componentInstance as unknown as { hudNote: () => string }).hudNote();
+    TestBed.inject(TimeStore).setDate(new Date('2020-12-21T18:00Z'));
+    navigationStore.selectStar(SUN.id);
+    await flushAsync();
+    await advanceFrames(engine, 2.5);
+    // The great conjunction, to the minute: not "now", and not a date the reader has to find.
+    expect(note()).toMatch(/ to 2020-12-21 18:00 UTC\.$/);
   });
 
   it('performs the floating-origin recenter: the camera lands close to the AU-space origin, not out at parsec-scale coordinates', async () => {

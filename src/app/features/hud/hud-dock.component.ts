@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 
 import { Bookmark, BookmarksStore } from '../../shared/state/bookmarks.store';
-import { TIME_RATES, TimeStore } from '../../shared/state/time.store';
+import { CLOCK_WINDOW, TIME_RATES, TimeStore } from '../../shared/state/time.store';
 import { BookmarkIconComponent } from '../../shared/ui/bookmark-icon.component';
 import { SearchComponent } from '../search/search.component';
 import {
@@ -303,11 +303,13 @@ function isWideViewport(): boolean {
                 role="radiogroup"
                 aria-label="Clock rate"
               >
+                <!-- A rate is picked by its size and the toggle after the radios says which way it
+                     runs, so a month a second backwards is the same radio as forwards. -->
                 @for (rate of timeRates; track rate.secondsPerSecond) {
                   <label
                     class="type-label cursor-pointer border px-3 py-1.5 transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-1 has-[:focus-visible]:-outline-offset-1 has-[:focus-visible]:outline-accent"
                     [class]="
-                      time.rate() === rate.secondsPerSecond
+                      Math.abs(time.rate()) === rate.secondsPerSecond
                         ? 'border-accent/60 bg-accent/12 text-accent hover:bg-accent/18'
                         : 'border-border/60 text-muted hover:border-border hover:text-text'
                     "
@@ -317,22 +319,67 @@ function isWideViewport(): boolean {
                       name="clock-rate"
                       class="sr-only"
                       [value]="rate.secondsPerSecond"
-                      [checked]="time.rate() === rate.secondsPerSecond"
-                      (change)="time.setRate(rate.secondsPerSecond)"
+                      [checked]="Math.abs(time.rate()) === rate.secondsPerSecond"
+                      (change)="time.setRate(Math.sign(time.rate()) * rate.secondsPerSecond)"
                     />
                     {{ rate.label }}
                   </label>
                 }
+                <button
+                  type="button"
+                  [attr.aria-pressed]="time.rate() < 0"
+                  (click)="time.setRate(-time.rate())"
+                  class="type-label flex items-center gap-2 border px-3 py-1.5 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+                  [class]="
+                    time.rate() < 0
+                      ? 'border-accent/60 bg-accent/12 text-accent hover:bg-accent/18'
+                      : 'border-border/60 text-muted hover:border-border hover:text-text'
+                  "
+                >
+                  <span
+                    aria-hidden="true"
+                    class="h-1.5 w-1.5 border border-current"
+                    [class.bg-current]="time.rate() < 0"
+                  ></span>
+                  Backwards
+                </button>
                 @if (!time.atNow()) {
                   <button
                     type="button"
-                    (click)="time.reset()"
+                    (click)="backToNow()"
                     class="type-label border border-border/60 px-3 py-1.5 text-muted transition-colors hover:border-accent/70 hover:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
                   >
                     Back to now
                   </button>
                 }
               </div>
+              <!-- A form, so Enter in the field goes there and the browser holds the field to its
+                   min and max before anything is submitted. Submitted rather than applied on each
+                   change: Chrome reports a year typed digit by digit as 0002, 0020, 0202 and 2020,
+                   and the sky would jump through every one. -->
+              <form class="mt-2 flex flex-wrap items-center gap-2" (submit)="goToDate($event)">
+                <label for="clock-date" class="type-label text-muted">Date (UTC)</label>
+                <input
+                  id="clock-date"
+                  name="date"
+                  type="datetime-local"
+                  required
+                  [min]="clockWindow.min"
+                  [max]="clockWindow.max"
+                  [value]="dateField()"
+                  aria-describedby="clock-date-window"
+                  class="hud-surface px-2.5 py-1 text-sm text-text tabular-nums caret-accent scheme-dark focus:border-accent focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  class="type-label border border-border/60 px-3 py-1.5 text-muted transition-colors hover:border-accent/70 hover:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+                >
+                  Go
+                </button>
+                <p id="clock-date-window" class="w-full text-[10px] text-muted">
+                  AD 1 to AD 3000, where the planets’ elements hold.
+                </p>
+              </form>
             </section>
           }
         }
@@ -458,12 +505,20 @@ export class HudDockComponent implements OnInit {
   readonly bookmarks = inject(BookmarksStore);
   readonly time = inject(TimeStore);
   readonly timeRates = TIME_RATES;
+  readonly clockWindow = CLOCK_WINDOW;
+  protected readonly Math = Math;
+  /**
+   * What the date field holds when the panel opens: the clock's date at that moment. Not bound to
+   * the running clock, which would rewrite the field under the reader's typing on every render.
+   */
+  readonly dateField = signal('');
 
   private readonly search = viewChild(SearchComponent);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   ngOnInit(): void {
     this.activeTab.set(isWideViewport() ? this.defaultTab() : null);
+    this.fillDateField();
   }
 
   tabLabel(tab: DockTab): string {
@@ -476,6 +531,27 @@ export class HudDockComponent implements OnInit {
 
   toggleTab(tab: DockTab): void {
     this.activeTab.set(this.activeTab() === tab ? null : tab);
+    this.fillDateField();
+  }
+
+  /** The field's value is read as UTC, which is what the strip and the note print dates in. */
+  goToDate(event: SubmitEvent): void {
+    event.preventDefault();
+    const field = (event.target as HTMLFormElement).elements.namedItem('date') as HTMLInputElement;
+    if (this.time.setDate(new Date(`${field.value}Z`))) {
+      // The field now says what the signal behind it does, so a later reset that fills it with
+      // the present is a change the binding writes back, not one it drops as the same value.
+      this.dateField.set(field.value);
+    }
+  }
+
+  backToNow(): void {
+    this.time.reset();
+    this.fillDateField();
+  }
+
+  private fillDateField(): void {
+    this.dateField.set(this.time.date().toISOString().slice(0, 16));
   }
 
   toggleLayer(key: keyof HudDisplay): void {

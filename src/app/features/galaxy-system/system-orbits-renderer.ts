@@ -3,7 +3,7 @@ import * as THREE from 'three/webgpu';
 import { appearanceForBody, appearanceForExoplanet } from '../../shared/astro/body-appearance';
 import { PlanetAppearance } from '../../shared/astro/planet-appearance';
 import { planetTexture } from '../../shared/rendering/procedural-planet-texture';
-import { bodyTexturePath, loadCachedTexture } from '../../shared/rendering/texture-catalog';
+import { bodyTexturePath, loadCachedTexture, saturnRing } from '../../shared/rendering/texture-catalog';
 import { isPropagatableOrbit, keplerRates, meanElementsAt, orbitEllipsePoints, positionAtEpoch, resolveGravitationalParameter, resolveOrbitalElements } from '../../shared/astro/kepler';
 import { CartesianCoordinates, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
 import { BodyRecord, MeanElementRates, OrbitalElements, RotationalElements } from '../../shared/models/body.model';
@@ -381,6 +381,14 @@ export class SystemOrbitsRenderer {
       // A body reaches here only when it has no parentBodyId, so `kind` is 'planet' or 'dwarf'.
       const kind: SystemMemberKind = body.kind;
       const tracked = this.addTopLevelBody(body.id, kind, body.orbit, body.rates, body.radiusKm, ECLIPTIC_FRAME, appearanceForBody(body, bodies, hostLuminositySolar), { periodHours: body.rotationPeriodHours, elements: body.rotationalElements });
+      if (body.id === 'saturn') {
+        // A child of the sphere, so it lies in the equator the IAU pole turns the sphere into and
+        // is scaled with it where the marker is held to its pixel floor. Jupiter's, Uranus's and
+        // Neptune's rings are left out: dark, narrow or dusty, they are too faint to see here.
+        const ring = saturnRing(body.radiusKm, bodyMarkerRadiusAu(body.radiusKm));
+        tracked.marker.add(ring);
+        this.trackDisposable(ring.geometry, ring.material as THREE.Material);
+      }
       members.push({ id: body.id, kind, marker: tracked.marker });
     }
 
@@ -503,9 +511,12 @@ export class SystemOrbitsRenderer {
     this.tethers?.setTargets(this.tetherPoints);
   }
 
-  /** Looks up which system member a marker object belongs to (e.g. from a raycast hit). */
+  /**
+   * Looks up which system member a marker object belongs to (e.g. from a raycast hit), or a part
+   * of one: a ray through Saturn's rings picks Saturn.
+   */
   memberForObject(object: THREE.Object3D): SystemMember | undefined {
-    return this.members.find((member) => member.marker === object);
+    return this.members.find((member) => member.marker === object || member.marker === object.parent);
   }
 
   /** All marker objects, for raycasting. */

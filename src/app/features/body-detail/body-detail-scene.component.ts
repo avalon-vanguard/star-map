@@ -9,7 +9,7 @@ import { EngineService } from '../../core/engine/engine.service';
 import { bodyPageView } from '../../shared/rendering/body-orientation';
 import { planetTexture } from '../../shared/rendering/procedural-planet-texture';
 import { applyMilkyWaySkybox, createGlowSprite } from '../../shared/rendering/skybox';
-import { atmosphereColorFor, bodyTexturePath, loadCachedTexture, MILKY_WAY_SKYBOX_PATH, SATURN_RING_TEXTURE_PATH } from '../../shared/rendering/texture-catalog';
+import { atmosphereColorFor, bodyTexturePath, loadCachedTexture, MILKY_WAY_SKYBOX_PATH, saturnRing } from '../../shared/rendering/texture-catalog';
 import { BodyRecord } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
@@ -192,8 +192,10 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     this.disposeRing();
     this.disposeGlow();
     if (this.scene) {
-      if (viewModel.id === 'saturn') {
-        this.ring = this.buildSaturnRing();
+      if (viewModel.id === 'saturn' && this.body) {
+        // Flat in the page's horizontal, which is Saturn's equator: the planet is drawn pole up, at
+        // unit radius. They used to reach 2.6 radii out; the outermost ring the texture draws is 2.42.
+        this.ring = saturnRing(this.body.radiusKm, 1);
         this.scene.add(this.ring);
       }
       const atmosphereColor = atmosphereColorFor(viewModel.id);
@@ -202,39 +204,6 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
         this.scene.add(this.glow);
       }
     }
-  }
-
-  /**
-   * Saturn's rings, built from a real ring-transparency map. `RingGeometry`'s default UVs wrap
-   * around the angle rather than the radius, so the per-vertex U is remapped to distance from
-   * center — the standard fix for sampling a radially-varying ring texture correctly.
-   */
-  private buildSaturnRing(): THREE.Mesh {
-    const geometry = new THREE.RingGeometry(1.4, 2.6, 128, 1);
-    const position = geometry.attributes['position'];
-    const uv = geometry.attributes['uv'];
-    const vertex = new THREE.Vector3();
-    for (let i = 0; i < position.count; i++) {
-      vertex.fromBufferAttribute(position, i);
-      const radialFraction = THREE.MathUtils.clamp((vertex.length() - 1.4) / (2.6 - 1.4), 0, 1);
-      uv.setXY(i, radialFraction, 1);
-    }
-
-    const ringTexture = loadCachedTexture(SATURN_RING_TEXTURE_PATH);
-    const material = new THREE.MeshBasicMaterial({
-      map: ringTexture,
-      alphaMap: ringTexture,
-      transparent: true,
-      opacity: 0.85,
-      side: THREE.DoubleSide,
-      depthWrite: false
-    });
-
-    const ring = new THREE.Mesh(geometry, material);
-    // Flat in Saturn's equator, which is the page's horizontal: the planet is drawn pole up. The
-    // 17 degrees they used to lean put them out of the equator they orbit in.
-    ring.rotation.x = Math.PI / 2;
-    return ring;
   }
 
   private disposeRing(): void {

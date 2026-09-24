@@ -56,9 +56,9 @@ export interface BodyRecord {
   rates: MeanElementRates;
   /**
    * The pole of the plane a moon's elements are measured against, where that is its local
-   * Laplace plane: right ascension and declination in the ICRF. The node is then counted from
-   * where that plane crosses the ICRF equator. Absent means the J2000 ecliptic, as for the
-   * planets and the Moon.
+   * Laplace plane or, for Uranus's and Pluto's moons, the planet's equator: right ascension and
+   * declination in the ICRF. The node is then counted from where that plane crosses the ICRF
+   * equator. Absent means the J2000 ecliptic, as for the planets and the Moon.
    */
   laplacePole?: { raDeg: number; decDeg: number };
   /** Where the elements come from and the span they hold over, as the card prints it. */
@@ -68,6 +68,14 @@ export interface BodyRecord {
    * relative to that planet, not heliocentrically. Undefined for planets/dwarfs.
    */
   parentBodyId?: string;
+  /**
+   * For a moon heavy enough that it and its planet go round a point outside the planet — Charon,
+   * an eighth of Pluto's mass, puts it 2 100 km from Pluto's centre, 900 km above its surface —
+   * the moon's mass over the planet's, from the GMs on their Horizons pages. The planet's own
+   * elements then place that barycentre, as Standish's "Pluto" does, and both bodies are drawn
+   * going round it. Absent for every other moon.
+   */
+  massRatio?: number;
   /**
    * How the body turns on its own axis: the sidereal rotation period in hours, negative where
    * Horizons gives a negative rate (Venus, Uranus), and the tilt of that axis from its orbital

@@ -294,6 +294,11 @@ interface TrackedMoon {
   parentId: string;
   rotationPeriodHours?: number;
   obliquityDeg?: number;
+  /**
+   * Where the moon and its planet go round a barycentre outside the planet (Charon): the moon's
+   * mass over the planet's, and the planet's own small orbit round that point.
+   */
+  barycentre?: { massRatio: number; parentOrbitLine: THREE.Line };
 }
 
 /**
@@ -378,7 +383,7 @@ export class SystemOrbitsRenderer {
       if (!parentTracked) {
         continue; // orphaned moon reference; skip rather than crash.
       }
-      const moon = this.addMoon(body.id, body.orbit, body.rates, body.radiusKm, parentTracked, moonFrame(body), appearanceForBody(body, bodies, hostLuminositySolar), { periodHours: body.rotationPeriodHours, obliquityDeg: body.obliquityDeg });
+      const moon = this.addMoon(body.id, body.orbit, body.rates, body.radiusKm, parentTracked, moonFrame(body), appearanceForBody(body, bodies, hostLuminositySolar), { periodHours: body.rotationPeriodHours, obliquityDeg: body.obliquityDeg }, body.massRatio);
       members.push({ id: body.id, kind: 'moon', marker: moon.marker, parentId: parent.id });
     }
 
@@ -466,6 +471,14 @@ export class SystemOrbitsRenderer {
       const orbital = positionAtEpoch(current);
       moon.marker.position.set(orbital.x, orbital.y, orbital.z).applyQuaternion(moon.frame);
       orientOrbit(moon.orbitLine.quaternion, current, moon.frame);
+      if (moon.barycentre) {
+        // The planet's elements place the pair's barycentre, which is where the pivot is: the
+        // planet sits the moon's share of their separation back from it, the moon the rest out.
+        const { massRatio, parentOrbitLine } = moon.barycentre;
+        parent.marker.position.copy(parent.position).addScaledVector(moon.marker.position, -massRatio / (1 + massRatio));
+        moon.marker.position.multiplyScalar(1 / (1 + massRatio));
+        parentOrbitLine.quaternion.copy(moon.orbitLine.quaternion);
+      }
       if (moon.rotationPeriodHours) {
         moon.marker.quaternion.copy(spinFor(current, moon.frame, moon.rotationPeriodHours, moon.obliquityDeg, epochJd - moon.elements.epochJd));
       }
@@ -545,7 +558,8 @@ export class SystemOrbitsRenderer {
     parent: TrackedTopLevelBody,
     frame: THREE.Quaternion,
     appearance?: PlanetAppearance,
-    rotation?: { periodHours?: number; obliquityDeg?: number }
+    rotation?: { periodHours?: number; obliquityDeg?: number },
+    massRatio?: number
   ): TrackedMoon {
     const pivot = new THREE.Group();
     const orbitLine = buildOrbitLine(elements, 'moon', frame);
@@ -555,7 +569,20 @@ export class SystemOrbitsRenderer {
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);
     this.trackDisposable(marker.geometry, marker.material as THREE.Material);
 
-    const moon: TrackedMoon = { id, elements, rates, marker, orbitLine, frame, pivot, parentId: parent.id, rotationPeriodHours: rotation?.periodHours, obliquityDeg: rotation?.obliquityDeg };
+    let barycentre: TrackedMoon['barycentre'];
+    if (massRatio !== undefined) {
+      // Both orbits are the relative one, scaled: the moon's by the planet's share of the mass,
+      // the planet's by the moon's share and turned half round, since it is always opposite.
+      // Charon's then spans 17 460 km of radius, Pluto's 2 131, and neither passes through Pluto.
+      orbitLine.scale.setScalar(1 / (1 + massRatio));
+      const parentOrbitLine = buildOrbitLine(elements, parent.kind, frame);
+      parentOrbitLine.scale.setScalar(-massRatio / (1 + massRatio));
+      pivot.add(parentOrbitLine);
+      this.trackDisposable(parentOrbitLine.geometry, parentOrbitLine.material as THREE.Material);
+      barycentre = { massRatio, parentOrbitLine };
+    }
+
+    const moon: TrackedMoon = { id, elements, rates, marker, orbitLine, frame, pivot, parentId: parent.id, rotationPeriodHours: rotation?.periodHours, obliquityDeg: rotation?.obliquityDeg, barycentre };
     this.moons.push(moon);
     return moon;
   }

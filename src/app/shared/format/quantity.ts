@@ -9,7 +9,35 @@
 
 /** Distance in parsecs, switching to kiloparsecs where the number would otherwise run long. */
 export function formatParsecs(distancePc: number): string {
-  return distancePc >= 1000 ? `${(distancePc / 1000).toFixed(1)} kpc` : `${distancePc.toFixed(distancePc < 10 ? 2 : 0)} pc`;
+  const { divisor, digits, unit } = parsecScale(distancePc);
+  return `${(distancePc / divisor).toFixed(digits)} ${unit}`;
+}
+
+function parsecScale(distancePc: number): { divisor: number; digits: number; unit: string } {
+  return distancePc >= 1000 ? { divisor: 1000, digits: 1, unit: 'kpc' } : { divisor: 1, digits: distancePc < 10 ? 2 : 0, unit: 'pc' };
+}
+
+/**
+ * A star's distance with its uncertainty, given as a fraction of it: `117 ± 12 pc`, to the
+ * digits the distance itself is shown to. Left off where it is 1 % or less, or would round to
+ * nothing at those digits, since the figure is then already as good as it reads.
+ *
+ * Past a fifth, a range: the distance is the inverse of a parallax, so the parallax's symmetric
+ * error bar is a lopsided one in distance — Alnilam's 1.65 ± 0.45 mas is 476 to 833 pc, not
+ * 606 ± 165. Only a Hipparcos or archive distance gets there; Gaia's query stops at a fifth. An
+ * error as large as the parallax leaves no upper bound at all.
+ */
+export function formatDistance(distancePc: number, relativeError: number | undefined): string {
+  if (relativeError === undefined || relativeError <= 0.01) {
+    return formatParsecs(distancePc);
+  }
+  if (relativeError < 0.2) {
+    const { divisor, digits, unit } = parsecScale(distancePc);
+    const error = ((distancePc * relativeError) / divisor).toFixed(digits);
+    return Number(error) === 0 ? formatParsecs(distancePc) : `${(distancePc / divisor).toFixed(digits)} ± ${error} ${unit}`;
+  }
+  const nearest = formatParsecs(distancePc / (1 + relativeError));
+  return relativeError >= 1 ? `${nearest} or more` : `${nearest} to ${formatParsecs(distancePc / (1 - relativeError))}`;
 }
 
 /** Distance in astronomical units, for anything inside a system. */

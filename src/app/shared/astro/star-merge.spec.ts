@@ -157,6 +157,33 @@ describe('mergeStarCatalogues', () => {
     expect(summary.duplicates).toBe(1);
   });
 
+  it("keeps the distance's error with the distance, and the photometry with the description", () => {
+    // Proxima's parallax is 768.07 ± 0.05 mas in Gaia and 768.13 ± 1.04 in Hipparcos: the star is
+    // drawn at Gaia's, so the error it is drawn with is Gaia's, while V 11.01 and B−V 1.81 stay HYG's.
+    const hyg = at(70666, 217.4289, -62.6795, 1.2959, {
+      name: 'Proxima Centauri',
+      magnitude: 11.01,
+      magnitudeBand: 'V',
+      colorIndex: 1.807,
+      colorSystem: 'B-V',
+      distanceError: 0.00135,
+      distanceFromGaia: false
+    });
+    const gaia = at(1000064182, 217.4289, -62.6795, 1.302, {
+      name: 'Gaia DR3 5853498713190525696',
+      magnitude: 8.985,
+      magnitudeBand: 'G',
+      colorIndex: 3.805,
+      colorSystem: 'BP-RP',
+      distanceError: 0.000065,
+      distanceFromGaia: true,
+      source: 'gaia'
+    });
+    const [merged] = mergeStarCatalogues([{ ...HIPPARCOS, stars: [hyg] }, { ...GAIA, stars: [gaia] }]).stars;
+
+    expect(merged).toMatchObject({ magnitude: 11.01, magnitudeBand: 'V', colorIndex: 1.807, colorSystem: 'B-V', distanceError: 0.000065, distanceFromGaia: true });
+  });
+
   it('keeps two entries of one source apart, however close they are', () => {
     // Gaia resolves doubles Hipparcos saw as one star: two source ids 0.8″ apart are two stars,
     // and only *another* catalogue can claim to have already listed either of them.

@@ -46,7 +46,7 @@ import {
   systemFramingDistanceAu,
   systemViewDirection,
 } from './system-framing';
-import { formatAu, formatLuminosity, formatParsecs } from '../../shared/format/quantity';
+import { formatAu, formatParsecs } from '../../shared/format/quantity';
 import {
   distanceRings,
   formatRoundLength,
@@ -83,6 +83,7 @@ import { JumpLinkRenderer } from './jump-link-renderer';
 import { ReservedBox, ringPlacement } from './label-ring';
 import { LabeledPoint, LabelSide, StarLabelOverlay } from './star-label-overlay';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
+import { catalogueCensus, starReadouts } from './star-readouts';
 
 /** HYG catalog id for the Sun itself — the only star we have a real close-up photo of. */
 const SOL_STAR_ID = 0;
@@ -532,6 +533,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private galacticStrength = 0;
   private labelOverlay?: StarLabelOverlay;
   private stars: readonly StarRecord[] = [];
+  /** The neighbourhood's subtitle: what the catalogue holds, by the catalogue describing it. */
+  private catalogueCensus = '';
   private starsById = new Map<number, StarRecord>();
   private bodies: readonly BodyRecord[] = [];
   private exoplanets: readonly ExoplanetRecord[] = [];
@@ -679,6 +682,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       }),
     ]);
     this.stars = stars;
+    this.catalogueCensus = catalogueCensus(stars);
     this.starsById = new Map(stars.map((star) => [star.id, star]));
     this.neighbourhood = new StarNeighbourhood(stars);
     this.routing = new RoutingClient(stars, positions, this.neighbourhood);
@@ -1742,8 +1746,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       const moonCount = this.bodies.filter(
         (body) => body.systemStarId === star.id && body.parentBodyId,
       ).length;
-      const distancePc = Math.hypot(star.x, star.y, star.z);
-      const luminosity = luminosityOf(star);
       this.hudEyebrow.set('System');
       this.hudTitle.set(star.name);
       this.hudSubtitle.set(star.spectralType ? `Spectral type ${star.spectralType}` : '');
@@ -1752,13 +1754,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
           label: 'Bodies',
           value: moonCount > 0 ? `${planetCount} + ${moonCount} moons` : `${planetCount}`,
         },
-        // Suppressed for the Sun rather than printed as `0.00 pc`, which is arithmetically right
-        // and reads as a bug: the distance from here to here is not a measurement.
-        ...(distancePc > 0 ? [{ label: 'Distance', value: formatParsecs(distancePc) }] : []),
-        { label: 'Magnitude', value: star.magnitude.toFixed(2) },
-        ...(luminosity !== null
-          ? [{ label: 'Luminosity', value: formatLuminosity(luminosity), derived: true }]
-          : []),
+        ...starReadouts(star, luminosityOf(star)),
       ]);
       this.hudNote.set(this.time.atNow() ? 'Orbits propagated from published elements to the current date.' : 'Orbits propagated from published elements to the date on the clock.');
       this.hudRange.set(
@@ -1796,7 +1792,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     this.hudEyebrow.set('Solar Neighbourhood');
     this.hudTitle.set('Local Stars');
-    this.hudSubtitle.set('Hipparcos · Yale Bright Star · Gliese');
+    this.hudSubtitle.set(this.catalogueCensus);
     this.hudReadouts.set([
       // Both numbers, because they differ: the catalogue is what the map knows and the first is
       // what it draws. See `STAR_RENDER_BUDGET`.

@@ -20,6 +20,15 @@ function assertCondition(condition: boolean, message: string): void {
   }
 }
 
+/**
+ * Stars whose magnitude is a stand-in, and distances published without an error. Measured 309 and
+ * 439: the 44 Gaia sources with no G and the 265 archive hosts with neither V nor G; the 357 Gliese
+ * distances (no Hipparcos parallax behind them) and 82 archive hosts the archive gives no error
+ * for. Losing either field loses it for hundreds of thousands of stars.
+ */
+const MAX_STARS_WITHOUT_BAND = 1_000;
+const MAX_STARS_WITHOUT_DISTANCE_ERROR = 1_000;
+
 function validateStars(stars: StarRecord[]): void {
   assertCondition(stars.length > 0, 'No stars were produced.');
 
@@ -49,7 +58,28 @@ function validateStars(stars: StarRecord[]): void {
     assertCondition(decoded[i].id === stars[i].id && decoded[i].name === stars[i].name, `Star catalogue round-trip altered record ${i}.`);
     assertCondition(decoded[i].spectralType === stars[i].spectralType, `Star catalogue round-trip lost the spectral type of star ${stars[i].id}.`);
     assertCondition(decoded[i].colorIndex === null === (stars[i].colorIndex === null), `Star catalogue round-trip changed whether star ${stars[i].id} has a colour index.`);
+    assertCondition(
+      decoded[i].magnitudeBand === stars[i].magnitudeBand && decoded[i].colorSystem === stars[i].colorSystem && decoded[i].distanceFromGaia === !!stars[i].distanceFromGaia,
+      `Star catalogue round-trip changed the photometry of star ${stars[i].id}.`
+    );
+    // Stored as its square root in 255ths, up to 100 %; see `star-catalog.ts`.
+    const error = stars[i].distanceError;
+    assertCondition(
+      error === undefined ? decoded[i].distanceError === undefined : Math.abs(Math.sqrt(decoded[i].distanceError!) - Math.sqrt(Math.min(1, error))) <= 0.5 / 255 + 1e-9,
+      `Star catalogue round-trip changed the distance error of star ${stars[i].id}.`
+    );
   }
+
+  // What each star says it was measured in. A band or an error dropped on the way still encodes,
+  // decodes and draws; it shows only as a card reading "Not measured" for a star that was.
+  const withoutBand = stars.filter((star) => star.magnitudeBand === undefined).length;
+  assertCondition(withoutBand <= MAX_STARS_WITHOUT_BAND, `${withoutBand} stars have no magnitude band (at most ${MAX_STARS_WITHOUT_BAND} expected) — the band is being lost.`);
+  const withoutError = stars.filter((star) => star.id !== SUN_STAR_ID && star.distanceError === undefined).length;
+  assertCondition(
+    withoutError <= MAX_STARS_WITHOUT_DISTANCE_ERROR,
+    `${withoutError} stars have no distance error (at most ${MAX_STARS_WITHOUT_DISTANCE_ERROR} expected) — the parallax errors are being lost.`
+  );
+  console.log(`  ${withoutBand} stars with a stand-in magnitude; ${withoutError} distances without a published error.`);
 }
 
 /**

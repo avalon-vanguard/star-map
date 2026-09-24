@@ -77,6 +77,13 @@ const COMPOSITE_COLUMNS = [
 // pl_name is unique here too, one row per planet.
 const COMPOSITE_URL = `${TAP_BASE_URL}?query=select+${COMPOSITE_COLUMNS}+from+pscomppars+order+by+pl_name&format=csv`;
 const COMPOSITE_CACHE_FILE = `exoplanet-archive-pscomppars-${createHash('sha1').update(COMPOSITE_URL).digest('hex').slice(0, 8)}.csv`;
+/**
+ * The same table's distance errors, for the stars placed from the archive. A query of its own,
+ * cached apart, so that asking for them did not refetch the columns above: the archive changes
+ * daily, and a new answer would have moved every figure the catalogue was checked against.
+ */
+const DISTANCE_ERRORS_URL = `${TAP_BASE_URL}?query=select+pl_name,sy_disterr1,sy_disterr2+from+pscomppars+order+by+pl_name&format=csv`;
+const DISTANCE_ERRORS_CACHE_FILE = `exoplanet-archive-disterr-${createHash('sha1').update(DISTANCE_ERRORS_URL).digest('hex').slice(0, 8)}.csv`;
 
 /**
  * Where the ids of the stars only the archive places begin: past Gaia's two ranges, and under
@@ -109,6 +116,7 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<{ exoplanet
   const csv = await fetchTextCached(TAP_URL, CACHE_FILE);
   const rows = parseCsvObjects(csv);
   const composite = new Map(parseCsvObjects(await fetchTextCached(COMPOSITE_URL, COMPOSITE_CACHE_FILE)).map((row) => [row['pl_name'], row]));
+  const distanceErrors = new Map(parseCsvObjects(await fetchTextCached(DISTANCE_ERRORS_URL, DISTANCE_ERRORS_CACHE_FILE)).map((row) => [row['pl_name'], row]));
 
   let matched = 0;
   // Catalogue stars known only by their Gaia designation, which take the archive's host name —
@@ -144,21 +152,29 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<{ exoplanet
         // Carried back from the archive's epoch like any Gaia row, and placed at `sy_dist`.
         const j2000 = propagateProperMotion(raDeg, decDeg, pmRaMasPerYear ?? 0, pmDecMasPerYear ?? 0, ARCHIVE_TO_CATALOGUE_YEARS);
         // V where the archive has it, as HYG's stars are; else Gaia's G, the band the catalogue's
-        // Gaia stars are already in. The assets carry no band, so it is counted below instead.
+        // Gaia stars are already in.
         const v = host('sy_vmag');
         const g = host('sy_gaiamag');
         const b = host('sy_bmag');
         const temperatureK = host('st_teff');
-        bands[v !== undefined ? 'V' : g !== undefined ? 'G' : 'none']++;
+        const band = v !== undefined ? 'V' : g !== undefined ? 'G' : undefined;
+        bands[band ?? 'none']++;
+        // B-V where the archive has both magnitudes, else the effective temperature's; with
+        // neither, null leaves the colour to the spectral type, as for any other star.
+        const colorIndex = b !== undefined && v !== undefined ? b - v : temperatureK !== undefined ? temperatureToColorIndex(temperatureK) : null;
+        // The archive gives the distance's error as two one-sided ones; their mean, relative.
+        const errors = distanceErrors.get(row['pl_name']);
+        const [above, below] = [parseOptionalNumber(errors?.['sy_disterr1']), parseOptionalNumber(errors?.['sy_disterr2'])];
         archiveStar = {
           id: ARCHIVE_ID_BASE + archiveStars.size,
           name: row['hostname'],
           ...raDegDecDistanceToXyz(j2000.raDeg, j2000.decDeg, distancePc),
           magnitude: v ?? g ?? UNKNOWN_MAGNITUDE,
+          ...(band === undefined ? {} : { magnitudeBand: band }),
           spectralType: compositeRow?.['st_spectype'] || 'Unknown',
-          // B-V where the archive has both magnitudes, else the effective temperature's; with
-          // neither, null leaves the colour to the spectral type, as for any other star.
-          colorIndex: b !== undefined && v !== undefined ? b - v : temperatureK !== undefined ? temperatureToColorIndex(temperatureK) : null,
+          colorIndex,
+          ...(colorIndex === null ? {} : { colorSystem: 'B-V' as const }),
+          ...(above === undefined || below === undefined ? {} : { distanceError: (Math.abs(above) + Math.abs(below)) / 2 / distancePc }),
           source: ARCHIVE_SOURCE
         };
         archiveStars.set(row['hostname'], archiveStar);

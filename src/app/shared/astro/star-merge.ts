@@ -222,12 +222,21 @@ export function isSameStar(kept: StarRecord, entry: StarRecord): boolean {
  * a catalogue number. HYG's "Proxima Centauri", "M5Ve" and V magnitude over Gaia's
  * "Gaia DR3 5853498713190525696", "Unknown" and G; keeping either row whole loses half of that,
  * and keeping Gaia's whole once cost the map 102 proper names and 32 000 spectral types. The id
- * travels with the description, so a star HYG knows keeps its HYG id from one refresh to the next;
- * `source` stays with the position, since that is what it records.
+ * travels with the description, so a star HYG knows keeps its HYG id from one refresh to the next,
+ * and so does its photometry, V and B−V. `source` stays with the position, since that is what it
+ * records, and so does the distance's error: Gaia's, not the Hipparcos one of a distance dropped.
  */
 function combine(kept: StarRecord, other: StarRecord): StarRecord {
   const described = isDesignation(kept) && !isDesignation(other) ? other : kept;
-  return { ...described, x: kept.x, y: kept.y, z: kept.z, source: kept.source };
+  return {
+    ...described,
+    x: kept.x,
+    y: kept.y,
+    z: kept.z,
+    source: kept.source,
+    distanceError: kept.distanceError,
+    distanceFromGaia: kept.distanceFromGaia
+  };
 }
 
 /**

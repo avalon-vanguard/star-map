@@ -1,5 +1,6 @@
 /**
- * A single star from the HYG (Hipparcos/Yale/Gliese) catalog, positioned relative to the
+ * A single star from Gaia DR3, HYG (Hipparcos/Yale/Gliese) or the NASA Exoplanet Archive — see
+ * `source` — positioned relative to the
  * Sun in the galaxy-scale coordinate system (parsecs). The same positions are also packed
  * into a compact binary buffer (`stars.bin`, in index order) for fast bulk rendering; this
  * record format (`stars-index.json`) is used for search, labels, and lookups by id/name.
@@ -13,13 +14,32 @@ export interface StarRecord {
   magnitude: number;
   spectralType: string;
   /**
-   * B-V colour index, or `null` where the catalog has no photometry — about 10% of stars
-   * within the distance cutoff. Deliberately nullable rather than defaulted: `0` is a real,
+   * Colour index — B-V, or Gaia's BP-RP where `colorSystem` says so — or `null` where the
+   * catalog has no photometry. Deliberately nullable rather than defaulted: `0` is a real,
    * meaningful colour index (a hot blue-white A-type star), so using it to stand for "unknown"
    * silently mis-colours those stars. Consumers resolve the gap from `spectralType`; see
    * `colorIndexToRgb`.
    */
   colorIndex: number | null;
+  /**
+   * The band `magnitude` was measured in: Johnson V (HYG, and the archive where it has one) or
+   * Gaia's G, which for a red dwarf reads up to three magnitudes brighter than V. Absent where no
+   * survey measured the star and `magnitude` is the ETL's stand-in.
+   */
+  magnitudeBand?: 'V' | 'G';
+  /**
+   * Which colour `colorIndex` is: Johnson B−V, or Gaia's BP−RP, which is larger for the same star
+   * — 0.82 against 0.65 for a G2 dwarf like the Sun, 3.35 against 1.83 for an M5 dwarf (Pecaut &
+   * Mamajek). Absent with it.
+   */
+  colorSystem?: 'B-V' | 'BP-RP';
+  /**
+   * Relative uncertainty of the distance, σd/d: the relative error of the parallax it was
+   * inverted from, which to first order is the same. Absent where none was published.
+   */
+  distanceError?: number;
+  /** Whether the distance is Gaia DR3's parallax, whichever catalogue describes the star. */
+  distanceFromGaia?: boolean;
   /**
    * Which catalogue this star's position came from, once more than one contributes. Absent for a
    * single-source build; see `star-merge.ts`, where overlapping catalogues are reconciled and

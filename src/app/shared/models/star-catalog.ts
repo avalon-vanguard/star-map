@@ -26,13 +26,38 @@ export const STAR_POSITION_COMPONENTS = 3;
 export const BYTES_PER_STAR_POSITION = STAR_POSITION_COMPONENTS * Float32Array.BYTES_PER_ELEMENT;
 
 /**
- * Columns in `stars-meta.bin`, in order: catalogue id, apparent magnitude, colour index, and an
- * index into the spectral-type dictionary. Stored column by column rather than record by record
- * so each one is a single typed-array view over the buffer, with no per-record stride or
- * alignment padding.
+ * Columns in `stars-meta.bin`, in order: catalogue id, apparent magnitude, colour index, an
+ * index into the spectral-type dictionary, what those were measured in (see {@link PHOTOMETRY}),
+ * and the distance's relative error (see {@link DISTANCE_ERROR_STEPS}). Stored column by column
+ * rather than record by record so each one is a single typed-array view over the buffer, with no
+ * per-record stride or alignment padding.
  */
 export const BYTES_PER_STAR_META =
-  Int32Array.BYTES_PER_ELEMENT + Float32Array.BYTES_PER_ELEMENT + Float32Array.BYTES_PER_ELEMENT + Uint16Array.BYTES_PER_ELEMENT;
+  Int32Array.BYTES_PER_ELEMENT +
+  Float32Array.BYTES_PER_ELEMENT +
+  Float32Array.BYTES_PER_ELEMENT +
+  Uint16Array.BYTES_PER_ELEMENT +
+  Uint8Array.BYTES_PER_ELEMENT +
+  Uint8Array.BYTES_PER_ELEMENT;
+
+/**
+ * Bits of the photometry column. The band takes two: none (a stand-in magnitude), V or G. None
+ * of it follows from the source, which records where the *position* came from: 62 002 stars
+ * Gaia places keep HYG's V and B−V, and the archive's stars in G have a B−V from their
+ * temperature. The last bit says whose parallax the distance is, which for a HYG star Gaia did
+ * not place can still be Gaia's.
+ */
+const PHOTOMETRY = { bandV: 1, bandG: 2, bandMask: 3, colorBpRp: 4, distanceFromGaia: 8 } as const;
+
+/**
+ * The distance error column holds the square root of the relative error, in 255ths, and 0 where
+ * none was published. The errors span three orders of magnitude — Gaia's are a median 0.3 % and
+ * at most 20 %, the cut its queries make, while a Hipparcos parallax the map keeps for a bright
+ * star can be as large as itself — and the square root keeps a step small at each end: 0.08 % of
+ * distance at 1 %, 0.35 % at 20 %, under 1 % at 100 %. Anything past 100 % is stored as that,
+ * where it no longer bounds the distance from above.
+ */
+const DISTANCE_ERROR_STEPS = 255;
 
 /** `stars-index.json`: everything that is a string, plus the count the columns are sized by. */
 export interface StarCatalogIndex {
@@ -81,6 +106,8 @@ interface StarMetaColumns {
   magnitudes: Float32Array;
   colorIndices: Float32Array;
   spectralTypeIndices: Uint16Array;
+  photometry: Uint8Array;
+  distanceErrors: Uint8Array;
 }
 
 /** Lays typed-array views over the meta buffer at the offsets the format defines. */
@@ -93,8 +120,12 @@ function metaColumns(buffer: ArrayBuffer, count: number): StarMetaColumns {
   const colorIndices = new Float32Array(buffer, offset, count);
   offset += count * Float32Array.BYTES_PER_ELEMENT;
   const spectralTypeIndices = new Uint16Array(buffer, offset, count);
+  offset += count * Uint16Array.BYTES_PER_ELEMENT;
+  const photometry = new Uint8Array(buffer, offset, count);
+  offset += count * Uint8Array.BYTES_PER_ELEMENT;
+  const distanceErrors = new Uint8Array(buffer, offset, count);
 
-  return { ids, magnitudes, colorIndices, spectralTypeIndices };
+  return { ids, magnitudes, colorIndices, spectralTypeIndices, photometry, distanceErrors };
 }
 
 /**
@@ -152,6 +183,13 @@ export function encodeStarCatalog(stars: readonly StarRecord[]): {
     columns.magnitudes[index] = star.magnitude;
     columns.colorIndices[index] = star.colorIndex ?? Number.NaN;
     columns.spectralTypeIndices[index] = spectralTypeId;
+    columns.photometry[index] =
+      (star.magnitudeBand === 'V' ? PHOTOMETRY.bandV : star.magnitudeBand === 'G' ? PHOTOMETRY.bandG : 0) |
+      (star.colorSystem === 'BP-RP' ? PHOTOMETRY.colorBpRp : 0) |
+      (star.distanceFromGaia ? PHOTOMETRY.distanceFromGaia : 0);
+    // At least one step, so an error too small to round to one is not read back as none published.
+    columns.distanceErrors[index] =
+      star.distanceError === undefined ? 0 : Math.max(1, Math.round(Math.sqrt(Math.min(1, star.distanceError)) * DISTANCE_ERROR_STEPS));
   });
 
   // A per-star column is only worth writing when the stars actually differ.
@@ -186,6 +224,9 @@ export function decodeStarCatalog(index: StarCatalogIndex, positions: Float32Arr
     const id = columns.ids[i];
     const sourceIndex = index.sourceIndices.length > 0 ? index.sourceIndices[i] : index.sources.length === 1 ? 0 : -1;
     const source = index.sources[sourceIndex];
+    const photometry = columns.photometry[i];
+    const band = photometry & PHOTOMETRY.bandMask;
+    const distanceError = columns.distanceErrors[i];
 
     stars[i] = {
       id,
@@ -196,6 +237,11 @@ export function decodeStarCatalog(index: StarCatalogIndex, positions: Float32Arr
       magnitude: columns.magnitudes[i],
       spectralType: index.spectralTypes[columns.spectralTypeIndices[i]],
       colorIndex: Number.isNaN(colorIndex) ? null : colorIndex,
+      // Set on every record, if only to undefined, so that all of them have the one shape.
+      magnitudeBand: band === PHOTOMETRY.bandV ? 'V' : band === PHOTOMETRY.bandG ? 'G' : undefined,
+      colorSystem: Number.isNaN(colorIndex) ? undefined : photometry & PHOTOMETRY.colorBpRp ? 'BP-RP' : 'B-V',
+      distanceError: distanceError === 0 ? undefined : (distanceError / DISTANCE_ERROR_STEPS) ** 2,
+      distanceFromGaia: (photometry & PHOTOMETRY.distanceFromGaia) !== 0,
       ...(source ? { source: source.id } : {})
     };
   }

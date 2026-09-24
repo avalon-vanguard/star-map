@@ -133,9 +133,9 @@ const MIN_ROW_SHARE = 0.95;
 export class GaiaAnswerError extends Error {}
 
 /**
- * Gaia publishes no spectral classifications, but `bp_rp` is a colour index on the same footing
- * as HYG's `ci` — so the app's existing colour and spectral-class handling works unchanged, and
- * the spectral type is left as unknown rather than invented from the colour.
+ * Gaia publishes no spectral classifications. Its `bp_rp` is a colour index, though not HYG's
+ * B−V — `colorSystem` says which — and the spectral type is left as unknown rather than
+ * invented from it.
  */
 const UNKNOWN_SPECTRAL_TYPE = 'Unknown';
 
@@ -209,10 +209,13 @@ function rowsToStars(rows: readonly Record<string, string>[], idBase: number): S
       return;
     }
 
+    const parallaxErrorMas = parseOptionalNumber(row['parallax_error']);
     const pmRaMasYr = parseOptionalNumber(row['pmra']);
     const pmDecMasYr = parseOptionalNumber(row['pmdec']);
     const j2000 = propagateProperMotion(raDeg, decDeg, pmRaMasYr ?? 0, pmDecMasYr ?? 0, CATALOGUE_EPOCH - GAIA_DR3_EPOCH);
     const { x, y, z } = raDegDecDistanceToXyz(j2000.raDeg, j2000.decDeg, distancePc);
+    const magnitudeG = parseOptionalNumber(row['phot_g_mean_mag']);
+    const colorIndex = parseOptionalNumber(row['bp_rp']);
     stars.push({
       id: idBase + index,
       name: `Gaia DR3 ${row['source_id']}`,
@@ -222,9 +225,13 @@ function rowsToStars(rows: readonly Record<string, string>[], idBase: number): S
       // Only the nearby query has sources without a G, 45 of them, and they are given its limit.
       // That errs bright: 26 of the 31 that 2MASS measured are at J 12.6–15.7, fainter still in G
       // for stars this red, and 5 at J 7–8.
-      magnitude: parseOptionalNumber(row['phot_g_mean_mag']) ?? MAGNITUDE_LIMIT,
+      magnitude: magnitudeG ?? MAGNITUDE_LIMIT,
+      ...(magnitudeG === undefined ? {} : { magnitudeBand: 'G' as const }),
       spectralType: UNKNOWN_SPECTRAL_TYPE,
-      colorIndex: parseOptionalNumber(row['bp_rp']) ?? null,
+      colorIndex: colorIndex ?? null,
+      ...(colorIndex === undefined ? {} : { colorSystem: 'BP-RP' as const }),
+      ...(parallaxErrorMas === undefined ? {} : { distanceError: parallaxErrorMas / parallaxMas }),
+      distanceFromGaia: true,
       source: 'gaia',
       pmRaMasYr,
       pmDecMasYr
@@ -243,7 +250,8 @@ function rowsToStars(rows: readonly Record<string, string>[], idBase: number): S
 const MIN_USABLE_HIP_DISTANCES = 90_000;
 
 /**
- * Gaia's distance for every Hipparcos star it has a usable parallax for, keyed by HIP number.
+ * Gaia's distance for every Hipparcos star it has a usable parallax for, and that distance's
+ * relative error, keyed by HIP number.
  *
  * Taken from the archive's own cross-match (`hipparcos2_best_neighbour`) rather than from
  * matching positions here, since Gaia's team made that identification star by star with the
@@ -255,7 +263,7 @@ const MIN_USABLE_HIP_DISTANCES = 90_000;
  * distance, the 6 833 that Gaia puts past 250 pc move back inside, and the published map would
  * flip between the two with the archive's availability.
  */
-export async function fetchGaiaDistancesByHip(): Promise<Map<number, number>> {
+export async function fetchGaiaDistancesByHip(): Promise<Map<number, { distancePc: number; relativeError: number }>> {
   const query = [
     'select top 200000 b.original_ext_source_id as hip, g.parallax, g.parallax_over_error',
     'from gaiadr3.hipparcos2_best_neighbour b join gaiadr3.gaia_source g on g.source_id = b.source_id'
@@ -264,13 +272,13 @@ export async function fetchGaiaDistancesByHip(): Promise<Map<number, number>> {
   console.log('Fetching Gaia DR3 distances for Hipparcos stars (archive cross-match)...');
   const rows = parseCsvObjects(await fetchTextCached(url, `gaia-dr3-hip-${createHash('sha1').update(url).digest('hex').slice(0, 8)}.csv`));
 
-  const distances = new Map<number, number>();
+  const distances = new Map<number, { distancePc: number; relativeError: number }>();
   for (const row of rows) {
     const hip = parseOptionalNumber(row['hip']);
     const parallaxMas = parseOptionalNumber(row['parallax']);
     const overError = parseOptionalNumber(row['parallax_over_error']);
     if (hip !== undefined && parallaxMas !== undefined && parallaxMas > 0 && overError !== undefined && overError > 1 / MAX_PARALLAX_ERROR_RATIO) {
-      distances.set(hip, 1000 / parallaxMas);
+      distances.set(hip, { distancePc: 1000 / parallaxMas, relativeError: 1 / overError });
     }
   }
   if (distances.size < MIN_USABLE_HIP_DISTANCES) {
@@ -281,4 +289,34 @@ export async function fetchGaiaDistancesByHip(): Promise<Map<number, number>> {
   }
   console.log(`  ${distances.size} Hipparcos stars have a Gaia distance (of ${rows.length} cross-matched).`);
   return distances;
+}
+
+/** The new Hipparcos reduction holds 117 955 stars, and every one has a parallax error. */
+const MIN_HIPPARCOS_ERRORS = 110_000;
+
+/**
+ * The relative error of every Hipparcos parallax, keyed by HIP number, for the stars that keep
+ * their Hipparcos distance: 3 067 of them, Rigel and Deneb among them, where Gaia saturates.
+ *
+ * From van Leeuwen's 2007 reduction, which the ESA archive hosts beside Gaia and HYG's distances
+ * are the inverse of. HYG publishes the distance and not its error.
+ */
+export async function fetchHipparcosParallaxErrors(): Promise<Map<number, number>> {
+  const url = `${GAIA_TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=${encodeURIComponent('select top 200000 hip, plx, e_plx from public.hipparcos_newreduction order by hip')}`;
+  console.log('Fetching Hipparcos parallax errors (new reduction)...');
+  const rows = parseCsvObjects(await fetchTextCached(url, `hipparcos-errors-${createHash('sha1').update(url).digest('hex').slice(0, 8)}.csv`));
+
+  const errors = new Map<number, number>();
+  for (const row of rows) {
+    const hip = parseOptionalNumber(row['hip']);
+    const parallaxMas = parseOptionalNumber(row['plx']);
+    const errorMas = parseOptionalNumber(row['e_plx']);
+    if (hip !== undefined && parallaxMas !== undefined && parallaxMas > 0 && errorMas !== undefined) {
+      errors.set(hip, errorMas / parallaxMas);
+    }
+  }
+  if (errors.size < MIN_HIPPARCOS_ERRORS) {
+    throw new Error(`the Hipparcos reduction gave ${errors.size} parallax errors (of ${rows.length} rows), not the ~117 955 it holds; delete tools/etl/.cache/hipparcos-errors-*.csv once the archive answers properly`);
+  }
+  return errors;
 }

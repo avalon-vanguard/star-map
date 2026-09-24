@@ -3,7 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { mergeStarCatalogues, placementDistancePc } from '../../src/app/shared/astro/star-merge';
 import { encodeStarCatalog } from '../../src/app/shared/models/star-catalog';
 import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model';
-import { fetchGaiaDistancesByHip, GaiaAnswerError } from './sources/gaia';
+import { fetchGaiaDistancesByHip, fetchHipparcosParallaxErrors, GaiaAnswerError } from './sources/gaia';
 import { positionalSources } from './sources/registry';
 import { PARALLAX_PRECISION_MAS } from './sources/star-sources';
 import { parseCsvObjects, parseOptionalNumber } from './lib/csv';
@@ -71,7 +71,8 @@ export async function fetchStars(): Promise<StarRecord[]> {
   const csv = await fetchTextCached(HYG_CSV_URL, 'hygdata_v41.csv');
   const rows = parseCsvObjects(csv);
   // Not skipped when unreachable, unlike the positional sources below; see its own comment.
-  const gaiaPcByHip = await fetchGaiaDistancesByHip();
+  const gaiaByHip = await fetchGaiaDistancesByHip();
+  const hipparcosErrors = await fetchHipparcosParallaxErrors();
 
   const stars: StarRecord[] = [];
   let atGaiaDistance = 0;
@@ -81,14 +82,16 @@ export async function fetchStars(): Promise<StarRecord[]> {
     const id = Number(row['id']);
 
     if (id === SUN_STAR_ID) {
-      stars.push({ id, name: 'Sol', x: 0, y: 0, z: 0, magnitude: parseOptionalNumber(row['mag']) ?? UNKNOWN_MAGNITUDE, spectralType: row['spect'] || 'G2V', colorIndex: parseOptionalNumber(row['ci']) ?? null });
+      stars.push({ id, name: 'Sol', x: 0, y: 0, z: 0, magnitude: parseOptionalNumber(row['mag']) ?? UNKNOWN_MAGNITUDE, magnitudeBand: 'V', spectralType: row['spect'] || 'G2V', colorIndex: parseOptionalNumber(row['ci']) ?? null, colorSystem: 'B-V' });
       continue;
     }
 
     const hygPc = Number(row['dist']);
     const hipparcosPc = Number.isFinite(hygPc) && hygPc > 0 && hygPc < HYG_UNKNOWN_DISTANCE_PC ? hygPc : undefined;
-    const gaiaPc = row['hip'] ? gaiaPcByHip.get(Number(row['hip'])) : undefined;
-    const magnitude = parseOptionalNumber(row['mag']) ?? UNKNOWN_MAGNITUDE;
+    const gaia = row['hip'] ? gaiaByHip.get(Number(row['hip'])) : undefined;
+    const gaiaPc = gaia?.distancePc;
+    const magnitudeV = parseOptionalNumber(row['mag']);
+    const magnitude = magnitudeV ?? UNKNOWN_MAGNITUDE;
     const distancePc = placementDistancePc(hipparcosPc, gaiaPc, magnitude, DISTANCE_CUTOFF_PC);
     if (distancePc === null) {
       continue;
@@ -119,6 +122,11 @@ export async function fetchStars(): Promise<StarRecord[]> {
       pastCutoff++;
     }
 
+    // Gaia's error with Gaia's distance, Hipparcos's with its own; a Gliese row, with neither, has
+    // no published error, and its distance is as often photometric as measured.
+    const distanceError = gaia?.relativeError ?? (row['hip'] ? hipparcosErrors.get(Number(row['hip'])) : undefined);
+    const colorIndex = parseOptionalNumber(row['ci']);
+
     stars.push({
       id,
       name: resolveName(row),
@@ -126,8 +134,12 @@ export async function fetchStars(): Promise<StarRecord[]> {
       y: y * scale,
       z: z * scale,
       magnitude,
+      ...(magnitudeV === undefined ? {} : { magnitudeBand: 'V' as const }),
       spectralType: row['spect'] || 'Unknown',
-      colorIndex: parseOptionalNumber(row['ci']) ?? null,
+      colorIndex: colorIndex ?? null,
+      ...(colorIndex === undefined ? {} : { colorSystem: 'B-V' as const }),
+      ...(distanceError === undefined ? {} : { distanceError }),
+      distanceFromGaia: gaia !== undefined,
       // Only for the Gliese-only rows, whose positions are what the merge needs the motion to see
       // past. A Hipparcos position is good to under an arcsecond; given its motion too, 15 stars
       // took their co-moving companion's Gaia entry, and the companion was kept twice.

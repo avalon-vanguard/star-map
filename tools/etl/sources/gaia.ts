@@ -135,7 +135,7 @@ export class GaiaAnswerError extends Error {}
 /**
  * Gaia publishes no spectral classifications. Its `bp_rp` is a colour index, though not HYG's
  * B−V — `colorSystem` says which — and the spectral type is left as unknown rather than
- * invented from it.
+ * invented from it; the app estimates one, and says it is an estimate.
  */
 const UNKNOWN_SPECTRAL_TYPE = 'Unknown';
 

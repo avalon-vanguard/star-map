@@ -1,3 +1,4 @@
+import { spectralTypeFromColor } from '../../shared/astro/spectral';
 import { formatDistance, formatLuminosity } from '../../shared/format/quantity';
 import { StarRecord } from '../../shared/models/star.model';
 import { HudReadout } from '../hud/hud-dock.component';
@@ -14,6 +15,19 @@ export function describingCatalogue(star: StarRecord): string {
     return 'NASA Exoplanet Archive';
   }
   return star.source === 'gaia' && star.magnitudeBand !== 'V' ? 'Gaia DR3' : 'HYG';
+}
+
+/**
+ * What the readout says a star is: the catalogue's classification, or — for the 83 % of stars
+ * that have none, every Gaia star among them — the dwarf type its colour matches, marked as an
+ * estimate. Empty with neither, rather than the ETL's literal "Unknown".
+ */
+export function starSubtitle(star: StarRecord): string {
+  if (star.spectralType && star.spectralType !== 'Unknown') {
+    return `Spectral type ${star.spectralType}`;
+  }
+  const estimate = spectralTypeFromColor(star.colorIndex, star.colorSystem);
+  return estimate ? `Spectral type ~${estimate}, from colour` : '';
 }
 
 /**

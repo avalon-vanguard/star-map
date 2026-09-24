@@ -302,7 +302,7 @@
     "systemStarId": 0,
     "name": "Phobos",
     "kind": "moon",
-    "radiusKm": 13.1,
+    "radiusKm": 11.058402868477721,
     "orbit": {
       "semiMajorAxisAu": 0.00006267468885838895,
       "eccentricity": 0.0151,
@@ -330,7 +330,7 @@
     "systemStarId": 0,
     "name": "Deimos",
     "kind": "moon",
-    "radiusKm": 7.8,
+    "radiusKm": 6.203050874487247,
     "orbit": {
       "semiMajorAxisAu": 0.00015680704471417322,
       "eccentricity": 0.0002,

@@ -1,4 +1,5 @@
 import { OrbitalElements } from '../../../src/app/shared/models/body.model';
+import { extractGmKm3PerS2, extractObliquityDeg, extractRadiusKm, extractRotationPeriodHours, isTidallyLocked } from '../../../src/app/shared/astro/horizons-page';
 import { fetchTextCached } from './http';
 
 const HORIZONS_URL = 'https://ssd.jpl.nasa.gov/api/horizons.api';
@@ -10,7 +11,7 @@ const REFERENCE_START = '2025-01-01';
 const REFERENCE_STOP = '2025-01-02';
 
 export interface HorizonsQuery {
-  /** Horizons body id, e.g. `'499'` for Mars. */
+  /** Horizons body id, e.g. `'499'` for Mars, or a small body's number and a semicolon, `'1;'` for Ceres. */
   command: string;
   /** Horizons coordinate center, e.g. `'500@10'` (Sun) or `'500@399'` (Earth). */
   center: string;
@@ -30,70 +31,8 @@ export interface HorizonsResult {
   obliquityDeg?: number;
   /** The page says "Synchronous" instead of a period: its day is its orbit. */
   tidallyLocked: boolean;
-}
-
-const RADIUS_PATTERNS = [
-  /Vol\.?\s*mean\s*radius[^=]*=\s*([\d.]+)/i,
-  /Mean\s*radius[^=]*=\s*([\d.]+)/i,
-  /Radius\s*\(IAU\)[^=]*=\s*([\d.]+)/i,
-  /Radius,?\s*\(km\)\s*=\s*([\d.]+)/i,
-  /Radius\s*\(gravity\),?\s*km\s*=\s*([\d.]+)/i
-];
-
-/**
- * How each page states how fast the body turns, in the order they are tried.
- *
- * The rate in radians per second is preferred wherever it appears: it is unambiguous and it is
- * signed: Venus and Uranus carry a negative one. A period in hours or days
- * comes next, then the sexagesimal form the giant planets use, and finally the word most moons carry
- * instead of a number, Synchronous. Not all do — the Moon's page gives a rate, Titan's nothing —
- * so the caller treats every moon it lists as locked whatever its page says.
- */
-const ROTATION_RATE_PATTERN = /Rot(?:ational)?\.?\s*Rate\s*[(,]\s*rad\/s\s*\)?\s*=\s*(-?[\d.]+)/i;
-const ROTATION_PERIOD_PATTERNS = [
-  /Sid(?:ereal|\.)?\s*rot\.?\s*period[^=]*=\s*(-?[\d.]+)(?:\+-[\d.]+)?\s*(h|hr|hrs|d|day|days)\b/i,
-  /Rotation(?:al)?\s*period[^=]*=\s*(-?[\d.]+)\s*(h|hr|hrs|d|day|days)\b/i
-];
-/** `9h 55m 29.711 s`, as Jupiter and Saturn state it. */
-const SEXAGESIMAL_ROTATION_PATTERN = /Sid(?:ereal|\.)?\s*rot\.?\s*period[^=]*=\s*(\d+)\s*h\s*(\d+)\s*m\s*([\d.]+)\s*s/i;
-const SYNCHRONOUS_PATTERN = /Rotation(?:al)?\s*period\s*=?\s*:?\s*Synchronous/i;
-const OBLIQUITY_PATTERN = /Obliquity\s*to\s*orbit[^=]*=\s*(-?[\d.]+)/i;
-
-const HOURS_PER_DAY = 24;
-const SECONDS_PER_HOUR = 3600;
-
-/**
- * True where the page gives no number because the body keeps one face to its parent, so its day
- * is its orbit. The period itself is then the orbit's, which the caller takes from the body's
- * mean motion.
- */
-export function isTidallyLocked(text: string): boolean {
-  return SYNCHRONOUS_PATTERN.test(text);
-}
-
-/** Sidereal rotation period, in hours, from whichever form the page states it in. */
-export function extractRotationPeriodHours(text: string): number | undefined {
-  const rate = text.match(ROTATION_RATE_PATTERN);
-  if (rate && Number(rate[1]) !== 0) {
-    return (2 * Math.PI) / (Number(rate[1]) * SECONDS_PER_HOUR);
-  }
-  const sexagesimal = text.match(SEXAGESIMAL_ROTATION_PATTERN);
-  if (sexagesimal) {
-    return Number(sexagesimal[1]) + Number(sexagesimal[2]) / 60 + Number(sexagesimal[3]) / SECONDS_PER_HOUR;
-  }
-  for (const pattern of ROTATION_PERIOD_PATTERNS) {
-    const match = text.match(pattern);
-    if (match) {
-      const hours = Number(match[1]) * (match[2].toLowerCase().startsWith('d') ? HOURS_PER_DAY : 1);
-      return Number.isFinite(hours) && hours !== 0 ? hours : undefined;
-    }
-  }
-  return undefined;
-}
-
-export function extractObliquityDeg(text: string): number | undefined {
-  const match = text.match(OBLIQUITY_PATTERN);
-  return match ? Number(match[1]) : undefined;
+  /** The body's own GM, km³/s², where the page states one: what sets where a pair's barycentre lies. */
+  gmKm3PerS2?: number;
 }
 
 /**
@@ -103,7 +42,7 @@ export function extractObliquityDeg(text: string): number | undefined {
  */
 export async function fetchHorizonsBody(query: HorizonsQuery): Promise<HorizonsResult> {
   const url =
-    `${HORIZONS_URL}?format=text&COMMAND='${query.command}'&OBJ_DATA='YES'` +
+    `${HORIZONS_URL}?format=text&COMMAND='${encodeURIComponent(query.command)}'&OBJ_DATA='YES'` +
     `&MAKE_EPHEM='YES'&EPHEM_TYPE='ELEMENTS'&CENTER='${query.center}'` +
     `&START_TIME='${REFERENCE_START}'&STOP_TIME='${REFERENCE_STOP}'&STEP_SIZE='1d'`;
 
@@ -113,18 +52,9 @@ export async function fetchHorizonsBody(query: HorizonsQuery): Promise<HorizonsR
     orbit: extractOrbitalElements(text),
     rotationPeriodHours: extractRotationPeriodHours(text),
     obliquityDeg: extractObliquityDeg(text),
-    tidallyLocked: isTidallyLocked(text)
+    tidallyLocked: isTidallyLocked(text),
+    gmKm3PerS2: extractGmKm3PerS2(text)
   };
-}
-
-function extractRadiusKm(text: string): number | undefined {
-  for (const pattern of RADIUS_PATTERNS) {
-    const match = text.match(pattern);
-    if (match) {
-      return Number(match[1]);
-    }
-  }
-  return undefined;
 }
 
 function extractOrbitalElements(text: string): OrbitalElements {

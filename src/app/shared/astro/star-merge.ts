@@ -67,6 +67,9 @@ export const MERGE_BRIGHTER_TOLERANCE = 1;
  */
 export const MERGE_DISTANCE_RATIO_TOLERANCE = 0.5;
 
+/** The faintest star, in V, the naked eye sees under a dark sky: the traditional limit of 6.5. */
+export const NAKED_EYE_MAGNITUDE = 6.5;
+
 /**
  * Where to draw a star Hipparcos and Gaia both measured, and whether the map keeps it at all.
  *
@@ -77,15 +80,18 @@ export const MERGE_DISTANCE_RATIO_TOLERANCE = 0.5;
  * Gaia counterpart, and at the median Hipparcos had them at two-thirds of Gaia's distance.
  *
  * Now a star either survey places inside `cutoffPc` is kept, and every kept star sits where the
- * better measurement puts it, inside the cutoff or not. `null` for a star neither survey places
- * inside, or that no survey gives a distance for.
+ * better measurement puts it, inside the cutoff or not. So is every star the naked eye sees, at
+ * any distance: the cutoff took 1 543 of HYG's 8 920 stars of V 6.5 or brighter, Rigel, Deneb
+ * and Alnilam among them, while 11th-magnitude Gaia stars at the same distance were drawn. Gaia
+ * saturates on the brightest of them, so those sit at their Hipparcos distance. `null` for a star
+ * kept by neither rule, or that no survey gives a distance for.
  */
-export function placementDistancePc(hipparcosPc: number | undefined, gaiaPc: number | undefined, cutoffPc: number): number | null {
+export function placementDistancePc(hipparcosPc: number | undefined, gaiaPc: number | undefined, magnitude: number, cutoffPc: number): number | null {
   const best = gaiaPc ?? hipparcosPc;
   if (best === undefined) {
     return null;
   }
-  const inside = best <= cutoffPc || (hipparcosPc !== undefined && hipparcosPc <= cutoffPc);
+  const inside = magnitude <= NAKED_EYE_MAGNITUDE || best <= cutoffPc || (hipparcosPc !== undefined && hipparcosPc <= cutoffPc);
   return inside ? best : null;
 }
 

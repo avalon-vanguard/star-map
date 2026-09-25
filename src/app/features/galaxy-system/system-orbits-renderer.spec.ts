@@ -464,3 +464,29 @@ describe('exoplanet size without a measured radius', () => {
     expect(radiusOf({ radiusEarth: 1.88, massEarth: 2829 }) / EARTH_AU).toBeCloseTo(1.88, 2);
   });
 });
+
+describe("SystemOrbitsRenderer's star light", () => {
+  const lightOf = (renderer: SystemOrbitsRenderer): THREE.PointLight => {
+    let light: THREE.PointLight | undefined;
+    renderer.object.traverse((object) => (light ??= (object as THREE.PointLight).isPointLight ? (object as THREE.PointLight) : undefined));
+    return light!;
+  };
+
+  it("is white at π from the Sun, or from a star with no temperature", () => {
+    for (const renderer of [new SystemOrbitsRenderer([], [], undefined, 1, 5772), new SystemOrbitsRenderer([], [exoplanet()])]) {
+      expect(lightOf(renderer).color.toArray()).toEqual([1, 1, 1]);
+      expect(lightOf(renderer).intensity).toBe(Math.PI);
+      renderer.dispose();
+    }
+  });
+
+  it("lights an M dwarf's planets orange-red, at the same π", () => {
+    const renderer = new SystemOrbitsRenderer([], [exoplanet()], undefined, 5.5e-4, 2566);
+    const [r, g, b] = lightOf(renderer).color.toArray();
+    expect(r).toBe(1);
+    expect(g).toBeLessThan(0.5);
+    expect(b).toBeLessThan(0.15);
+    expect(lightOf(renderer).intensity).toBe(Math.PI);
+    renderer.dispose();
+  });
+});

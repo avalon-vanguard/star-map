@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import * as THREE from 'three/webgpu';
+import { normalView, positionViewDirection, texture, uniform } from 'three/tsl';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import {
@@ -19,6 +20,7 @@ import {
   galacticCentrePositionPc,
   galacticToEquatorial,
 } from '../../shared/astro/galaxy';
+import { blackbodyColor, SOLAR_EFFECTIVE_TEMPERATURE_K } from '../../shared/astro/stellar';
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { EngineService, SceneCamera } from '../../core/engine/engine.service';
 import { BodyRecord } from '../../shared/models/body.model';
@@ -68,7 +70,6 @@ import { StarmapHudComponent } from './starmap-hud.component';
 import { SystemObjectCardComponent } from './system-object-card.component';
 import { RoutingClient } from './routing-client';
 import {
-  colorIndexToRgb,
   FOCUS_RADIUS_PC,
   StarFieldRenderer,
   starRenderBudgetFromUrl,
@@ -85,10 +86,36 @@ import { LabeledPoint, LabelSide, StarLabelOverlay } from './star-label-overlay'
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
 import { catalogueCensus, starReadouts, starSubtitle } from './star-readouts';
 
-/** HYG catalog id for the Sun itself — the only star we have a real close-up photo of. */
-const SOL_STAR_ID = 0;
 /** Radius, in CSS pixels, below which a body in the system view is scaled up to be seen at all. */
 const MIN_MARKER_PIXELS = 3;
+
+/**
+ * The linear limb-darkening coefficient: a star's surface is I(μ) = I(1) (1 − u (1 − μ)) bright,
+ * where μ is the cosine of the angle between the line of sight and the surface normal. The Sun's
+ * is about 0.6 in the visible, so its limb is 40 % as bright as its centre. Taken for every star,
+ * although a hotter star's limb is somewhat brighter and a cooler one's darker.
+ */
+const LIMB_DARKENING = 0.6;
+
+/**
+ * The surface every star is drawn with: the Sun's photograph in grey, in `tint` — the colour of a
+ * blackbody at the star's temperature — and darkened towards the limb. Unlit: it is the source.
+ *
+ * The pattern is the Sun's, standing in for a surface no telescope resolves on another star, at a
+ * contrast turned down to the Sun's own (see `SUN_TEXTURE_PATH`). Its colour was taken out, so
+ * the tint says what colour the star is rather than which filter the Sun was photographed in: the
+ * Sun itself comes out the warm white of 5 772 K, not the pack's orange.
+ *
+ * The tint is a uniform, so every star shares one shader, compiled on the first system entry.
+ */
+function starSurfaceMaterial(tint: THREE.Node<'color'>): THREE.MeshBasicNodeMaterial {
+  const material = new THREE.MeshBasicNodeMaterial();
+  const mu = normalView.dot(positionViewDirection).clamp(0, 1);
+  material.colorNode = texture(loadCachedTexture(SUN_TEXTURE_PATH))
+    .rgb.mul(tint)
+    .mul(mu.sub(1).mul(LIMB_DARKENING).add(1));
+  return material;
+}
 
 /**
  * How far from what the camera is looking at a star can be and still be named, as a fraction of
@@ -413,7 +440,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private readonly raycaster = new THREE.Raycaster();
   private readonly galaxyGroup = new THREE.Group();
   private readonly systemGroup = new THREE.Group();
-  private readonly starMarkerMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  /** The colour of the system's star, set on entering it; see `starSurfaceMaterial`. */
+  private readonly starTint = uniform(new THREE.Color(1, 1, 1));
+  /** One for every star, built on the first system entry, so its pipeline is compiled once. */
+  private starMarkerMaterial?: THREE.MeshBasicNodeMaterial;
   /** Rebuilt per system, since every star has its own radius. */
   private starMarkerGeometry?: THREE.SphereGeometry;
 
@@ -599,9 +629,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.tethers?.dispose();
     this.labelOverlay?.dispose();
     this.systemRenderer?.dispose();
-    (this.starMarker?.material as THREE.Material | undefined)?.dispose();
     this.starMarkerGeometry?.dispose();
-    this.starMarkerMaterial.dispose();
+    this.starMarkerMaterial?.dispose();
     this.engine.dispose();
   }
 
@@ -2182,7 +2211,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.systemRenderer?.dispose();
     if (this.starMarker) {
       this.systemGroup.remove(this.starMarker);
-      (this.starMarker.material as THREE.Material).dispose();
     }
 
     const systemBodies = this.bodies.filter((body) => body.systemStarId === star.id);
@@ -2195,19 +2223,21 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // The star's luminosity, derived from its own catalogued magnitude and distance, is what
     // decides how hot each body in the system is — and so what each of them looks like.
     const hostLuminosity = luminosityOf(star);
+    // Every star at its own radius: the archive's for a planet host, otherwise derived from its
+    // colour and brightness — or the Sun's, for the 3 077 stars with no measured magnitude or with
+    // neither a colour nor a type, which the card then gives no radius. Its temperature is the
+    // colour of its disc and of the light it casts.
+    this.currentStarSurface = starSurfaceOf(star, systemExoplanets);
     this.systemRenderer = new SystemOrbitsRenderer(
       systemBodies,
       systemExoplanets,
       { x: star.x, y: star.y, z: star.z },
       hostLuminosity,
+      this.currentStarSurface.temperatureK,
     );
     this.systemGroup.add(this.systemRenderer.object);
     this.applyDisplay(this.display());
 
-    // Every star at its own radius: the archive's for a planet host, otherwise derived from its
-    // colour and brightness — or the Sun's, for the 3 077 stars with no measured magnitude or with
-    // neither a colour nor a type, which the card then gives no radius.
-    this.currentStarSurface = starSurfaceOf(star, systemExoplanets);
     const starRadiusAu = (this.currentStarSurface.radiusSolar ?? 1) * SUN_RADIUS_AU;
 
     // Framed against the grid's outer ring rather than the outermost orbit — the ring is always
@@ -2225,20 +2255,15 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.starMarkerGeometry?.dispose();
     this.starMarkerGeometry = new THREE.SphereGeometry(starRadiusAu, 64, 32);
 
-    const starMarkerMaterial = this.starMarkerMaterial.clone();
-    const starColor = colorIndexToRgb(star.colorIndex, star.spectralType);
-    if (star.id === SOL_STAR_ID) {
-      // The Sun is the only star we have (and could ever have) a real photograph of; every
-      // other point in the galaxy view is far too distant to be resolved as a disk.
-      starMarkerMaterial.map = loadCachedTexture(SUN_TEXTURE_PATH);
-      starMarkerMaterial.color.set(0xffffff);
-    } else {
-      starMarkerMaterial.color.copy(starColor);
-    }
+    this.starMarkerMaterial ??= starSurfaceMaterial(this.starTint);
+    this.starTint.value.setRGB(
+      ...blackbodyColor(this.currentStarSurface.temperatureK ?? SOLAR_EFFECTIVE_TEMPERATURE_K),
+      THREE.LinearSRGBColorSpace,
+    );
     // No halo. It was a sprite sized against the arrival frame — 1.12 AU for the Sun — so it
     // stayed put as the camera closed in and ended up filling the screen with the flat gradient
     // that was meant to dress the star, over the photograph underneath it.
-    this.starMarker = new THREE.Mesh(this.starMarkerGeometry, starMarkerMaterial);
+    this.starMarker = new THREE.Mesh(this.starMarkerGeometry, this.starMarkerMaterial);
     this.systemGroup.add(this.starMarker);
 
     this.galaxyGroup.visible = false;

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   absoluteMagnitude,
+  blackbodyColor,
   bolometricCorrection,
   effectiveTemperatureK,
   luminositySolar,
@@ -162,5 +163,31 @@ describe('radiusFromLuminositySolar', () => {
       expect(radius / published).toBeGreaterThan(0.8);
       expect(radius / published).toBeLessThan(1.2);
     }
+  });
+});
+
+describe('blackbodyColor', () => {
+  /** As the display shows it: sRGB-encoded, 0 to 255. */
+  const displayed = (rgb: readonly number[]) => rgb.map((v) => Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055)));
+
+  it('gives the colours of the stars against the display white', () => {
+    // Charity's blackbody colour table (CIE 1931 2°, D65): 2 900 K #ffb662, 5 800 K #fff1e7, 9 600 K #d3ddff.
+    for (const [temperatureK, expected] of [[2900, [255, 182, 98]], [5800, [255, 241, 231]], [9600, [211, 221, 255]]] as const) {
+      displayed(blackbodyColor(temperatureK)).forEach((channel, i) => expect(Math.abs(channel - expected[i])).toBeLessThanOrEqual(5));
+    }
+  });
+
+  it("is white at the white point it is given, and an M dwarf's light orange-red against the Sun's", () => {
+    expect(blackbodyColor(SOLAR_EFFECTIVE_TEMPERATURE_K, SOLAR_EFFECTIVE_TEMPERATURE_K)).toEqual([1, 1, 1]);
+    const [r, g, b] = blackbodyColor(2566, SOLAR_EFFECTIVE_TEMPERATURE_K);
+    expect(r).toBe(1);
+    expect(g).toBeCloseTo(0.44, 2);
+    expect(b).toBeCloseTo(0.1, 2);
+  });
+
+  it('holds the ends of the fit, and never goes negative', () => {
+    expect(blackbodyColor(800)).toEqual(blackbodyColor(1667));
+    expect(blackbodyColor(60000)).toEqual(blackbodyColor(25000));
+    expect(Math.min(...blackbodyColor(1667))).toBe(0);
   });
 });

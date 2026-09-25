@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { absoluteMagnitude, bolometricCorrection, luminositySolar, SOLAR_ABSOLUTE_MAGNITUDE_V, SOLAR_BOLOMETRIC_MAGNITUDE } from './stellar';
+import {
+  absoluteMagnitude,
+  bolometricCorrection,
+  effectiveTemperatureK,
+  luminositySolar,
+  radiusFromLuminositySolar,
+  SOLAR_ABSOLUTE_MAGNITUDE_V,
+  SOLAR_BOLOMETRIC_MAGNITUDE,
+  SOLAR_EFFECTIVE_TEMPERATURE_K
+} from './stellar';
 
 /** Real catalogue rows, with the published luminosity each one should reproduce. */
 const SIRIUS = { magnitude: -1.44, distancePc: 2.6371, spectralType: 'A0m...', publishedLuminosity: 25.4 };
@@ -120,5 +129,38 @@ describe('luminositySolar', () => {
 
   it('has no answer for a star with no usable distance', () => {
     expect(luminositySolar({ magnitude: 5, distancePc: -1 })).toBeNull();
+  });
+});
+
+describe('effectiveTemperatureK', () => {
+  it("is the Sun's own for the Sun", () => {
+    expect(effectiveTemperatureK({ magnitude: -26.7, distancePc: 0, colorIndex: 0.7 })).toBe(SOLAR_EFFECTIVE_TEMPERATURE_K);
+  });
+
+  it('reads a colour in its own system, and a spectral type where there is no colour', () => {
+    // An M5 dwarf is 3 060 K at B−V 1.83 or BP−RP 3.35. Its type alone goes through the colour
+    // `spectralTypeToColorIndex` gives it, B−V 1.70, and comes out a little warmer.
+    expect(effectiveTemperatureK({ magnitude: 11, distancePc: 5, colorIndex: 3.35, colorSystem: 'BP-RP' })).toBeCloseTo(3060, 0);
+    expect(effectiveTemperatureK({ magnitude: 11, distancePc: 5, colorIndex: 1.83, colorSystem: 'B-V' })).toBeCloseTo(3060, 0);
+    expect(effectiveTemperatureK({ magnitude: 11, distancePc: 5, spectralType: 'M5Ve', colorIndex: null })).toBeCloseTo(3106, 0);
+    expect(effectiveTemperatureK({ magnitude: 11, distancePc: 5, spectralType: 'Unknown', colorIndex: null })).toBeNull();
+  });
+});
+
+describe('radiusFromLuminositySolar', () => {
+  it('is one for the Sun', () => {
+    expect(radiusFromLuminositySolar(1, SOLAR_EFFECTIVE_TEMPERATURE_K)).toBeCloseTo(1, 12);
+  });
+
+  it('gives Sirius and TRAPPIST-1 their published radii from colour and brightness alone', () => {
+    // 1.711 R☉ (Liebert et al. 2005) and 0.119 R☉ (Agol et al. 2021), each to within a fifth.
+    for (const [star, published] of [
+      [{ magnitude: -1.44, distancePc: 2.6371, magnitudeBand: 'V', colorIndex: 0.009, colorSystem: 'B-V' }, 1.711],
+      [{ magnitude: 15.6226, distancePc: 12.467, magnitudeBand: 'G', colorIndex: 4.902, colorSystem: 'BP-RP' }, 0.119]
+    ] as const) {
+      const radius = radiusFromLuminositySolar(luminositySolar(star)!, effectiveTemperatureK(star)!);
+      expect(radius / published).toBeGreaterThan(0.8);
+      expect(radius / published).toBeLessThan(1.2);
+    }
   });
 });

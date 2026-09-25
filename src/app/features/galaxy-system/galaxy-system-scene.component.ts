@@ -40,7 +40,7 @@ import { DeepSkyRenderer } from './deep-sky-renderer';
 import { galacticNormal, PolarGridPlane, TetherField } from './grid-plane';
 import { MilkyWayRenderer } from './milky-way-renderer';
 import {
-  starMarkerRadiusAu,
+  closestApproachAu,
   SUN_RADIUS_AU,
   systemFrameRadiusAu,
   systemFramingDistanceAu,
@@ -55,7 +55,7 @@ import {
   type ScaleBar,
 } from '../../shared/format/scale-bar';
 import { BodyDetailViewModel } from '../body-detail/body-detail.model';
-import { buildBodyViewModel, luminosityOf } from '../body-detail/body-view-model';
+import { buildBodyViewModel, luminosityOf, starSurfaceOf, StarSurface } from '../body-detail/body-view-model';
 import {
   DEFAULT_HUD_DISPLAY,
   HudDisplay,
@@ -284,7 +284,6 @@ const GALACTIC_LEVEL_THRESHOLD = 0.5;
 
 const SYSTEM_NEAR_AU = 0.002;
 const SYSTEM_FAR_AU = 20000;
-const SYSTEM_MIN_DISTANCE_AU = 0.05;
 const SYSTEM_MAX_DISTANCE_AU = 5000;
 /** Where the camera lands (AU) immediately after swapping into system space, pre-settle. */
 const SYSTEM_ENTRY_DISTANCE_AU = 200;
@@ -415,7 +414,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private readonly galaxyGroup = new THREE.Group();
   private readonly systemGroup = new THREE.Group();
   private readonly starMarkerMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  /** Rebuilt per system, since the star's radius is derived from that system's innermost orbit. */
+  /** Rebuilt per system, since every star has its own radius. */
   private starMarkerGeometry?: THREE.SphereGeometry;
 
   /** Readout panel contents, refreshed on the same cadence as the labels rather than per frame. */
@@ -551,6 +550,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private currentStarId: number | null = null;
   private systemRenderer?: SystemOrbitsRenderer;
   private starMarker?: THREE.Mesh;
+  /** The system's star's radius and temperature, worked out once on entering it. */
+  private currentStarSurface?: StarSurface;
 
   constructor(
     private readonly engine: EngineService,
@@ -1754,7 +1755,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
           label: 'Bodies',
           value: moonCount > 0 ? `${planetCount} + ${moonCount} moons` : `${planetCount}`,
         },
-        ...starReadouts(star, luminosityOf(star)),
+        ...starReadouts(star, luminosityOf(star), this.currentStarSurface),
       ]);
       this.hudNote.set(this.time.atNow() ? 'Orbits propagated from published elements to the current date.' : 'Orbits propagated from published elements to the date on the clock.');
       this.hudRange.set(
@@ -2203,10 +2204,15 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.systemGroup.add(this.systemRenderer.object);
     this.applyDisplay(this.display());
 
+    // Every star at its own radius: the archive's for a planet host, otherwise derived from its
+    // colour and brightness — or the Sun's, for the 3 077 stars with no measured magnitude or with
+    // neither a colour nor a type, which the card then gives no radius.
+    this.currentStarSurface = starSurfaceOf(star, systemExoplanets);
+    const starRadiusAu = (this.currentStarSurface.radiusSolar ?? 1) * SUN_RADIUS_AU;
+
     // Framed against the grid's outer ring rather than the outermost orbit — the ring is always
-    // the wider of the two — and against the camera this scene actually has, so the margin holds
-    // whatever the window shape. Computed before the star, because how far away the star will be
-    // seen from is what decides how big its halo has to be to stay visible.
+    // the wider of the two — or against the star, for a giant wider than both; and against the
+    // camera this scene actually has, so the margin holds whatever the window shape.
     // Framed against the perspective camera whichever is active: the framing distance is what
     // the orthographic frustum is then sized from, so both projections show the same extent.
     const framingCamera = this.engine.getPerspectiveCamera();
@@ -2214,14 +2220,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const framingDistance = systemFramingDistanceAu(
       this.systemRenderer.gridOuterRadiusAu,
       viewport,
+      starRadiusAu,
     );
-
-    // The Sun at its own radius; every other star sized against its innermost orbit, which is all
-    // the catalogue supports, and which at least never lets it swallow its own planets.
-    const starRadiusAu =
-      star.id === SOL_STAR_ID
-        ? SUN_RADIUS_AU
-        : starMarkerRadiusAu(this.systemRenderer.minTopLevelSemiMajorAxisAu);
     this.starMarkerGeometry?.dispose();
     this.starMarkerGeometry = new THREE.SphereGeometry(starRadiusAu, 64, 32);
 
@@ -2255,7 +2255,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     depthCamera.near = SYSTEM_NEAR_AU;
     depthCamera.far = SYSTEM_FAR_AU;
     depthCamera.updateProjectionMatrix();
-    this.controls!.minDistance = SYSTEM_MIN_DISTANCE_AU;
+    this.controls!.minDistance = closestApproachAu(starRadiusAu);
     this.controls!.maxDistance = SYSTEM_MAX_DISTANCE_AU;
 
     this.resetZoom();

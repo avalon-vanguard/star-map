@@ -264,8 +264,6 @@ export class SystemOrbitsRenderer {
   readonly members: readonly SystemMember[];
   /** Largest semi-major axis (AU) among top-level bodies/exoplanets; 0 if there are none. */
   readonly maxTopLevelSemiMajorAxisAu: number;
-  /** Smallest semi-major axis (AU) among top-level bodies/exoplanets; 0 if there are none. */
-  readonly minTopLevelSemiMajorAxisAu: number;
   /**
    * The plane this system is read against, as a rotation from XY into the scene's equatorial
    * frame: the ecliptic for the solar system, the plane of the sky for everything else.
@@ -308,7 +306,6 @@ export class SystemOrbitsRenderer {
       ...exoplanets.filter((exoplanet) => isPropagatableOrbit(exoplanet.orbit)).map((exoplanet) => exoplanet.orbit.semiMajorAxisAu!)
     ].filter((axis) => Number.isFinite(axis) && axis > 0);
     this.maxTopLevelSemiMajorAxisAu = topLevelAxes.length > 0 ? Math.max(...topLevelAxes) : 0;
-    this.minTopLevelSemiMajorAxisAu = topLevelAxes.length > 0 ? Math.min(...topLevelAxes) : 0;
 
     for (const body of bodies) {
       if (!body.parentBodyId) {

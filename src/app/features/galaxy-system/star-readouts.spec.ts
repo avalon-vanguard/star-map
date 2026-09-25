@@ -67,6 +67,18 @@ describe('starReadouts', () => {
     expect(value(starReadouts({ ...HYG_STAR, source: 'exoplanet-archive' }, null), 'Source')).toBe('NASA Exoplanet Archive');
   });
 
+  it('says a radius was derived, and from what; a published one plainly', () => {
+    expect(starReadouts(PLACED_BY_GAIA, null, { radiusSolar: 0.1049, radiusDerived: true, temperatureK: 3068 }).find((readout) => readout.label === 'Radius')).toEqual({
+      label: 'Radius',
+      value: '~0.10 solar radii, from colour and brightness',
+      derived: true
+    });
+    expect(value(starReadouts(PLACED_BY_GAIA, null, { radiusSolar: 0.141, radiusDerived: false, temperatureK: 2900 }), 'Radius')).toBe('0.141 solar radii');
+    expect(value(starReadouts(HYG_STAR, null, { radiusSolar: 584.3, radiusDerived: true, temperatureK: 3590 }), 'Radius')).toBe('~580 solar radii, from colour and brightness');
+    expect(value(starReadouts(HYG_STAR, null, { radiusSolar: 1, radiusDerived: false, temperatureK: 5772 }), 'Radius')).toBe('1.00 solar radii');
+    expect(starReadouts(HYG_STAR, null, { radiusSolar: null, radiusDerived: true, temperatureK: null }).some((readout) => readout.label === 'Radius')).toBe(false);
+  });
+
   it('marks the luminosity as derived', () => {
     expect(starReadouts(HYG_STAR, 25.4).find((readout) => readout.label === 'Luminosity')).toEqual({ label: 'Luminosity', value: '25.40 L☉', derived: true });
   });

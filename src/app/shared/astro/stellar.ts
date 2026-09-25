@@ -1,4 +1,4 @@
-import { dwarfSequenceAtColor, parseSpectralClass, SpectralClass } from './spectral';
+import { dwarfSequenceAtColor, parseSpectralClass, SpectralClass, spectralTypeToColorIndex } from './spectral';
 
 /**
  * Stellar luminosity, derived from the two things the star catalogue actually measures.
@@ -135,3 +135,27 @@ export function luminositySolar(star: StellarPhotometry): number | null {
   return Math.min(Math.max(luminosity, MIN_LUMINOSITY_SOLAR), MAX_LUMINOSITY_SOLAR);
 }
 
+/** The Sun's effective temperature, the IAU 2015 nominal value. */
+export const SOLAR_EFFECTIVE_TEMPERATURE_K = 5772;
+
+/**
+ * Effective temperature, off the dwarf sequence at the star's colour, or at the colour its
+ * spectral type implies where it has none. Exactly the Sun's for the Sun, which is at zero
+ * distance here. A giant is read as the dwarf of its colour: a few hundred kelvin too cool at K.
+ */
+export function effectiveTemperatureK(star: StellarPhotometry): number | null {
+  if (star.distancePc === 0) {
+    return SOLAR_EFFECTIVE_TEMPERATURE_K;
+  }
+  const measured = star.colorIndex != null ? dwarfSequenceAtColor(star.colorIndex, star.colorSystem) : null;
+  return (measured ?? dwarfSequenceAtColor(spectralTypeToColorIndex(star.spectralType)))?.temperatureK ?? null;
+}
+
+/**
+ * Radius in solar radii from luminosity and temperature — Stefan-Boltzmann, L = 4πR²σT⁴, in solar
+ * units. Luminosity-class blind, since the luminosity comes from the distance: a giant comes out a
+ * giant whatever the sequence took it for.
+ */
+export function radiusFromLuminositySolar(luminositySolar: number, temperatureK: number): number {
+  return Math.sqrt(luminositySolar) / (temperatureK / SOLAR_EFFECTIVE_TEMPERATURE_K) ** 2;
+}

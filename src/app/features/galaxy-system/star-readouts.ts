@@ -1,6 +1,7 @@
 import { spectralTypeFromColor } from '../../shared/astro/spectral';
 import { formatDistance, formatLuminosity } from '../../shared/format/quantity';
 import { StarRecord } from '../../shared/models/star.model';
+import { StarSurface } from '../body-detail/body-view-model';
 import { HudReadout } from '../hud/hud-dock.component';
 
 /**
@@ -33,9 +34,9 @@ export function starSubtitle(star: StarRecord): string {
 /**
  * A star's measured readouts, each with what it was measured in: the band of its magnitude, which
  * colour its colour index is, the distance's uncertainty, and the catalogues they come from.
- * `luminosity` is derived, and marked so.
+ * `luminosity` is derived, and marked so; so is a radius derived from it, and it says from what.
  */
-export function starReadouts(star: StarRecord, luminosity: number | null): HudReadout[] {
+export function starReadouts(star: StarRecord, luminosity: number | null, surface?: StarSurface): HudReadout[] {
   const distancePc = Math.hypot(star.x, star.y, star.z);
   const catalogue = describingCatalogue(star);
   return [
@@ -48,8 +49,18 @@ export function starReadouts(star: StarRecord, luminosity: number | null): HudRe
       ? [{ label: 'Colour', value: `${star.colorSystem === 'BP-RP' ? 'BP−RP' : 'B−V'} ${star.colorIndex.toFixed(2)}` }]
       : []),
     ...(luminosity !== null ? [{ label: 'Luminosity', value: formatLuminosity(luminosity), derived: true }] : []),
+    ...(surface?.radiusSolar ? [radiusReadout(surface.radiusSolar, surface.radiusDerived)] : []),
     { label: 'Source', value: catalogue === 'HYG' && star.distanceFromGaia ? 'HYG, Gaia DR3 distance' : catalogue }
   ];
+}
+
+/** Two figures for a derived radius, three for a published one: 0.105 is not what colour gives. */
+function radiusReadout(radiusSolar: number, derived: boolean): HudReadout {
+  const digits = derived ? 2 : 3;
+  const figure = radiusSolar.toLocaleString('en-GB', { minimumSignificantDigits: digits, maximumSignificantDigits: digits });
+  return derived
+    ? { label: 'Radius', value: `~${figure} solar radii, from colour and brightness`, derived: true }
+    : { label: 'Radius', value: `${figure} solar radii` };
 }
 
 /** What the catalogue holds, counted by the catalogue describing each star, largest first. */

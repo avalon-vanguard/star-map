@@ -12,9 +12,7 @@ import * as THREE from 'three/webgpu';
  *
  * Io, Pluto, Titan and Deimos used to be listed with square photographs of them: pictures of a
  * lit disc against black sky, not maps, which wrapped round a sphere put black sky on a fifth to a
- * third of the surface. Io's, Pluto's and Titan's are now the global mosaics the moons below are
- * drawn from; Deimos's photograph is still in the folder, unlisted, for want of a map whose
- * longitudes could be checked.
+ * third of the surface. All four are now global mosaics like the other moons'.
  *
  * Provenance (CC BY 4.0 Solar System Scope, via Wikimedia Commons — see each file's Commons page
  * for the original credit line): mercury/venus/earth/mars/saturn/uranus/neptune/moon/sun/
@@ -36,6 +34,7 @@ const BODY_TEXTURE_PATHS: Record<string, string> = {
   neptune: 'assets/textures/bodies/neptune.jpg',
   moon: 'assets/textures/bodies/moon.jpg',
   phobos: 'assets/textures/bodies/phobos.jpg',
+  deimos: 'assets/textures/bodies/deimos.jpg',
   io: 'assets/textures/bodies/io.jpg',
   europa: 'assets/textures/bodies/europa.jpg',
   ganymede: 'assets/textures/bodies/ganymede.jpg',

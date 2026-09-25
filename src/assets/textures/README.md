@@ -41,6 +41,7 @@ processing; the disc photographs dropped in PR #33 were 20-43% black sky.
 | Map | Source | Mission, credit | Checked against | Unmapped (grey) | Black | Size |
 | --- | --- | --- | --- | --- | --- | --- |
 | `phobos.jpg` | [USGS](https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Phobos_Viking_Mosaic_40ppd_DLRcontrol.tif) Phobos Viking Mosaic 40ppd (DLR controlled) | Viking Orbiter, with Mars Express images; P. Stooke after Simonelli et al. 1993, PDS Stooke Small Bodies Maps | Stickney (1 N, 49 W) | 0.03% | 0.008% | 1024x512, 119 KB |
+| `deimos.jpg` | [PDS SBN](https://sbnarchive.psi.edu/pds3/multi_mission/MULTI_SA_MULTI_6_STOOKEMAPS_V3_0/document/m2deimos/deimos_cyl_viking_mro.jpg) Stooke Small Bodies Maps V3.0, Deimos simple cylindrical mosaic, 20 px/deg | Viking Orbiter, with MRO HiRISE; P. Stooke and colleagues, control after P. Thomas (Cornell) | Swift (12.5 N, 1.8 E); the set's leading and trailing sheets (see below) | 0% | 0% | 1024x512, 55 KB |
 | `io.jpg` | [USGS](https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Io_GalileoSSI-Voyager_Global_Mosaic_ClrMerge_1km.tif) Io Galileo SSI-Voyager Global Mosaic, colour merge, 1 km | Galileo SSI and Voyager; USGS Astrogeology | Pele, Loki, Prometheus | 0.02% | 0% | 2048x1024, 283 KB |
 | `europa.jpg` | [USGS](https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Europa_Voyager_GalileoSSI_global_mosaic_500m.tif) Europa Voyager-Galileo SSI Global Mosaic 500 m | Voyager and Galileo SSI; Archinal et al., USGS | Pwyll (25 S, 271 W) | 4.33% (polar gaps) | 0% | 2048x1024, 386 KB |
 | `ganymede.jpg` | [USGS](https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Ganymede_Voyager_GalileoSSI_Global_ClrMosaic_1435m.tif) Ganymede Voyager-Galileo SSI Colour Global Mosaic 1.4 km | Voyager and Galileo SSI; USGS | Osiris, Tros, Galileo Regio | 3.63% (polar gaps) | 0% | 2048x1024, 363 KB |
@@ -66,7 +67,19 @@ filters, which USGS says the eye would see "similar but much more muted"; Ganyme
 Galileo and Voyager colour mosaic; Triton's is orange, violet and ultraviolet shown as red, green
 and blue (Smith et al. 1989). Phoebe is irregular (a 106.6 km sphere here), and its map keeps the
 deep shadows of a single flyby. Phobos's source notes that where images lit
-from opposite sides meet, the seam was blended for appearance, not geometry.
+from opposite sides meet, the seam was blended for appearance, not geometry. Deimos's map is from
+the NASA PDS Small Bodies Node archive (MULTI-SA-MULTI-6-STOOKEMAPS-V3.0), which states no use
+restriction; the credit column cites its author.
+
+Deimos's map says only "0 longitude at the center", not which way longitude runs, and USGS's own
+copy of the older version (`wms_basemaps/Deimos/deimoscyl4.jgw`) is georeferenced with longitude 0
+at its left edge instead. Its frame was settled on the body. Read with longitude 0 in the middle
+and east to the right, and drawn as a globe seen from outside, north up, the hemisphere centred at
+90 E matches, unmirrored, the sheet of the same set that Stooke titles "trailing side" and numbers
+270 (270 W), and the one centred at 90 W matches his "leading side" at 90. A synchronous prograde
+moon trails at 90 E and leads at 90 W, so that reading is the right one; read the USGS way, the
+two sheets would land on the wrong hemispheres. A 1 km depression lies at Swift's Gazetteer
+position (12.5 N, 1.8 E), near the middle; Voltaire (22 N, 3.5 W, 1.9 km) could not be picked out.
 
 Longitudes follow each body's IAU prime meridian, which the checks above confirm on the maps. For
 Pluto and Charon that is the right-hand-rule pole of the WGCCRE 2015 report, which New Horizons'
@@ -75,10 +88,6 @@ the far side, near 180.
 
 ## Left out
 
-- **Deimos.** `deimos.jpg` is a square disc photograph (32.6% black sky), not a map, and is not
-  listed. The only cylindrical map found, `wms_basemaps/Deimos/deimoscyl4.jpg` (Stooke, Viking), has
-  no label giving its longitude direction, and neither Voltaire nor Swift, the craters near its
-  prime meridian, could be found on it to settle it.
 - **Miranda, Ariel, Umbriel, Titania, Oberon.** Voyager 2 saw only their southern hemispheres,
   and no public-domain map of them exists at USGS or the PDS. The best maps (P. Schenk 2020, USRA
   repository, hdl.handle.net/20.500.11753/1687) carry no licence.

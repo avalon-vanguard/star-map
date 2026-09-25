@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { BodyRecord, OrbitalElements } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord, SUN_STAR_ID } from '../../shared/models/star.model';
-import { buildBodyViewModel, heliocentricPeriodDays } from './body-view-model';
+import { buildBodyViewModel, heliocentricPeriodDays, starSurfaceOf } from './body-view-model';
 
 const orbit = (overrides: Partial<OrbitalElements> = {}): OrbitalElements => ({
   semiMajorAxisAu: 1,
@@ -120,5 +120,38 @@ describe('buildBodyViewModel', () => {
 
   it('carries the host star id, so callers need not rescan the catalogues for it', () => {
     expect(buildBodyViewModel('earth', catalogues)?.hostStarId).toBe(SUN_STAR_ID);
+  });
+});
+
+describe('starSurfaceOf', () => {
+  // Proxima Centauri as HYG describes it, and one of its planets' archive rows.
+  const proxima: StarRecord = { id: 70666, name: 'Proxima Centauri', x: 1.2959, y: 0, z: 0, magnitude: 11.01, magnitudeBand: 'V', spectralType: 'M5Ve', colorIndex: 1.807, colorSystem: 'B-V' };
+  const proximaB: ExoplanetRecord = { id: 'proxima-cen-b', hostStarId: 70666, hostStarName: 'Proxima Cen', name: 'Proxima Cen b', orbit: { semiMajorAxisAu: 0.0485 } };
+
+  it("is the Sun's own for the Sun, and not derived", () => {
+    expect(starSurfaceOf(sun, [])).toEqual({ radiusSolar: 1, radiusDerived: false, temperatureK: 5772 });
+  });
+
+  it("takes a host's radius and temperature from the archive", () => {
+    const surface = starSurfaceOf(proxima, [{ ...proximaB, hostStarRadiusSolar: 0.141, hostStarTemperatureK: 2900 }]);
+    expect(surface).toEqual({ radiusSolar: 0.141, radiusDerived: false, temperatureK: 2900 });
+  });
+
+  it('derives both otherwise, and says the radius is derived', () => {
+    const surface = starSurfaceOf(proxima, [proximaB]);
+    expect(surface.radiusDerived).toBe(true);
+    // Its colour reads as an M5 dwarf: 3 068 K and 0.105 R☉, against 2 900 K and 0.154 R☉
+    // measured (Kervella et al. 2017). B−V barely changes along the late M dwarfs.
+    expect(surface.temperatureK).toBeCloseTo(3068, -1);
+    expect(surface.radiusSolar).toBeCloseTo(0.105, 2);
+  });
+
+  it('has no radius for a star with neither a colour nor a type', () => {
+    expect(starSurfaceOf({ ...proxima, colorIndex: null, spectralType: 'Unknown' }, []).radiusSolar).toBeNull();
+  });
+
+  it('has none from a magnitude no survey measured', () => {
+    // No band: the magnitude is the ETL's stand-in, and the luminosity from it means nothing.
+    expect(starSurfaceOf({ ...proxima, magnitudeBand: undefined }, []).radiusSolar).toBeNull();
   });
 });

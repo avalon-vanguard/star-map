@@ -4,8 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { eclipticToEquatorial, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
 import {
   bodyMarkerRadiusAu,
-  DEFAULT_STAR_MARKER_RADIUS_AU,
-  starMarkerRadiusAu,
+  closestApproachAu,
   systemFrameRadiusAu,
   systemFramingDistanceAu,
   systemGridRingsAu,
@@ -18,39 +17,6 @@ import {
 const TRAPPIST_1 = { innermost: 0.01154, outermost: 0.06189 };
 const GL_357 = { innermost: 0.035, outermost: 0.204 };
 const SOLAR = { innermost: 0.387, outermost: 30.07 };
-
-describe('starMarkerRadiusAu', () => {
-  it('never reaches the innermost orbit', () => {
-    for (const { innermost } of [TRAPPIST_1, GL_357, SOLAR]) {
-      expect(starMarkerRadiusAu(innermost)).toBeLessThan(innermost);
-    }
-  });
-
-  it('shrinks to fit a compact system whose orbits were all inside the old fixed radius', () => {
-    // Every TRAPPIST-1 orbit is inside 0.2 AU, so the star used to swallow the entire system.
-    expect(starMarkerRadiusAu(TRAPPIST_1.innermost)).toBeLessThan(TRAPPIST_1.outermost);
-    expect(starMarkerRadiusAu(GL_357.innermost)).toBeLessThan(GL_357.outermost);
-  });
-
-  it('never grows beyond the default, however wide the system', () => {
-    expect(starMarkerRadiusAu(SOLAR.innermost)).toBeLessThanOrEqual(DEFAULT_STAR_MARKER_RADIUS_AU);
-    expect(starMarkerRadiusAu(500)).toBe(DEFAULT_STAR_MARKER_RADIUS_AU);
-  });
-
-  it('scales in proportion to the innermost orbit', () => {
-    expect(starMarkerRadiusAu(0.02) / starMarkerRadiusAu(0.01)).toBeCloseTo(2, 9);
-  });
-
-  it('falls back to the default when there are no planets to scale against', () => {
-    for (const innermost of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
-      expect(starMarkerRadiusAu(innermost)).toBe(DEFAULT_STAR_MARKER_RADIUS_AU);
-    }
-  });
-
-  it('stays positive for an extremely tight orbit', () => {
-    expect(starMarkerRadiusAu(0.0001)).toBeGreaterThan(0);
-  });
-});
 
 describe('systemFramingDistanceAu', () => {
   it('fits the radius it is given in view, with room around it', () => {
@@ -86,6 +52,15 @@ describe('systemFramingDistanceAu', () => {
   it('ignores aspect once the window is landscape, since the vertical binds there', () => {
     const square = systemFramingDistanceAu(1, { fovDegrees: 50, aspect: 1 });
     expect(systemFramingDistanceAu(1, { fovDegrees: 50, aspect: 2.5 })).toBeCloseTo(square, 9);
+  });
+
+  it('backs off to hold a giant wider than its system, and leaves a dwarf to the system', () => {
+    // Betelgeuse drawn at 584 solar radii, 2.7 AU, with nothing around it; the Sun inside its own.
+    const betelgeuseAu = 2.72;
+    expect(systemFrameRadiusAu(systemFramingDistanceAu(0, undefined, betelgeuseAu))).toBeGreaterThan(betelgeuseAu);
+    expect(systemFrameRadiusAu(systemFramingDistanceAu(0.5, undefined, betelgeuseAu))).toBeGreaterThan(betelgeuseAu);
+    expect(systemFramingDistanceAu(SOLAR.outermost, undefined, 0.00465)).toBe(systemFramingDistanceAu(SOLAR.outermost));
+    expect(systemFramingDistanceAu(0, undefined, 0.00465)).toBe(systemFramingDistanceAu(0));
   });
 
   it('caps the distance so a far-flung companion cannot shrink the star to nothing', () => {
@@ -154,25 +129,10 @@ describe('the grid and the framing together', () => {
   });
 });
 
-describe('star and framing together', () => {
-  it('gives compact and wide systems a comparable apparent star size', () => {
-    // Both scale with the system, so the star subtends a similar angle either way — the point
-    // of deriving them from the same measurements rather than fixing them.
-    const apparent = ({ innermost, outermost }: { innermost: number; outermost: number }) =>
-      starMarkerRadiusAu(innermost) / systemFramingDistanceAu(outermost);
-
-    const compact = apparent(TRAPPIST_1);
-    const midRange = apparent(GL_357);
-
-    expect(compact).toBeGreaterThan(0);
-    expect(compact / midRange).toBeGreaterThan(0.25);
-    expect(compact / midRange).toBeLessThan(4);
-  });
-
-  it('always leaves the innermost orbit outside the star, at every scale', () => {
-    for (const innermost of [0.005, 0.01, 0.05, 0.2, 1, 5, 40]) {
-      expect(starMarkerRadiusAu(innermost)).toBeLessThan(innermost);
-    }
+describe('closestApproachAu', () => {
+  it('keeps the camera three radii out from a giant, and at the old floor for the Sun', () => {
+    expect(closestApproachAu(0.00465)).toBe(0.05);
+    expect(closestApproachAu(2.72)).toBeCloseTo(8.16, 9);
   });
 });
 

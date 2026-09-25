@@ -12,20 +12,10 @@ import { CartesianCoordinates } from '../../shared/astro/coordinates';
  * the star marker, so they rendered as a lone sphere with nothing around it, and 52% were
  * framed from a distance floor far larger than the system itself.
  *
- * Both quantities are therefore derived from the system's own scale. Because the star and the
- * camera scale together, a compact system ends up looking like a wide one: same apparent star,
- * same apparent spread of orbits.
+ * The camera's distance is therefore derived from the system's own scale. The star is not: it is
+ * drawn at its own radius, like every body here, and the framing only makes room for it when the
+ * star is a giant wider than its system.
  */
-
-/** Star size when there are no orbits to scale against, and the ceiling everywhere else. */
-export const DEFAULT_STAR_MARKER_RADIUS_AU = 0.2;
-
-/**
- * Star radius as a fraction of the innermost orbit. Comfortably below 1 so there is visible
- * space between the star's limb and the closest orbit, rather than the orbit grazing or
- * disappearing inside it.
- */
-const STAR_RADIUS_TO_INNERMOST_ORBIT = 0.45;
 
 /**
  * Clear space left around the framed radius, as a fraction of it. The camera backs off this
@@ -104,20 +94,6 @@ export function systemViewDirection(referenceFrame: THREE.Quaternion): THREE.Vec
 }
 
 /**
- * Radius (AU) to draw the system's star at, given its innermost orbit.
- *
- * Never larger than {@link DEFAULT_STAR_MARKER_RADIUS_AU}, and never large enough to reach the
- * closest orbit. Falls back to that default when the system has no planets, since there is
- * then nothing for the star to crowd.
- */
-export function starMarkerRadiusAu(innermostOrbitAu: number): number {
-  if (!Number.isFinite(innermostOrbitAu) || innermostOrbitAu <= 0) {
-    return DEFAULT_STAR_MARKER_RADIUS_AU;
-  }
-  return Math.min(DEFAULT_STAR_MARKER_RADIUS_AU, innermostOrbitAu * STAR_RADIUS_TO_INNERMOST_ORBIT);
-}
-
-/**
  * Radius, in AU, that the camera can see at the star's own distance — the half-height of the
  * view frustum where the system sits, along whichever screen axis is tighter.
  */
@@ -138,12 +114,30 @@ export function systemFrameRadiusAu(distanceAu: number, viewport: SystemViewport
  * Callers pass the outermost thing actually drawn, which is the reference grid's outer ring
  * rather than the outermost orbit — the ring is always the wider of the two, by construction.
  */
-export function systemFramingDistanceAu(framedRadiusAu: number, viewport: SystemViewport = DEFAULT_SYSTEM_VIEWPORT): number {
+export function systemFramingDistanceAu(framedRadiusAu: number, viewport: SystemViewport = DEFAULT_SYSTEM_VIEWPORT, starRadiusAu = 0): number {
+  // A giant drawn at its own radius can be wider than the system around it — Betelgeuse's 584
+  // solar radii are 2.7 AU — or than the empty framing, and the camera must not settle inside it.
+  const star = (starRadiusAu * (1 + FRAME_MARGIN)) / tightHalfExtent(viewport);
   if (!Number.isFinite(framedRadiusAu) || framedRadiusAu <= 0) {
-    return EMPTY_SYSTEM_FRAMING_DISTANCE_AU;
+    return Math.max(EMPTY_SYSTEM_FRAMING_DISTANCE_AU, star);
   }
-  const required = (framedRadiusAu * (1 + FRAME_MARGIN)) / tightHalfExtent(viewport);
+  const required = Math.max((framedRadiusAu * (1 + FRAME_MARGIN)) / tightHalfExtent(viewport), star);
   return clamp(required, MIN_FRAMING_DISTANCE_AU, MAX_FRAMING_DISTANCE_AU);
+}
+
+/** How close the camera may come to the star's centre, whatever the star: ten solar radii. */
+const MIN_APPROACH_AU = 0.05;
+/** From three radii out a star spans 39 degrees, most of the view's 50, and the camera stays out of it. */
+const STAR_CLEARANCE_RADII = 3;
+
+/**
+ * The orbit controls' minimum distance in a system. The fixed 0.05 AU it used to be leaves the
+ * Sun 11 degrees across; but 23 211 stars on the map are drawn wider than 3.6 solar radii, which
+ * puts 0.05 AU inside three of their radii, and a giant's surface further out still — a zoom
+ * would have carried the camera through it.
+ */
+export function closestApproachAu(starRadiusAu: number): number {
+  return Math.max(MIN_APPROACH_AU, STAR_CLEARANCE_RADII * starRadiusAu);
 }
 
 /** Roughly how many rings the system grid aims for, and how far past the outermost orbit it runs. */
@@ -192,13 +186,8 @@ const KM_PER_AU = 149597870.7;
 const DEFAULT_BODY_RADIUS_KM = 6371;
 
 /**
- * The Sun's own radius, in AU — the one star whose size this map knows.
- *
- * Every other star is drawn at {@link starMarkerRadiusAu}, a size derived from its innermost
- * orbit rather than measured, because no stellar radius reaches the app: the catalogue carries
- * positions, magnitudes and colours. Gaia publishes `radius_gspphot` for most of what is drawn
- * here, and until the ETL fetches it, a system's star is the one body in the view that is not
- * to scale.
+ * The Sun's own radius, in AU: the unit every star's radius is drawn in, the archive's or the one
+ * `starSurfaceOf` derives from its colour and brightness.
  */
 export const SUN_RADIUS_AU = 696340 / KM_PER_AU;
 

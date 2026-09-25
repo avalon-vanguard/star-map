@@ -159,3 +159,41 @@ export function effectiveTemperatureK(star: StellarPhotometry): number | null {
 export function radiusFromLuminositySolar(luminositySolar: number, temperatureK: number): number {
   return Math.sqrt(luminositySolar) / (temperatureK / SOLAR_EFFECTIVE_TEMPERATURE_K) ** 2;
 }
+
+/** The range Kim et al.'s fit to the Planckian locus covers; a temperature outside it is clamped. */
+const PLANCKIAN_LOCUS_MIN_K = 1667;
+const PLANCKIAN_LOCUS_MAX_K = 25000;
+
+/**
+ * The colour of a blackbody at `temperatureK`, in linear sRGB with its brightest channel at 1:
+ * its chromaticity off the Planckian locus (Kim et al. 2002, the cubic fit to CIE 1931), then
+ * CIE XYZ to sRGB. Against the display's own white, D65, unless `whitePointK` names the blackbody
+ * that is to read as white — as the Sun's does for the photographs of its planets, which were
+ * taken in its light.
+ *
+ * At D65, a 2 900 K M dwarf is sRGB (255, 180, 103), the Sun (255, 241, 234), a 9 600 K A star
+ * (208, 219, 255): Charity's table, which integrates the Planck spectrum, gives (255, 182, 98),
+ * (255, 241, 231) at 5 800 K and (211, 221, 255).
+ */
+export function blackbodyColor(temperatureK: number, whitePointK?: number): [number, number, number] {
+  const rgb = blackbodyLinearSrgb(temperatureK);
+  const white = whitePointK === undefined ? [1, 1, 1] : blackbodyLinearSrgb(whitePointK);
+  const relative = rgb.map((channel, i) => channel / white[i]);
+  const brightest = Math.max(...relative);
+  return relative.map((channel) => channel / brightest) as [number, number, number];
+}
+
+function blackbodyLinearSrgb(temperatureK: number): number[] {
+  const t = 1000 / Math.min(Math.max(temperatureK, PLANCKIAN_LOCUS_MIN_K), PLANCKIAN_LOCUS_MAX_K);
+  const x =
+    t >= 0.25 ? -0.2661239 * t ** 3 - 0.2343589 * t ** 2 + 0.8776956 * t + 0.17991 : -3.0258469 * t ** 3 + 2.1070379 * t ** 2 + 0.2226347 * t + 0.24039;
+  const y =
+    t >= 1000 / 2222
+      ? -1.1063814 * x ** 3 - 1.3481102 * x ** 2 + 2.18555832 * x - 0.20219683
+      : t >= 0.25
+        ? -0.9549476 * x ** 3 - 1.37418593 * x ** 2 + 2.09137015 * x - 0.16748867
+        : 3.081758 * x ** 3 - 5.8733867 * x ** 2 + 3.75112997 * x - 0.37001483;
+  const [X, Y, Z] = [x / y, 1, (1 - x - y) / y];
+  // Below 1 920 K the locus leaves the sRGB gamut, and blue comes out negative.
+  return [3.2406 * X - 1.5372 * Y - 0.4986 * Z, -0.9689 * X + 1.8758 * Y + 0.0415 * Z, 0.0557 * X - 0.204 * Y + 1.057 * Z].map((channel) => Math.max(channel, 0));
+}

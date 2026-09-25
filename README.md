@@ -134,11 +134,11 @@ its own readout, so a stale image is visible as one.
 
 ### On surfaces that were never photographed
 
-Twenty-seven bodies here are wrapped in real photography: the Sun, the eight planets and the Moon,
-and seventeen moons and dwarf planets in mission mosaics, grey where no probe has seen them
+Twenty-eight bodies here are wrapped in real photography: the Sun, the eight planets and the Moon,
+and eighteen moons and dwarf planets in mission mosaics, grey where no probe has seen them
 (`src/assets/textures/README.md`). Everything else is not, and no exoplanet ever will be on
-current instruments: none has had its surface imaged. Deimos, the five large moons of Uranus and
-a few small bodies have no map in this asset set either.
+current instruments: none has had its surface imaged. The five large moons of Uranus and a few
+small bodies have no map in this asset set either.
 
 Those bodies get a surface reasoned from what *has* been measured, in a chain that is worth
 following because every link is standard:

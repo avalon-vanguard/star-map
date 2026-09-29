@@ -68,6 +68,12 @@ describe('buildBodyViewModel', () => {
     expect(model?.orbitalPeriodDays).toBeCloseTo(27.32166, 5);
   });
 
+  it('prints the size of an inclination fitted below zero, as the same orbit with its node turned half round', () => {
+    const tilted: BodyRecord = { ...earth, orbit: orbit({ inclinationDeg: -0.00054346 }) };
+    const model = buildBodyViewModel('earth', { ...catalogues, bodies: [tilted] })!;
+    expect(bodyReadouts(model).measured.find((row) => row.label === 'Inclination')?.value).toBe('0.00°');
+  });
+
   it('says where the orbit comes from, in the card’s provenance', () => {
     expect(bodyReadouts(buildBodyViewModel('luna', catalogues)!).provenance).toContain('Orbit: JPL SSD satellite mean elements, epoch 2000 Jan 1.');
   });

@@ -43,7 +43,9 @@ export function bodyReadouts(body: BodyDetailViewModel): BodyReadouts {
     measured.push({ label: 'Eccentricity', value: body.orbit.eccentricity.toFixed(3) });
   }
   if (body.orbit.inclinationDeg !== undefined) {
-    measured.push({ label: 'Inclination', value: `${body.orbit.inclinationDeg.toFixed(2)}°` });
+    // Its size: Standish fits Earth's as -0.00054 degrees, which is the same orbit as +0.00054 with
+    // the node half a turn round, and printed as it stands read "-0.00°".
+    measured.push({ label: 'Inclination', value: `${Math.abs(body.orbit.inclinationDeg).toFixed(2)}°` });
   }
   // The period sits under whichever heading its provenance calls for. Same number, same field —
   // a published period is an observation and a computed one is not.

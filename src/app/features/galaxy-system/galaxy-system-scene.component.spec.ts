@@ -964,9 +964,20 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
   });
 
   it('offers a star for a route by its classification, and a star with none by its name alone', () => {
-    const component = fixture.componentInstance as unknown as { starSearchIndex(): { entry: { starId?: number; subtitle: string } }[]; currentStarOption(): { subtitle: string } | null };
-    expect(component.starSearchIndex().find(({ entry }) => entry.starId === LENS.id)?.entry.subtitle).toBe('');
-    expect(component.starSearchIndex().find(({ entry }) => entry.starId === PROXIMA.id)?.entry.subtitle).toBe('M5V');
+    const component = fixture.componentInstance as unknown as {
+      starSearchIndex(): { entry: { starId?: number; subtitle: string } }[];
+      routeOptions(): { id: number; subtitle: string }[];
+      onRouteQuery(query: string): void;
+      currentStarOption(): { subtitle: string } | null;
+    };
+    const optionFor = (query: string, id: number): string | undefined => {
+      component.onRouteQuery(query);
+      return component.routeOptions().find((option) => option.id === id)?.subtitle;
+    };
+    expect(optionFor('KMT-2016', LENS.id)).toBe('');
+    expect(optionFor('Proxima', PROXIMA.id)).toBe('M5V');
+    // Classified for the options shown only: the index holds none, where all 455 571 stars cost 140-230 ms at boot.
+    expect(component.starSearchIndex().every(({ entry }) => entry.subtitle === '')).toBe(true);
     navigationStore.selectStar(LENS.id);
     expect(component.currentStarOption()?.subtitle).toBe('');
     navigationStore.selectStar(PROXIMA.id);

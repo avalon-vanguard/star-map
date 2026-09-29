@@ -118,6 +118,9 @@ describe('SearchComponent', () => {
     expect(kindLine()).toBe('Star · ~M8');
     await type('KMT-2016-BLG-1107L');
     expect(kindLine()).toBe('Star');
+    // Classified for the rows shown only: over all 455 571 stars, each opening of the tab spent 140-230 ms on it.
+    const index = (fixture.componentInstance as unknown as { index(): { entry: { kind: string; subtitle: string } }[] }).index();
+    expect(index.filter(({ entry }) => entry.kind === 'star').every(({ entry }) => entry.subtitle === '')).toBe(true);
   });
 
   it('shows nothing for a query that matches nothing', async () => {

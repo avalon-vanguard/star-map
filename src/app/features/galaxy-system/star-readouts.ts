@@ -44,7 +44,13 @@ export function starReadouts(star: StarRecord, surface?: StarSurface): HudReadou
     // A G magnitude and a V one are not comparable: a red dwarf is up to three brighter in G.
     { label: 'Magnitude', value: star.magnitudeBand ? `${star.magnitudeBand} ${star.magnitude.toFixed(2)}` : 'Not measured' },
     ...(star.colorIndex !== null
-      ? [{ label: 'Colour', value: `${star.colorSystem === 'BP-RP' ? 'BP−RP' : 'B−V'} ${star.colorIndex.toFixed(2)}` }]
+      ? [
+          {
+            label: 'Colour',
+            value: `${star.colorSystem === 'BP-RP' ? 'BP−RP' : 'B−V'} ${star.colorIndex.toFixed(2)}${star.colorFromTemperature ? ', from its temperature' : ''}`,
+            ...(star.colorFromTemperature ? { derived: true } : {})
+          }
+        ]
       : []),
     ...(surface?.luminositySolar
       ? [{ label: 'Luminosity', value: formatLuminosity(surface.luminositySolar), ...(surface.luminosityDerived ? { derived: true } : {}) }]

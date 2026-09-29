@@ -105,15 +105,18 @@ describe('the photometry and distance error columns', () => {
     { id: 3, name: 'HD 3', x: 0, y: 0, z: 300, magnitude: 7, magnitudeBand: 'V', spectralType: 'K0', colorIndex: 1.0, colorSystem: 'B-V', distanceError: 0.000001, distanceFromGaia: true, source: 'hyg' },
     { id: 4, name: 'Gaia DR3 4', x: 5, y: 5, z: 0, magnitude: 12, spectralType: 'Unknown', colorIndex: null, distanceFromGaia: true, source: 'gaia' },
     // A Hipparcos parallax smaller than its own error.
-    { id: 5, name: 'HIP 5', x: 0, y: 200, z: 0, magnitude: 6, magnitudeBand: 'V', spectralType: 'B8', colorIndex: -0.1, colorSystem: 'B-V', distanceError: 1.4, source: 'hyg' }
+    { id: 5, name: 'HIP 5', x: 0, y: 200, z: 0, magnitude: 6, magnitudeBand: 'V', spectralType: 'B8', colorIndex: -0.1, colorSystem: 'B-V', distanceError: 1.4, source: 'hyg' },
+    // An archive host whose B−V is its temperature's.
+    { id: 6, name: 'Kepler-445', x: 0, y: 0, z: 90, magnitude: 17.6, magnitudeBand: 'G', spectralType: 'M4', colorIndex: 1.66, colorSystem: 'B-V', colorFromTemperature: true, source: 'exoplanet-archive' }
   ];
   const encoded = encodeStarCatalog(MEASURED);
   const decoded = decodeStarCatalog(encoded.index, encoded.positions, encoded.meta);
 
   it('carries the band, which colour the colour index is, and whose parallax the distance is', () => {
-    expect(decoded.map((star) => star.magnitudeBand)).toEqual(['V', 'G', 'V', undefined, 'V']);
-    expect(decoded.map((star) => star.colorSystem)).toEqual(['B-V', 'BP-RP', 'B-V', undefined, 'B-V']);
-    expect(decoded.map((star) => star.distanceFromGaia)).toEqual([false, true, true, true, false]);
+    expect(decoded.map((star) => star.magnitudeBand)).toEqual(['V', 'G', 'V', undefined, 'V', 'G']);
+    expect(decoded.map((star) => star.colorSystem)).toEqual(['B-V', 'BP-RP', 'B-V', undefined, 'B-V', 'B-V']);
+    expect(decoded.map((star) => star.distanceFromGaia)).toEqual([false, true, true, true, false, false]);
+    expect(decoded.map((star) => star.colorFromTemperature)).toEqual([false, false, false, false, false, true]);
   });
 
   it('keeps a distance error to within a step at both ends of its range, and none as none', () => {

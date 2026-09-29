@@ -50,6 +50,11 @@ describe('starReadouts', () => {
     expect(value(starReadouts(GAIA_STAR), 'Colour')).toBe('BP−RP 1.43');
   });
 
+  it('says a colour read off a temperature was not measured', () => {
+    const kepler445 = { ...HYG_STAR, magnitudeBand: 'G' as const, colorIndex: 1.66, colorFromTemperature: true, source: 'exoplanet-archive' };
+    expect(starReadouts(kepler445).find((readout) => readout.label === 'Colour')).toEqual({ label: 'Colour', value: 'B−V 1.66, from its temperature', derived: true });
+  });
+
   it('says a stand-in magnitude was not measured, and leaves out a colour there is none of', () => {
     const unmeasured = starReadouts({ ...GAIA_STAR, magnitude: 12, magnitudeBand: undefined, colorIndex: null, colorSystem: undefined });
     expect(value(unmeasured, 'Magnitude')).toBe('Not measured');

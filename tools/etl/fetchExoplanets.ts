@@ -170,6 +170,7 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<{ exoplanet
           spectralType: compositeRow?.['st_spectype'] || 'Unknown',
           colorIndex,
           ...(colorIndex === null ? {} : { colorSystem: 'B-V' as const }),
+          ...(colorIndex !== null && (b === undefined || v === undefined) ? { colorFromTemperature: true } : {}),
           ...(above === undefined || below === undefined ? {} : { distanceError: (Math.abs(above) + Math.abs(below)) / 2 / distancePc }),
           source: ARCHIVE_SOURCE
         };

@@ -104,22 +104,23 @@ export function spectralTypeToColorIndex(spectralType: string | null | undefined
 
 /**
  * B-V colour index for an effective temperature, for stars the Exoplanet Archive gives a
- * temperature but no B magnitude. Inverts Ballesteros (2012), T = 4600 K · (1 / (0.92 (B-V) +
- * 1.7) + 1 / (0.92 (B-V) + 0.62)), a blackbody fit good to a few per cent from A to early M: it
- * puts the Sun's 5 772 K at 0.65, which is the Sun's own. Clamped to the range the class anchors
- * above span, because the fit runs on past it — TRAPPIST-1's 2 566 K would come out at 2.7.
+ * temperature but no B magnitude: the dwarf sequence below read the other way, interpolated
+ * between the two types the temperature falls between, so that the correction and the temperature
+ * read back off the colour are the table's at that temperature. Ballesteros' blackbody fit, used
+ * before, runs 0.1 to 0.2 redder than the table below 3 800 K, and the colour it gave was read on
+ * the table: 3 500 K came back as 3 102 K with a correction 1.15 magnitudes too large, and the 57
+ * hosts placed this way were off the archive's own luminosity by 0.23 dex at the median. `null`
+ * outside the table, 2 420 to 31 400 K, rather than a colour clamped to its end — CFBDSIR
+ * J145829+101343, a 580 K brown dwarf, read as B−V 2.00 and "~M6".
  */
 export function temperatureToColorIndex(temperatureK: number): number | null {
-  if (!Number.isFinite(temperatureK) || temperatureK <= 0) {
+  const [hottest, coolest] = [DWARF_SEQUENCE[0], DWARF_SEQUENCE[DWARF_SEQUENCE.length - 1]];
+  if (!(temperatureK <= hottest[3] && temperatureK >= coolest[3])) {
     return null;
   }
-  // With x = 0.92 (B-V) and k = T / 4600 the fit is k x² + (2.32 k - 2) x + (1.054 k - 2.32) = 0,
-  // whose larger root is the physical one.
-  const k = temperatureK / 4600;
-  const b = 2.32 * k - 2;
-  const c = 1.054 * k - 2.32;
-  const x = (-b + Math.sqrt(b * b - 4 * k * c)) / (2 * k);
-  return Math.min(BEYOND_M, Math.max(COLOR_INDEX_ANCHORS.O, x / 0.92));
+  const cooler = Math.max(1, DWARF_SEQUENCE.findIndex((row) => row[3] <= temperatureK));
+  const [hot, cool] = [DWARF_SEQUENCE[cooler - 1], DWARF_SEQUENCE[cooler]];
+  return hot[1] + ((cool[1] - hot[1]) * (hot[3] - temperatureK)) / (hot[3] - cool[3]);
 }
 
 /**

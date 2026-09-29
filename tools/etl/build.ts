@@ -145,6 +145,8 @@ function validateMerge(stars: StarRecord[]): void {
  * 0.9.
  */
 const MAX_PLANET_OFFSET_DEG = 0.25;
+/** Measured on this catalogue: at most 0.0151 (Phoebe and the Moon) once Hyperion prints its current 0.105. */
+const MAX_ECCENTRICITY_OFFSET = 0.03;
 const MAX_MOON_OFFSET_DEG = 2.5;
 const KM_PER_AU = 149597870.7;
 const DEG_TO_RAD = Math.PI / 180;
@@ -259,6 +261,13 @@ function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, Orbita
       `${body.name}'s mean elements put it ${offset.toFixed(2)} degrees from where Horizons has it (at most ${ceiling} expected) — the elements were read wrongly.`
     );
     offsets.push(`${body.id} ${offset.toFixed(3)}`);
+    // The card prints this under "Measured". An osculating eccentricity swings about its mean — the
+    // Moon's by 0.015 here, Phoebe's by as much — but not by the 0.087 Hyperion's older row was out.
+    const printed = body.measuredEccentricity ?? body.orbit.eccentricity;
+    assertCondition(
+      Math.abs(printed - horizons!.eccentricity) <= MAX_ECCENTRICITY_OFFSET,
+      `${body.name}'s card gives an eccentricity of ${printed}, where Horizons' osculating orbit has ${horizons!.eccentricity.toFixed(4)} (at most ${MAX_ECCENTRICITY_OFFSET} apart expected).`
+    );
 
     // A radius of 0 is what a page whose radius no pattern reads comes out as — Charon's did.
     assertCondition(body.radiusKm > 0, `Body ${body.id} has no radius; its page states it in a form the ETL does not read.`);

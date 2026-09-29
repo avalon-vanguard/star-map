@@ -106,6 +106,12 @@ const BODY_SPECS: BodySpec[] = [
   // SBDB itself flags as "may be wrong by 30 percent or so": it turns once in 15.771 +/- 0.008 days
   // (Bernstein et al. 2023, PSJ 4, 115), locked to Dysnomia's 15.786-day orbit (Szakáts et al.
   // 2023, A&A 669, L3). On the SBDB's figure it turned 14.6 times too fast.
+  //
+  // Makemake's day, the SBDB's 22.83 hours, carries the same flag and is not settled either: it is
+  // the double-peaked reading Hromakina et al. 2019 (A&A 625, A46) give as "possible" of a light
+  // curve that repeats every 11.4 hours. Kiss et al. 2024 (ApJL, arXiv:2410.22544) find that 11.40
+  // +/- 0.08 hour single peak again with TESS and Gaia, cannot confirm the 22.8, and take 11.4 as
+  // their default. Neither overturns the other; the SBDB's 22.83 is kept, and may be twice the day.
   { id: 'eris', name: 'Eris', kind: 'dwarf', horizonsCommand: '136199;', center: '500@10', sbdb: 'Eris', radiusKm: 1163, rotationPeriodHours: 15.771 * 24 },
   { id: 'haumea', name: 'Haumea', kind: 'dwarf', horizonsCommand: '136108;', center: '500@10', sbdb: 'Haumea', radiusKm: 797.6 },
   { id: 'makemake', name: 'Makemake', kind: 'dwarf', horizonsCommand: '136472;', center: '500@10', sbdb: 'Makemake', radiusKm: 715 },

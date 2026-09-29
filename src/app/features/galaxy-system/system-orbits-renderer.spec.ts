@@ -449,6 +449,28 @@ describe('rotation without IAU elements', () => {
   });
 });
 
+describe('outermostRadiusAu', () => {
+  function drawn(axis: number, eccentricity: number): BodyRecord {
+    return {
+      id: 'eris', systemStarId: 0, name: 'Eris', kind: 'dwarf', radiusKm: 1163, orbitSource: 'test',
+      orbit: { semiMajorAxisAu: axis, eccentricity, inclinationDeg: 44, longitudeOfAscendingNodeDeg: 36, argumentOfPeriapsisDeg: 151, meanAnomalyAtEpochDeg: 0, epochJd: DEFAULT_EPOCH_JD },
+      rates: keplerRates(axis, GM_SUN_AU3_PER_DAY2)
+    };
+  }
+
+  it('reaches as far as an eccentric orbit goes past the grid: Eris’s aphelion, 97.7 AU, not the 80 AU ring', () => {
+    const renderer = new SystemOrbitsRenderer([drawn(67.934, 0.4382)], []);
+    expect(renderer.outermostRadiusAu).toBeCloseTo(67.934 * 1.4382, 9);
+    renderer.dispose();
+  });
+
+  it('is the grid’s outer ring where every orbit stays inside it', () => {
+    const renderer = new SystemOrbitsRenderer([drawn(30, 0.01)], []);
+    expect(renderer.outermostRadiusAu).toBe(35);
+    renderer.dispose();
+  });
+});
+
 describe('photographs', () => {
   it('puts them on their bodies once loaded, one a frame, so the GPU is not handed every map at once, and in their own colours', () => {
     // Ids no other test here draws, since the loaded textures are shared through the cache.

@@ -20,6 +20,8 @@ const GL_357 = { innermost: 0.035, outermost: 0.204 };
 const SOLAR = { innermost: 0.387, outermost: 30.07 };
 /** The solar system as the map draws it: out to Eris's semi-major axis, 67.93 AU. */
 const SOLAR_TO_ERIS = { innermost: 0.387, outermost: 67.93 };
+/** Eris's aphelion, a(1 + e) = 67.934 x 1.4382: past the 80 AU ring its semi-major axis gives. */
+const ERIS_APHELION_AU = 97.7;
 
 describe('starMarkerRadiusAu', () => {
   it('never reaches the innermost orbit', () => {
@@ -138,6 +140,14 @@ describe('the grid and the framing together', () => {
         expect(ring).toBeLessThan(frame);
         expect(ring / frame).toBeLessThan(0.93);
       }
+    }
+  });
+
+  it('leaves Eris’s aphelion its whole margin in every window shape, a phone held upright included', () => {
+    // The scene frames the aphelion where it runs past the ring. Under the old 500 AU ceiling the
+    // phone would hold it at 0.907 of the half-width instead of 1 / 1.12 = 0.893.
+    for (const viewport of VIEWPORTS) {
+      expect(ERIS_APHELION_AU / systemFrameRadiusAu(systemFramingDistanceAu(ERIS_APHELION_AU, viewport), viewport)).toBeLessThan(0.9);
     }
   });
 

@@ -2221,8 +2221,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.systemGroup.add(this.systemRenderer.object);
     this.applyDisplay(this.display());
 
-    // Framed against the grid's outer ring rather than the outermost orbit — the ring is always
-    // the wider of the two — and against the camera this scene actually has, so the margin holds
+    // Framed against the outermost thing drawn — the grid's outer ring, or an eccentric orbit's
+    // aphelion where it runs past it — and against the camera this scene actually has, so the margin holds
     // whatever the window shape. Computed before the star, because how far away the star will be
     // seen from is what decides how big its halo has to be to stay visible.
     // Framed against the perspective camera whichever is active: the framing distance is what
@@ -2230,7 +2230,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const framingCamera = this.engine.getPerspectiveCamera();
     const viewport = { fovDegrees: framingCamera.fov, aspect: framingCamera.aspect };
     const framingDistance = systemFramingDistanceAu(
-      this.systemRenderer.gridOuterRadiusAu,
+      this.systemRenderer.outermostRadiusAu,
       viewport,
     );
 

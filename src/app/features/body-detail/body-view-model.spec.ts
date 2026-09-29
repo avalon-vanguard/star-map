@@ -146,17 +146,28 @@ describe('starSurfaceOf', () => {
   const proximaB: ExoplanetRecord = { id: 'proxima-cen-b', hostStarId: 70666, hostStarName: 'Proxima Cen', name: 'Proxima Cen b', orbit: { semiMajorAxisAu: 0.0485 } };
 
   it("is the Sun's own for the Sun, and not derived", () => {
-    expect(starSurfaceOf(sun, [])).toEqual({ radiusSolar: 1, radiusDerived: false, temperatureK: 5772 });
+    expect(starSurfaceOf(sun, [])).toEqual({ radiusSolar: 1, radiusDerived: false, temperatureK: 5772, luminositySolar: 1, luminosityDerived: false });
   });
 
-  it("takes a host's radius and temperature from the archive", () => {
-    const surface = starSurfaceOf(proxima, [{ ...proximaB, hostStarRadiusSolar: 0.141, hostStarTemperatureK: 2900 }]);
-    expect(surface).toEqual({ radiusSolar: 0.141, radiusDerived: false, temperatureK: 2900 });
+  it("takes a host's radius, temperature and luminosity from the archive", () => {
+    const surface = starSurfaceOf(proxima, [{ ...proximaB, hostStarRadiusSolar: 0.141, hostStarTemperatureK: 2900, hostStarLuminositySolar: 0.00151 }]);
+    expect(surface).toEqual({ radiusSolar: 0.141, radiusDerived: false, temperatureK: 2900, luminositySolar: 0.00151, luminosityDerived: false });
+  });
+
+  it('warms a planet by the luminosity the archive gives its host, on its own page as in its system', () => {
+    // 8.9×10⁻⁴ L☉ from Proxima's V and B−V, which put b at 200 K; the archive's 1.51×10⁻³ at 228 K.
+    const b = { ...proximaB, hostStarLuminositySolar: 0.00151 };
+    const catalogues = { bodies: [], exoplanets: [b, { ...proximaB, id: 'proxima-cen-d', name: 'Proxima Cen d', orbit: { semiMajorAxisAu: 0.02881 } }], stars: [proxima] };
+    expect(buildBodyViewModel('proxima-cen-b', catalogues)?.appearance.equilibriumTemperatureK).toBeCloseTo(228, 0);
+    // d's own row gives none; its host's luminosity is still the archive's, from b's.
+    expect(buildBodyViewModel('proxima-cen-d', catalogues)?.appearance.equilibriumTemperatureK).toBeCloseTo(296, 0);
   });
 
   it('derives both otherwise, and says the radius is derived', () => {
     const surface = starSurfaceOf(proxima, [proximaB]);
     expect(surface.radiusDerived).toBe(true);
+    expect(surface.luminosityDerived).toBe(true);
+    expect(surface.luminositySolar).toBeCloseTo(0.00088, 5);
     // Its colour reads as an M5 dwarf: 3 068 K and 0.105 R☉, against 2 900 K and 0.154 R☉
     // measured (Kervella et al. 2017). B−V barely changes along the late M dwarfs.
     expect(surface.temperatureK).toBeCloseTo(3068, -1);

@@ -44,43 +44,46 @@ function value(readouts: { label: string; value: string }[], label: string): str
 
 describe('starReadouts', () => {
   it('names the band of the magnitude, and which colour the colour index is', () => {
-    expect(value(starReadouts(HYG_STAR, null), 'Magnitude')).toBe('V -1.44');
-    expect(value(starReadouts(GAIA_STAR, null), 'Magnitude')).toBe('G 11.20');
-    expect(value(starReadouts(HYG_STAR, null), 'Colour')).toBe('B−V 0.01');
-    expect(value(starReadouts(GAIA_STAR, null), 'Colour')).toBe('BP−RP 1.43');
+    expect(value(starReadouts(HYG_STAR), 'Magnitude')).toBe('V -1.44');
+    expect(value(starReadouts(GAIA_STAR), 'Magnitude')).toBe('G 11.20');
+    expect(value(starReadouts(HYG_STAR), 'Colour')).toBe('B−V 0.01');
+    expect(value(starReadouts(GAIA_STAR), 'Colour')).toBe('BP−RP 1.43');
   });
 
   it('says a stand-in magnitude was not measured, and leaves out a colour there is none of', () => {
-    const unmeasured = starReadouts({ ...GAIA_STAR, magnitude: 12, magnitudeBand: undefined, colorIndex: null, colorSystem: undefined }, null);
+    const unmeasured = starReadouts({ ...GAIA_STAR, magnitude: 12, magnitudeBand: undefined, colorIndex: null, colorSystem: undefined });
     expect(value(unmeasured, 'Magnitude')).toBe('Not measured');
     expect(value(unmeasured, 'Colour')).toBeUndefined();
   });
 
   it('gives the distance with its uncertainty', () => {
-    expect(value(starReadouts(GAIA_STAR, null), 'Distance')).toBe('117 ± 12 pc');
+    expect(value(starReadouts(GAIA_STAR), 'Distance')).toBe('117 ± 12 pc');
   });
 
   it('names the catalogue a star comes from, and whose distance it has', () => {
-    expect(value(starReadouts(GAIA_STAR, null), 'Source')).toBe('Gaia DR3');
-    expect(value(starReadouts(HYG_STAR, null), 'Source')).toBe('HYG');
-    expect(value(starReadouts(PLACED_BY_GAIA, null), 'Source')).toBe('HYG, Gaia DR3 distance');
-    expect(value(starReadouts({ ...HYG_STAR, source: 'exoplanet-archive' }, null), 'Source')).toBe('NASA Exoplanet Archive');
+    expect(value(starReadouts(GAIA_STAR), 'Source')).toBe('Gaia DR3');
+    expect(value(starReadouts(HYG_STAR), 'Source')).toBe('HYG');
+    expect(value(starReadouts(PLACED_BY_GAIA), 'Source')).toBe('HYG, Gaia DR3 distance');
+    expect(value(starReadouts({ ...HYG_STAR, source: 'exoplanet-archive' }), 'Source')).toBe('NASA Exoplanet Archive');
   });
 
   it('says a radius was derived, and from what; a published one plainly', () => {
-    expect(starReadouts(PLACED_BY_GAIA, null, { radiusSolar: 0.1049, radiusDerived: true, temperatureK: 3068 }).find((readout) => readout.label === 'Radius')).toEqual({
+    expect(starReadouts(PLACED_BY_GAIA, { radiusSolar: 0.1049, radiusDerived: true, temperatureK: 3068, luminositySolar: null, luminosityDerived: true }).find((readout) => readout.label === 'Radius')).toEqual({
       label: 'Radius',
       value: '~0.10 solar radii, from colour and brightness',
       derived: true
     });
-    expect(value(starReadouts(PLACED_BY_GAIA, null, { radiusSolar: 0.141, radiusDerived: false, temperatureK: 2900 }), 'Radius')).toBe('0.141 solar radii');
-    expect(value(starReadouts(HYG_STAR, null, { radiusSolar: 584.3, radiusDerived: true, temperatureK: 3590 }), 'Radius')).toBe('~580 solar radii, from colour and brightness');
-    expect(value(starReadouts(HYG_STAR, null, { radiusSolar: 1, radiusDerived: false, temperatureK: 5772 }), 'Radius')).toBe('1.00 solar radii');
-    expect(starReadouts(HYG_STAR, null, { radiusSolar: null, radiusDerived: true, temperatureK: null }).some((readout) => readout.label === 'Radius')).toBe(false);
+    expect(value(starReadouts(PLACED_BY_GAIA, { radiusSolar: 0.141, radiusDerived: false, temperatureK: 2900, luminositySolar: null, luminosityDerived: true }), 'Radius')).toBe('0.141 solar radii');
+    expect(value(starReadouts(HYG_STAR, { radiusSolar: 584.3, radiusDerived: true, temperatureK: 3590, luminositySolar: null, luminosityDerived: true }), 'Radius')).toBe('~580 solar radii, from colour and brightness');
+    expect(value(starReadouts(HYG_STAR, { radiusSolar: 1, radiusDerived: false, temperatureK: 5772, luminositySolar: null, luminosityDerived: true }), 'Radius')).toBe('1.00 solar radii');
+    expect(starReadouts(HYG_STAR, { radiusSolar: null, radiusDerived: true, temperatureK: null, luminositySolar: null, luminosityDerived: true }).some((readout) => readout.label === 'Radius')).toBe(false);
   });
 
-  it('marks the luminosity as derived', () => {
-    expect(starReadouts(HYG_STAR, 25.4).find((readout) => readout.label === 'Luminosity')).toEqual({ label: 'Luminosity', value: '25.40 L☉', derived: true });
+  it('marks a derived luminosity so, and a published one not', () => {
+    const surface = { radiusSolar: null, radiusDerived: true, temperatureK: null };
+    expect(starReadouts(HYG_STAR, { ...surface, luminositySolar: 25.4, luminosityDerived: true }).find((readout) => readout.label === 'Luminosity')).toEqual({ label: 'Luminosity', value: '25.40 L☉', derived: true });
+    expect(starReadouts(PLACED_BY_GAIA, { ...surface, luminositySolar: 0.00151, luminosityDerived: false }).find((readout) => readout.label === 'Luminosity')).toEqual({ label: 'Luminosity', value: '0.002 L☉' });
+    expect(starReadouts(HYG_STAR, { ...surface, luminositySolar: null, luminosityDerived: true }).some((readout) => readout.label === 'Luminosity')).toBe(false);
   });
 });
 

@@ -57,7 +57,7 @@ import {
   type ScaleBar,
 } from '../../shared/format/scale-bar';
 import { BodyDetailViewModel } from '../body-detail/body-detail.model';
-import { buildBodyViewModel, luminosityOf, starSurfaceOf, StarSurface } from '../body-detail/body-view-model';
+import { buildBodyViewModel, starSurfaceOf, StarSurface } from '../body-detail/body-view-model';
 import {
   DEFAULT_HUD_DISPLAY,
   HudDisplay,
@@ -1784,7 +1784,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
           label: 'Bodies',
           value: moonCount > 0 ? `${planetCount} + ${moonCount} moons` : `${planetCount}`,
         },
-        ...starReadouts(star, luminosityOf(star), this.currentStarSurface),
+        ...starReadouts(star, this.currentStarSurface),
       ]);
       this.hudNote.set(this.time.atNow() ? 'Orbits propagated from published elements to the current date.' : 'Orbits propagated from published elements to the date on the clock.');
       this.hudRange.set(
@@ -2220,19 +2220,18 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // The star's own position is the line of sight to it, which is the plane the archive
     // measures exoplanet inclinations against. The Sun sits at the origin and has no
     // exoplanets, so it has no meaningful direction and the renderer falls back.
-    // The star's luminosity, derived from its own catalogued magnitude and distance, is what
-    // decides how hot each body in the system is — and so what each of them looks like.
-    const hostLuminosity = luminosityOf(star);
     // Every star at its own radius: the archive's for a planet host, otherwise derived from its
     // colour and brightness — or the Sun's, for the 3 077 stars with no measured magnitude or with
     // neither a colour nor a type, which the card then gives no radius. Its temperature is the
-    // colour of its disc and of the light it casts.
+    // colour of its disc and of the light it casts, and its luminosity — the archive's, or else
+    // derived from its magnitude and distance — decides how hot each body in the system is, and
+    // so what each of them looks like.
     this.currentStarSurface = starSurfaceOf(star, systemExoplanets);
     this.systemRenderer = new SystemOrbitsRenderer(
       systemBodies,
       systemExoplanets,
       { x: star.x, y: star.y, z: star.z },
-      hostLuminosity,
+      this.currentStarSurface.luminositySolar,
       this.currentStarSurface.temperatureK,
     );
     this.systemGroup.add(this.systemRenderer.object);

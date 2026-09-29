@@ -34,9 +34,10 @@ export function starSubtitle(star: StarRecord): string {
 /**
  * A star's measured readouts, each with what it was measured in: the band of its magnitude, which
  * colour its colour index is, the distance's uncertainty, and the catalogues they come from.
- * `luminosity` is derived, and marked so; so is a radius derived from it, and it says from what.
+ * The luminosity and radius are the archive's where it publishes them, and otherwise derived and
+ * marked so; a derived radius also says from what.
  */
-export function starReadouts(star: StarRecord, luminosity: number | null, surface?: StarSurface): HudReadout[] {
+export function starReadouts(star: StarRecord, surface?: StarSurface): HudReadout[] {
   const distancePc = Math.hypot(star.x, star.y, star.z);
   const catalogue = describingCatalogue(star);
   return [
@@ -48,7 +49,9 @@ export function starReadouts(star: StarRecord, luminosity: number | null, surfac
     ...(star.colorIndex !== null
       ? [{ label: 'Colour', value: `${star.colorSystem === 'BP-RP' ? 'BP−RP' : 'B−V'} ${star.colorIndex.toFixed(2)}` }]
       : []),
-    ...(luminosity !== null ? [{ label: 'Luminosity', value: formatLuminosity(luminosity), derived: true }] : []),
+    ...(surface?.luminositySolar
+      ? [{ label: 'Luminosity', value: formatLuminosity(surface.luminositySolar), ...(surface.luminosityDerived ? { derived: true } : {}) }]
+      : []),
     ...(surface?.radiusSolar ? [radiusReadout(surface.radiusSolar, surface.radiusDerived)] : []),
     { label: 'Source', value: catalogue === 'HYG' && star.distanceFromGaia ? 'HYG, Gaia DR3 distance' : catalogue }
   ];

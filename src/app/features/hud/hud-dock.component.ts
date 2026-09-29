@@ -377,7 +377,7 @@ function isWideViewport(): boolean {
                   Go
                 </button>
                 <p id="clock-date-window" class="w-full text-[10px] text-muted">
-                  AD 1 to AD 3000, where the planets’ elements hold. Each moon’s and dwarf planet’s card says how far its orbit strays from 1950 to 2100.
+                  AD 1 to AD 3000, where the planets’ and Pluto’s elements hold. Each moon’s card, and Ceres’s, Eris’s, Haumea’s and Makemake’s, says how far its orbit strays from 1950 to 2100.
                 </p>
               </form>
             </section>

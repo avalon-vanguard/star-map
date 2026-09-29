@@ -416,7 +416,9 @@ describe('HudDockComponent', () => {
       expect(field.min).toBe('0001-01-01T00:00');
       expect(field.max).toBe('3000-01-01T00:00');
       expect(host().querySelector(`#${field.getAttribute('aria-describedby')}`)?.textContent).toContain('AD 1 to AD 3000');
-      expect(host().querySelector(`#${field.getAttribute('aria-describedby')}`)?.textContent).toContain('how far its orbit strays from 1950 to 2100');
+      // Only the moons and the four dwarf planets from the SBDB are measured against Horizons; Pluto
+      // is on Standish's planet elements, and its card gives their span instead.
+      expect(host().querySelector(`#${field.getAttribute('aria-describedby')}`)?.textContent).toContain('Each moon’s card, and Ceres’s, Eris’s, Haumea’s and Makemake’s, says how far its orbit strays from 1950 to 2100');
     });
 
     it('jumps the clock to the date submitted, read as UTC', () => {

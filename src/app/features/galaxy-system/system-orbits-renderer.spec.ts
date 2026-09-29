@@ -678,7 +678,9 @@ describe('solar-system bodies against Horizons', () => {
     return (spin.angleTo(new THREE.Vector3(0, 0, 1).applyQuaternion(line.quaternion)) * 180) / Math.PI;
   }
 
-  it('turns Venus, Uranus and Pluto backwards against their orbits, at the tilts Horizons gives', () => {
+  it('turns Venus, Uranus and Pluto backwards against their orbits, at the tilts Horizons gives the first two', () => {
+    // Pluto's Horizons page gives no tilt; 119.6 is the one its IAU pole makes with its orbit, so for
+    // Pluto this checks that its pole and W are drawn as the kernel gives them, not the pole itself.
     // The IAU names a planet's north pole by the side of the solar system it lies on, so Venus's W
     // and Uranus's run backwards; Pluto's pole follows the right-hand rule instead, and points
     // south. Either way the spin read off the drawn sphere is past 90 degrees from the orbit's pole.

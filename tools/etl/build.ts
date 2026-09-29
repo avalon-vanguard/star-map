@@ -209,6 +209,10 @@ const DAY_OFFSET_CEILINGS: Record<string, number> = { neptune: 0.01 };
  * a planet's north pole by the side of the solar system it lies on, whichever way the planet turns.
  * Measured on this catalogue: at most 0.058 degrees (Venus, 177.358 against 177.3). Taken as the
  * pole alone, Venus comes out at 2.6 degrees and Uranus at 82.2, which is what this catches.
+ *
+ * Pluto's Horizons page states no obliquity: its 119.6 is worked out from the IAU pole itself (see
+ * `BodySpec.obliquityDeg`), so for Pluto this checks only that the kernel's pole and W were read as
+ * written, not the pole against a second source.
  */
 const MAX_OBLIQUITY_OFFSET_DEG = 0.1;
 
@@ -327,7 +331,7 @@ function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, Orbita
         const obliquity = angleBetweenDeg(axis, body.laplacePole ? laplacePlaneToEquatorial(normal, body.laplacePole) : eclipticToEquatorial(normal));
         assertCondition(
           Math.abs(obliquity - body.obliquityDeg) <= MAX_OBLIQUITY_OFFSET_DEG,
-          `${body.name}'s IAU spin axis is ${obliquity.toFixed(3)} degrees from its orbit's pole, where Horizons gives an obliquity of ${body.obliquityDeg} (at most ${MAX_OBLIQUITY_OFFSET_DEG} apart expected) — the pole or the sense of W was read wrongly.`
+          `${body.name}'s IAU spin axis is ${obliquity.toFixed(3)} degrees from its orbit's pole, where ${body.id === 'pluto' ? 'its IAU pole' : 'Horizons'} gives an obliquity of ${body.obliquityDeg} (at most ${MAX_OBLIQUITY_OFFSET_DEG} apart expected) — the pole or the sense of W was read wrongly.`
         );
         spins.push(`${body.id} tilt ${obliquity.toFixed(3)}`);
       }

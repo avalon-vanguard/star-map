@@ -464,6 +464,14 @@ describe('outermostRadiusAu', () => {
     renderer.dispose();
   });
 
+  it('reaches an exoplanet’s aphelion too: HD 20782 b’s, 1.66 times its 1.6 AU ring', () => {
+    // The most eccentric of the 303 exoplanet systems with an orbit past their ring, counted on
+    // exoplanets.json (a = 1.3649 AU, e = 0.95).
+    const renderer = new SystemOrbitsRenderer([], [exoplanet({ id: 'HD 20782 b', name: 'HD 20782 b', orbit: { semiMajorAxisAu: 1.3649, eccentricity: 0.95 } })]);
+    expect(renderer.outermostRadiusAu).toBeCloseTo(1.3649 * 1.95, 9);
+    renderer.dispose();
+  });
+
   it('is the grid’s outer ring where every orbit stays inside it', () => {
     const renderer = new SystemOrbitsRenderer([drawn(30, 0.01)], []);
     expect(renderer.outermostRadiusAu).toBe(35);
@@ -511,13 +519,19 @@ describe('derived surfaces', () => {
   const twoPlanets = (): SystemOrbitsRenderer =>
     new SystemOrbitsRenderer([], [exoplanet({ radiusEarth: 1.1 }), exoplanet({ id: 'TRAPPIST-1 c', name: 'TRAPPIST-1 c', radiusEarth: 1.0 })], undefined, 1);
 
-  it('paints them after the system is built, one a task, so entering a system is not held up', async () => {
+  it('paints them after the system is built, one a task, so entering a system is not held up, and in their own colours', async () => {
+    const colours = (renderer: SystemOrbitsRenderer): number[] =>
+      renderer.members.map((member) => ((member.marker as THREE.Mesh).material as THREE.MeshStandardMaterial).color.getHex());
     const renderer = twoPlanets();
     expect(maps(renderer)).toEqual([null, null]);
+    // Until then each is its kind's flat colour, an exoplanet's magenta.
+    expect(colours(renderer)).toEqual([new THREE.Color(0.85, 0.4, 0.85).getHex(), new THREE.Color(0.85, 0.4, 0.85).getHex()]);
     await nextTask();
     expect(maps(renderer).filter(Boolean)).toHaveLength(1);
     await nextTask();
     expect(maps(renderer).every(Boolean)).toBe(true);
+    // Left magenta, every derived surface would be multiplied by it, its green cut by 60 per cent.
+    expect(colours(renderer)).toEqual([0xffffff, 0xffffff]);
     renderer.dispose();
   });
 
@@ -765,8 +779,9 @@ describe('solar-system bodies against Horizons', () => {
 
   it('turns Earth by the UT the clock names, which is its turning: at AD 1000 the Sun stands over Horizons’ point', () => {
     // Horizons' sub-solar longitude from the Sun (observer quantity 14, TIME_TYPE=UT) on JD 2086455,
-    // 1.0510 E, is Earth as it was 8.454 minutes before. Turned by the IAU's W at UT the drawn face
-    // was 2.3 degrees off; taken at TDB, 6.6.
+    // 1.0510 E, is Earth as it was 8.454 minutes before. Turned by the IAU's W at UT + 69.184 s, as it
+    // was, the drawn face was 2.3 degrees off (2.0 at UT itself); taken at TDB, which turns it ΔT
+    // (6.6 degrees) further the same way, 8.6.
     renderer.update(2086455 - 8.45437443 / 1440);
     expect(apart(facing('earth', new THREE.Vector3()).eastDeg, 1.05101)).toBeLessThan(0.15);
   });

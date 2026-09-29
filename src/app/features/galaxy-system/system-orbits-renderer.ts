@@ -480,7 +480,7 @@ export class SystemOrbitsRenderer {
       body.marker.position.copy(body.position);
       orientOrbit(body.orbitLine.quaternion, current, body.frame);
       if (body.rotationalElements) {
-        bodyOrientation(body.rotationalElements, epochJd, body.marker.quaternion);
+        bodyOrientation(body.rotationalElements, epochJd, body.marker.quaternion, body.id === 'earth');
       } else if (body.rotationPeriodHours) {
         body.marker.quaternion.copy(spinFor(current, body.frame, body.rotationPeriodHours, jdTdb - body.elements.epochJd));
       }

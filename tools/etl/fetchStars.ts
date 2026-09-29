@@ -71,9 +71,9 @@ function spectralTypeOf(row: Record<string, string>): string {
 
 /**
  * Downloads the HYG (Hipparcos/Yale/Gliese) stellar database, places each star along its
- * equatorial direction (epoch J2000.0) at the better of its Hipparcos and Gaia distances, keeps
- * the ones either survey puts within range, unions the other positional sources, and writes
- * `stars.bin` (packed positions) + `stars-index.json` (everything else).
+ * equatorial direction (epoch J2000.0) at whichever of its Hipparcos and Gaia distances has the
+ * smaller error, keeps the ones either survey puts within range, unions the other positional
+ * sources, and writes `stars.bin` (packed positions) + `stars-index.json` (everything else).
  */
 export async function fetchStars(): Promise<StarRecord[]> {
   console.log(`Fetching HYG star catalog (distance cutoff: ${DISTANCE_CUTOFF_PC} pc)...`);
@@ -101,10 +101,12 @@ export async function fetchStars(): Promise<StarRecord[]> {
     const gaiaPc = gaia?.distancePc;
     const magnitudeV = parseOptionalNumber(row['mag']);
     const magnitude = magnitudeV ?? UNKNOWN_MAGNITUDE;
-    const distancePc = placementDistancePc(hipparcosPc, gaiaPc, magnitude, DISTANCE_CUTOFF_PC);
+    const hipparcosError = row['hip'] ? hipparcosErrors.get(Number(row['hip'])) : undefined;
+    const distancePc = placementDistancePc(hipparcosPc, gaiaPc, magnitude, DISTANCE_CUTOFF_PC, hipparcosError, gaia?.relativeError);
     if (distancePc === null) {
       continue;
     }
+    const fromGaia = gaia !== undefined && distancePc === gaiaPc;
 
     // HYG's own Cartesian columns rather than its `ra`/`dec`, which are in the same frame as
     // `raDecDistanceToXyz` and would be redundant if the two agreed. They do not, for the stars
@@ -124,7 +126,7 @@ export async function fetchStars(): Promise<StarRecord[]> {
       continue;
     }
     const scale = distancePc / length;
-    if (gaiaPc !== undefined) {
+    if (fromGaia) {
       atGaiaDistance++;
     }
     if (distancePc > DISTANCE_CUTOFF_PC) {
@@ -133,7 +135,7 @@ export async function fetchStars(): Promise<StarRecord[]> {
 
     // Gaia's error with Gaia's distance, Hipparcos's with its own; a Gliese row, with neither, has
     // no published error, and its distance is as often photometric as measured.
-    const distanceError = gaia?.relativeError ?? (row['hip'] ? hipparcosErrors.get(Number(row['hip'])) : undefined);
+    const distanceError = fromGaia ? gaia.relativeError : hipparcosError;
     const colorIndex = parseOptionalNumber(row['ci']);
 
     stars.push({
@@ -148,7 +150,7 @@ export async function fetchStars(): Promise<StarRecord[]> {
       colorIndex: colorIndex ?? null,
       ...(colorIndex === undefined ? {} : { colorSystem: 'B-V' as const }),
       ...(distanceError === undefined ? {} : { distanceError }),
-      distanceFromGaia: gaia !== undefined,
+      distanceFromGaia: fromGaia,
       // Only for the Gliese-only rows, whose positions are what the merge needs the motion to see
       // past. A Hipparcos position is good to under an arcsecond; given its motion too, 15 stars
       // took their co-moving companion's Gaia entry, and the companion was kept twice.

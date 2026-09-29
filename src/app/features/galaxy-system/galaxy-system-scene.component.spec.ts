@@ -837,7 +837,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     navigationStore.selectStar(SUN.id);
     await flushAsync();
     await advanceFrames(engine, 2.5);
-    expect(note()).toMatch(/^Orbits propagated from JPL mean elements, the planets’ fit for 3000 BC to AD 3000, and the SBDB’s osculating ones for Ceres, Eris, Haumea and Makemake, to now, \d{4}-\d\d-\d\d \d\d:\d\d UTC\.$/);
+    expect(note()).toMatch(/^Orbits propagated from JPL mean elements, the planets’ fit for 3000 BC to AD 3000 and the moons’ checked from 1950 to 2100, and the SBDB’s osculating ones for Ceres, Eris, Haumea and Makemake, checked over the same span, to now, \d{4}-\d\d-\d\d \d\d:\d\d UTC\.$/);
 
     navigationStore.selectStar(ALPHA_CENTAURI.id);
     await flushAsync();

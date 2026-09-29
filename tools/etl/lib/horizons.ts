@@ -93,3 +93,40 @@ function extractNumber(text: string, pattern: RegExp): number {
   }
   return Number(match[1]);
 }
+
+/** The span a moon's or dwarf planet's mean elements are checked against Horizons over, and the card names. */
+export const TRACK_START_YEAR = 1950;
+export const TRACK_STOP_YEAR = 2100;
+
+/** One Horizons position: TDB Julian date, and ICRF equatorial coordinates in AU from the centre. */
+export interface TrackPoint {
+  jd: number;
+  x: number;
+  y: number;
+  z: number;
+}
+
+/**
+ * Where Horizons has a body, from its centre, every `stepDays` from 1950 to 2100: the ephemeris the
+ * mean elements are checked against over the whole span, where one date saw a moon at its best.
+ */
+export async function fetchHorizonsTrack(command: string, center: string, stepDays: number, cacheKey: string): Promise<TrackPoint[]> {
+  const url =
+    `${HORIZONS_URL}?format=text&COMMAND='${encodeURIComponent(command)}'&OBJ_DATA='NO'&MAKE_EPHEM='YES'` +
+    `&EPHEM_TYPE='VECTORS'&CENTER='${center}'&START_TIME='${TRACK_START_YEAR}-01-01'&STOP_TIME='${TRACK_STOP_YEAR}-01-01'` +
+    `&STEP_SIZE='${stepDays}%20d'&REF_PLANE='FRAME'&REF_SYSTEM='ICRF'&VEC_TABLE='1'&OUT_UNITS='AU-D'&CSV_FORMAT='YES'&VEC_CORR='NONE'`;
+  const text = await fetchTextCached(url, cacheKey);
+  const startIndex = text.indexOf('$$SOE');
+  const endIndex = text.indexOf('$$EOE');
+  if (startIndex === -1 || endIndex === -1) {
+    throw new Error(`Horizons gave no vectors for ${command} from ${center}: ${text.slice(0, 300)}`);
+  }
+  return text
+    .slice(startIndex + '$$SOE'.length, endIndex)
+    .trim()
+    .split(/\r?\n/)
+    .map((row) => {
+      const [jd, , x, y, z] = row.split(',').map((field) => field.trim());
+      return { jd: Number(jd), x: Number(x), y: Number(y), z: Number(z) };
+    });
+}

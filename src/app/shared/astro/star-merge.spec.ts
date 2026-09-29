@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { raDegDecDistanceToXyz } from './coordinates';
 import { StarRecord } from '../models/star.model';
-import { directionCosine, isSameStar, MERGE_ANGULAR_TOLERANCE_DEG, mergeStarCatalogues, NAKED_EYE_MAGNITUDE, placementDistancePc } from './star-merge';
+import { directionCosine, hipparcosDistancePc, HYG_UNKNOWN_DISTANCE_PC, isSameStar, MERGE_ANGULAR_TOLERANCE_DEG, mergeStarCatalogues, NAKED_EYE_MAGNITUDE, placementDistancePc } from './star-merge';
 
 /** A star at a given sky position and distance, which is how catalogues actually report them. */
 function at(id: number, raDeg: number, decDeg: number, distancePc: number, overrides: Partial<StarRecord> = {}): StarRecord {
@@ -306,6 +306,20 @@ describe('mergeStarCatalogues', () => {
 
     expect(stars).toHaveLength(20000);
     expect(Date.now() - started).toBeLessThan(10000);
+  });
+});
+
+describe('hipparcosDistancePc', () => {
+  it("takes HYG's distance where it gives one", () => {
+    expect(hipparcosDistancePc(606.06, { parallaxMas: 1.65, relativeError: 0.45 / 1.65 })).toBe(606.06);
+  });
+
+  it("places a star HYG gives no distance for by its parallax, if the parallax is 2.5 times its error", () => {
+    // HD 74180 at 0.67 ± 0.16 mas and Mu Cep at 0.55 ± 0.20; a parallax at 1.5 times its error stays out.
+    expect(hipparcosDistancePc(HYG_UNKNOWN_DISTANCE_PC, { parallaxMas: 0.67, relativeError: 0.16 / 0.67 })).toBeCloseTo(1492.5, 1);
+    expect(hipparcosDistancePc(HYG_UNKNOWN_DISTANCE_PC, { parallaxMas: 0.55, relativeError: 0.2 / 0.55 })).toBeCloseTo(1818.2, 1);
+    expect(hipparcosDistancePc(HYG_UNKNOWN_DISTANCE_PC, { parallaxMas: 0.3, relativeError: 0.2 / 0.3 })).toBeUndefined();
+    expect(hipparcosDistancePc(HYG_UNKNOWN_DISTANCE_PC)).toBeUndefined();
   });
 });
 

@@ -168,8 +168,8 @@ describe('dwarfSequenceAtColor', () => {
   });
 
   it('reads the row at the end a colour is past, when asked to', () => {
-    expect(dwarfSequenceAtColor(2.2, 'B-V', true)).toEqual({ temperatureK: 2420, bolometricCorrectionV: -5.78, gMinusV: -3.09 });
-    expect(dwarfSequenceAtColor(-0.15, 'BP-RP', true)).toEqual({ temperatureK: 10700, bolometricCorrectionV: -0.42, gMinusV: 0.018 });
+    expect(dwarfSequenceAtColor(2.2, 'B-V', true)).toEqual({ bMinusV: 2.16, temperatureK: 2420, bolometricCorrectionV: -5.78, gMinusV: -3.09 });
+    expect(dwarfSequenceAtColor(-0.15, 'BP-RP', true)).toEqual({ bMinusV: -0.07, temperatureK: 10700, bolometricCorrectionV: -0.42, gMinusV: 0.018 });
     expect(dwarfSequenceAtColor(null, 'B-V', true)).toBeNull();
   });
 });

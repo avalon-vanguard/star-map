@@ -85,6 +85,24 @@ describe('colorIndexToRgb', () => {
     });
   });
 
+  it('reads a BP−RP colour as the B−V of the dwarf of that colour, so a type tints alike in either', () => {
+    // G2 V is B−V 0.65 or BP−RP 0.823, M0 V 1.42 or 1.84 (Pecaut & Mamajek).
+    for (const [bMinusV, bpRp] of [[0.65, 0.823], [1.42, 1.84]]) {
+      const [fromBpRp, fromBv] = [colorIndexToRgb(bpRp, undefined, 'BP-RP'), colorIndexToRgb(bMinusV)];
+      expect([fromBpRp.r, fromBpRp.g, fromBpRp.b].map((channel) => channel.toFixed(5))).toEqual([fromBv.r, fromBv.g, fromBv.b].map((channel) => channel.toFixed(5)));
+      expect(colorIndexToRgb(bpRp).b).toBeLessThan(fromBv.b);
+    }
+  });
+
+  it('draws a star measured in BP−RP in that colour', () => {
+    const gaia = star({ id: 5, x: 0, y: 0, z: -10, colorIndex: 1.84, colorSystem: 'BP-RP', spectralType: 'Unknown' });
+    const renderer = new StarFieldRenderer([gaia], packPositions([gaia]), 1);
+    renderer.refocus({ centre: { x: 0, y: 0, z: 0 } });
+    const { colorAttribute } = renderer as unknown as { colorAttribute: THREE.InstancedBufferAttribute };
+    expect(colorAttribute.getZ(0)).toBeCloseTo(colorIndexToRgb(1.42).b, 5);
+    renderer.dispose();
+  });
+
   it('prefers a measured index over the spectral type', () => {
     const measured = colorIndexToRgb(-0.3, 'M5');
     expect(measured.b).toBeGreaterThan(measured.r);
@@ -460,7 +478,7 @@ describe('StarFieldRenderer refocus', () => {
 
     for (let instance = 0; instance < renderer.drawnCount; instance++) {
       const drawnStar = catalogue.find((candidate) => candidate.id === renderer.starIdAt(instance))!;
-      const expected = colorIndexToRgb(drawnStar.colorIndex, drawnStar.spectralType);
+      const expected = colorIndexToRgb(drawnStar.colorIndex, drawnStar.spectralType, drawnStar.colorSystem);
       expect(colorAttribute.getX(instance)).toBeCloseTo(expected.r, 5);
       expect(colorAttribute.getZ(instance)).toBeCloseTo(expected.b, 5);
       expect(sizeAttribute.getX(instance)).toBeGreaterThan(0);

@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import { float, instancedBufferAttribute, mix, modelViewMatrix, smoothstep, uniform, uv, vec2, vec4 } from 'three/tsl';
 
 import { BrightnessIndex, brightnessIndex, Positioned } from '../../shared/astro/brightest';
-import { spectralTypeToColorIndex } from '../../shared/astro/spectral';
+import { dwarfSequenceAtColor, spectralTypeToColorIndex } from '../../shared/astro/spectral';
 import { SceneCamera } from '../../core/engine/engine.service';
 import { StarRecord } from '../../shared/models/star.model';
 import { PIXELS_TO_ANGULAR_SIZE, REFERENCE_FOV_DEGREES, REFERENCE_VIEWPORT_HEIGHT_PX } from './angular-size';
@@ -109,9 +109,15 @@ const WARM_STAR_COLOR = new THREE.Color(1.0, 0.6, 0.35);
  * value derived from `spectralType`, and to neutral white only when the catalog records no
  * classification at all — never to 0, which is itself a real color index meaning "hot A-type"
  * and would paint several hundred red dwarfs blue-white.
+ *
+ * A Gaia BP−RP is carried to the B−V of the dwarf of that colour first. It is the larger of the
+ * two for the same star — 0.82 against 0.65 for a G2 dwarf, 1.84 against 1.42 for an M0 — and read
+ * as B−V it tinted the 376 703 stars measured in it, 83 % of the map, as a K2 where they were a G7
+ * at the median, and an M0 dwarf as an M5.
  */
-export function colorIndexToRgb(colorIndex: number | null, spectralType?: string): THREE.Color {
-  const resolved = colorIndex ?? spectralTypeToColorIndex(spectralType);
+export function colorIndexToRgb(colorIndex: number | null, spectralType?: string, colorSystem?: 'B-V' | 'BP-RP'): THREE.Color {
+  const measured = colorIndex !== null && colorSystem === 'BP-RP' ? dwarfSequenceAtColor(colorIndex, 'BP-RP', true)!.bMinusV : colorIndex;
+  const resolved = measured ?? spectralTypeToColorIndex(spectralType);
   const color = new THREE.Color();
   if (resolved === null) {
     return color.copy(NEUTRAL_STAR_COLOR);
@@ -295,7 +301,7 @@ export class StarFieldRenderer {
     this.catalogueColors = new Float32Array(catalogue.length * 3);
     this.catalogueSizes = new Float32Array(catalogue.length);
     catalogue.forEach((star, index) => {
-      const color = colorIndexToRgb(star.colorIndex, star.spectralType);
+      const color = colorIndexToRgb(star.colorIndex, star.spectralType, star.colorSystem);
       this.catalogueColors[index * 3] = color.r;
       this.catalogueColors[index * 3 + 1] = color.g;
       this.catalogueColors[index * 3 + 2] = color.b;

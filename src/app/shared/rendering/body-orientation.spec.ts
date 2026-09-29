@@ -1,8 +1,11 @@
 import * as THREE from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 
+import { TT_MINUS_UTC_DAYS } from '../astro/constants';
+import { eclipticToEquatorial } from '../astro/coordinates';
+import { meanElementsAt, positionAtEpoch } from '../astro/kepler';
 import { BodyRecord } from '../models/body.model';
-import { bodyPageView } from './body-orientation';
+import { bodyOrientation, bodyPageView } from './body-orientation';
 
 // Earth (the Earth-Moon barycentre's mean elements) and the Moon as bodies.json carries them.
 const EARTH: BodyRecord = {
@@ -49,6 +52,17 @@ describe('bodyPageView', () => {
     // 116.2859 E and 1.5030 N, seen from Earth's centre.
     expect(Math.abs(moon.eastDeg - 116.285934)).toBeLessThan(0.1);
     expect(Math.abs(moon.latDeg - 1.503004)).toBeLessThan(0.05);
+  });
+
+  it('takes the Sun where it stands at the same TDB instant the body is turned for', () => {
+    // Earth's own sphere, turned as the system view turns it, and the Sun seen from Earth's mean
+    // place at the clock's date taken to TDB: the page must light that same point of its map.
+    const planet = new THREE.Quaternion();
+    const sun = new THREE.Vector3();
+    bodyPageView(EARTH, BODIES, JUNE_1_2025_NOON_UTC, SUN_AZIMUTH, planet, sun);
+    const place = eclipticToEquatorial(positionAtEpoch(meanElementsAt(EARTH.orbit, EARTH.rates, JUNE_1_2025_NOON_UTC + TT_MINUS_UTC_DAYS)));
+    const expected = new THREE.Vector3(-place.x, -place.y, -place.z).normalize().applyQuaternion(bodyOrientation(EARTH.rotationalElements!, JUNE_1_2025_NOON_UTC).invert());
+    expect(sun.clone().applyQuaternion(planet.clone().invert()).angleTo(expected)).toBeLessThan(1e-9);
   });
 
   it('keeps the pole up and the Sun where the page’s light stands, turning the body under it', () => {

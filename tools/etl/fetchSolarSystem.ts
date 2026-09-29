@@ -33,6 +33,8 @@ interface BodySpec {
   radiusKm?: number;
   /** A measured sidereal day, in hours, where a later measurement overturns the one its source gives. */
   rotationPeriodHours?: number;
+  /** The eccentricity for the card, where the row the orbit is drawn from gives an outdated one; see `BodyRecord.measuredEccentricity`. */
+  measuredEccentricity?: number;
   /** A moon that does not keep one face to its planet: its page's own spin, or none, is kept. */
   spinsFreely?: boolean;
   /** A moon heavy enough to move its planet round their barycentre visibly; see `BodyRecord.massRatio`. */
@@ -111,7 +113,8 @@ const BODY_SPECS: BodySpec[] = [
   { id: 'rhea', name: 'Rhea', kind: 'moon', horizonsCommand: '605', center: '500@699', parentBodyId: 'saturn' },
   { id: 'titan', name: 'Titan', kind: 'moon', horizonsCommand: '606', center: '500@699', parentBodyId: 'saturn' },
   // Hyperion tumbles ("Rotational period = Chaotic") and Phoebe, captured, turns in 9.27 hours.
-  { id: 'hyperion', name: 'Hyperion', kind: 'moon', horizonsCommand: '607', center: '500@699', parentBodyId: 'saturn', spinsFreely: true },
+  // Hyperion's eccentricity is 0.105 in JPL's current table (ssd.jpl.nasa.gov/sats/elem, SAT441).
+  { id: 'hyperion', name: 'Hyperion', kind: 'moon', horizonsCommand: '607', center: '500@699', parentBodyId: 'saturn', spinsFreely: true, measuredEccentricity: 0.105 },
   { id: 'iapetus', name: 'Iapetus', kind: 'moon', horizonsCommand: '608', center: '500@699', parentBodyId: 'saturn' },
   // Phoebe's row gives a mean motion of 0.6569114 degrees a day, a 548.02-day year, where its
   // Horizons page and JPL's current table (SAT441) give 550.30: the table's own note warns that
@@ -232,6 +235,7 @@ export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizo
       rates: mean.rates,
       ...(mean.laplacePole ? { laplacePole: mean.laplacePole } : {}),
       orbitSource: mean.orbitSource,
+      ...(spec.measuredEccentricity !== undefined ? { measuredEccentricity: spec.measuredEccentricity } : {}),
       ...(spec.parentBodyId ? { parentBodyId: spec.parentBodyId } : {}),
       ...(parentGm !== undefined ? { massRatio: result.gmKm3PerS2! / parentGm } : {}),
       ...(rotationPeriodHours !== undefined ? { rotationPeriodHours } : {}),

@@ -64,6 +64,13 @@ export interface BodyRecord {
   /** Where the elements come from and the span they hold over, as the card prints it. */
   orbitSource: string;
   /**
+   * The eccentricity the card prints, where it is not the orbit's own: Hyperion's row in the table
+   * its orbit is drawn from gives 0.0232, under a quarter of the 0.105 JPL's current table (SAT441)
+   * and Horizons (0.074 to 0.132 from 1980 to 2100) give. The older row still places Hyperion
+   * nearer where Horizons has it than the same row with 0.105 does, so the orbit keeps it.
+   */
+  measuredEccentricity?: number;
+  /**
    * For `kind: 'moon'`, the `id` of the planet it orbits — its `orbit` is expressed
    * relative to that planet, not heliocentrically. Undefined for planets/dwarfs.
    */

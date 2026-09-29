@@ -74,6 +74,12 @@ describe('buildBodyViewModel', () => {
     expect(bodyReadouts(model).measured.find((row) => row.label === 'Inclination')?.value).toBe('0.00°');
   });
 
+  it('prints the eccentricity measured for a moon whose orbit keeps an older one', () => {
+    const hyperion: BodyRecord = { ...luna, id: 'hyperion', orbit: orbit({ eccentricity: 0.0232 }), measuredEccentricity: 0.105 };
+    const model = buildBodyViewModel('hyperion', { ...catalogues, bodies: [earth, hyperion] })!;
+    expect(bodyReadouts(model).measured.find((row) => row.label === 'Eccentricity')?.value).toBe('0.105');
+  });
+
   it('says where the orbit comes from, in the card’s provenance', () => {
     expect(bodyReadouts(buildBodyViewModel('luna', catalogues)!).provenance).toContain('Orbit: JPL SSD satellite mean elements, epoch 2000 Jan 1.');
   });

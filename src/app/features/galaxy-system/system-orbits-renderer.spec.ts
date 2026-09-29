@@ -8,6 +8,7 @@ import { orientationAt } from '../../shared/astro/rotational-elements';
 import { BodyRecord, RotationalElements } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
+import { bodyTexturePath, loadCachedTexture } from '../../shared/rendering/texture-catalog';
 
 /** The clock's UT date that names a TDB one: TT - UT, which moves by under a second a year, earlier. */
 const utOf = (jdTdb: number): number => jdTdb - ttMinusUtSeconds(jdTdb) / 86400;
@@ -445,6 +446,32 @@ describe('rotation without IAU elements', () => {
     renderer.update(DEFAULT_EPOCH_JD + 40);
 
     expect(renderer.members[0].marker.quaternion.angleTo(start)).toBe(0);
+  });
+});
+
+describe('photographs', () => {
+  it('puts them on their bodies once loaded, one a frame, so the GPU is not handed every map at once', () => {
+    // Ids no other test here draws, since the loaded textures are shared through the cache.
+    const ids = ['ganymede', 'callisto'];
+    const records: BodyRecord[] = ids.map((id, index) => ({
+      id, systemStarId: 0, name: id, kind: 'planet', radiusKm: 2500, orbitSource: 'test',
+      orbit: { semiMajorAxisAu: 1 + index, eccentricity: 0, inclinationDeg: 0, longitudeOfAscendingNodeDeg: 0, argumentOfPeriapsisDeg: 0, meanAnomalyAtEpochDeg: 0, epochJd: DEFAULT_EPOCH_JD },
+      rates: keplerRates(1 + index, GM_SUN_AU3_PER_DAY2)
+    }));
+    const renderer = new SystemOrbitsRenderer(records, []);
+    const maps = (): Array<THREE.Texture | null> => renderer.members.map((member) => ((member.marker as THREE.Mesh).material as THREE.MeshStandardMaterial).map);
+
+    renderer.update(DEFAULT_EPOCH_JD);
+    expect(maps()).toEqual([null, null]); // not loaded yet: jsdom never loads an image
+
+    for (const id of ids) {
+      loadCachedTexture(bodyTexturePath(id)!).image = { width: 2, height: 1 };
+    }
+    renderer.update(DEFAULT_EPOCH_JD);
+    expect(maps().filter(Boolean)).toHaveLength(1);
+    renderer.update(DEFAULT_EPOCH_JD);
+    expect(maps()).toEqual(ids.map((id) => loadCachedTexture(bodyTexturePath(id)!)));
+    renderer.dispose();
   });
 });
 

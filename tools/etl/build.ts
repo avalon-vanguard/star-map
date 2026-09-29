@@ -28,6 +28,21 @@ function assertCondition(condition: boolean, message: string): void {
  */
 const MAX_STARS_WITHOUT_BAND = 1_000;
 const MAX_STARS_WITHOUT_DISTANCE_ERROR = 1_000;
+/**
+ * What the errors themselves come to, which the two counts above cannot see: Gaia's parallax_error
+ * stored in milliarcseconds rather than over the parallax still encodes, decodes and passes both.
+ * Measured: the median relative error of the stars at Gaia's distance is 0.33 %, and 1 109 parallax
+ * distances (0.24 % of the stars) have one of a fifth or more, which the card prints as a range.
+ * The mistake above gives 1.92 % and 17 689.
+ */
+const MAX_MEDIAN_GAIA_DISTANCE_ERROR = 0.01;
+const MAX_RANGED_DISTANCE_SHARE = 0.01;
+/**
+ * HYG stars that keep their own row but sit at Gaia's distance, which fetchStars flags for the card
+ * to say "HYG, Gaia DR3 distance". Measured 8 129; the flag dropped leaves none, and nothing else
+ * notices — the other 62 002 carry it from their Gaia row.
+ */
+const MIN_HYG_STARS_AT_GAIA_DISTANCE = 6_000;
 
 function validateStars(stars: StarRecord[]): void {
   assertCondition(stars.length > 0, 'No stars were produced.');
@@ -80,6 +95,30 @@ function validateStars(stars: StarRecord[]): void {
     `${withoutError} stars have no distance error (at most ${MAX_STARS_WITHOUT_DISTANCE_ERROR} expected) — the parallax errors are being lost.`
   );
   console.log(`  ${withoutBand} stars with a stand-in magnitude; ${withoutError} distances without a published error.`);
+
+  const gaiaErrors = stars
+    .filter((star) => star.distanceFromGaia && star.distanceError !== undefined)
+    .map((star) => star.distanceError!)
+    .sort((a, b) => a - b);
+  const medianGaiaError = gaiaErrors[Math.floor(gaiaErrors.length / 2)] ?? 0;
+  assertCondition(
+    medianGaiaError <= MAX_MEDIAN_GAIA_DISTANCE_ERROR,
+    `The median error of Gaia's distances is ${(medianGaiaError * 100).toFixed(2)} % (at most ${MAX_MEDIAN_GAIA_DISTANCE_ERROR * 100} % expected) — the parallax errors are no longer relative.`
+  );
+  // The archive's errors are on the distance and never printed as a range; see formatDistance.
+  const ranged = stars.filter((star) => star.source !== 'exoplanet-archive' && (star.distanceError ?? 0) >= 0.2).length;
+  assertCondition(
+    ranged <= stars.length * MAX_RANGED_DISTANCE_SHARE,
+    `${ranged} parallax distances have an error of a fifth or more (at most ${MAX_RANGED_DISTANCE_SHARE * 100} % of stars expected).`
+  );
+  const hygAtGaiaDistance = stars.filter((star) => star.source === 'hyg' && star.distanceFromGaia).length;
+  assertCondition(
+    hygAtGaiaDistance >= MIN_HYG_STARS_AT_GAIA_DISTANCE,
+    `Only ${hygAtGaiaDistance} HYG stars are flagged at Gaia's distance (at least ${MIN_HYG_STARS_AT_GAIA_DISTANCE} expected) — fetchStars no longer says whose parallax it placed them by.`
+  );
+  console.log(
+    `  Gaia distances a median ${(medianGaiaError * 100).toFixed(2)} % uncertain; ${ranged} parallax distances ranged; ${hygAtGaiaDistance} HYG stars at Gaia's distance.`
+  );
 
   // Hipparcos's mark on a classification it does not print in full reached the card as "Spectral
   // type A0m...", for Sirius and 2 126 other stars, which reads as text the app cut short.
@@ -198,6 +237,14 @@ function validateBodies(bodies: BodyRecord[]): void {
  */
 const MIN_HOSTED_SHARE = 0.995;
 
+/**
+ * The share of planets whose host's radius and temperature the archive gives, which is what
+ * starSurfaceOf draws a host with before deriving one. Measured 6 030 and 6 054 of 6 354 (0.95).
+ * Both come from the composite table only; a column lost on the way leaves every host derived —
+ * Proxima 0.105 R☉ instead of 0.141 — and nothing else fails.
+ */
+const MIN_HOST_SURFACE_SHARE = 0.9;
+
 function validateExoplanets(exoplanets: ExoplanetRecord[], stars: StarRecord[]): void {
   assertCondition(exoplanets.length > 0, 'No exoplanets were produced.');
   const starsById = new Map(stars.map((star) => [star.id, star]));
@@ -236,6 +283,14 @@ function validateExoplanets(exoplanets: ExoplanetRecord[], stars: StarRecord[]):
     crossReferenced >= exoplanets.length * MIN_HOSTED_SHARE,
     `Only ${crossReferenced} of ${exoplanets.length} exoplanets have a host star (at least ${MIN_HOSTED_SHARE * 100} % expected) — hosts are no longer being matched or added.`
   );
+
+  const withRadius = exoplanets.filter((exoplanet) => exoplanet.hostStarRadiusSolar !== undefined).length;
+  const withTemperature = exoplanets.filter((exoplanet) => exoplanet.hostStarTemperatureK !== undefined).length;
+  assertCondition(
+    Math.min(withRadius, withTemperature) >= exoplanets.length * MIN_HOST_SURFACE_SHARE,
+    `Only ${withRadius} of ${exoplanets.length} exoplanets carry their host's radius and ${withTemperature} its temperature (at least ${MIN_HOST_SURFACE_SHARE * 100} % expected) — st_rad or st_teff is being lost.`
+  );
+  console.log(`  ${withRadius}/${exoplanets.length} carry their host's radius, ${withTemperature} its temperature.`);
 
   // How many can be propagated at their real rate rather than as if the host were the Sun.
   const withPeriod = exoplanets.filter((exoplanet) => exoplanet.periodDays !== undefined).length;

@@ -224,6 +224,20 @@ describe('the archive epoch', () => {
     const separationArcsec = (Math.acos(Math.min(1, a.x * b.x + a.y * b.y + a.z * b.z)) * 180 * 3600) / Math.PI;
     expect(separationArcsec).toBeLessThan(0.02);
   });
+
+  it("matches Barnard's star from the archive's row at J2015.5, not an entry where a J2016 or J2015 row would carry it", () => {
+    // Half a year of its 10.4″/yr is 5.2″: a decoy placed where carrying the row back sixteen, or
+    // fifteen, years lands is nearer that point than Barnard's star is.
+    const row = { hostname: "Barnard's star", raDeg: 269.4486144, decDeg: 4.7379808, distancePc: 1.8266, pmRaMasPerYear: -802.803, pmDecMasPerYear: 10362.5 };
+    const at = (years: number) => propagateProperMotion(row.raDeg, row.decDeg, row.pmRaMasPerYear, row.pmDecMasPerYear, years);
+    const [truth, fromJ2016, fromJ2015] = [at(CATALOGUE_EPOCH - ARCHIVE_EPOCH), at(CATALOGUE_EPOCH - 2016), at(CATALOGUE_EPOCH - 2015)];
+    const stars = [
+      star(201, 'Gaia DR3 decoy', fromJ2016.raDeg, fromJ2016.decDeg, 1.8266),
+      star(202, 'Gaia DR3 other decoy', fromJ2015.raDeg, fromJ2015.decDeg, 1.8266),
+      star(200, 'GJ 699', truth.raDeg, truth.decDeg, 1.8266)
+    ];
+    expect(resolveHostStarId(row, stars)).toBe(200);
+  });
 });
 
 describe('archiveStarId', () => {

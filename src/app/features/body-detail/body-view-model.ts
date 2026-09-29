@@ -39,39 +39,49 @@ function photometryOf(star: StarRecord): StellarPhotometry {
   };
 }
 
-/** How big and how hot a star is, and whether the radius was measured or derived here. */
+/** How big, how hot and how bright a star is, and whether each was measured or derived here. */
 export interface StarSurface {
   /** Solar radii; `null` without a published radius, a measured magnitude, and a colour or type. */
   radiusSolar: number | null;
   radiusDerived: boolean;
   temperatureK: number | null;
+  /** Solar luminosities, what its planets are warmed by; `null` where there is neither. */
+  luminositySolar: number | null;
+  luminosityDerived: boolean;
 }
 
 /**
- * A star's radius and effective temperature: the archive's `st_rad` and `st_teff` for a planet
- * host, from any of its planets' rows, and otherwise derived — the temperature off the dwarf
- * sequence at the star's colour, the radius from that and the luminosity (Stefan-Boltzmann).
- * The Sun's are its own, the nominal values the rest are measured in.
+ * A star's radius, effective temperature and luminosity: the archive's `st_rad`, `st_teff` and
+ * `st_lum` for a planet host, from any of its planets' rows, and otherwise derived — the
+ * temperature off the dwarf sequence at the star's colour, the luminosity from its magnitude
+ * (`luminosityOf`), the radius from those two (Stefan-Boltzmann). The Sun's are its own, the
+ * nominal values the rest are measured in.
  *
  * Derived radii land within a factor of 1.5 of the archive's for 97 % of the 1 447 catalogue
- * hosts that have both, and within 0.018 dex at the median.
+ * hosts that have both, and within 0.018 dex at the median. Derived luminosities fare worse: 757
+ * of the 4 440 hosts the archive gives one for were off by more than that factor, 667 of them
+ * stars placed from the archive's own V and B−V, and Proxima read 8.9×10⁻⁴ L☉ against the
+ * archive's 1.51×10⁻³ beside the radius and temperature it was drawn with, which imply 1.27×10⁻³.
  */
 export function starSurfaceOf(star: StarRecord, planets: readonly ExoplanetRecord[]): StarSurface {
   if (star.id === SUN_STAR_ID) {
-    return { radiusSolar: 1, radiusDerived: false, temperatureK: SOLAR_EFFECTIVE_TEMPERATURE_K };
+    return { radiusSolar: 1, radiusDerived: false, temperatureK: SOLAR_EFFECTIVE_TEMPERATURE_K, luminositySolar: 1, luminosityDerived: false };
   }
   const temperatureK = planets.find((planet) => planet.hostStarTemperatureK)?.hostStarTemperatureK ?? effectiveTemperatureK(photometryOf(star));
-  const measured = planets.find((planet) => planet.hostStarRadiusSolar)?.hostStarRadiusSolar;
-  if (measured) {
-    return { radiusSolar: measured, radiusDerived: false, temperatureK };
-  }
+  const published = planets.find((planet) => planet.hostStarLuminositySolar)?.hostStarLuminositySolar;
   // None from a stand-in magnitude: PSR J1719-1438 came out 2.3 solar radii, wider than its
   // planet's orbit.
-  const luminosity = luminosityOf(star);
+  const derived = luminosityOf(star);
+  const luminosity = { luminositySolar: published ?? derived, luminosityDerived: published === undefined };
+  const measured = planets.find((planet) => planet.hostStarRadiusSolar)?.hostStarRadiusSolar;
+  if (measured) {
+    return { radiusSolar: measured, radiusDerived: false, temperatureK, ...luminosity };
+  }
   return {
-    radiusSolar: luminosity !== null && temperatureK !== null ? radiusFromLuminositySolar(luminosity, temperatureK) : null,
+    radiusSolar: derived !== null && temperatureK !== null ? radiusFromLuminositySolar(derived, temperatureK) : null,
     radiusDerived: true,
     temperatureK,
+    ...luminosity,
   };
 }
 
@@ -118,7 +128,11 @@ export function buildBodyViewModel(id: string, catalogues: BodyCatalogues): Body
     massEarth: exoplanet.massEarth,
     discoveryYear: exoplanet.discoveryYear,
     orbit: exoplanet.orbit,
-    appearance: appearanceForExoplanet(exoplanet, luminosityOf(hostStar)),
+    // Warmed by what the system view warms it by: the archive's luminosity where it has one.
+    appearance: appearanceForExoplanet(
+      exoplanet,
+      hostStar ? starSurfaceOf(hostStar, catalogues.exoplanets.filter((candidate) => candidate.hostStarId === hostStar.id)).luminositySolar : null,
+    ),
     hasPhotography: bodyTexturePath(exoplanet.id) !== undefined,
     // `periodDays` is populated for none of the shipped records, and deriving one would need the
     // host star's mass, which is equally absent. Left undefined rather than assuming a solar-mass

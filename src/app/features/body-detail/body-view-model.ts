@@ -18,9 +18,14 @@ export interface BodyCatalogues {
  * Bolometric luminosity of a star in solar units, from what the catalogue measured: apparent
  * magnitude in its band, parallax distance, and a bolometric correction read off the colour, or
  * off the spectral type where there is no colour.
+ *
+ * None where no survey measured the star and its magnitude is the ETL's stand-in, which is all
+ * 309 stars without a band have. The 265 archive hosts among them came out at a median 33 L☉
+ * from it, KMT-2016-BLG-1107L, a 0.087 M☉ star, at 37, and OGLE-2005-BLG-390L b, published at
+ * about 50 K, read 388 K. The Sun is the unit, whatever its magnitude is filed under.
  */
 export function luminosityOf(star: StarRecord | undefined): number | null {
-  return star ? luminositySolar(photometryOf(star)) : null;
+  return star && (star.magnitudeBand || star.id === SUN_STAR_ID) ? luminositySolar(photometryOf(star)) : null;
 }
 
 function photometryOf(star: StarRecord): StellarPhotometry {
@@ -60,9 +65,9 @@ export function starSurfaceOf(star: StarRecord, planets: readonly ExoplanetRecor
   if (measured) {
     return { radiusSolar: measured, radiusDerived: false, temperatureK };
   }
-  // Not from the ETL's stand-in magnitude, which is all 309 stars without a band have: PSR
-  // J1719-1438 came out 2.3 solar radii, wider than its planet's orbit.
-  const luminosity = star.magnitudeBand ? luminosityOf(star) : null;
+  // None from a stand-in magnitude: PSR J1719-1438 came out 2.3 solar radii, wider than its
+  // planet's orbit.
+  const luminosity = luminosityOf(star);
   return {
     radiusSolar: luminosity !== null && temperatureK !== null ? radiusFromLuminositySolar(luminosity, temperatureK) : null,
     radiusDerived: true,

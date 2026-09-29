@@ -289,8 +289,13 @@ const SYSTEM_MIN_DISTANCE_AU = 0.05;
 const SYSTEM_MAX_DISTANCE_AU = 5000;
 /** Where the camera lands (AU) immediately after swapping into system space, pre-settle. */
 const SYSTEM_ENTRY_DISTANCE_AU = 200;
-/** How far out (AU) the camera flies before swapping back to galaxy/parsec space. */
+/**
+ * How far out (AU) the camera flies, at least, before swapping back to galaxy/parsec space. A camera
+ * already beyond it flies half as far again: a phone held upright frames the Sun's system from 508 AU,
+ * and flying to 400 drew the system 21 per cent nearer while the reader was leaving it.
+ */
 const SYSTEM_EXIT_DISTANCE_AU = 400;
+const SYSTEM_EXIT_PULL_BACK = 1.5;
 
 const APPROACH_DURATION_SECONDS = 1.0;
 const SETTLE_DURATION_SECONDS = 0.9;
@@ -2321,7 +2326,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     this.rig.flyTo(
       {
-        position: direction.clone().multiplyScalar(SYSTEM_EXIT_DISTANCE_AU),
+        position: direction.clone().multiplyScalar(Math.max(SYSTEM_EXIT_DISTANCE_AU, SYSTEM_EXIT_PULL_BACK * camera.position.length())),
         target: new THREE.Vector3(0, 0, 0),
       },
       EXIT_DURATION_SECONDS,

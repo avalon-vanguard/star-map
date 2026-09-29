@@ -19,6 +19,8 @@ import { GalaxySystemSceneComponent } from './galaxy-system-scene.component';
 import { galacticNormal } from './grid-plane';
 import { JumpLinkRenderer } from './jump-link-renderer';
 import { StarFieldRenderer } from './star-field-renderer';
+import { systemFramingDistanceAu } from './system-framing';
+import { SystemOrbitsRenderer } from './system-orbits-renderer';
 import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
 
 // jsdom does not implement ResizeObserver; the component only uses it to react to real
@@ -875,6 +877,58 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     await advanceFrames(engine, 2.5);
     // The great conjunction, to the minute: not "now", and not a date the reader has to find.
     expect(note()).toMatch(/ to 2020-12-21 18:00 UTC\.$/);
+  });
+
+  describe('with Eris, whose aphelion runs past the grid', () => {
+    type FramedScene = { bodies: BodyRecord[]; controls: { target: THREE.Vector3 }; systemRenderer: SystemOrbitsRenderer; systemGroup: THREE.Group };
+    // Its 67.9 AU axis gives the grid an 80 AU outer ring; at aphelion it is 97.7 AU out.
+    const ERIS: BodyRecord = {
+      ...EARTH, id: 'eris', name: 'Eris', kind: 'dwarf', radiusKm: 1163,
+      orbit: { ...EARTH.orbit, semiMajorAxisAu: 67.934, eccentricity: 0.4382 }, rates: keplerRates(67.934, GM_SUN_AU3_PER_DAY2)
+    };
+
+    async function enterTheSun(aspect: number): Promise<FramedScene> {
+      const component = fixture.componentInstance as unknown as FramedScene;
+      component.bodies = [EARTH, ERIS];
+      engine.getPerspectiveCamera().aspect = aspect;
+      navigationStore.selectStar(SUN.id);
+      await flushAsync();
+      await advanceFrames(engine, 2.5);
+      return component;
+    }
+
+    it('frames the furthest the system draws, Eris’s aphelion, not the ring inside it nor its semi-major axis', async () => {
+      const component = await enterTheSun(1);
+      const camera = engine.getPerspectiveCamera();
+      expect(component.systemRenderer.outermostRadiusAu).toBeCloseTo(67.934 * 1.4382, 9);
+      // 234.7 AU; framed on the 67.9 AU axis the camera would stand at 163 AU and Eris arrive off screen.
+      expect(camera.position.distanceTo(component.controls.target)).toBeCloseTo(
+        systemFramingDistanceAu(component.systemRenderer.outermostRadiusAu, { fovDegrees: camera.fov, aspect: camera.aspect }),
+        6
+      );
+    });
+
+    it('leaves the system outwards even from a phone’s framing, which stands past the 400 AU it used to fly to', async () => {
+      const component = await enterTheSun(390 / 844);
+      const camera = engine.getCamera();
+      const arrival = camera.position.length();
+      expect(arrival).toBeGreaterThan(500);
+
+      navigationStore.selectStar(null);
+      await flushAsync(1);
+      // Until the swap: it flew 508 AU in to 400, and the system grew on screen while the reader left it.
+      let previous = arrival;
+      for (let frame = 0; frame < 100 && component.systemGroup.visible; frame++) {
+        engine.tick(0.05);
+        await flushAsync(1);
+        if (component.systemGroup.visible) {
+          expect(camera.position.length()).toBeGreaterThanOrEqual(previous - 1e-9);
+          previous = camera.position.length();
+        }
+      }
+      expect(component.systemGroup.visible).toBe(false);
+      expect(previous).toBeGreaterThan(arrival);
+    });
   });
 
   it('performs the floating-origin recenter: the camera lands close to the AU-space origin, not out at parsec-scale coordinates', async () => {

@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 
-import { tdbFromUtc, TT_MINUS_UTC_DAYS } from '../astro/constants';
+import { tdbFromUtc } from '../astro/constants';
 import { CartesianCoordinates, eclipticToEquatorial, laplacePlaneToEquatorial } from '../astro/coordinates';
 import { meanElementsAt, positionAtEpoch } from '../astro/kepler';
 import { orientationAt } from '../astro/rotational-elements';
@@ -54,14 +54,18 @@ export function poleFrame(pole: { raDeg: number; decDeg: number }, target = new 
  *
  * The clock is UT and the IAU's elements run on TDB, 69.184 s ahead today and 1 574 s at AD 1000;
  * in 69 s Earth turns 0.29 degrees, Jupiter 0.70 and Phobos 0.90, so the date is taken to TDB here
- * (see `tdbFromUtc`). Earth, `followsUt`, is the one exception: its turning is what UT counts,
- * so the clock's date already says how far it has turned, and its W, fitted to today, is taken at
- * that date plus today's TT - UTC. Taken at TDB, it would turn ΔT further: 44 degrees at AD 1.
+ * (see `tdbFromUtc`). Earth, `followsUt`, is the one exception: its turning is what UT counts, so
+ * it is turned by the IERS Earth Rotation Angle at the clock's date (IERS Conventions 2010, eq.
+ * 5.15), counted from the node its W starts at, 90 degrees past its pole's right ascension. The
+ * IAU's W for Earth, fitted to today, runs 6.3e-6 degrees a day slow of that once its pole's drift
+ * is counted: taken at UT, it left Earth's lit face 2.3 degrees off Horizons at AD 1000 and 4.5 at
+ * AD 1. Taken at TDB, it would have turned ΔT further, 44 degrees at AD 1.
  */
 export function bodyOrientation(elements: RotationalElements, jdUtc: number, target = new THREE.Quaternion(), followsUt = false): THREE.Quaternion {
-  const { poleRaDeg, poleDecDeg, primeMeridianDeg } = orientationAt(elements, followsUt ? jdUtc + TT_MINUS_UTC_DAYS : tdbFromUtc(jdUtc));
+  const { poleRaDeg, poleDecDeg, primeMeridianDeg } = orientationAt(elements, tdbFromUtc(jdUtc));
+  const turnDeg = followsUt ? 360 * (0.779057273264 + 1.00273781191135448 * (jdUtc - 2451545)) - 90 - poleRaDeg : primeMeridianDeg;
   return poleFrame({ raDeg: poleRaDeg, decDeg: poleDecDeg }, target)
-    .multiply(scratchTurn.setFromAxisAngle(Z_AXIS, primeMeridianDeg * DEG_TO_RAD))
+    .multiply(scratchTurn.setFromAxisAngle(Z_AXIS, turnDeg * DEG_TO_RAD))
     .multiply(MAP_TO_BODY);
 }
 

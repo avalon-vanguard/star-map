@@ -19,13 +19,6 @@ export const DEFAULT_EPOCH_JD = 2451545.0;
  */
 export const GM_SUN_AU3_PER_DAY2 = 0.01720209895 * 0.01720209895;
 
-/**
- * TT - UTC today, in days: 32.184 s plus the 37 leap seconds UTC has taken since 1972, the last at
- * the end of 2016. TDB, which ephemerides run on, stays within 2 ms of TT. See {@link ttMinusUtSeconds}
- * for other dates.
- */
-export const TT_MINUS_UTC_DAYS = 69.184 / 86400;
-
 /** The first day of each month UTC took a leap second at the start of, from its 10 s of 1972. */
 const LEAP_SECONDS_FROM = [
   [1972, 7], [1973, 1], [1974, 1], [1975, 1], [1976, 1], [1977, 1], [1978, 1], [1979, 1], [1980, 1], [1981, 7],

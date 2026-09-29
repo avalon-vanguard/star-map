@@ -103,7 +103,11 @@ describe('formatTemperature and formatDensity', () => {
 describe('formatLuminosity', () => {
   it('stays decimal across the ordinary range', () => {
     expect(formatLuminosity(1)).toBe('1.00 L☉');
-    expect(formatLuminosity(0.0017)).toBe('0.002 L☉');
+    expect(formatLuminosity(0.0017)).toBe('0.0017 L☉');
+    // Proxima's archive figure, which three decimals read as 0.002, a third over.
+    expect(formatLuminosity(0.0015100106)).toBe('0.0015 L☉');
+    expect(formatLuminosity(0.0523)).toBe('0.052 L☉');
+    expect(formatLuminosity(0.523)).toBe('0.523 L☉');
   });
 
   it('goes to powers of ten at the extremes', () => {

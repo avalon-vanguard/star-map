@@ -1010,7 +1010,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expectColour(scene.starTint.value, blackbodyColor(2900));
       const light = scene.systemRenderer.object.children.find((child): child is THREE.PointLight => child instanceof THREE.PointLight)!;
       expectColour(light.color, blackbodyColor(2900, SOLAR_EFFECTIVE_TEMPERATURE_K));
-      expect(scene.hudReadouts().find((readout) => readout.label === 'Luminosity')).toEqual({ label: 'Luminosity', value: '0.002 L☉' });
+      expect(scene.hudReadouts().find((readout) => readout.label === 'Luminosity')).toEqual({ label: 'Luminosity', value: '0.0015 L☉' });
       expect(scene.hudReadouts().find((readout) => readout.label === 'Radius')?.value).toBe('0.141 solar radii');
     });
 

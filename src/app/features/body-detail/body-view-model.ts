@@ -78,6 +78,7 @@ export function buildBodyViewModel(id: string, catalogues: BodyCatalogues): Body
     orbit: exoplanet.orbit,
     appearance: appearanceForExoplanet(exoplanet, luminosityOf(hostStar)),
     hasPhotography: bodyTexturePath(exoplanet.id) !== undefined,
+    imaged: exoplanet.imaged,
     // `periodDays` is populated for none of the shipped records, and deriving one would need the
     // host star's mass, which is equally absent. Left undefined rather than assuming a solar-mass
     // host, which would silently mis-state the period of every planet around an M dwarf.

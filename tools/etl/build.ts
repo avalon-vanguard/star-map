@@ -421,7 +421,16 @@ function validateExoplanets(exoplanets: ExoplanetRecord[], starIds: Set<number>)
   const withPeriod = exoplanets.filter((exoplanet) => exoplanet.periodDays !== undefined).length;
   const withHostMass = exoplanets.filter((exoplanet) => exoplanet.hostStarMassSolar !== undefined).length;
   console.log(`  ${withPeriod}/${exoplanets.length} have a measured period, ${withHostMass} a host star mass.`);
+
+  // The planets photographed by direct imaging, whose card must not say no image of them exists.
+  // Measured: 102 of 102 flagged in the archive are in the catalogue. What this catches is the
+  // join by name failing, which would put every one of them back under "no image".
+  const imaged = exoplanets.filter((exoplanet) => exoplanet.imaged).length;
+  assertCondition(imaged >= MIN_IMAGED_EXOPLANETS, `Only ${imaged} exoplanets are marked as imaged (at least ${MIN_IMAGED_EXOPLANETS} expected).`);
+  console.log(`  ${imaged} were imaged directly.`);
 }
+
+const MIN_IMAGED_EXOPLANETS = 95;
 
 const UNIT_VECTOR_TOLERANCE = 1e-6;
 

@@ -32,6 +32,8 @@ export interface BodyDetailViewModel {
   appearance: PlanetAppearance;
   /** True when a real photograph is being shown rather than the derived surface. */
   hasPhotography: boolean;
+  /** An exoplanet photographed by direct imaging, as a point of light; see `ExoplanetRecord.imaged`. */
+  imaged?: boolean;
   /**
    * Sidereal orbital period. For a solar-system body, 360 degrees over JPL's published mean
    * motion; for an exoplanet, the archive's period where it published one, and undefined where not.

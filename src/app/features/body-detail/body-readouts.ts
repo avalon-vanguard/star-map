@@ -75,15 +75,22 @@ export function bodyReadouts(body: BodyDetailViewModel): BodyReadouts {
  * The derived surface is a reasoned illustration, and a panel of real measurements sitting next
  * to it is exactly the context in which it could be mistaken for another one.
  *
- * Only an exoplanet has never been imaged. A moon or dwarf planet drawn this way has been — Voyager
- * 2 photographed Uranus's five large moons, Proteus and Nereid, Cassini Hyperion, and Hubble sees
- * Eris, Haumea and Makemake as points — but has no global map this app can use.
+ * A moon or dwarf planet drawn this way has been imaged — Voyager 2 photographed Uranus's five
+ * large moons, Proteus and Nereid, Cassini Hyperion, and Hubble sees Eris, Haumea and Makemake as
+ * points — but has no global map this app can use. So have the hundred or so exoplanets the
+ * archive flags as imaged, HR 8799's four among them, though only as points of light beside their
+ * star. Only the other exoplanets, known from what they do to starlight, have no image at all.
  */
 function provenanceFor(body: BodyDetailViewModel): string {
   if (body.hasPhotography) {
     return 'Surface: NASA/ESA/USGS photography.';
   }
-  const why = body.kind === 'exoplanet' ? 'no image of this world exists' : 'no global map of this world is used here';
+  const why =
+    body.kind !== 'exoplanet'
+      ? 'no global map of this world is used here'
+      : body.imaged
+        ? 'it has been imaged only as a point of light beside its star, and no map of it exists'
+        : 'no image of this world exists';
   return body.appearance.equilibriumTemperatureK === null
     ? `Surface illustrated from this body’s measured size and mass. Its host star is not in the catalogue, so no temperature could be derived. Not an observation — ${why}.`
     : `Surface illustrated from the measurements above — size, density and the temperature derived from its star’s output and its orbit. Not an observation — ${why}.`;

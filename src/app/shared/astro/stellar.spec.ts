@@ -160,9 +160,10 @@ describe('effectiveTemperatureK', () => {
   });
 
   it('reads a colour past the table at its end where there is no type, and the type where there is', () => {
-    // An ultracool dwarf redder than M8.5, a white dwarf bluer than B9, and an O star B−V puts at B0.
+    // An ultracool dwarf redder than M8.5, a white dwarf bluer than B9 at the 19 012 K Gentile
+    // Fusillo et al. (2021) measure at its colour, not B9's 10 700, and an O star B−V puts at B0.
     expect(effectiveTemperatureK({ magnitude: 14.005, distancePc: 4.005, spectralType: 'Unknown', magnitudeBand: 'G', colorIndex: 5.113, colorSystem: 'BP-RP' })).toBe(2420);
-    expect(effectiveTemperatureK({ magnitude: 14, distancePc: 25, spectralType: 'Unknown', magnitudeBand: 'G', colorIndex: -0.25, colorSystem: 'BP-RP' })).toBe(10700);
+    expect(effectiveTemperatureK({ magnitude: 14, distancePc: 25, spectralType: 'Unknown', magnitudeBand: 'G', colorIndex: -0.25, colorSystem: 'BP-RP' })).toBeCloseTo(19012, 6);
     expect(effectiveTemperatureK({ magnitude: 7, distancePc: 121, spectralType: 'O8', colorIndex: -0.31, colorSystem: 'B-V' })).toBe(31400);
     // HD 49748, G5 V at B−V −0.32: the colour is the one that is wrong.
     const g5 = effectiveTemperatureK({ magnitude: 9, distancePc: 184, spectralType: 'G5V', colorIndex: null })!;
@@ -182,6 +183,15 @@ describe('radiusFromLuminositySolar', () => {
     const radius = radiusFromLuminositySolar(luminositySolar(star)!, effectiveTemperatureK(star)!);
     expect(radius / 0.104).toBeGreaterThan(1 / 1.2);
     expect(radius / 0.104).toBeLessThan(1.2);
+  });
+
+  it('gives a white dwarf bluer than the table the radius its mass and gravity give', () => {
+    // Gaia DR3 6791196382856581376, 24.5 pc: 19 205 K, log g 8.07 and 0.66 M☉ in Gentile Fusillo et
+    // al. (2021), so 0.01245 R☉. At B9's 10 700 K it came out about 1.5 times that.
+    const star = { magnitude: 12.9198, distancePc: 24.5237, spectralType: 'Unknown', magnitudeBand: 'G', colorIndex: -0.2539, colorSystem: 'BP-RP' } as const;
+    const radius = radiusFromLuminositySolar(luminositySolar(star)!, effectiveTemperatureK(star)!);
+    expect(radius / 0.01245).toBeGreaterThan(1 / 1.2);
+    expect(radius / 0.01245).toBeLessThan(1.2);
   });
 
   it('gives Sirius and TRAPPIST-1 their published radii from colour and brightness alone', () => {

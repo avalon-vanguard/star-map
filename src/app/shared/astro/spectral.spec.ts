@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { dwarfSequenceAtColor, isGiant, parseSpectralClass, spectralClassification, SPECTRAL_CLASSES, spectralTypeFromColor, spectralTypeToColorIndex, temperatureToColorIndex } from './spectral';
+import { dwarfSequenceAtColor, dwarfSequenceAtTemperature, isGiant, parseSpectralClass, spectralClassification, SPECTRAL_CLASSES, spectralTypeFromColor, spectralTypeToColorIndex, temperatureToColorIndex } from './spectral';
 
 describe('parseSpectralClass', () => {
   it('reads a clean class and subclass', () => {
@@ -180,7 +180,26 @@ describe('dwarfSequenceAtColor', () => {
 
   it('reads the row at the end a colour is past, when asked to', () => {
     expect(dwarfSequenceAtColor(2.2, 'B-V', true)).toEqual({ bMinusV: 2.16, temperatureK: 2420, bolometricCorrectionV: -5.78, gMinusV: -3.09 });
-    expect(dwarfSequenceAtColor(-0.15, 'BP-RP', true)).toEqual({ bMinusV: -0.07, temperatureK: 10700, bolometricCorrectionV: -0.42, gMinusV: 0.018 });
+    expect(dwarfSequenceAtColor(5.3, 'BP-RP', true)).toEqual({ bMinusV: 2.16, temperatureK: 2420, bolometricCorrectionV: -5.78, gMinusV: -3.09 });
+    expect(dwarfSequenceAtColor(-0.4, 'B-V', true)).toEqual({ bMinusV: -0.301, temperatureK: 31400, bolometricCorrectionV: -2.99, gMinusV: null });
     expect(dwarfSequenceAtColor(null, 'B-V', true)).toBeNull();
+  });
+
+  it("reads a white dwarf bluer than BP−RP's end at the temperature measured at its colour, and the table's correction there", () => {
+    // Gentile Fusillo et al. (2021): 15 369 K at −0.15, where B9's row had 10 700; between B6 and B5.
+    const point = dwarfSequenceAtColor(-0.15, 'BP-RP', true)!;
+    expect(point.temperatureK).toBeCloseTo(15369, 6);
+    expect(point.bolometricCorrectionV).toBeCloseTo(-1.13 - 0.21 * (869 / 1200), 6);
+    expect(dwarfSequenceAtColor(-0.13, 'BP-RP', true)!.temperatureK).toBeCloseTo(15369 - 4669 * (2 / 3), 6);
+    expect(dwarfSequenceAtColor(-0.6, 'BP-RP', true)!.temperatureK).toBeCloseTo(28585, 6);
+  });
+});
+
+describe('dwarfSequenceAtTemperature', () => {
+  it("is a type's own row at its temperature, between two rows between them, and the end row past either end", () => {
+    expect(dwarfSequenceAtTemperature(5770)).toEqual({ bMinusV: 0.65, temperatureK: 5770, bolometricCorrectionV: -0.085, gMinusV: -0.165 });
+    expect(dwarfSequenceAtTemperature(3615).bolometricCorrectionV).toBeCloseTo(-1.51, 6);
+    expect(dwarfSequenceAtTemperature(50000).temperatureK).toBe(31400);
+    expect(dwarfSequenceAtTemperature(1000).temperatureK).toBe(2420);
   });
 });

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { BodyRecord, OrbitalElements } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord, SUN_STAR_ID } from '../../shared/models/star.model';
-import { buildBodyViewModel, heliocentricPeriodDays, starSurfaceOf } from './body-view-model';
+import { buildBodyViewModel, heliocentricPeriodDays, luminosityOf, starSurfaceOf } from './body-view-model';
 
 const orbit = (overrides: Partial<OrbitalElements> = {}): OrbitalElements => ({
   semiMajorAxisAu: 1,
@@ -120,6 +120,23 @@ describe('buildBodyViewModel', () => {
 
   it('carries the host star id, so callers need not rescan the catalogues for it', () => {
     expect(buildBodyViewModel('earth', catalogues)?.hostStarId).toBe(SUN_STAR_ID);
+  });
+});
+
+describe('luminosityOf', () => {
+  // KMT-2016-BLG-1107L as the ETL adds it from the archive: no V, no G, so the stand-in 15.
+  const lens: StarRecord = { id: 1070000536, name: 'KMT-2016-BLG-1107L', x: 6651, y: 0, z: 0, magnitude: 15, spectralType: 'Unknown', colorIndex: null, source: 'exoplanet-archive' };
+  const lensB: ExoplanetRecord = { id: 'lens-b', hostStarId: lens.id, hostStarName: lens.name, name: 'KMT-2016-BLG-1107L b', orbit: { semiMajorAxisAu: 0.342 } };
+
+  it('has none from a magnitude no survey measured, and gives its planets no temperature from it', () => {
+    expect(luminosityOf(lens)).toBeNull();
+    expect(buildBodyViewModel('lens-b', { bodies: [], exoplanets: [lensB], stars: [lens] })?.appearance.equilibriumTemperatureK).toBeNull();
+    // The same figure measured in V is a star, 37 L☉ at that distance.
+    expect(luminosityOf({ ...lens, magnitudeBand: 'V' })).toBeCloseTo(36.8, 0);
+  });
+
+  it('is 1 for the Sun, whatever its magnitude is filed under', () => {
+    expect(luminosityOf(sun)).toBe(1);
   });
 });
 

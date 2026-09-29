@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 
-import { tdbFromUtc } from '../astro/constants';
+import { tdbFromUtc, TT_MINUS_UTC_DAYS } from '../astro/constants';
 import { CartesianCoordinates, eclipticToEquatorial, laplacePlaneToEquatorial } from '../astro/coordinates';
 import { meanElementsAt, positionAtEpoch } from '../astro/kepler';
 import { orientationAt } from '../astro/rotational-elements';
@@ -50,11 +50,14 @@ export function poleFrame(pole: { raDeg: number; decDeg: number }, target = new 
  * into the ICRF at the map's own clock: the map onto the body's frame, turned by W about the pole,
  * and on to where the pole points.
  *
- * The clock is UTC and the IAU's elements run on TDB, 69.184 s ahead; in that time Earth turns
- * 0.29 degrees, Jupiter 0.70 and Phobos 0.90, so the date is taken to TDB here (see `tdbFromUtc`).
+ * The clock is UT and the IAU's elements run on TDB, 69.184 s ahead today and 1 574 s at AD 1000;
+ * in 69 s Earth turns 0.29 degrees, Jupiter 0.70 and Phobos 0.90, so the date is taken to TDB here
+ * (see `tdbFromUtc`). Earth, `followsUt`, is the one exception: its turning is what UT counts,
+ * so the clock's date already says how far it has turned, and its W, fitted to today, is taken at
+ * that date plus today's TT - UTC. Taken at TDB, it would turn ΔT further: 44 degrees at AD 1.
  */
-export function bodyOrientation(elements: RotationalElements, jdUtc: number, target = new THREE.Quaternion()): THREE.Quaternion {
-  const { poleRaDeg, poleDecDeg, primeMeridianDeg } = orientationAt(elements, tdbFromUtc(jdUtc));
+export function bodyOrientation(elements: RotationalElements, jdUtc: number, target = new THREE.Quaternion(), followsUt = false): THREE.Quaternion {
+  const { poleRaDeg, poleDecDeg, primeMeridianDeg } = orientationAt(elements, followsUt ? jdUtc + TT_MINUS_UTC_DAYS : tdbFromUtc(jdUtc));
   return poleFrame({ raDeg: poleRaDeg, decDeg: poleDecDeg }, target)
     .multiply(scratchTurn.setFromAxisAngle(Z_AXIS, primeMeridianDeg * DEG_TO_RAD))
     .multiply(MAP_TO_BODY);
@@ -100,6 +103,6 @@ export function bodyPageView(body: BodyRecord, bodies: readonly BodyRecord[], jd
   sun.set(-position.x, -position.y, -position.z).normalize().applyQuaternion(toPage);
   const turn = scratchPageTurn.setFromAxisAngle(Y_AXIS, sunAzimuthRad - Math.atan2(sun.x, sun.z));
   sun.applyQuaternion(turn);
-  planet.copy(turn).multiply(toPage).multiply(bodyOrientation(elements, jdUtc, scratchBody));
+  planet.copy(turn).multiply(toPage).multiply(bodyOrientation(elements, jdUtc, scratchBody, body.id === 'earth'));
   return true;
 }

@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 
-import { TT_MINUS_UTC_DAYS } from '../astro/constants';
+import { tdbFromUtc } from '../astro/constants';
 import { eclipticToEquatorial } from '../astro/coordinates';
 import { meanElementsAt, positionAtEpoch } from '../astro/kepler';
 import { BodyRecord } from '../models/body.model';
@@ -54,15 +54,18 @@ describe('bodyPageView', () => {
     expect(Math.abs(moon.latDeg - 1.503004)).toBeLessThan(0.05);
   });
 
-  it('takes the Sun where it stands at the same TDB instant the body is turned for', () => {
-    // Earth's own sphere, turned as the system view turns it, and the Sun seen from Earth's mean
-    // place at the clock's date taken to TDB: the page must light that same point of its map.
-    const planet = new THREE.Quaternion();
-    const sun = new THREE.Vector3();
-    bodyPageView(EARTH, BODIES, JUNE_1_2025_NOON_UTC, SUN_AZIMUTH, planet, sun);
-    const place = eclipticToEquatorial(positionAtEpoch(meanElementsAt(EARTH.orbit, EARTH.rates, JUNE_1_2025_NOON_UTC + TT_MINUS_UTC_DAYS)));
-    const expected = new THREE.Vector3(-place.x, -place.y, -place.z).normalize().applyQuaternion(bodyOrientation(EARTH.rotationalElements!, JUNE_1_2025_NOON_UTC).invert());
-    expect(sun.clone().applyQuaternion(planet.clone().invert()).angleTo(expected)).toBeLessThan(1e-9);
+  it('takes the Sun where it stands at the same TDB instant the body is turned for, and Earth turned as the system view turns it', () => {
+    // Earth's own sphere, turned as the system view turns it (by UT, see `bodyOrientation`), and
+    // the Sun seen from Earth's mean place at the clock's date taken to TDB: the page must light that
+    // same point of its map, today and at AD 1000, when TT was 1 574 s past UT.
+    for (const jdUt of [JUNE_1_2025_NOON_UTC, 2086307.5]) {
+      const planet = new THREE.Quaternion();
+      const sun = new THREE.Vector3();
+      bodyPageView(EARTH, BODIES, jdUt, SUN_AZIMUTH, planet, sun);
+      const place = eclipticToEquatorial(positionAtEpoch(meanElementsAt(EARTH.orbit, EARTH.rates, tdbFromUtc(jdUt))));
+      const expected = new THREE.Vector3(-place.x, -place.y, -place.z).normalize().applyQuaternion(bodyOrientation(EARTH.rotationalElements!, jdUt, undefined, true).invert());
+      expect(sun.clone().applyQuaternion(planet.clone().invert()).angleTo(expected)).toBeLessThan(1e-9);
+    }
   });
 
   it('keeps the pole up and the Sun where the page’s light stands, turning the body under it', () => {

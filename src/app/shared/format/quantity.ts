@@ -96,13 +96,18 @@ export function formatDensity(gramsPerCm3: number): string {
   return `${gramsPerCm3.toFixed(2)} g/cm³`;
 }
 
-/** Bolometric luminosity in solar units, which spans many orders of magnitude. */
+/**
+ * Bolometric luminosity in solar units, which spans many orders of magnitude. Two figures below a
+ * hundredth, as in the ×10ⁿ form below a thousandth: three decimals left one there, and Proxima's
+ * archive luminosity, 1.51×10⁻³ L☉, read 0.002, a third over; 23 of the 4 440 hosts the archive
+ * gives one for read more than 10 % off it.
+ */
 export function formatLuminosity(solar: number): string {
   if (solar >= 1000 || (solar > 0 && solar < 0.001)) {
     const exponent = Math.floor(Math.log10(solar));
     return `${(solar / Math.pow(10, exponent)).toFixed(1)}×10${superscript(exponent)} L☉`;
   }
-  return `${solar.toFixed(solar < 1 ? 3 : 2)} L☉`;
+  return `${solar < 0.01 ? solar.toPrecision(2) : solar.toFixed(solar < 1 ? 3 : 2)} L☉`;
 }
 
 function superscript(value: number): string {

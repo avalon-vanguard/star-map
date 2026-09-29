@@ -96,7 +96,7 @@ describe('starReadouts', () => {
   it('marks a derived luminosity so, and a published one not', () => {
     const surface = { radiusSolar: null, radiusDerived: true, temperatureK: null };
     expect(starReadouts(HYG_STAR, { ...surface, luminositySolar: 25.4, luminosityDerived: true }).find((readout) => readout.label === 'Luminosity')).toEqual({ label: 'Luminosity', value: '25.40 L☉', derived: true });
-    expect(starReadouts(PLACED_BY_GAIA, { ...surface, luminositySolar: 0.00151, luminosityDerived: false }).find((readout) => readout.label === 'Luminosity')).toEqual({ label: 'Luminosity', value: '0.002 L☉' });
+    expect(starReadouts(PLACED_BY_GAIA, { ...surface, luminositySolar: 0.00151, luminosityDerived: false }).find((readout) => readout.label === 'Luminosity')).toEqual({ label: 'Luminosity', value: '0.0015 L☉' });
     expect(starReadouts(HYG_STAR, { ...surface, luminositySolar: null, luminosityDerived: true }).some((readout) => readout.label === 'Luminosity')).toBe(false);
   });
 });

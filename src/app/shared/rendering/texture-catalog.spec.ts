@@ -1,3 +1,7 @@
+/// <reference types="node" />
+// Node, for the one test that reads a map's bytes from disk.
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import * as THREE from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 
@@ -9,6 +13,16 @@ describe('bodyTexturePath', () => {
     for (const id of mapped) {
       expect(bodyTexturePath(id)).toBe(`assets/textures/bodies/${id}.jpg`);
     }
+  });
+
+  it('wraps Venus in the map turned north up, the one checked for Maxwell Montes', () => {
+    // As the Solar System Scope pack ships it, venus.jpg is the Magellan map turned half round:
+    // Maxwell Montes, 65.2 N 3.3 E in the IAU Gazetteer, was its brightest point at 63 S 9 W. The
+    // file turned back puts it at 63.7 N 8.3 E; see assets/textures/README.md. No decoder runs
+    // here, so the check is pinned to those bytes.
+    expect(bodyTexturePath('venus')).toBe('assets/textures/bodies/venus.jpg');
+    const bytes = readFileSync(`${process.cwd()}/src/assets/textures/bodies/venus.jpg`);
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe('4528b8e9a3cf880d80e8a5321a3001e8792bc18f266c06f3456a6bd8475e021d');
   });
 
   it('leaves the bodies with no map it could check to their derived surface', () => {

@@ -506,6 +506,10 @@ describe('solar-system bodies against Horizons', () => {
     charon: {kind: 'moon', orbit: {semiMajorAxisAu: 0.00013095774631236113, eccentricity: 0.0002, inclinationDeg: 0.08, longitudeOfAscendingNodeDeg: 26.928, argumentOfPeriapsisDeg: 146.106, meanAnomalyAtEpochDeg: 131.07, epochJd: 2451545}, rates: {meanMotionDegPerDay: 56.362521, longitudeOfAscendingNodeDegPerDay: -0.00010926638529337138, argumentOfPeriapsisDegPerDay: 0.00009683851540842405}, laplacePole: {raDeg: 132.993, decDeg: -6.163}, parentBodyId: 'pluto', massRatio: 0.1220485755631374},
     venus: {kind: 'planet', orbit: {semiMajorAxisAu: 0.72332102, eccentricity: 0.00676399, inclinationDeg: 3.39777545, longitudeOfAscendingNodeDeg: 76.67261496, argumentOfPeriapsisDeg: 55.094942169999996, meanAnomalyAtEpochDeg: 50.21215136999999, epochJd: 2451545}, rates: {meanMotionDegPerDay: 1.6021304750882956, longitudeOfAscendingNodeDegPerDay: -0.000007467261875427789, argumentOfPeriapsisDegPerDay: 0.000009022264750171116, semiMajorAxisAuPerDay: -7.118412046543463e-12, eccentricityPerDay: -1.398220396988364e-9, inclinationDegPerDay: 1.1908008213552361e-8}},
     mars: {kind: 'planet', orbit: {semiMajorAxisAu: 1.52371243, eccentricity: 0.09336511, inclinationDeg: 1.85181869, longitudeOfAscendingNodeDeg: 49.71320984, argumentOfPeriapsisDeg: -73.63065768, meanAnomalyAtEpochDeg: 19.3493162, epochJd: 2451545}, rates: {meanMotionDegPerDay: 0.5240328362061601, longitudeOfAscendingNodeDegPerDay: -0.000007351794934976044, argumentOfPeriapsisDegPerDay: 0.00001973334866529774, semiMajorAxisAuPerDay: 2.6557152635181385e-11, eccentricityPerDay: 2.5048596851471597e-9, inclinationDegPerDay: -1.9842765229295004e-7}},
+    // Mimas and Phobos carry the terms of their IAU W that are motion along the orbit: the Mimas-Tethys
+    // libration and Phobos's tidal acceleration (see `orbitalTermsOfPrimeMeridian`).
+    mimas: {kind: 'moon', orbit: {semiMajorAxisAu: 0.0012402516100785653, eccentricity: 0.0196, inclinationDeg: 1.574, longitudeOfAscendingNodeDeg: 173.027, argumentOfPeriapsisDeg: 332.499, meanAnomalyAtEpochDeg: 14.848, epochJd: 2451545}, rates: {meanMotionDegPerDay: 381.9944948, longitudeOfAscendingNodeDegPerDay: -0.9996209770462032, argumentOfPeriapsisDegPerDay: 1.9992419540924065, meanAnomalyTerms: {b: 0, c: 30.901081394463684, s: -32.50608664008527, f: 506.2}}, laplacePole: {raDeg: 40.589, decDeg: 83.536}, parentBodyId: 'saturn'},
+    phobos: {kind: 'moon', orbit: {semiMajorAxisAu: 0.00006267468885838895, eccentricity: 0.0151, inclinationDeg: 1.075, longitudeOfAscendingNodeDeg: 207.784, argumentOfPeriapsisDeg: 150.057, meanAnomalyAtEpochDeg: 94.2394819925, epochJd: 2433282.5}, rates: {meanMotionDegPerDay: 1128.8444085925948, longitudeOfAscendingNodeDegPerDay: -0.43579001784832494, argumentOfPeriapsisDegPerDay: 0.871002371303956, meanAnomalyTerms: {b: 12.721927969999998, c: 0, s: 0, f: 0}}, laplacePole: {raDeg: 317.671, decDeg: 52.893}, parentBodyId: 'mars'},
   };
   // The IAU WGCCRE 2015 rotational elements bodies.json carries for them, from pck00011.tpc.
   const ROTATION: Record<string, RotationalElements> = {
@@ -521,7 +525,9 @@ describe('solar-system bodies against Horizons', () => {
   // Each ceiling sits just above what these elements measure on that date: Earth 0.003 degrees,
   // Jupiter 0.063, Saturn 0.164, Pluto 0.054, the Moon 0.72 (no mean ellipse has its evection or
   // variation), Io 0.021, Europa 0.036, Titan 0.014, Triton 0.137, Titania 0.62 (against Uranus's
-  // equator, 120 years from its 1980 epoch), Charon 0.37.
+  // equator, 120 years from its 1980 epoch), Charon 0.37, Mimas 2.24 on 2026 May 27, when its libration has it
+  // 44 degrees ahead of its mean motion (43.3 without the term), and Phobos 1.25 in 2100 (11.1 without its
+  // tidal acceleration).
   const HORIZONS: Array<[id: string, jd: number, x: number, y: number, z: number, maxDeg: number]> = [
     ['earth', 2488069.5, -0.1574071329883954, 0.890666220858489, 0.3859132211165683, 0.02],
     ['jupiter', 2433282.5, 3.406605247558555, -3.425997624196318, -1.551719750032203, 0.1],
@@ -534,6 +540,8 @@ describe('solar-system bodies against Horizons', () => {
     ['triton', 2488069.5, -0.001421151845853369, -0.0001894510477241482, 0.001888790702926415, 0.2],
     ['titania', 2488069.5, -0.00151919968294745, -0.0003387914082135071, 0.002465657830788125, 0.75],
     ['charon', 2488069.5, -0.00003046411046017432, -0.000009404114448552256, 0.0001270457155789907, 0.5],
+    ['mimas', 2461187.5, -3.840685116962088e-4, 1.182766232573268e-3, -2.006928678577268e-5, 3],
+    ['phobos', 2488069.5, 4.269855297288105e-5, -2.759158950396543e-5, -3.816269137755616e-5, 1.5],
   ];
 
   function record(id: string): BodyRecord {

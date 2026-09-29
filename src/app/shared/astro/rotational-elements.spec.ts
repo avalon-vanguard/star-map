@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { orientationAt, parsePckRotationalElements } from './rotational-elements';
+import { meanElementsAt } from './kepler';
+import { orbitalTermsOfPrimeMeridian, orientationAt, parsePckRotationalElements } from './rotational-elements';
+import { MeanElementRates, OrbitalElements, RotationalElements } from '../models/body.model';
 
 // Excerpts of pck00011.tpc as NAIF publishes it: prose, then data blocks.
 const KERNEL = String.raw`KPL/PCK
@@ -129,5 +131,70 @@ describe('orientationAt', () => {
     const expected = 35.1877444 + 1128.84475928 * days + 9.536137031212154e-9 * days * days + 1.42421769 * Math.sin(first) - 1.143 * Math.sin(second);
 
     expect(orientationAt(phobos, J2000 + days).primeMeridianDeg).toBeCloseTo(((expected % 360) + 360) % 360, 5);
+  });
+});
+
+describe('orbitalTermsOfPrimeMeridian', () => {
+  const J2000 = 2451545.0;
+  // Mimas's and Phobos's rows and W as pck00011.tpc and JPL's table give them, with each mean
+  // motion set to W's rate, so that only the terms can part the two.
+  const MIMAS: RotationalElements = {
+    poleRaDeg: [40.66, -0.036],
+    poleDecDeg: [83.52, -0.004],
+    primeMeridianDeg: [333.46, 381.994555, 0],
+    terms: [
+      { angleDeg: [177.4, -36505.5], ra: 13.56, dec: -1.53, pm: -13.48 },
+      { angleDeg: [316.45, 506.2], ra: 0, dec: 0, pm: -44.85 }
+    ]
+  };
+  const PHOBOS: RotationalElements = {
+    poleRaDeg: [317.67071657, -0.10844326, 0],
+    poleDecDeg: [52.88627266, -0.06134706, 0],
+    primeMeridianDeg: [35.1877444, 1128.84475928, 9.536137031212154e-9]
+  };
+  const orbit = (epochJd: number): OrbitalElements => ({
+    semiMajorAxisAu: 0.001,
+    eccentricity: 0.02,
+    inclinationDeg: 1.5,
+    longitudeOfAscendingNodeDeg: 170,
+    argumentOfPeriapsisDeg: 60,
+    meanAnomalyAtEpochDeg: 10,
+    epochJd
+  });
+
+  /** The moon's mean longitude less W, which a locked moon holds still whatever the date. */
+  function lead(elements: RotationalElements, epochJd: number, angleRate: number | undefined, jd: number): number {
+    const { meanAnomalyTerms, meanMotionDegPerDay, meanAnomalyDeg } = orbitalTermsOfPrimeMeridian(elements, epochJd, angleRate);
+    const start = orbit(epochJd);
+    const rates: MeanElementRates = {
+      meanMotionDegPerDay: elements.primeMeridianDeg[1] + meanMotionDegPerDay,
+      longitudeOfAscendingNodeDegPerDay: -1,
+      argumentOfPeriapsisDegPerDay: 2,
+      meanAnomalyTerms
+    };
+    const moved = meanElementsAt({ ...start, meanAnomalyAtEpochDeg: start.meanAnomalyAtEpochDeg + meanAnomalyDeg }, rates, jd);
+    const longitude = moved.longitudeOfAscendingNodeDeg + moved.argumentOfPeriapsisDeg + moved.meanAnomalyAtEpochDeg;
+    // W with the pole's nodding term left out: that one is the pole's, not the orbit's.
+    const w = orientationAt({ ...elements, terms: elements.terms?.filter((term) => term.angleDeg[1] === angleRate) }, jd).primeMeridianDeg;
+    return (((longitude - w) % 360) + 540) % 360 - 180;
+  }
+
+  it('moves Mimas along its orbit by the libration its W carries, over the 71 years it takes', () => {
+    const atEpoch = lead(MIMAS, J2000, 506.2, J2000);
+    for (const years of [-130, -40, 17.8, 35.5, 100]) {
+      expect(lead(MIMAS, J2000, 506.2, J2000 + years * 365.25)).toBeCloseTo(atEpoch, 8);
+    }
+  });
+
+  it('speeds Phobos up by the tidal quadratic its W carries about J2000, from a row whose epoch is 1950', () => {
+    const epoch = 2433282.5;
+    const atEpoch = lead(PHOBOS, epoch, undefined, epoch);
+    for (const years of [-150, 0, 50, 100, 150, 400]) {
+      expect(lead(PHOBOS, epoch, undefined, J2000 + years * 365.25)).toBeCloseTo(atEpoch, 6);
+    }
+  });
+
+  it('refuses a term W does not carry', () => {
+    expect(() => orbitalTermsOfPrimeMeridian(PHOBOS, J2000, 506.2)).toThrow();
   });
 });

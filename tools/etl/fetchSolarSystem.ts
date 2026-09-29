@@ -5,7 +5,7 @@ import { SUN_STAR_ID } from '../../src/app/shared/models/star.model';
 import { fetchHorizonsBody } from './lib/horizons';
 import { MeanOrbit, parsePlanetMeanElements, parseSatelliteMeanElements, parseSmallBodyElements } from '../../src/app/shared/astro/mean-elements';
 import { fetchPlanetMeanElementsText, fetchSatelliteMeanElementsHtml, fetchSmallBodyAnswer } from './lib/mean-elements';
-import { MIN_PERIODIC_TERM_DEG, parsePckRotationalElements } from '../../src/app/shared/astro/rotational-elements';
+import { MIN_PERIODIC_TERM_DEG, orbitalTermsOfPrimeMeridian, parsePckRotationalElements } from '../../src/app/shared/astro/rotational-elements';
 import { fetchPckText } from './lib/pck';
 import { dataPath, ensureDataDir } from './lib/paths';
 
@@ -42,7 +42,16 @@ interface BodySpec {
   nodeOffsetDeg?: number;
   epochJd?: number;
   periodDays?: number;
+  /**
+   * The terms of the IAU's W that are this locked moon's motion along its orbit, which its row has
+   * no column for: W's quadratic, and the term whose angle turns at `angleRateDegPerCentury`, if
+   * given. See `orbitalTermsOfPrimeMeridian`.
+   */
+  orbitFromW?: { angleRateDegPerCentury?: number };
 }
+
+/** S5 in pck00011.tpc, 316.45 + 506.2 T: the libration of Mimas and Tethys in their 4:2 resonance. */
+const MIMAS_TETHYS_LIBRATION = { angleRateDegPerCentury: 506.2 };
 
 /**
  * The poles of the equators JPL refers Uranus's and Pluto's moons to, from the IAU WGCCRE 2015
@@ -82,15 +91,15 @@ const BODY_SPECS: BodySpec[] = [
   { id: 'haumea', name: 'Haumea', kind: 'dwarf', horizonsCommand: '136108;', center: '500@10', sbdb: 'Haumea', radiusKm: 797.6 },
   { id: 'makemake', name: 'Makemake', kind: 'dwarf', horizonsCommand: '136472;', center: '500@10', sbdb: 'Makemake', radiusKm: 715 },
   { id: 'moon', name: 'Moon', kind: 'moon', horizonsCommand: '301', center: '500@399', parentBodyId: 'earth' },
-  { id: 'phobos', name: 'Phobos', kind: 'moon', horizonsCommand: '401', center: '500@499', parentBodyId: 'mars' },
+  { id: 'phobos', name: 'Phobos', kind: 'moon', horizonsCommand: '401', center: '500@499', parentBodyId: 'mars', orbitFromW: {} },
   { id: 'deimos', name: 'Deimos', kind: 'moon', horizonsCommand: '402', center: '500@499', parentBodyId: 'mars' },
   { id: 'io', name: 'Io', kind: 'moon', horizonsCommand: '501', center: '500@599', parentBodyId: 'jupiter', apsidesRegress: true },
   { id: 'europa', name: 'Europa', kind: 'moon', horizonsCommand: '502', center: '500@599', parentBodyId: 'jupiter', apsidesRegress: true },
   { id: 'ganymede', name: 'Ganymede', kind: 'moon', horizonsCommand: '503', center: '500@599', parentBodyId: 'jupiter' },
   { id: 'callisto', name: 'Callisto', kind: 'moon', horizonsCommand: '504', center: '500@599', parentBodyId: 'jupiter' },
-  { id: 'mimas', name: 'Mimas', kind: 'moon', horizonsCommand: '601', center: '500@699', parentBodyId: 'saturn' },
+  { id: 'mimas', name: 'Mimas', kind: 'moon', horizonsCommand: '601', center: '500@699', parentBodyId: 'saturn', orbitFromW: MIMAS_TETHYS_LIBRATION },
   { id: 'enceladus', name: 'Enceladus', kind: 'moon', horizonsCommand: '602', center: '500@699', parentBodyId: 'saturn' },
-  { id: 'tethys', name: 'Tethys', kind: 'moon', horizonsCommand: '603', center: '500@699', parentBodyId: 'saturn' },
+  { id: 'tethys', name: 'Tethys', kind: 'moon', horizonsCommand: '603', center: '500@699', parentBodyId: 'saturn', orbitFromW: MIMAS_TETHYS_LIBRATION },
   { id: 'dione', name: 'Dione', kind: 'moon', horizonsCommand: '604', center: '500@699', parentBodyId: 'saturn' },
   { id: 'rhea', name: 'Rhea', kind: 'moon', horizonsCommand: '605', center: '500@699', parentBodyId: 'saturn' },
   { id: 'titan', name: 'Titan', kind: 'moon', horizonsCommand: '606', center: '500@699', parentBodyId: 'saturn' },
@@ -148,6 +157,15 @@ export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizo
     horizonsOrbits.set(spec.id, result.orbit);
     gmById.set(spec.id, result.gmKm3PerS2);
 
+    // NAIF numbers a small body 2 000 000 past its catalogue number: Ceres, "1;" to Horizons, is 2000001.
+    const naifId = spec.horizonsCommand.endsWith(';') ? 2_000_000 + Number.parseInt(spec.horizonsCommand, 10) : Number(spec.horizonsCommand);
+    const rotation = parsePckRotationalElements(pck, naifId);
+    if (!rotation) {
+      console.warn(`  no IAU rotational elements for ${spec.name}; its pole and meridian are not known.`);
+    } else if (rotation.skippedDeg.length > 0) {
+      console.log(`  ${spec.name}: ${rotation.skippedDeg.length} periodic terms under ${MIN_PERIODIC_TERM_DEG} degrees left out, the largest ${Math.max(...rotation.skippedDeg)}.`);
+    }
+
     const parentName = BODY_SPECS.find((candidate) => candidate.id === spec.parentBodyId)?.name;
     const smallBody = spec.sbdb ? parseSmallBodyElements(await fetchSmallBodyAnswer(spec.sbdb, `sbdb-${spec.id}.json`)) : undefined;
     const read: MeanOrbit =
@@ -155,7 +173,7 @@ export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizo
       (parentName
         ? parseSatelliteMeanElements(satelliteElements, parentName, spec.name, spec.apsidesRegress ?? false, spec.equatorPole)
         : parsePlanetMeanElements(planetElements, spec.id));
-    const mean: MeanOrbit = {
+    const corrected: MeanOrbit = {
       ...read,
       orbit: {
         ...read.orbit,
@@ -164,17 +182,28 @@ export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizo
       },
       rates: spec.periodDays ? { ...read.rates, meanMotionDegPerDay: 360 / spec.periodDays } : read.rates
     };
+    if (spec.orbitFromW && !rotation) {
+      throw new Error(`${spec.name}'s orbit takes terms from a W the kernel does not give.`);
+    }
+    const fromW = spec.orbitFromW && orbitalTermsOfPrimeMeridian(rotation!.elements, corrected.orbit.epochJd, spec.orbitFromW.angleRateDegPerCentury);
+    const mean: MeanOrbit = fromW
+      ? {
+          ...corrected,
+          orbit: { ...corrected.orbit, meanAnomalyAtEpochDeg: corrected.orbit.meanAnomalyAtEpochDeg + fromW.meanAnomalyDeg },
+          rates: { ...corrected.rates, meanMotionDegPerDay: corrected.rates.meanMotionDegPerDay + fromW.meanMotionDegPerDay, meanAnomalyTerms: fromW.meanAnomalyTerms }
+        }
+      : corrected;
     const radiusKm = smallBody?.radiusKm ?? spec.radiusKm ?? result.radiusKm;
     if (radiusKm === undefined) {
       console.warn(`  no physical radius found for ${spec.name}; defaulting to 0.`);
     }
 
     // A moon listed here is tidally locked unless its spec says otherwise, so its day is its
-    // orbit: the sidereal period from the same mean motion that carries it round, which keeps one
-    // face towards the parent however long the clock runs. Not every page says so — the Moon's
-    // gives a rate, Titan's and Proteus's nothing. The Kepler period of the osculating orbit this
-    // used to take, 27.70 days for the Moon, would now turn its face five degrees an orbit away
-    // from the orbit it is drawn on.
+    // orbit: the sidereal period from the same mean motion that carries it round. Not every page
+    // says so — the Moon's gives a rate, Titan's and Proteus's nothing. Every locked moon here is
+    // turned by its IAU W rather than by this day, and `build.ts` checks that W and the orbit keep
+    // its face to its planet from 1950 to 2100; this day is what the renderer would turn a moon
+    // without W by.
     const rotationPeriodHours = result.tidallyLocked || (spec.kind === 'moon' && !spec.spinsFreely)
       ? (360 / mean.rates.meanMotionDegPerDay) * HOURS_PER_DAY
       : smallBody
@@ -186,14 +215,6 @@ export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizo
     }
     if (rotationPeriodHours === undefined) {
       console.warn(`  no rotation period found for ${spec.name}; it will not turn.`);
-    }
-    // NAIF numbers a small body 2 000 000 past its catalogue number: Ceres, "1;" to Horizons, is 2000001.
-    const naifId = spec.horizonsCommand.endsWith(';') ? 2_000_000 + Number.parseInt(spec.horizonsCommand, 10) : Number(spec.horizonsCommand);
-    const rotation = parsePckRotationalElements(pck, naifId);
-    if (!rotation) {
-      console.warn(`  no IAU rotational elements for ${spec.name}; its pole and meridian are not known.`);
-    } else if (rotation.skippedDeg.length > 0) {
-      console.log(`  ${spec.name}: ${rotation.skippedDeg.length} periodic terms under ${MIN_PERIODIC_TERM_DEG} degrees left out, the largest ${Math.max(...rotation.skippedDeg)}.`);
     }
 
     bodies.push({

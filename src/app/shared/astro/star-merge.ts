@@ -57,10 +57,13 @@ export const MERGE_CERTAIN_ANGULAR_TOLERANCE_DEG = 3 / 3600;
  *
  * Once the nearby faint Gaia stars joined, 253 of the 602 Gliese-only stars left without a
  * counterpart had a Gaia entry within a minute of arc moving within a fifth of their own motion;
- * shifted a quarter of a degree, none did. Brightness still has its say, so a co-moving companion
+ * shifted a quarter of a degree, none did. A minute was not enough, though: 39 Gliese stars within
+ * 25 pc still had a bare Gaia entry moving with them 60 to 150″ away, 36 of which SIMBAD names as
+ * the same star — GJ 3618, LHS 288, drawn at 4.49 pc and again 94″ away at 4.83 — while shifted a
+ * quarter of a degree, none did. So 160″. Brightness still has its say, so a co-moving companion
  * is not folded into its primary, and `fetchStars` gives HYG's motions only to those rows.
  */
-export const MERGE_COMOVING_ANGULAR_TOLERANCE_DEG = 60 / 3600;
+export const MERGE_COMOVING_ANGULAR_TOLERANCE_DEG = 160 / 3600;
 export const MERGE_PROPER_MOTION_TOLERANCE = 0.2;
 
 /**

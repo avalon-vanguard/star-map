@@ -92,11 +92,19 @@ describe('isSameStar', () => {
     expect(isSameStar(gj3052, gliese3052)).toBe(true);
   });
 
-  it('does not match two entries moving differently past fifteen arcseconds, nor co-moving ones past a minute', () => {
+  it("matches LHS 288's Gliese entry to its Gaia entry, a minute and a half away", () => {
+    const lhs288 = at(1000388933, 161.08846863703002, -61.20979834516761, 4.8316, { magnitude: 11.859, source: 'gaia', pmRaMasYr: -346.21, pmDecMasYr: 1611.1 });
+    const gliese3618 = at(118704, 161.13112906780827, -61.1935811389294, 4.4883, { name: 'GJ 3618', magnitude: 13.92, pmRaMasYr: -340.24, pmDecMasYr: 1614.54 });
+    expect(Math.acos(directionCosine(lhs288, gliese3618)) * (180 / Math.PI) * 3600).toBeCloseTo(94, 0);
+    expect(isSameStar(lhs288, gliese3618)).toBe(true);
+  });
+
+  it('does not match two entries moving differently past fifteen arcseconds, nor co-moving ones past 160″', () => {
     const kept = at(1, 120, 30, 10, { magnitude: 12, source: 'gaia', pmRaMasYr: 1000, pmDecMasYr: 0 });
     expect(isSameStar(kept, at(2, 120 + arcsecOfRa(20, 30), 30, 10, { magnitude: 13, pmRaMasYr: 750, pmDecMasYr: 0 }))).toBe(false);
     expect(isSameStar(kept, at(2, 120 + arcsecOfRa(20, 30), 30, 10, { magnitude: 13, pmRaMasYr: 850, pmDecMasYr: 0 }))).toBe(true);
-    expect(isSameStar(kept, at(2, 120 + arcsecOfRa(65, 30), 30, 10, { magnitude: 13, pmRaMasYr: 1000, pmDecMasYr: 0 }))).toBe(false);
+    expect(isSameStar(kept, at(2, 120 + arcsecOfRa(155, 30), 30, 10, { magnitude: 13, pmRaMasYr: 1000, pmDecMasYr: 0 }))).toBe(true);
+    expect(isSameStar(kept, at(2, 120 + arcsecOfRa(165, 30), 30, 10, { magnitude: 13, pmRaMasYr: 1000, pmDecMasYr: 0 }))).toBe(false);
   });
 
   it("keeps a co-moving primary out of its companion's entry", () => {

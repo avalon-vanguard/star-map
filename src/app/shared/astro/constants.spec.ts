@@ -29,9 +29,11 @@ describe('ttMinusUtSeconds', () => {
 
   it('hands over from the polynomial to the leap seconds at the start of 1972, 0.07 s apart', () => {
     // The switch is placed by the calendar, not by a 365.2425-day year, so it is sampled on either
-    // side of midnight; and the last day of 1971 must still be the polynomial's 42.25 s, not the
-    // table's 42.184, or the switch has moved.
+    // side of midnight; the last day of 1971 must still be the polynomial's 42.25 s, not the table's
+    // 42.184, or the switch has moved earlier; and midnight itself must already be the table's, or it
+    // has moved later, which the step alone cannot see once both samples fall on the polynomial.
     const start = jd(1972);
+    expect(ttMinusUtSeconds(start)).toBe(42.184);
     expect(Math.abs(ttMinusUtSeconds(start) - ttMinusUtSeconds(start - 1e-6))).toBeLessThan(0.1);
     expect(Math.abs(ttMinusUtSeconds(jd(1971, 12, 31)) - 42.2485)).toBeLessThan(0.01);
   });

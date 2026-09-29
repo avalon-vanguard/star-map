@@ -20,11 +20,20 @@ describe('ttMinusUtSeconds', () => {
     expect(ttMinusUtSeconds(jd(2999, 1, 1))).toBe(69.184);
   });
 
-  it('joins its pieces without a jump of more than a second', () => {
-    for (const year of [500, 1600, 1700, 1800, 1860, 1900, 1920, 1941, 1961, 1972]) {
+  it('joins its polynomials without a jump of more than 0.3 s, the 0.25 s at 1600 the worst', () => {
+    for (const year of [500, 1600, 1700, 1800, 1860, 1900, 1920, 1941, 1961]) {
       const at = 2451544.5 + (year - 2000) * 365.2425;
-      expect(Math.abs(ttMinusUtSeconds(at + 0.01) - ttMinusUtSeconds(at - 0.01))).toBeLessThan(1);
+      expect(Math.abs(ttMinusUtSeconds(at + 0.01) - ttMinusUtSeconds(at - 0.01))).toBeLessThan(0.3);
     }
+  });
+
+  it('hands over from the polynomial to the leap seconds at the start of 1972, 0.07 s apart', () => {
+    // The switch is placed by the calendar, not by a 365.2425-day year, so it is sampled on either
+    // side of midnight; and the last day of 1971 must still be the polynomial's 42.25 s, not the
+    // table's 42.184, or the switch has moved.
+    const start = jd(1972);
+    expect(Math.abs(ttMinusUtSeconds(start) - ttMinusUtSeconds(start - 1e-6))).toBeLessThan(0.1);
+    expect(Math.abs(ttMinusUtSeconds(jd(1971, 12, 31)) - 42.2485)).toBeLessThan(0.01);
   });
 });
 

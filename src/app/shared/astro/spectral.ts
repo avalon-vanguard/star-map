@@ -73,12 +73,14 @@ export function parseSpectralClass(
 const GIANT_LUMINOSITY_CLASS = /(?<![IV])(?:III|II|I)(?![IV])/;
 
 /**
- * Whether a spectral type says its star is a giant or supergiant: luminosity class I to III, or
- * HYG's `g` or `c` prefix. Read off the primary only — Antares is `M1Ib + B2.5V`.
+ * Whether a spectral type says its star is a giant or supergiant: luminosity class I to III,
+ * HYG's `g` or `c` prefix, or a carbon or S star (C, N, R, S), which are all giants on the
+ * asymptotic branch whether or not a class is given. Read off the primary only — Antares is
+ * `M1Ib + B2.5V`.
  */
 export function isGiant(spectralType: string | null | undefined): boolean {
   const primary = (spectralType ?? '').split('+')[0].trim();
-  return /^[gc][OBAFGKM]/.test(primary) || GIANT_LUMINOSITY_CLASS.test(primary);
+  return /^(?:[gc][OBAFGKM]|[CNRS])/.test(primary) || GIANT_LUMINOSITY_CLASS.test(primary);
 }
 
 /**
@@ -191,17 +193,19 @@ export interface DwarfSequencePoint {
  * same table the spectral estimate reads, so a star's temperature and its estimated type agree.
  * Linear rather than nearest, because the red end is steep: B−V runs 1.495 to 1.53 from M1.5 to
  * M3, over which the temperature drops 190 K and the correction 0.4 magnitudes. `null` outside
- * the table, as for the estimate.
+ * the table, as for the estimate — or, with `clampToTable`, the row at the end the colour is past.
  */
-export function dwarfSequenceAtColor(colorIndex: number | null, system: 'B-V' | 'BP-RP' = 'B-V'): DwarfSequencePoint | null {
+export function dwarfSequenceAtColor(colorIndex: number | null, system: 'B-V' | 'BP-RP' = 'B-V', clampToTable = false): DwarfSequencePoint | null {
   const column = system === 'B-V' ? 1 : 2;
   const rows = DWARF_SEQUENCE.filter((row) => row[column] !== null);
-  if (colorIndex === null || !(colorIndex >= rows[0][column]! && colorIndex <= rows[rows.length - 1][column]!)) {
+  const [bluest, reddest] = [rows[0][column]!, rows[rows.length - 1][column]!];
+  if (colorIndex === null || !Number.isFinite(colorIndex) || (!clampToTable && !(colorIndex >= bluest && colorIndex <= reddest))) {
     return null;
   }
-  const above = Math.max(1, rows.findIndex((row) => row[column]! >= colorIndex));
+  const colour = Math.min(Math.max(colorIndex, bluest), reddest);
+  const above = Math.max(1, rows.findIndex((row) => row[column]! >= colour));
   const [blue, red] = [rows[above - 1], rows[above]];
-  const t = (colorIndex - blue[column]!) / (red[column]! - blue[column]!);
+  const t = (colour - blue[column]!) / (red[column]! - blue[column]!);
   const lerp = (from: number, to: number): number => from + (to - from) * t;
   return {
     temperatureK: lerp(blue[3], red[3]),

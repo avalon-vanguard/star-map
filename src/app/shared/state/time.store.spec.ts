@@ -85,6 +85,22 @@ describe('TimeStore', () => {
     expect(time.date().toISOString()).toBe('2020-12-21T19:00:01.000Z');
   });
 
+  it('stops a running clock at either end of the window, at real time turned back into it', () => {
+    time.setDate(new Date('0001-01-10T00:00Z'));
+    time.setRate(-2_629_800); // a month a second, backwards
+    vi.advanceTimersByTime(60_000);
+    expect(time.date().toISOString()).toBe('0001-01-01T00:00:00.000Z');
+    expect(time.rate()).toBe(1);
+    vi.advanceTimersByTime(1000);
+    expect(time.date().toISOString()).toBe('0001-01-01T00:00:01.000Z');
+
+    time.setDate(new Date('2999-12-01T00:00Z'));
+    time.setRate(2_629_800);
+    vi.advanceTimersByTime(60_000);
+    expect(time.date().toISOString()).toBe('3000-01-01T00:00:00.000Z');
+    expect(time.rate()).toBe(-1);
+  });
+
   it('refuses a date the planets’ elements were never fitted for, and stays where it was', () => {
     const before = time.date().toISOString();
 

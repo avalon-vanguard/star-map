@@ -17,6 +17,8 @@ import { galacticNormal } from './grid-plane';
 import { catalogueCensus, positionsNote } from './star-readouts';
 import { closestApproachAu, SUN_RADIUS_AU } from './system-framing';
 import { blackbodyColor, SOLAR_EFFECTIVE_TEMPERATURE_K } from '../../shared/astro/stellar';
+import { appearanceForExoplanet } from '../../shared/astro/body-appearance';
+import { planetTexture } from '../../shared/rendering/procedural-planet-texture';
 import { JumpLinkRenderer } from './jump-link-renderer';
 import { StarFieldRenderer } from './star-field-renderer';
 import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
@@ -1012,6 +1014,17 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expectColour(light.color, blackbodyColor(2900, SOLAR_EFFECTIVE_TEMPERATURE_K));
       expect(scene.hudReadouts().find((readout) => readout.label === 'Luminosity')).toEqual({ label: 'Luminosity', value: '0.0015 L☉' });
       expect(scene.hudReadouts().find((readout) => readout.label === 'Radius')?.value).toBe('0.141 solar radii');
+    });
+
+    it("warms a host's planets by the luminosity the archive gives it, in the system as on their own page", async () => {
+      const scene = await enter(PROXIMA);
+      const planet = (scene.systemRenderer as unknown as { members: { id: string; marker: THREE.Mesh }[] }).members.find((member) => member.id === PROXIMA_B.id)!;
+      // The archive's 1.51×10⁻³ L☉ puts b at 228 K, temperate. The fixture has no measured band, so
+      // without it b gets no temperature and another class, as it does in the Sun's light.
+      const warmed = appearanceForExoplanet(PROXIMA_B, 0.00151);
+      expect(warmed.planetClass).not.toBe(appearanceForExoplanet(PROXIMA_B, null).planetClass);
+      expect(warmed.planetClass).not.toBe(appearanceForExoplanet(PROXIMA_B, 1).planetClass);
+      expect((planet.marker.material as THREE.MeshStandardMaterial).map).toBe(planetTexture(warmed, { width: 128, height: 64 }));
     });
 
     it('keeps the camera three radii out from a supergiant drawn at the radius its type and brightness give', async () => {

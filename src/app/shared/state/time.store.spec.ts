@@ -48,6 +48,14 @@ describe('TimeStore', () => {
     expect(time.julianDate() - afterTwoDays).toBeLessThan(1 / 24);
   });
 
+  it('runs the date backwards at a negative rate', () => {
+    time.setRate(-86_400);
+    const before = time.julianDate();
+    vi.advanceTimersByTime(1000);
+
+    expect(time.julianDate() - before).toBeCloseTo(-1, 9);
+  });
+
   it('knows the map is away from now even once it is back at real time', () => {
     expect(time.atNow()).toBe(true);
     time.setRate(2_629_800);

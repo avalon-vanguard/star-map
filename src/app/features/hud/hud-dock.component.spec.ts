@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { BookmarksStore } from '../../shared/state/bookmarks.store';
@@ -378,6 +378,8 @@ describe('HudDockComponent', () => {
       fixture.detectChanges();
     });
 
+    afterEach(() => vi.unstubAllEnvs());
+
     function button(name: string): HTMLButtonElement {
       return [...host().querySelectorAll<HTMLButtonElement>('#dock-panel-display button')].find((b) => b.textContent?.trim() === name)!;
     }
@@ -417,6 +419,9 @@ describe('HudDockComponent', () => {
     });
 
     it('jumps the clock to the date submitted, read as UTC', () => {
+      // Five and a half hours from UTC, so a field read as local time lands elsewhere: in UTC itself,
+      // where CI runs, the two readings are the same instant and this could not tell them apart.
+      vi.stubEnv('TZ', 'Asia/Kolkata');
       const field = host().querySelector<HTMLInputElement>('#clock-date')!;
       field.value = '2020-12-21T18:00';
       button('Go').click();
@@ -430,6 +435,16 @@ describe('HudDockComponent', () => {
       fixture.detectChanges();
       expect(time.atNow()).toBe(true);
       expect(host().querySelector<HTMLInputElement>('#clock-date')!.value).toBe(time.date().toISOString().slice(0, 16));
+    });
+
+    it('fills the date field again with the clock’s date when the panel is opened again', () => {
+      time.setDate(new Date('2020-12-21T18:00Z'));
+      fixture.componentInstance.toggleTab('display');
+      fixture.detectChanges();
+      fixture.componentInstance.toggleTab('display');
+      fixture.detectChanges();
+
+      expect(host().querySelector<HTMLInputElement>('#clock-date')!.value).toBe('2020-12-21T18:00');
     });
   });
 });

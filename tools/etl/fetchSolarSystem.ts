@@ -31,6 +31,8 @@ interface BodySpec {
   sbdb?: string;
   /** A measured mean radius, in km, for a body neither Horizons nor the SBDB gives one for. */
   radiusKm?: number;
+  /** A measured sidereal day, in hours, where a later measurement overturns the one its source gives. */
+  rotationPeriodHours?: number;
   /** A moon that does not keep one face to its planet: its page's own spin, or none, is kept. */
   spinsFreely?: boolean;
   /** A moon heavy enough to move its planet round their barycentre visibly; see `BodyRecord.massRatio`. */
@@ -87,7 +89,12 @@ const BODY_SPECS: BodySpec[] = [
   // 2017 (Nature 550, 219); drawn as a sphere, at the radius of the sphere of the same volume.
   // Makemake: 1434 km across its equator and 1422 across its projected pole, Brown 2013 (ApJ 767,
   // L7); the same mean.
-  { id: 'eris', name: 'Eris', kind: 'dwarf', horizonsCommand: '136199;', center: '500@10', sbdb: 'Eris', radiusKm: 1163 },
+  //
+  // Eris's day is not the SBDB's 25.9 hours, a light curve of partial coverage (Roe et al. 2008) the
+  // SBDB itself flags as "may be wrong by 30 percent or so": it turns once in 15.771 +/- 0.008 days
+  // (Bernstein et al. 2023, PSJ 4, 115), locked to Dysnomia's 15.786-day orbit (Szakáts et al.
+  // 2023, A&A 669, L3). On the SBDB's figure it turned 14.6 times too fast.
+  { id: 'eris', name: 'Eris', kind: 'dwarf', horizonsCommand: '136199;', center: '500@10', sbdb: 'Eris', radiusKm: 1163, rotationPeriodHours: 15.771 * 24 },
   { id: 'haumea', name: 'Haumea', kind: 'dwarf', horizonsCommand: '136108;', center: '500@10', sbdb: 'Haumea', radiusKm: 797.6 },
   { id: 'makemake', name: 'Makemake', kind: 'dwarf', horizonsCommand: '136472;', center: '500@10', sbdb: 'Makemake', radiusKm: 715 },
   { id: 'moon', name: 'Moon', kind: 'moon', horizonsCommand: '301', center: '500@399', parentBodyId: 'earth' },
@@ -206,9 +213,7 @@ export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizo
     // without W by.
     const rotationPeriodHours = result.tidallyLocked || (spec.kind === 'moon' && !spec.spinsFreely)
       ? (360 / mean.rates.meanMotionDegPerDay) * HOURS_PER_DAY
-      : smallBody
-        ? smallBody.rotationPeriodHours
-        : result.rotationPeriodHours;
+      : (spec.rotationPeriodHours ?? (smallBody ? smallBody.rotationPeriodHours : result.rotationPeriodHours));
     const parentGm = spec.barycentric && spec.parentBodyId ? gmById.get(spec.parentBodyId) : undefined;
     if (spec.barycentric && (result.gmKm3PerS2 === undefined || parentGm === undefined)) {
       throw new Error(`${spec.name} and its planet need a GM each to place their barycentre.`);

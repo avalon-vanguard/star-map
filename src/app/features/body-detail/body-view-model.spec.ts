@@ -72,6 +72,19 @@ describe('buildBodyViewModel', () => {
     expect(bodyReadouts(buildBodyViewModel('luna', catalogues)!).provenance).toContain('Orbit: JPL SSD satellite mean elements, epoch 2000 Jan 1.');
   });
 
+  it('says a moon without a map is illustrated, without saying it was never imaged', () => {
+    // luna has no map under that id. Voyager and Cassini photographed every moon drawn this way.
+    const provenance = bodyReadouts(buildBodyViewModel('luna', catalogues)!).provenance;
+    expect(provenance).toContain('Not an observation — no global map of this world is used here.');
+    expect(provenance).not.toContain('no image of this world exists');
+  });
+
+  it('says an exoplanet has never been imaged', () => {
+    const exoplanet: ExoplanetRecord = { id: 'x', hostStarId: SUN_STAR_ID, hostStarName: 'Sol', name: 'X b', orbit: { semiMajorAxisAu: 0.05 } };
+    const model = buildBodyViewModel('x', { bodies: [], exoplanets: [exoplanet], stars: [sun] })!;
+    expect(bodyReadouts(model).provenance).toContain('Not an observation — no image of this world exists.');
+  });
+
   it('marks a published exoplanet period as measured, not derived', () => {
     const exoplanet: ExoplanetRecord = {
       id: 'kepler-22-b',

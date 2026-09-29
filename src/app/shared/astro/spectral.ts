@@ -69,6 +69,18 @@ export function parseSpectralClass(
   return { spectralClass, subclass };
 }
 
+/** Luminosity class I (with Ia, Iab, Ib), II or III, not the I of a IV. */
+const GIANT_LUMINOSITY_CLASS = /(?<![IV])(?:III|II|I)(?![IV])/;
+
+/**
+ * Whether a spectral type says its star is a giant or supergiant: luminosity class I to III, or
+ * HYG's `g` or `c` prefix. Read off the primary only — Antares is `M1Ib + B2.5V`.
+ */
+export function isGiant(spectralType: string | null | undefined): boolean {
+  const primary = (spectralType ?? '').split('+')[0].trim();
+  return /^[gc][OBAFGKM]/.test(primary) || GIANT_LUMINOSITY_CLASS.test(primary);
+}
+
 /**
  * Approximate B-V colour index for a spectral type, interpolating between the class anchors by
  * subclass. Returns `null` when no class can be recognised, which is the honest answer for the

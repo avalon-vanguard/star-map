@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { dwarfSequenceAtColor, parseSpectralClass, SPECTRAL_CLASSES, spectralTypeFromColor, spectralTypeToColorIndex, temperatureToColorIndex } from './spectral';
+import { dwarfSequenceAtColor, isGiant, parseSpectralClass, SPECTRAL_CLASSES, spectralTypeFromColor, spectralTypeToColorIndex, temperatureToColorIndex } from './spectral';
 
 describe('parseSpectralClass', () => {
   it('reads a clean class and subclass', () => {
@@ -43,6 +43,20 @@ describe('parseSpectralClass', () => {
 
   it('ignores an out-of-range subclass rather than trusting it', () => {
     expect(parseSpectralClass('M42')).toEqual({ spectralClass: 'M', subclass: 0 });
+  });
+});
+
+describe('isGiant', () => {
+  it('reads luminosity classes I to III off the primary, and the giant and supergiant prefixes', () => {
+    for (const type of ['M1Ib + B2.5V', 'K5III', 'M2II-IIIvar', 'C7Iab', 'K0IIIb', 'gK0', 'cM2']) {
+      expect(isGiant(type), type).toBe(true);
+    }
+  });
+
+  it('leaves dwarfs, subgiants, a dwarf with a giant companion and the unclassified alone', () => {
+    for (const type of ['G2V', 'B2IV', 'F0IVn', 'M5Ve', 'K1V + M3III', 'g-k', 'Unknown', 'DA', '']) {
+      expect(isGiant(type), type).toBe(false);
+    }
   });
 });
 

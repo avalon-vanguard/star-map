@@ -122,6 +122,18 @@ describe('luminositySolar', () => {
     expect(derived / 5.53e-4).toBeLessThan(1.5);
   });
 
+  it("gives a giant its type's correction, not the cooler dwarf's its colour reads as", () => {
+    // Antares, M1 Ib at B−V 1.87 and 170 pc, and Aldebaran, K5 III: 680 R☉ (Ohnaka et al. 2013)
+    // and 44.2 (Richichi & Roccatagliata 2005). As dwarfs they came out 1 516 and 86.
+    const antares = { magnitude: 1.06, distancePc: 169.78, spectralType: 'M1Ib + B2.5V', magnitudeBand: 'V', colorIndex: 1.865, colorSystem: 'B-V' } as const;
+    const aldebaran = { magnitude: 0.87, distancePc: 20.433, spectralType: 'K5III', magnitudeBand: 'V', colorIndex: 1.538, colorSystem: 'B-V' } as const;
+    for (const [star, published] of [[antares, 680], [aldebaran, 44.2]] as const) {
+      const radius = radiusFromLuminositySolar(luminositySolar(star)!, effectiveTemperatureK(star)!);
+      expect(radius / published).toBeGreaterThan(1 / 1.2);
+      expect(radius / published).toBeLessThan(1.2);
+    }
+  });
+
   it('clamps a pathological record instead of producing an absurd luminosity', () => {
     const absurd = luminositySolar({ magnitude: -40, distancePc: 5000, spectralType: 'O5V' })!;
     expect(Number.isFinite(absurd)).toBe(true);

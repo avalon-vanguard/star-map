@@ -1,4 +1,4 @@
-import { dwarfSequenceAtColor, parseSpectralClass, SpectralClass, spectralTypeToColorIndex } from './spectral';
+import { dwarfSequenceAtColor, isGiant, parseSpectralClass, SpectralClass, spectralTypeToColorIndex } from './spectral';
 
 /**
  * Stellar luminosity, derived from the two things the star catalogue actually measures.
@@ -128,9 +128,15 @@ export function luminositySolar(star: StellarPhotometry): number | null {
   // given the Sun's correction, and TRAPPIST-1 came out at a seventh of its luminosity. Against
   // the archive's own figure for 1 449 hosts, the worst tenth was off by 0.29 dex or more, and is
   // now off by 0.12.
+  //
+  // Not for a star its type says is a giant, though: at its colour the dwarf sequence is a cooler
+  // dwarf, whose correction is larger. Antares, M1 Ib at B−V 1.87, read as an M5 dwarf's −3.26
+  // came out 1 516 R☉ against the 680 Ohnaka et al. (2013) measure, and 119 Tau 2 838 against 587;
+  // its type's −1.55 gives 690.
   const sequence = star.colorIndex != null ? dwarfSequenceAtColor(star.colorIndex, star.colorSystem) : null;
   const absoluteV = absolute - (star.magnitudeBand === 'G' ? (sequence?.gMinusV ?? 0) : 0);
-  const bolometric = absoluteV + (sequence?.bolometricCorrectionV ?? bolometricCorrection(star.spectralType));
+  const bolometric =
+    absoluteV + (sequence && !isGiant(star.spectralType) ? sequence.bolometricCorrectionV : bolometricCorrection(star.spectralType));
   const luminosity = Math.pow(10, (SOLAR_BOLOMETRIC_MAGNITUDE - bolometric) / 2.5);
   return Math.min(Math.max(luminosity, MIN_LUMINOSITY_SOLAR), MAX_LUMINOSITY_SOLAR);
 }
@@ -141,7 +147,8 @@ export const SOLAR_EFFECTIVE_TEMPERATURE_K = 5772;
 /**
  * Effective temperature, off the dwarf sequence at the star's colour, or at the colour its
  * spectral type implies where it has none. Exactly the Sun's for the Sun, which is at zero
- * distance here. A giant is read as the dwarf of its colour: a few hundred kelvin too cool at K.
+ * distance here. A giant is read as the dwarf of its colour: a few hundred kelvin too cool at K,
+ * and Antares, an M1 supergiant, 3 019 K against the 3 660 Ohnaka et al. (2013) measure.
  */
 export function effectiveTemperatureK(star: StellarPhotometry): number | null {
   if (star.distancePc === 0) {

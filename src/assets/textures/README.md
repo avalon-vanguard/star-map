@@ -45,6 +45,14 @@ Each was then checked by eye against the IAU Gazetteer: the named feature lies w
 coordinates put it on the processed map. "Black" is the share of pixels darker than 8 of 255 after
 processing; the disc photographs dropped in PR #33 were 20-43% black sky.
 
+Their brightness is the mosaics' own, contrast-stretched frame by frame to show terrain: it places
+features, not albedo. Iapetus shows it most. Its leading hemisphere, Cassini Regio, has an albedo of
+0.03-0.05 and its trailing one 0.5-0.6 (NASA), about a tenth; on `iapetus.jpg`, between 30 S and
+30 N, the leading side (30-150 W) averages 83.4 of 255 and the trailing (30-150 E) 108.2, a ratio of
+0.77, as in the USGS source (83.3 and 108.1) and the DLR PDS map. So the drawn Iapetus is a shade
+darker on one side, where the real one is coal against snow. No map here was rescaled to published
+photometry.
+
 | Map | Source | Mission, credit | Checked against | Unmapped (grey) | Black | Size |
 | --- | --- | --- | --- | --- | --- | --- |
 | `phobos.jpg` | [USGS](https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Phobos_Viking_Mosaic_40ppd_DLRcontrol.tif) Phobos Viking Mosaic 40ppd (DLR controlled) | Viking Orbiter, with Mars Express images; P. Stooke after Simonelli et al. 1993, PDS Stooke Small Bodies Maps | Stickney (1 N, 49 W) | 0.03% | 0.008% | 1024x512, 119 KB |

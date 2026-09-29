@@ -329,10 +329,12 @@ export class SystemOrbitsRenderer {
    */
   readonly referenceFrame: THREE.Quaternion;
   /**
-   * Outer radius (AU) of the reference grid, or 0 where there is none. This — not the outermost
-   * orbit — is the widest thing the system draws, so it is what the camera has to frame.
+   * How far (AU) from the star the system draws anything, or 0 where it draws nothing: what the
+   * camera has to frame. The reference grid's outer ring, which runs 15 per cent past the largest
+   * semi-major axis, unless an eccentric orbit reaches further at its aphelion — Eris's, 97.7 AU,
+   * does past the solar system's 80 AU ring, and some orbit does in 303 of the 1 190 exoplanet systems.
    */
-  readonly gridOuterRadiusAu: number;
+  readonly outermostRadiusAu: number;
 
   private readonly topLevelBodies: TrackedTopLevelBody[] = [];
   private readonly moons: TrackedMoon[] = [];
@@ -376,10 +378,11 @@ export class SystemOrbitsRenderer {
     const members: SystemMember[] = [];
     const topLevelBodiesById = new Map<string, BodyRecord>();
 
-    const topLevelAxes = [
-      ...bodies.filter((body) => !body.parentBodyId).map((body) => body.orbit.semiMajorAxisAu),
-      ...exoplanets.filter((exoplanet) => isPropagatableOrbit(exoplanet.orbit)).map((exoplanet) => exoplanet.orbit.semiMajorAxisAu!)
-    ].filter((axis) => Number.isFinite(axis) && axis > 0);
+    const topLevelOrbits = [
+      ...bodies.filter((body) => !body.parentBodyId).map(({ orbit }) => ({ axis: orbit.semiMajorAxisAu, eccentricity: orbit.eccentricity })),
+      ...exoplanets.filter((exoplanet) => isPropagatableOrbit(exoplanet.orbit)).map(({ orbit }) => ({ axis: orbit.semiMajorAxisAu!, eccentricity: orbit.eccentricity ?? 0 }))
+    ].filter(({ axis }) => Number.isFinite(axis) && axis > 0);
+    const topLevelAxes = topLevelOrbits.map(({ axis }) => axis);
     this.maxTopLevelSemiMajorAxisAu = topLevelAxes.length > 0 ? Math.max(...topLevelAxes) : 0;
     this.minTopLevelSemiMajorAxisAu = topLevelAxes.length > 0 ? Math.min(...topLevelAxes) : 0;
 
@@ -453,7 +456,7 @@ export class SystemOrbitsRenderer {
     this.referenceFrame = bodies.some((body) => !body.parentBodyId) ? ECLIPTIC_FRAME.clone() : exoplanetFrame;
 
     const rings = systemGridRingsAu(this.maxTopLevelSemiMajorAxisAu);
-    this.gridOuterRadiusAu = rings.length > 0 ? rings[rings.length - 1] : 0;
+    this.outermostRadiusAu = Math.max(rings.length > 0 ? rings[rings.length - 1] : 0, ...topLevelOrbits.map(({ axis, eccentricity }) => axis * (1 + eccentricity)));
     if (rings.length > 0) {
       this.grid = new PolarGridPlane({
         ringRadii: rings,

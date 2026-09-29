@@ -108,7 +108,9 @@ describe('SystemObjectCardComponent', () => {
       appearance: appearance({ equilibriumTemperatureK: null }),
     });
     expect(block(host, 'Derived')).not.toContain('Equilibrium temp.');
-    expect(host.textContent).toContain('host star is not in the catalogue');
+    // Not that the host is missing, which it is for 27 of the 2 714 planets without a temperature.
+    expect(host.textContent).toContain('its star’s luminosity or its orbit’s size is not known');
+    expect(host.textContent).not.toContain('not in the catalogue');
   });
 
   it('emits rather than navigating, so the scene decides what selection means', () => {

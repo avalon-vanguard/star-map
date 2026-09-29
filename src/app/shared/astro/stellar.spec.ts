@@ -122,16 +122,39 @@ describe('luminositySolar', () => {
     expect(derived / 5.53e-4).toBeLessThan(1.5);
   });
 
-  it("gives a giant its type's correction, not the cooler dwarf's its colour reads as", () => {
-    // Antares, M1 Ib at B−V 1.87 and 170 pc, and Aldebaran, K5 III: 680 R☉ (Ohnaka et al. 2013)
-    // and 44.2 (Richichi & Roccatagliata 2005). As dwarfs they came out 1 516 and 86.
+  it("reads a giant's temperature and correction both off its type, not the cooler dwarf's its colour reads as", () => {
+    // Antares, M1 Ib at B−V 1.87: 3 660 K (Ohnaka et al. 2013), where its colour's dwarf is 3 019.
     const antares = { magnitude: 1.06, distancePc: 169.78, spectralType: 'M1Ib + B2.5V', magnitudeBand: 'V', colorIndex: 1.865, colorSystem: 'B-V' } as const;
+    expect(Math.abs(effectiveTemperatureK(antares)! - 3660)).toBeLessThan(100);
+    // Aldebaran, K5 III, 44.2 R☉ (Richichi & Roccatagliata 2005), to a tenth; Rigel, B8 Ia, 74.1
+    // (Baines et al. 2018), to a fifth. With a correction off the type beside the colour's
+    // temperature, Rigel came out 101.6; with K5's own correction at 3 902 K, Aldebaran 52.
     const aldebaran = { magnitude: 0.87, distancePc: 20.433, spectralType: 'K5III', magnitudeBand: 'V', colorIndex: 1.538, colorSystem: 'B-V' } as const;
-    for (const [star, published] of [[antares, 680], [aldebaran, 44.2]] as const) {
+    const rigel = { magnitude: 0.18, distancePc: 264.55, spectralType: 'B8Ia', magnitudeBand: 'V', colorIndex: -0.03, colorSystem: 'B-V' } as const;
+    for (const [star, published, tolerance] of [[aldebaran, 44.2, 1.1], [rigel, 74.1, 1.2]] as const) {
       const radius = radiusFromLuminositySolar(luminositySolar(star)!, effectiveTemperatureK(star)!);
-      expect(radius / published).toBeGreaterThan(1 / 1.2);
-      expect(radius / published).toBeLessThan(1.2);
+      expect(radius / published).toBeGreaterThan(1 / tolerance);
+      expect(radius / published).toBeLessThan(tolerance);
     }
+  });
+
+  it('reads a hot giant reddened by dust at its type, not at the cool star its colour reads as', () => {
+    // Menkib, O7.5 Iab at B−V 0.02: 14 R☉ (Krtička & Kubát 2010). At its colour's 9 517 K and its
+    // type's correction it was drawn at 95; the dust it is behind still leaves it dimmer than it is.
+    const menkib = { magnitude: 3.98, distancePc: 408.881, spectralType: 'O7.5Iab:', magnitudeBand: 'V', colorIndex: 0.016, colorSystem: 'B-V' } as const;
+    expect(effectiveTemperatureK(menkib)).toBeCloseTo(36100, 6);
+    const radius = radiusFromLuminositySolar(luminositySolar(menkib)!, effectiveTemperatureK(menkib)!);
+    expect(radius / 14).toBeGreaterThan(1 / 2.5);
+    expect(radius / 14).toBeLessThan(2.5);
+  });
+
+  it("gives a carbon star the carbon stars' correction and temperature, not the Sun's correction at an M dwarf's", () => {
+    // La Superba, C7 Iab: Bergeat et al. (2001) have it at bolometric magnitude 2.43, which at the
+    // catalogue's 310 pc is 8 090 L☉. The Sun's −0.06 at 2 420 K gave 544 L☉ and 133 R☉.
+    const laSuperba = { magnitude: 5.42, distancePc: 310.342, spectralType: 'C7Iab', magnitudeBand: 'V', colorIndex: 2.994, colorSystem: 'B-V' } as const;
+    expect(luminositySolar(laSuperba)! / 8090).toBeGreaterThan(1 / 1.2);
+    expect(luminositySolar(laSuperba)! / 8090).toBeLessThan(1.2);
+    expect(effectiveTemperatureK(laSuperba)).toBe(2990);
   });
 
   it('clamps a pathological record instead of producing an absurd luminosity', () => {

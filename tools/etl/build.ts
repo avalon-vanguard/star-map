@@ -181,9 +181,13 @@ const MOON_OFFSET_CEILINGS_DEG: Record<string, number> = { hyperion: 21, iapetus
  *   `orbitFromW` in `fetchSolarSystem.ts`), but not the rest of what Horizons integrates.
  * - Ceres, 7.12 (1953): the SBDB's elements are osculating, exact at 2026 Jun 9 and drifting
  *   either side; 1.9 by 2050, 5.3 by 2100, and 39 at 1600 on Horizons' own figures.
+ *
+ * And one is held tighter than the rest: Tethys, 0.28, which takes the other half of that
+ * libration, 2.23 degrees, from its W. Without it Tethys strays 2.09 degrees, under the general
+ * ceiling, and its card would quietly restate itself as "within 2.1".
  */
 const MAX_TRACK_OFFSET_DEG = 3;
-const TRACK_OFFSET_CEILINGS_DEG: Record<string, number> = { hyperion: 23, nereid: 12, iapetus: 11, mimas: 8, ceres: 8 };
+const TRACK_OFFSET_CEILINGS_DEG: Record<string, number> = { hyperion: 23, nereid: 12, iapetus: 11, mimas: 8, ceres: 8, tethys: 0.5 };
 
 /**
  * The bodies the IAU WGCCRE 2015 report gives no rotational elements for: Hyperion tumbles, and
@@ -222,8 +226,13 @@ const MAX_OBLIQUITY_OFFSET_DEG = 0.1;
  * sampled every 135 days from 1950 to 2100, where both the tables and the IAU's elements hold.
  *
  * Measured on this catalogue: at most 6.70 degrees (the Moon, whose longitude swings 6.3 either
- * way with its eccentricity; Horizons has the same). Three need their own: Mimas 10.15, whose
- * physical libration W carries and Horizons shows as 5 to 9 degrees at its true place; Iapetus
+ * way with its eccentricity; Horizons has the same). Three need their own. Mimas 10.15: its drawn
+ * face runs from 2.5 to 10.15 degrees, about 6.3 off on average because the IAU's W and JPL's mean
+ * longitude disagree, drifting 3.3 over the span because W turns 6.0e-5 degrees a day faster than
+ * the row's n, and swung 2.3 either way (2e) by its eccentricity. None of that is Mimas: its
+ * measured physical libration is 0.84 degrees (Tajeddine et al. 2014, Science 346, 322), and W
+ * carries none; Horizons, on the same W against its integrated orbit, runs from -2.7 to 12.7
+ * degrees over 1950-2100 with the 71-year S5 term the orbit here cancels. Iapetus
  * 18.33, whose row sits 9.4 degrees behind Horizons; and Proteus 8.18, whose W turns 6.3e-7 of
  * its rate slower than its orbit, a drift of 74 degrees by AD 3000. What this catches is an orbit
  * and a W that go round at different rates: the tidal acceleration W carried and the orbit did not
@@ -282,6 +291,12 @@ function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, Orbita
     assertCondition(
       (track !== undefined) === !body.orbitSource.startsWith('JPL approximate mean elements (Standish)'),
       `${body.name}'s orbit, "${body.orbitSource}", ${track ? 'names its own span' : 'names no span it holds over'}.`
+    );
+    // JPL's satellite table carries no periodic terms: a moon's are from its IAU W, and its card
+    // names the kernel they come from as well as the table.
+    assertCondition(
+      !body.parentBodyId || !body.rates.meanAnomalyTerms || body.orbitSource.includes('NAIF pck00011'),
+      `${body.name}'s orbit carries terms taken from its IAU W, and its card, "${body.orbitSource}", credits only the table.`
     );
     if (track) {
       const worst = Math.max(...track.map((point) => offsetFromTrackDeg(body, point)));

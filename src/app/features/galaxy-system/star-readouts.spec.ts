@@ -54,6 +54,8 @@ describe('starReadouts', () => {
     const unmeasured = starReadouts({ ...GAIA_STAR, magnitude: 12, magnitudeBand: undefined, colorIndex: null, colorSystem: undefined });
     expect(value(unmeasured, 'Magnitude')).toBe('Not measured');
     expect(value(unmeasured, 'Colour')).toBeUndefined();
+    // Still Gaia's star, as the 44 Gaia sources with no G are: no band is not HYG's V.
+    expect(value(unmeasured, 'Source')).toBe('Gaia DR3');
   });
 
   it('gives the distance with its uncertainty', () => {

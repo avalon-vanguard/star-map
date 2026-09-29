@@ -32,12 +32,16 @@ const JD_1972 = Date.UTC(1972, 0, 1) / 86400000 + 2440587.5;
  * has fallen behind the uniform time the ephemerides run on.
  *
  * From 1972 the clock is UTC, held to within 0.9 s of UT by leap seconds, and TT - UTC is exact:
- * 32.184 s plus the 10 to 37 of them. After the last, at the start of 2017, it is held at 69.184 s,
- * as Horizons holds it: no one knows the leap seconds to come. Before 1972 it is ΔT from the
- * Espenak-Meeus polynomials (NASA's Five Millennium Canon, 2006), which fit the historical record
- * of eclipses and occultations: 10 570 s at AD 1, 1 574 at AD 1000, 29 in 1950. Held at 69 s there,
- * as it was, every spin but Earth's was a turn of (ΔT - 69 s) times its rate out, 15 degrees for
- * Jupiter at AD 1000 and 106 at AD 1, and the Moon 0.22 and 1.43 degrees along its orbit.
+ * 32.184 s plus TAI - UTC, which is the 10 s UTC started from in 1972 and the 27 leap seconds taken
+ * since, 37 s from 2017. After the last, at the start of 2017, it is held at 69.184 s, as Horizons
+ * holds it: no one knows the leap seconds to come. Before 1972 it is ΔT from the Espenak-Meeus
+ * polynomials (NASA's Five Millennium Canon, 2006), which fit the historical record of eclipses and
+ * occultations: 10 570 s at AD 1, 1 574 at AD 1000, 29 in 1950. As published they join within
+ * 0.26 s (at 1600; 0.16 s at 1700, under 0.09 s elsewhere), and the last meets the leap-second
+ * table 0.07 s apart. Held at 69 s there, as it was, every spin but Earth's was a turn of
+ * (ΔT - 69 s) times its rate out, 15 degrees for Jupiter at AD 1000 and 106 at AD 1, and the Moon
+ * 0.21 to 0.26 and 1.44 to 1.79 degrees along its orbit, as its eccentric orbit carries it faster
+ * or slower through those hours.
  */
 export function ttMinusUtSeconds(jdUt: number): number {
   if (jdUt >= JD_1972) {

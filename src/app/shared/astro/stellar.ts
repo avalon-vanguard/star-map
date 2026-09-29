@@ -1,4 +1,4 @@
-import { dwarfSequenceAtColor, isGiant, parseSpectralClass, SpectralClass, spectralTypeToColorIndex } from './spectral';
+import { DwarfSequencePoint, dwarfSequenceAtColor, isGiant, parseSpectralClass, SpectralClass, spectralTypeToColorIndex } from './spectral';
 
 /**
  * Stellar luminosity, derived from the two things the star catalogue actually measures.
@@ -133,12 +133,28 @@ export function luminositySolar(star: StellarPhotometry): number | null {
   // dwarf, whose correction is larger. Antares, M1 Ib at B−V 1.87, read as an M5 dwarf's −3.26
   // came out 1 516 R☉ against the 680 Ohnaka et al. (2013) measure, and 119 Tau 2 838 against 587;
   // its type's −1.55 gives 690.
-  const sequence = star.colorIndex != null ? dwarfSequenceAtColor(star.colorIndex, star.colorSystem) : null;
+  const sequence = sequenceAtColour(star);
   const absoluteV = absolute - (star.magnitudeBand === 'G' ? (sequence?.gMinusV ?? 0) : 0);
   const bolometric =
     absoluteV + (sequence && !isGiant(star.spectralType) ? sequence.bolometricCorrectionV : bolometricCorrection(star.spectralType));
   const luminosity = Math.pow(10, (SOLAR_BOLOMETRIC_MAGNITUDE - bolometric) / 2.5);
   return Math.min(Math.max(luminosity, MIN_LUMINOSITY_SOLAR), MAX_LUMINOSITY_SOLAR);
+}
+
+/**
+ * The dwarf sequence at a star's colour — at the end of the table a colour is past, where the star
+ * has no type to go by instead. Past the red end are the ultracool dwarfs Gaia measures redder than
+ * BP−RP 5.1, M8.5; past the blue end, its white dwarfs and hot stars bluer than −0.12, B9, and
+ * B−V's O stars. Unclamped, they had no temperature and were drawn at the Sun's: Gaia DR3
+ * 6439125097427143808, an ultracool dwarf 4.0 pc away, and 110 white dwarfs within 50 pc, all at
+ * 1 R☉. Beside a type, an off-table colour is more often a bad one than an extreme star — HD
+ * 49748, G5 V, at B−V −0.32 — and the type is read instead.
+ */
+function sequenceAtColour(star: StellarPhotometry): DwarfSequencePoint | null {
+  if (star.colorIndex == null) {
+    return null;
+  }
+  return dwarfSequenceAtColor(star.colorIndex, star.colorSystem) ?? (parseSpectralClass(star.spectralType) ? null : dwarfSequenceAtColor(star.colorIndex, star.colorSystem, true));
 }
 
 /** The Sun's effective temperature, the IAU 2015 nominal value. */
@@ -154,8 +170,8 @@ export function effectiveTemperatureK(star: StellarPhotometry): number | null {
   if (star.distancePc === 0) {
     return SOLAR_EFFECTIVE_TEMPERATURE_K;
   }
-  const measured = star.colorIndex != null ? dwarfSequenceAtColor(star.colorIndex, star.colorSystem) : null;
-  return (measured ?? dwarfSequenceAtColor(spectralTypeToColorIndex(star.spectralType)))?.temperatureK ?? null;
+  // A type's colour past the table is an O star's, which B−V no longer tells apart from B0.
+  return (sequenceAtColour(star) ?? dwarfSequenceAtColor(spectralTypeToColorIndex(star.spectralType), 'B-V', true))?.temperatureK ?? null;
 }
 
 /**

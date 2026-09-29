@@ -158,11 +158,30 @@ describe('effectiveTemperatureK', () => {
     expect(effectiveTemperatureK({ magnitude: 11, distancePc: 5, spectralType: 'M5Ve', colorIndex: null })).toBeCloseTo(3106, 0);
     expect(effectiveTemperatureK({ magnitude: 11, distancePc: 5, spectralType: 'Unknown', colorIndex: null })).toBeNull();
   });
+
+  it('reads a colour past the table at its end where there is no type, and the type where there is', () => {
+    // An ultracool dwarf redder than M8.5, a white dwarf bluer than B9, and an O star B−V puts at B0.
+    expect(effectiveTemperatureK({ magnitude: 14.005, distancePc: 4.005, spectralType: 'Unknown', magnitudeBand: 'G', colorIndex: 5.113, colorSystem: 'BP-RP' })).toBe(2420);
+    expect(effectiveTemperatureK({ magnitude: 14, distancePc: 25, spectralType: 'Unknown', magnitudeBand: 'G', colorIndex: -0.25, colorSystem: 'BP-RP' })).toBe(10700);
+    expect(effectiveTemperatureK({ magnitude: 7, distancePc: 121, spectralType: 'O8', colorIndex: -0.31, colorSystem: 'B-V' })).toBe(31400);
+    // HD 49748, G5 V at B−V −0.32: the colour is the one that is wrong.
+    const g5 = effectiveTemperatureK({ magnitude: 9, distancePc: 184, spectralType: 'G5V', colorIndex: null })!;
+    expect(effectiveTemperatureK({ magnitude: 9, distancePc: 184, spectralType: 'G5V', colorIndex: -0.319, colorSystem: 'B-V' })).toBe(g5);
+    expect(g5).toBeGreaterThan(5500);
+  });
 });
 
 describe('radiusFromLuminositySolar', () => {
   it('is one for the Sun', () => {
     expect(radiusFromLuminositySolar(1, SOLAR_EFFECTIVE_TEMPERATURE_K)).toBeCloseTo(1, 12);
+  });
+
+  it("gives an ultracool dwarf redder than the table an M8.5 dwarf's radius, not none", () => {
+    // Gaia DR3 6439125097427143808, 4.0 pc away at BP−RP 5.11; M8.5 V is 0.104 R☉ (Mamajek).
+    const star = { magnitude: 14.005, distancePc: 4.005, spectralType: 'Unknown', magnitudeBand: 'G', colorIndex: 5.113, colorSystem: 'BP-RP' } as const;
+    const radius = radiusFromLuminositySolar(luminositySolar(star)!, effectiveTemperatureK(star)!);
+    expect(radius / 0.104).toBeGreaterThan(1 / 1.2);
+    expect(radius / 0.104).toBeLessThan(1.2);
   });
 
   it('gives Sirius and TRAPPIST-1 their published radii from colour and brightness alone', () => {

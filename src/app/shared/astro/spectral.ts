@@ -271,8 +271,20 @@ export function dwarfSequenceAtTemperature(temperatureK: number): DwarfSequenceP
 
 /** The sequence where `key`, rising down `rows`, reaches `value`: linear between the two rows either side, the end row past either end. */
 function sequenceWhere(rows: readonly SequenceRow[], key: (row: SequenceRow) => number, value: number): DwarfSequencePoint {
-  const next = rows.findIndex((row) => key(row) >= value);
-  const [first, second] = next === -1 ? [rows[rows.length - 2], rows[rows.length - 1]] : [rows[Math.max(next, 1) - 1], rows[Math.max(next, 1)]];
+  // Bisected, not scanned: the star field reads it for each of the 455 571 stars, and a scan of the
+  // rows took 200 ms of that.
+  let low = 1;
+  let high = rows.length - 1;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (key(rows[middle]) >= value) {
+      high = middle;
+    } else {
+      low = middle + 1;
+    }
+  }
+  const first = rows[low - 1];
+  const second = rows[low];
   const t = Math.min(Math.max((value - key(first)) / (key(second) - key(first)), 0), 1);
   const lerp = (from: number, to: number): number => from + (to - from) * t;
   return {

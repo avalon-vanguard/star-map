@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import { float, instancedBufferAttribute, mix, modelViewMatrix, smoothstep, uniform, uv, vec2, vec4 } from 'three/tsl';
 
 import { BrightnessIndex, brightnessIndex, Positioned } from '../../shared/astro/brightest';
-import { dwarfSequenceAtColor, spectralTypeToColorIndex } from '../../shared/astro/spectral';
+import { blackbodyColor, effectiveTemperatureK } from '../../shared/astro/stellar';
 import { SceneCamera } from '../../core/engine/engine.service';
 import { StarRecord } from '../../shared/models/star.model';
 import { PIXELS_TO_ANGULAR_SIZE, REFERENCE_FOV_DEGREES, REFERENCE_VIEWPORT_HEIGHT_PX } from './angular-size';
@@ -97,35 +97,39 @@ export interface DrawFocus {
 
 const SUN: Positioned = { x: 0, y: 0, z: 0 };
 
-const COLD_STAR_COLOR = new THREE.Color(0.65, 0.75, 1.0);
 const NEUTRAL_STAR_COLOR = new THREE.Color(1.0, 1.0, 1.0);
-const WARM_STAR_COLOR = new THREE.Color(1.0, 0.6, 0.35);
 
 /**
- * Crude but effective B-V color-index -> RGB tint: hot/blue stars (low/negative index) skew
- * blue-white, cool/red stars (high index) skew orange-red, matching real spectral colors.
+ * A star's tint in the field: the colour of a blackbody at its effective temperature against the
+ * display's white — the tint its own disc is drawn in, in its system. The temperature is the one
+ * the disc is drawn at (`effectiveTemperatureK`): off the dwarf sequence at the star's colour, in
+ * B−V or Gaia's BP−RP, off the type where there is no colour, and off the type for a giant.
  *
- * `colorIndex` is `null` for the ~10% of stars HYG never photometered. Those fall back to a
- * value derived from `spectralType`, and to neutral white only when the catalog records no
- * classification at all — never to 0, which is itself a real color index meaning "hot A-type"
- * and would paint several hundred red dwarfs blue-white.
+ * `colorIndex` is `null` for the ~10% of stars HYG never photometered. Those fall back to their
+ * `spectralType`, and to neutral white only when the catalog records no classification at all —
+ * never to 0, which is itself a real color index meaning "hot A-type" and would paint several
+ * hundred red dwarfs blue-white.
  *
- * A Gaia BP−RP is carried to the B−V of the dwarf of that colour first. It is the larger of the
- * two for the same star — 0.82 against 0.65 for a G2 dwarf, 1.84 against 1.42 for an M0 — and read
- * as B−V it tinted the 376 703 stars measured in it, 83 % of the map, as a K2 where they were a G7
- * at the median, and an M0 dwarf as an M5.
+ * It was a ramp in B−V, white at 0.8, a K0 dwarf, where a blackbody against D65 is white at about
+ * 6 500 K, B−V 0.44: of the 376 660 stars measured in BP−RP, 245 850 were tinted bluish, 227 797 of
+ * them while their disc was warm, and a G2 dwarf (0.956, 0.969, 1) beside its disc's (1, 0.878,
+ * 0.821). Its red end, (1, 0.6, 0.35), was paler than an M dwarf's disc.
  */
 export function colorIndexToRgb(colorIndex: number | null, spectralType?: string, colorSystem?: 'B-V' | 'BP-RP'): THREE.Color {
-  const measured = colorIndex !== null && colorSystem === 'BP-RP' ? dwarfSequenceAtColor(colorIndex, 'BP-RP', true)!.bMinusV : colorIndex;
-  const resolved = measured ?? spectralTypeToColorIndex(spectralType);
-  const color = new THREE.Color();
-  if (resolved === null) {
-    return color.copy(NEUTRAL_STAR_COLOR);
+  // The distance is only there to say the star is not the Sun; the temperature reads none of the rest.
+  const temperatureK = effectiveTemperatureK({ magnitude: 0, distancePc: 1, spectralType, colorIndex, colorSystem });
+  if (temperatureK === null) {
+    return new THREE.Color().copy(NEUTRAL_STAR_COLOR);
   }
-
-  const t = THREE.MathUtils.clamp((resolved + 0.4) / 2.4, 0, 1);
-  return t < 0.5 ? color.lerpColors(COLD_STAR_COLOR, NEUTRAL_STAR_COLOR, t * 2) : color.lerpColors(NEUTRAL_STAR_COLOR, WARM_STAR_COLOR, (t - 0.5) * 2);
+  // ponytail: the colour at the nearest 10 K, computed once. Rounding moves no channel by more than
+  // 0.0014, and computing it for each of the 455 571 stars took 100 ms of the boot.
+  const step = Math.round(temperatureK / BLACKBODY_STEP_K);
+  const tint = (BLACKBODY_TINTS[step] ??= blackbodyColor(step * BLACKBODY_STEP_K));
+  return new THREE.Color(tint[0], tint[1], tint[2]);
 }
+
+const BLACKBODY_STEP_K = 10;
+const BLACKBODY_TINTS: [number, number, number][] = [];
 
 /** Brighter stars (lower apparent magnitude) render as bigger points. */
 export function magnitudeToPointSize(magnitude: number): number {

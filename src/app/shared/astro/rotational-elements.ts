@@ -121,3 +121,44 @@ export function orientationAt(elements: RotationalElements, jdTdb: number): { po
   }
   return { poleRaDeg, poleDecDeg, primeMeridianDeg: ((primeMeridianDeg % 360) + 360) % 360 };
 }
+
+/**
+ * What a locked moon's W says of its going round that a row of mean elements leaves out, as terms
+ * of that row. W follows the moon's mean longitude, so a term of W that is the moon running ahead
+ * of and behind its mean motion, rather than its pole nodding, is its orbit's too. Two are here,
+ * and JPL's satellite table has a column for neither: Mimas's -44.85 degrees and Tethys's +2.23 on
+ * the angle that turns 506.2 degrees a century, the 71-year libration of their 4:2 resonance, and
+ * Phobos's quadratic, 12.72 degrees per century squared about J2000, the tidal acceleration
+ * drawing it in. Carried by W and not by the orbit, they left the drawn Mimas up to 45 degrees from
+ * where Horizons has it and its face as far from Saturn, and Phobos 11 degrees out by 2100.
+ *
+ * `angleRateDegPerCentury` names the term by its angle's rate; W's quadratic, where it has one, is
+ * always taken. Both come back about `epochJd`, which is where `meanAnomalyTerms` counts T from:
+ * the sine as its `c` and `s`, and the quadratic re-centred from J2000 onto that epoch, as `b` plus
+ * what the re-centring adds to the mean motion and to the mean anomaly at the epoch.
+ */
+export function orbitalTermsOfPrimeMeridian(
+  elements: RotationalElements,
+  epochJd: number,
+  angleRateDegPerCentury?: number
+): { meanAnomalyTerms: { b: number; c: number; s: number; f: number }; meanMotionDegPerDay: number; meanAnomalyDeg: number } {
+  const epochCenturies = (epochJd - J2000_JD) / DAYS_PER_JULIAN_CENTURY;
+  // W turns clockwise about the pole the IAU names where its rate is negative; the orbit does not.
+  const sense = Math.sign(elements.primeMeridianDeg[1]);
+  const quadratic = sense * (elements.primeMeridianDeg[2] ?? 0) * DAYS_PER_JULIAN_CENTURY * DAYS_PER_JULIAN_CENTURY;
+  let sine = { c: 0, s: 0, f: 0 };
+  if (angleRateDegPerCentury !== undefined) {
+    const term = elements.terms?.find((candidate) => candidate.angleDeg[1] === angleRateDegPerCentury);
+    if (!term || (term.angleDeg[2] ?? 0) !== 0) {
+      throw new Error(`No term of W turns linearly at ${angleRateDegPerCentury} degrees a century.`);
+    }
+    const phase = (term.angleDeg[0] + term.angleDeg[1] * epochCenturies) * DEG_TO_RAD;
+    sine = { c: sense * term.pm * Math.sin(phase), s: sense * term.pm * Math.cos(phase), f: term.angleDeg[1] };
+  }
+  // q (T + T0)², T from the epoch and T0 the epoch from J2000, is q T² + 2 q T0 T + q T0².
+  return {
+    meanAnomalyTerms: { b: quadratic, ...sine },
+    meanMotionDegPerDay: (2 * quadratic * epochCenturies) / DAYS_PER_JULIAN_CENTURY,
+    meanAnomalyDeg: quadratic * epochCenturies * epochCenturies
+  };
+}

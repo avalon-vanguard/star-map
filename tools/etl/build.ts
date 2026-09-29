@@ -150,20 +150,27 @@ const KM_PER_AU = 149597870.7;
 const DEG_TO_RAD = Math.PI / 180;
 
 /**
- * The moons whose table row cannot come within that, each for a reason no mean ellipse carries,
- * with a ceiling just above its worst offset from Horizons at twelve dates from 1980 to 2100:
+ * The moons whose table row cannot come within that on this one date, each for a reason no mean
+ * ellipse carries, with a ceiling just above its offset here. What each reaches elsewhere is
+ * larger, and neither this check nor twelve New Year's Days sampled from 1980 to 2100 see it:
  *
- * - Mimas, 44.7 degrees: its resonance with Tethys swings its mean longitude 44 degrees either
- *   way over 70.8 years, and the table has no column for it (Tethys, on the other end, swings 2).
- * - Hyperion, 20.2: held in a 4:3 resonance by Titan; the row's eccentricity, 0.0232, is less than
- *   a quarter of the 0.105 JPL's current table gives.
- * - Iapetus, 10.1: the row sits 9.4 degrees behind Horizons at its own epoch, 2000 Jan 1.5, and
- *   keeps that offset; its plane agrees with Horizons' to 0.07 degrees and its period to 0.001 per
- *   cent, so the fault is in the row's longitude, which this has no second source to correct.
- * - Nereid, 2.6: an eccentricity of 0.75, the largest here, which a mean ellipse follows least
- *   well: under 0.9 degrees in every year measured but 2025 and 2030 (2.6 and 2.3) and 2100 (1.7).
+ * - Hyperion, 9.4 degrees here and 22.2 at worst, sampled every other day from 1980 to 2100: held
+ *   in a 4:3 resonance by Titan; the row's eccentricity, 0.0232, is less than a quarter of the
+ *   0.105 JPL's current table gives.
+ * - Iapetus, 9.6 here and 10.1 at worst: the row sits 9.4 degrees behind Horizons at its own epoch,
+ *   2000 Jan 1.5, and keeps that offset; its plane agrees with Horizons' to 0.07 degrees and its
+ *   period to 0.001 per cent, so the fault is in the row's longitude, which this has no second
+ *   source to correct.
+ * - Nereid, 2.6 here and 11.2 at worst, sampled daily: an eccentricity of 0.75, the largest here,
+ *   which a mean ellipse follows least well near periapsis, where the true anomaly runs ten times
+ *   faster than the mean. Its 360-day year put all twelve New Year's Days, under 2.6, far from
+ *   periapsis; sampled daily it is past 2.6 on 92 days in 2010-2020 and on 295 in 2040-2050, each
+ *   near a periapsis, and under 0.4 on most days.
+ *
+ * Mimas's swing of 44 degrees either way, the libration of its resonance with Tethys, which also
+ * needed a ceiling here once, is now in its orbit; see `orbitFromW` in `fetchSolarSystem.ts`.
  */
-const MOON_OFFSET_CEILINGS_DEG: Record<string, number> = { mimas: 46, hyperion: 21, iapetus: 11, nereid: 3 };
+const MOON_OFFSET_CEILINGS_DEG: Record<string, number> = { hyperion: 21, iapetus: 11, nereid: 3 };
 
 /**
  * The bodies the IAU WGCCRE 2015 report gives no rotational elements for: Hyperion tumbles, and
@@ -191,6 +198,36 @@ const DAY_OFFSET_CEILINGS: Record<string, number> = { neptune: 0.01 };
  * pole alone, Venus comes out at 2.6 degrees and Uranus at 82.2, which is what this catches.
  */
 const MAX_OBLIQUITY_OFFSET_DEG = 0.1;
+
+/**
+ * How far from its planet a locked moon's drawn face may turn: the east longitude, on the IAU's
+ * body-fixed frame, of the direction to the planet from where the mean elements put the moon,
+ * sampled every 135 days from 1950 to 2100, where both the tables and the IAU's elements hold.
+ *
+ * Measured on this catalogue: at most 6.70 degrees (the Moon, whose longitude swings 6.3 either
+ * way with its eccentricity; Horizons has the same). Three need their own: Mimas 10.15, whose
+ * physical libration W carries and Horizons shows as 5 to 9 degrees at its true place; Iapetus
+ * 18.33, whose row sits 9.4 degrees behind Horizons; and Proteus 8.18, whose W turns 6.3e-7 of
+ * its rate slower than its orbit, a drift of 74 degrees by AD 3000. What this catches is an orbit
+ * and a W that go round at different rates: the tidal acceleration W carried and the orbit did not
+ * turned Phobos 13.8 degrees from Mars by 2100, and the Mimas-Tethys libration Mimas 54.5.
+ */
+const MAX_SUB_PLANET_LONGITUDE_DEG = 7;
+const SUB_PLANET_CEILINGS_DEG: Record<string, number> = { mimas: 11, iapetus: 19, proteus: 9 };
+const LOCK_DATES_JD = Array.from({ length: 407 }, (_, index) => 2433282.5 + index * 135);
+
+/** The planet's east longitude on a moon's IAU body-fixed frame, from the moon's mean place, at a TDB date. */
+function subPlanetLongitudeDeg(body: BodyRecord, jd: number): number {
+  const own = positionAtEpoch(meanElementsAt(body.orbit, body.rates, jd));
+  const place = body.laplacePole ? laplacePlaneToEquatorial(own, body.laplacePole) : eclipticToEquatorial(own);
+  const { poleRaDeg, poleDecDeg, primeMeridianDeg } = orientationAt(body.rotationalElements!, jd);
+  const pole = { raDeg: poleRaDeg, decDeg: poleDecDeg };
+  const w = primeMeridianDeg * DEG_TO_RAD;
+  const meridian = laplacePlaneToEquatorial({ x: Math.cos(w), y: Math.sin(w), z: 0 }, pole);
+  const east = laplacePlaneToEquatorial({ x: -Math.sin(w), y: Math.cos(w), z: 0 }, pole);
+  const along = (axis: { x: number; y: number; z: number }) => -(place.x * axis.x + place.y * axis.y + place.z * axis.z);
+  return Math.atan2(along(east), along(meridian)) / DEG_TO_RAD;
+}
 
 function angleBetweenDeg(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }): number {
   const cosine = (a.x * b.x + a.y * b.y + a.z * b.z) / (Math.hypot(a.x, a.y, a.z) * Math.hypot(b.x, b.y, b.z));
@@ -271,13 +308,16 @@ function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, Orbita
           `Moon ${body.id} does not keep one face to its planet, yet turns once in ${body.rotationPeriodHours} hours against an orbit of ${orbitHours}.`
         );
       } else {
-        // Every other moon here is tidally locked: its day is its orbit, from the same mean motion
-        // that carries it round, or its face turns away from its planet: the Kepler period of the
-        // osculating orbit this used to take would turn the Moon's five degrees an orbit.
+        // Every other moon here is tidally locked, and drawn by its orbit and its IAU W: the two
+        // have to agree, or its face turns away from its planet.
+        assertCondition(rotation !== undefined, `Moon ${body.id} is locked but has no W to keep its face to its planet by.`);
+        const ceiling = SUB_PLANET_CEILINGS_DEG[body.id] ?? MAX_SUB_PLANET_LONGITUDE_DEG;
+        const worst = Math.max(...LOCK_DATES_JD.map((jd) => Math.abs(subPlanetLongitudeDeg(body, jd))));
         assertCondition(
-          body.rotationPeriodHours !== undefined && Math.abs(body.rotationPeriodHours - orbitHours) <= orbitHours * 1e-9,
-          `Moon ${body.id} turns once in ${body.rotationPeriodHours} hours but goes round in ${orbitHours} — it will not keep one face to its planet.`
+          worst <= ceiling,
+          `Moon ${body.id} turns its face up to ${worst.toFixed(2)} degrees from its planet between 1950 and 2100 (at most ${ceiling} expected) — its orbit and its W disagree.`
         );
+        spins.push(`${body.id} faces ${worst.toFixed(2)}`);
       }
       if (body.massRatio !== undefined) {
         // The pair's barycentre, which the planet's elements place, must lie outside the planet —

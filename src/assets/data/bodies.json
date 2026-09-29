@@ -689,13 +689,19 @@
       "inclinationDeg": 1.075,
       "longitudeOfAscendingNodeDeg": 207.784,
       "argumentOfPeriapsisDeg": 150.057,
-      "meanAnomalyAtEpochDeg": 91.059,
+      "meanAnomalyAtEpochDeg": 94.2394819925,
       "epochJd": 2433282.5
     },
     "rates": {
-      "meanMotionDegPerDay": 1128.8447569,
+      "meanMotionDegPerDay": 1128.8444085925948,
       "longitudeOfAscendingNodeDegPerDay": -0.43579001784832494,
-      "argumentOfPeriapsisDegPerDay": 0.871002371303956
+      "argumentOfPeriapsisDegPerDay": 0.871002371303956,
+      "meanAnomalyTerms": {
+        "b": 12.721927969999998,
+        "c": 0,
+        "s": 0,
+        "f": 0
+      }
     },
     "laplacePole": {
       "raDeg": 317.671,
@@ -703,7 +709,7 @@
     },
     "orbitSource": "JPL SSD satellite mean elements, epoch 1950 Jan 1",
     "parentBodyId": "mars",
-    "rotationPeriodHours": 7.653842521027348,
+    "rotationPeriodHours": 7.653844882637157,
     "rotationalElements": {
       "poleRaDeg": [
         317.67071657,
@@ -1166,7 +1172,13 @@
     "rates": {
       "meanMotionDegPerDay": 381.9944948,
       "longitudeOfAscendingNodeDegPerDay": -0.9996209770462032,
-      "argumentOfPeriapsisDegPerDay": 1.9992419540924065
+      "argumentOfPeriapsisDegPerDay": 1.9992419540924065,
+      "meanAnomalyTerms": {
+        "b": 0,
+        "c": 30.901081394463684,
+        "s": -32.50608664008527,
+        "f": 506.2
+      }
     },
     "laplacePole": {
       "raDeg": 40.589,
@@ -1276,7 +1288,13 @@
     "rates": {
       "meanMotionDegPerDay": 190.6979109,
       "longitudeOfAscendingNodeDegPerDay": -0.1978374715711675,
-      "argumentOfPeriapsisDegPerDay": 0.3958338487419905
+      "argumentOfPeriapsisDegPerDay": 0.3958338487419905,
+      "meanAnomalyTerms": {
+        "b": 0,
+        "c": -1.5364417281974139,
+        "s": 1.6162446646017872,
+        "f": 506.2
+      }
     },
     "laplacePole": {
       "raDeg": 40.578,

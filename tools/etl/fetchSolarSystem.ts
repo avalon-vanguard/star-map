@@ -5,7 +5,7 @@ import { SUN_STAR_ID } from '../../src/app/shared/models/star.model';
 import { fetchHorizonsBody } from './lib/horizons';
 import { MeanOrbit, parsePlanetMeanElements, parseSatelliteMeanElements, parseSmallBodyElements } from '../../src/app/shared/astro/mean-elements';
 import { fetchPlanetMeanElementsText, fetchSatelliteMeanElementsHtml, fetchSmallBodyAnswer } from './lib/mean-elements';
-import { MIN_PERIODIC_TERM_DEG, orbitalTermsOfPrimeMeridian, parsePckRotationalElements } from '../../src/app/shared/astro/rotational-elements';
+import { MIN_PERIODIC_TERM_DEG, orbitalTermsOfPrimeMeridian, parsePckRotationalElements, SUN_ROTATIONAL_ELEMENTS } from '../../src/app/shared/astro/rotational-elements';
 import { fetchPckText } from './lib/pck';
 import { dataPath, ensureDataDir } from './lib/paths';
 
@@ -155,6 +155,10 @@ export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizo
   const planetElements = await fetchPlanetMeanElementsText();
   const satelliteElements = await fetchSatelliteMeanElementsHtml();
   const pck = await fetchPckText();
+  // The app turns the Sun by elements it carries itself; they must be the kernel's.
+  if (JSON.stringify(parsePckRotationalElements(pck, 10)?.elements) !== JSON.stringify(SUN_ROTATIONAL_ELEMENTS)) {
+    throw new Error(`The Sun's rotational elements in the app, ${JSON.stringify(SUN_ROTATIONAL_ELEMENTS)}, are not the kernel's.`);
+  }
   const gmById = new Map<string, number | undefined>();
 
   for (const spec of BODY_SPECS) {

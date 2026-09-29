@@ -21,7 +21,9 @@ import {
 } from '../../shared/astro/galaxy';
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { EngineService, SceneCamera } from '../../core/engine/engine.service';
-import { BodyRecord } from '../../shared/models/body.model';
+import { BodyRecord, RotationalElements } from '../../shared/models/body.model';
+import { SUN_ROTATIONAL_ELEMENTS } from '../../shared/astro/rotational-elements';
+import { bodyOrientation } from '../../shared/rendering/body-orientation';
 import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { applyMilkyWaySkybox } from '../../shared/rendering/skybox';
@@ -548,6 +550,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private currentStarId: number | null = null;
   private systemRenderer?: SystemOrbitsRenderer;
   private starMarker?: THREE.Mesh;
+  /** How the star marker is turned: the Sun's IAU elements for the Sun, nothing for any other star. */
+  private starRotation?: RotationalElements;
 
   constructor(
     private readonly engine: EngineService,
@@ -820,6 +824,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     if (this.systemGroup.visible) {
       this.systemRenderer?.update(this.time.julianDate());
+      if (this.starMarker && this.starRotation) {
+        bodyOrientation(this.starRotation, this.time.julianDate(), this.starMarker.quaternion);
+      }
       this.keepMarkersLegible(camera);
     }
     this.updateSelectionMark(camera);
@@ -2249,6 +2256,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // stayed put as the camera closed in and ended up filling the screen with the flat gradient
     // that was meant to dress the star, over the photograph underneath it.
     this.starMarker = new THREE.Mesh(this.starMarkerGeometry, starMarkerMaterial);
+    // Its pole 115 degrees from the one the IAU gives, and still, until it was turned like a planet.
+    // The map's longitudes are Solar System Scope's, not Carrington's, so only the pole and the
+    // 25.38-day turn are the Sun's own.
+    this.starRotation = star.id === SOL_STAR_ID ? SUN_ROTATIONAL_ELEMENTS : undefined;
     this.systemGroup.add(this.starMarker);
 
     this.galaxyGroup.visible = false;

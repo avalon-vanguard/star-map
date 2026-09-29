@@ -845,6 +845,28 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(note()).toMatch(/^Orbits propagated from published elements to now, \d{4}-\d\d-\d\d \d\d:\d\d UTC\.$/);
   });
 
+  it('turns the Sun about its IAU pole, once in 25.38 days', async () => {
+    const time = TestBed.inject(TimeStore);
+    time.setRate(0);
+    time.setDate(new Date('2026-01-01T00:00Z'));
+    navigationStore.selectStar(SUN.id);
+    await flushAsync();
+    await advanceFrames(engine, 2.5);
+    const sun = (): THREE.Object3D => (fixture.componentInstance as unknown as { starMarker: THREE.Object3D }).starMarker;
+    const turned = (local: THREE.Vector3): THREE.Vector3 => local.applyQuaternion(sun().getWorldQuaternion(new THREE.Quaternion()));
+
+    // The sphere's +Y, which MAP_TO_BODY carries onto the body's pole, at RA 286.13, Dec 63.87.
+    const ra = (286.13 * Math.PI) / 180;
+    const dec = (63.87 * Math.PI) / 180;
+    const pole = new THREE.Vector3(Math.cos(dec) * Math.cos(ra), Math.cos(dec) * Math.sin(ra), Math.sin(dec));
+    expect(turned(new THREE.Vector3(0, 1, 0)).angleTo(pole)).toBeLessThan(1e-6);
+
+    const before = turned(new THREE.Vector3(1, 0, 0));
+    time.setDate(new Date('2026-01-02T00:00Z'));
+    await advanceFrames(engine, 0.1);
+    expect((turned(new THREE.Vector3(1, 0, 0)).angleTo(before) * 180) / Math.PI).toBeCloseTo(14.1844, 3);
+  });
+
   it('names the date the system is drawn for once the clock is set to one', async () => {
     const note = (): string => (fixture.componentInstance as unknown as { hudNote: () => string }).hudNote();
     TestBed.inject(TimeStore).setDate(new Date('2020-12-21T18:00Z'));

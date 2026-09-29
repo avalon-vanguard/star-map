@@ -192,6 +192,16 @@ describe('mergeStarCatalogues', () => {
     expect(merged).toMatchObject({ magnitude: 11.01, magnitudeBand: 'V', colorIndex: 1.807, colorSystem: 'B-V', distanceError: 0.000065, distanceFromGaia: true });
   });
 
+  it("takes a Hipparcos distance more precise than the Gaia entry it folds into, along Gaia's direction", () => {
+    // Schedar: 71.0 pc ±3.5 % in Gaia, which saturates on it, and 70.0 pc ±1.0 % in Hipparcos.
+    const hyg = at(3179, 10.1268, 56.5373, 70.0, { name: 'Schedar', magnitude: 2.24, distanceError: 0.0105, distanceFromGaia: false });
+    const gaia = at(1000000100, 10.1268 + arcsecOfRa(0.2, 56.5373), 56.5373, 71.0, { name: 'Gaia DR3 425040000962559616', magnitude: 1.94, distanceError: 0.035, distanceFromGaia: true, source: 'gaia' });
+    const [merged] = mergeStarCatalogues([{ ...HIPPARCOS, stars: [hyg] }, { ...GAIA, stars: [gaia] }]).stars;
+    expect(Math.hypot(merged.x, merged.y, merged.z)).toBeCloseTo(70.0, 9);
+    expect(directionCosine(merged, gaia)).toBeCloseTo(1, 12);
+    expect(merged).toMatchObject({ name: 'Schedar', distanceError: 0.0105, distanceFromGaia: false, source: 'gaia' });
+  });
+
   it('keeps two entries of one source apart, however close they are', () => {
     // Gaia resolves doubles Hipparcos saw as one star: two source ids 0.8″ apart are two stars,
     // and only *another* catalogue can claim to have already listed either of them.
@@ -318,6 +328,12 @@ describe('placementDistancePc', () => {
 
   it('keeps a star Gaia measured and Hipparcos gave no distance for', () => {
     expect(placementDistancePc(undefined, 180, 8, 250)).toBe(180);
+  });
+
+  it("takes the distance with the smaller error, Hipparcos's where Gaia saturated", () => {
+    // Eta Leo: 556.6 pc ±17 % in Gaia, 389.1 pc ±6.2 % in Hipparcos. Sirius the other way round.
+    expect(placementDistancePc(389.1, 556.6, 3.5, 250, 0.062, 0.17)).toBe(389.1);
+    expect(placementDistancePc(2.64, 2.67, -1.44, 250, 0.004, 0.002)).toBe(2.67);
   });
 
   it('falls back to Hipparcos where Gaia has no usable distance', () => {

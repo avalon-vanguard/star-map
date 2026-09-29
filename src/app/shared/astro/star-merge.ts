@@ -92,8 +92,11 @@ export const NAKED_EYE_MAGNITUDE = 6.5;
 /**
  * Where to draw a star Hipparcos and Gaia both measured, and whether the map keeps it at all.
  *
- * Gaia's distance wherever it has a usable one, since its parallaxes are fifty times more
- * precise; Hipparcos's otherwise. The two catalogues used to be cut at the same radius, each on
+ * At whichever distance has the smaller relative error, given both; Gaia's without them, or
+ * Hipparcos's where Gaia has none. Gaia's parallaxes are some fifty times more precise, and its
+ * distance wins for all but 273 of the 88 781 HYG stars with both; those are bright stars Gaia
+ * saturates on, 257 of them naked-eye — Eta Leo is 556.6 pc ±17 % in Gaia and 389 pc ±6.2 % in
+ * Hipparcos, Schedar ±3.5 % against ±1.0 %. The two catalogues used to be cut at the same radius, each on
  * its own distance, so a star Hipparcos put at 200 pc and Gaia at 300 was kept by one, never
  * downloaded from the other, and drawn at 200. That was 83% of the HYG stars left without a
  * Gaia counterpart, and at the median Hipparcos had them at two-thirds of Gaia's distance.
@@ -101,12 +104,20 @@ export const NAKED_EYE_MAGNITUDE = 6.5;
  * Now a star either survey places inside `cutoffPc` is kept, and every kept star sits where the
  * better measurement puts it, inside the cutoff or not. So is every star the naked eye sees, at
  * any distance: the cutoff took 1 543 of HYG's 8 920 stars of V 6.5 or brighter, Rigel, Deneb
- * and Alnilam among them, while 11th-magnitude Gaia stars at the same distance were drawn. Gaia
- * saturates on the brightest of them, so those sit at their Hipparcos distance. `null` for a star
- * kept by neither rule, or that no survey gives a distance for.
+ * and Alnilam among them, while 11th-magnitude Gaia stars at the same distance were drawn. Those
+ * Gaia has no usable parallax for sit at their Hipparcos distance. `null` for a star kept by
+ * neither rule, or that no survey gives a distance for.
  */
-export function placementDistancePc(hipparcosPc: number | undefined, gaiaPc: number | undefined, magnitude: number, cutoffPc: number): number | null {
-  const best = gaiaPc ?? hipparcosPc;
+export function placementDistancePc(
+  hipparcosPc: number | undefined,
+  gaiaPc: number | undefined,
+  magnitude: number,
+  cutoffPc: number,
+  hipparcosError?: number,
+  gaiaError?: number
+): number | null {
+  const hipparcosBetter = hipparcosPc !== undefined && hipparcosError !== undefined && gaiaError !== undefined && hipparcosError < gaiaError;
+  const best = hipparcosBetter ? hipparcosPc : (gaiaPc ?? hipparcosPc);
   if (best === undefined) {
     return null;
   }
@@ -227,18 +238,23 @@ export function isSameStar(kept: StarRecord, entry: StarRecord): boolean {
  * and keeping Gaia's whole once cost the map 102 proper names and 32 000 spectral types. The id
  * travels with the description, so a star HYG knows keeps its HYG id from one refresh to the next,
  * and so does its photometry, V and B−V. `source` stays with the position, since that is what it
- * records, and so does the distance's error: Gaia's, not the Hipparcos one of a distance dropped.
+ * records, and so does the distance's error: Gaia's, not the Hipparcos one of a distance dropped —
+ * unless the other entry's distance is the more precise, as the Hipparcos one of a bright star
+ * `placementDistancePc` keeps at it is, which then sets the distance along Gaia's direction.
  */
 function combine(kept: StarRecord, other: StarRecord): StarRecord {
   const described = isDesignation(kept) && !isDesignation(other) ? other : kept;
+  const otherBetter = other.distanceError !== undefined && kept.distanceError !== undefined && other.distanceError < kept.distanceError;
+  const placed = otherBetter ? other : kept;
+  const scale = otherBetter ? distanceOf(other) / distanceOf(kept) : 1;
   return {
     ...described,
-    x: kept.x,
-    y: kept.y,
-    z: kept.z,
+    x: kept.x * scale,
+    y: kept.y * scale,
+    z: kept.z * scale,
     source: kept.source,
-    distanceError: kept.distanceError,
-    distanceFromGaia: kept.distanceFromGaia
+    distanceError: placed.distanceError,
+    distanceFromGaia: placed.distanceFromGaia
   };
 }
 

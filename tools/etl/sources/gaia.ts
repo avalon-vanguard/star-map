@@ -295,8 +295,9 @@ export async function fetchGaiaDistancesByHip(): Promise<Map<number, { distanceP
 const MIN_HIPPARCOS_ERRORS = 110_000;
 
 /**
- * The relative error of every Hipparcos parallax, keyed by HIP number, for the stars that keep
- * their Hipparcos distance: 3 067 of them, Rigel and Deneb among them, where Gaia saturates.
+ * The relative error of every Hipparcos parallax, keyed by HIP number: to choose between it and
+ * Gaia's, and for the stars that keep their Hipparcos distance — Rigel and Deneb, which Gaia has
+ * no usable parallax for, and the few hundred bright stars where Gaia's is the less precise.
  *
  * From van Leeuwen's 2007 reduction, which the ESA archive hosts beside Gaia and HYG's distances
  * are the inverse of. HYG publishes the distance and not its error.

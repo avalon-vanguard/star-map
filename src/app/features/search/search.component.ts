@@ -2,10 +2,9 @@ import { Component, computed, ElementRef, output, signal, viewChild } from '@ang
 import { Router } from '@angular/router';
 
 import { DataLoaderService } from '../../core/data/data-loader.service';
-import { spectralClassification } from '../../shared/astro/spectral';
 import { NavigationStore } from '../../shared/state/navigation.store';
 import { ReticleIconComponent } from '../../shared/ui/reticle-icon.component';
-import { buildSearchIndex, IndexedSearchEntry, rankSearchResults, SearchEntry, SearchResultKind } from './search-ranking';
+import { buildSearchIndex, entrySubtitle, IndexedSearchEntry, rankSearchResults, SearchEntry, SearchResultKind } from './search-ranking';
 
 const MAX_RESULTS = 8;
 const MIN_QUERY_LENGTH = 2;
@@ -108,7 +107,7 @@ export class SearchComponent {
   });
 
   readonly matchTotal = computed(() => this.matches().length);
-  readonly results = computed(() => this.matches().slice(0, MAX_RESULTS));
+  readonly results = computed(() => this.matches().slice(0, MAX_RESULTS).map((entry) => ({ ...entry, subtitle: entrySubtitle(entry) })));
 
   constructor(
     private readonly dataLoader: DataLoaderService,
@@ -154,7 +153,7 @@ export class SearchComponent {
       ]);
 
       const entries: SearchEntry[] = [
-        ...stars.map((star): SearchEntry => ({ kind: 'star', name: star.name, subtitle: spectralClassification(star), starId: star.id })),
+        ...stars.map((star): SearchEntry => ({ kind: 'star', name: star.name, subtitle: '', star, starId: star.id })),
         ...bodies.map((body): SearchEntry => ({ kind: 'body', name: body.name, subtitle: body.kind, bodyId: body.id })),
         ...exoplanets.map((exoplanet): SearchEntry => ({ kind: 'exoplanet', name: exoplanet.name, subtitle: exoplanet.hostStarName, bodyId: exoplanet.id }))
       ];

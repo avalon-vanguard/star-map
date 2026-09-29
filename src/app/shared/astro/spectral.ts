@@ -159,6 +159,13 @@ const DWARF_SEQUENCE: readonly (readonly [string, number, number | null, number,
 ];
 
 /**
+ * The rows each colour is tabulated for, filtered once. Filtered on every call, the search index
+ * and the star field's tints, which read the table for each of the 455 571 stars, spent 140-230
+ * ms of the main thread on it at boot, and the search index again on each opening of its tab.
+ */
+const ROWS_WITH_COLOUR = { 1: DWARF_SEQUENCE.filter((row) => row[1] !== null), 2: DWARF_SEQUENCE.filter((row) => row[2] !== null) } as const;
+
+/**
  * The spectral type of the dwarf whose colour is nearest, for the stars no catalogue classified —
  * every Gaia star, 83 % of the map. An estimate, and the caller must say so: it assumes a dwarf,
  * so a giant is given a later type than its own — Pollux, a K0 giant at B−V 0.99, reads as K3 —
@@ -167,7 +174,7 @@ const DWARF_SEQUENCE: readonly (readonly [string, number, number | null, number,
  */
 export function spectralTypeFromColor(colorIndex: number | null, system: 'B-V' | 'BP-RP' = 'B-V'): string | null {
   const column = system === 'B-V' ? 1 : 2;
-  const rows = DWARF_SEQUENCE.filter((row) => row[column] !== null);
+  const rows = ROWS_WITH_COLOUR[column];
   if (colorIndex === null || !(colorIndex >= rows[0][column]! && colorIndex <= rows[rows.length - 1][column]!)) {
     return null;
   }
@@ -213,7 +220,7 @@ export interface DwarfSequencePoint {
  */
 export function dwarfSequenceAtColor(colorIndex: number | null, system: 'B-V' | 'BP-RP' = 'B-V', clampToTable = false): DwarfSequencePoint | null {
   const column = system === 'B-V' ? 1 : 2;
-  const rows = DWARF_SEQUENCE.filter((row) => row[column] !== null);
+  const rows = ROWS_WITH_COLOUR[column];
   const [bluest, reddest] = [rows[0][column]!, rows[rows.length - 1][column]!];
   if (colorIndex === null || !Number.isFinite(colorIndex) || (!clampToTable && !(colorIndex >= bluest && colorIndex <= reddest))) {
     return null;

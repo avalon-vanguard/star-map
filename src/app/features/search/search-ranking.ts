@@ -1,3 +1,5 @@
+import { spectralClassification } from '../../shared/astro/spectral';
+
 export type SearchResultKind = 'star' | 'body' | 'exoplanet';
 
 export interface SearchEntry {
@@ -6,8 +8,19 @@ export interface SearchEntry {
   subtitle: string;
   /** HYG star id, for `kind: 'star'` results. */
   starId?: number;
+  /**
+   * The star behind a `kind: 'star'` entry, classified by {@link entrySubtitle} for the rows shown
+   * only. Classified up front, all 455 571 took 140-230 ms of the main thread at boot, for the
+   * route index, and again each time the search tab was opened.
+   */
+  star?: Parameters<typeof spectralClassification>[0];
   /** `bodies.json`/`exoplanets.json` id, for `kind: 'body' | 'exoplanet'` results. */
   bodyId?: string;
+}
+
+/** The line an entry is listed with: its subtitle, or a star's classification. */
+export function entrySubtitle(entry: SearchEntry): string {
+  return entry.star ? spectralClassification(entry.star) : entry.subtitle;
 }
 
 /**

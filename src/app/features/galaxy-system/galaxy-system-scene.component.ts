@@ -66,7 +66,7 @@ import {
   HudReadout,
 } from '../hud/hud-dock.component';
 import { RouteRequest, RouteResult, RouteStarOption } from '../hud/routes-panel.component';
-import { buildSearchIndex, IndexedSearchEntry, rankSearchResults } from '../search/search-ranking';
+import { buildSearchIndex, entrySubtitle, IndexedSearchEntry, rankSearchResults } from '../search/search-ranking';
 import { StarmapHudComponent } from './starmap-hud.component';
 import { SystemObjectCardComponent } from './system-object-card.component';
 import { RoutingClient } from './routing-client';
@@ -526,7 +526,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     return rankSearchResults(index, query, ROUTE_OPTION_COUNT).flatMap((entry) =>
       entry.starId === undefined
         ? []
-        : [{ id: entry.starId, name: entry.name, subtitle: entry.subtitle }],
+        : [{ id: entry.starId, name: entry.name, subtitle: entrySubtitle(entry) }],
     );
   });
   private readonly routeQuery = signal('');
@@ -733,7 +733,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         stars.map((star) => ({
           kind: 'star' as const,
           name: star.name,
-          subtitle: spectralClassification(star),
+          subtitle: '',
+          star,
           starId: star.id,
         })),
       ),

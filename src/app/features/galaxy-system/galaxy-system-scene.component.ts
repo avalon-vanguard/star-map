@@ -1768,7 +1768,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
           : []),
       ]);
       // Where the orbits come from, and for the Sun how far from the present they hold: each
-      // body's card names its own source, and for a moon or dwarf planet how far it strays from
+      // body's card names its own source, and for a moon or an SBDB dwarf planet how far it strays from
       // Horizons over the span it was checked.
       const source = this.bodies.some((body) => body.systemStarId === star.id) ? 'JPL mean elements, the planets’ fit for 3000 BC to AD 3000 and the moons’ checked from 1950 to 2100, and the SBDB’s osculating ones for Ceres, Eris, Haumea and Makemake, checked over the same span,' : 'published elements';
       // Named to the minute, in UTC like the date field: a jump to 18:00 on a given day is a

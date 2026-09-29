@@ -33,7 +33,8 @@ const JULIAN_DATE_AT_EPOCH = 2440587.5;
  * each date measured out to 3000. The start is not the fit's but the date input's, which cannot
  * go before 0001-01-01. Both are proleptic Gregorian, as a `Date` is, so before 1582 they part from
  * the Julian-calendar dates history gives: two days behind them at AD 1, level from AD 200 to 300,
- * ten days ahead by 1582. The moons and dwarf planets hold for far less of it: each card says how
+ * ten days ahead by 1582. Pluto, on Standish's elements too, holds with them; the moons and the four
+ * dwarf planets from the SBDB hold for far less of it: each of their cards says how
  * far its orbit strays from Horizons from 1950 to 2100 (Ceres 7.1 degrees there, 11.6 by 2200 and
  * 39 by 1600).
  */

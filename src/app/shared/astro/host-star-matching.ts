@@ -171,3 +171,30 @@ export function resolveHostStarId(
 
   return best ? best.id : null;
 }
+
+/**
+ * Where the ids of the stars only the archive places begin: past Gaia's two ranges, and under
+ * the 2^30 `validateStars` holds every id to — which leaves 3.7 million.
+ */
+export const ARCHIVE_ID_BASE = 1_070_000_000;
+const ARCHIVE_ID_RANGE = 2 ** 30 - ARCHIVE_ID_BASE;
+
+/**
+ * The id of a star the ETL places from the archive, from its host's name rather than from its
+ * place in the answer. Numbered in pl_name order, a refresh that added or dropped one host
+ * renumbered every host after it — one row dropped renamed 3 276 of 3 277 ids, and a bookmark kept
+ * on Kepler-186 opened Kepler-1860 — while HYG's and Gaia's ids hold. FNV-1a over the name, into
+ * the range above; a name whose id is taken takes the next free one, the one case a refresh can
+ * still move, and only between the two names that collided.
+ */
+export function archiveStarId(hostname: string, taken: ReadonlySet<number>): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < hostname.length; i++) {
+    hash = Math.imul(hash ^ hostname.charCodeAt(i), 0x01000193) >>> 0;
+  }
+  let offset = hash % ARCHIVE_ID_RANGE;
+  while (taken.has(ARCHIVE_ID_BASE + offset)) {
+    offset = (offset + 1) % ARCHIVE_ID_RANGE;
+  }
+  return ARCHIVE_ID_BASE + offset;
+}

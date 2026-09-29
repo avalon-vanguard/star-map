@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 
 import { propagateProperMotion, raDegDecDistanceToXyz } from '../../src/app/shared/astro/coordinates';
-import { buildStarNameIndex, resolveHostStarId } from '../../src/app/shared/astro/host-star-matching';
+import { archiveStarId, buildStarNameIndex, resolveHostStarId } from '../../src/app/shared/astro/host-star-matching';
 import { temperatureToColorIndex } from '../../src/app/shared/astro/spectral';
 import { ExoplanetRecord } from '../../src/app/shared/models/exoplanet.model';
 import { isDesignation } from '../../src/app/shared/models/star-catalog';
@@ -85,11 +85,6 @@ const COMPOSITE_CACHE_FILE = `exoplanet-archive-pscomppars-${createHash('sha1').
 const DISTANCE_ERRORS_URL = `${TAP_BASE_URL}?query=select+pl_name,sy_disterr1,sy_disterr2+from+pscomppars+order+by+pl_name&format=csv`;
 const DISTANCE_ERRORS_CACHE_FILE = `exoplanet-archive-disterr-${createHash('sha1').update(DISTANCE_ERRORS_URL).digest('hex').slice(0, 8)}.csv`;
 
-/**
- * Where the ids of the stars only the archive places begin: past Gaia's two ranges, and under
- * the 2^30 `validateStars` holds every id to.
- */
-const ARCHIVE_ID_BASE = 1_070_000_000;
 const ARCHIVE_SOURCE = 'exoplanet-archive';
 /**
  * The archive's positions are at Gaia's epoch, J2016, not the catalogue's J2000: of the 746
@@ -123,6 +118,7 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<{ exoplanet
   // the only way "TRAPPIST-1" or "Teegarden's Star" can be found by search.
   const renamed = new Map<number, string>();
   const archiveStars = new Map<string, StarRecord>();
+  const archiveIds = new Set<number>();
   const bands = { V: 0, G: 0, none: 0 };
   const exoplanets: ExoplanetRecord[] = rows.map((row, index) => {
     const compositeRow = composite.get(row['pl_name']);
@@ -166,7 +162,7 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<{ exoplanet
         const errors = distanceErrors.get(row['pl_name']);
         const [above, below] = [parseOptionalNumber(errors?.['sy_disterr1']), parseOptionalNumber(errors?.['sy_disterr2'])];
         archiveStar = {
-          id: ARCHIVE_ID_BASE + archiveStars.size,
+          id: archiveStarId(row['hostname'], archiveIds),
           name: row['hostname'],
           ...raDegDecDistanceToXyz(j2000.raDeg, j2000.decDeg, distancePc),
           magnitude: v ?? g ?? UNKNOWN_MAGNITUDE,
@@ -178,6 +174,7 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<{ exoplanet
           source: ARCHIVE_SOURCE
         };
         archiveStars.set(row['hostname'], archiveStar);
+        archiveIds.add(archiveStar.id);
       }
       hostStarId = archiveStar.id;
     }
@@ -215,9 +212,9 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<{ exoplanet
     };
   });
 
-  // Appended after the catalogue, whose ids all sit below ARCHIVE_ID_BASE, so the list stays in
-  // the id order `fetchStars` sorted it into.
-  const added = [...archiveStars.values()];
+  // Appended after the catalogue, whose ids all sit below ARCHIVE_ID_BASE, and sorted, so the list
+  // stays in the id order `fetchStars` sorted it into.
+  const added = [...archiveStars.values()].sort((a, b) => a.id - b.id);
   const allStars = [...knownStars.map((star) => (renamed.has(star.id) ? { ...star, name: renamed.get(star.id)! } : star)), ...added];
   writeStarAssets(allStars);
 

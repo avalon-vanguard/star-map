@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildStarNameIndex, normalizeStarName, resolveHostStarId } from './host-star-matching';
+import { ARCHIVE_ID_BASE, archiveStarId, buildStarNameIndex, normalizeStarName, resolveHostStarId } from './host-star-matching';
 import { propagateProperMotion, raDegDecDistanceToXyz } from './coordinates';
 import { StarRecord } from '../models/star.model';
 
@@ -212,5 +212,21 @@ describe('resolveHostStarId', () => {
 
       expect(id).toBe(2);
     });
+  });
+});
+
+describe('archiveStarId', () => {
+  it('gives a host the same id whatever else the archive holds, inside the range left for it', () => {
+    const kepler186 = archiveStarId('Kepler-186', new Set());
+    const others = new Set(['1RXS J160929.1-210524', 'Kepler-1860', 'Kepler-452', 'TOI-700'].map((name) => archiveStarId(name, new Set())));
+    expect(archiveStarId('Kepler-186', others)).toBe(kepler186);
+    expect(others.has(kepler186)).toBe(false);
+    expect(kepler186).toBeGreaterThanOrEqual(ARCHIVE_ID_BASE);
+    expect(kepler186).toBeLessThan(2 ** 30);
+  });
+
+  it('moves a host whose id is taken to the next free one', () => {
+    const kepler186 = archiveStarId('Kepler-186', new Set());
+    expect(archiveStarId('Kepler-186', new Set([kepler186, kepler186 + 1]))).toBe(kepler186 + 2);
   });
 });

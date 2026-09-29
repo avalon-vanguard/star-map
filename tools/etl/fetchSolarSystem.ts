@@ -1,9 +1,13 @@
 import { writeFileSync } from 'node:fs';
 
 import { BodyRecord } from '../../src/app/shared/models/body.model';
+import { gmForParent } from '../../src/app/shared/astro/constants';
+import { orbitalPeriodDays } from '../../src/app/shared/astro/kepler';
 import { SUN_STAR_ID } from '../../src/app/shared/models/star.model';
 import { fetchHorizonsBody } from './lib/horizons';
 import { dataPath, ensureDataDir } from './lib/paths';
+
+const HOURS_PER_DAY = 24;
 
 interface BodySpec {
   id: string;
@@ -12,6 +16,11 @@ interface BodySpec {
   horizonsCommand: string;
   center: string;
   parentBodyId?: string;
+  /**
+   * Obliquity to orbit, in degrees, where the Horizons page states none. Pluto's is from the IAU
+   * WGCCRE 2015 pole (RA 132.99, Dec -6.16), 119.6 degrees: past 90, so it turns retrograde.
+   */
+  obliquityDeg?: number;
 }
 
 // Sun-centered planets/dwarf, then their major moons (planetocentric elements).
@@ -24,7 +33,7 @@ const BODY_SPECS: BodySpec[] = [
   { id: 'saturn', name: 'Saturn', kind: 'planet', horizonsCommand: '699', center: '500@10' },
   { id: 'uranus', name: 'Uranus', kind: 'planet', horizonsCommand: '799', center: '500@10' },
   { id: 'neptune', name: 'Neptune', kind: 'planet', horizonsCommand: '899', center: '500@10' },
-  { id: 'pluto', name: 'Pluto', kind: 'dwarf', horizonsCommand: '999', center: '500@10' },
+  { id: 'pluto', name: 'Pluto', kind: 'dwarf', horizonsCommand: '999', center: '500@10', obliquityDeg: 119.6 },
   { id: 'moon', name: 'Moon', kind: 'moon', horizonsCommand: '301', center: '500@399', parentBodyId: 'earth' },
   { id: 'phobos', name: 'Phobos', kind: 'moon', horizonsCommand: '401', center: '500@499', parentBodyId: 'mars' },
   { id: 'deimos', name: 'Deimos', kind: 'moon', horizonsCommand: '402', center: '500@499', parentBodyId: 'mars' },
@@ -56,6 +65,18 @@ export async function fetchSolarSystem(): Promise<BodyRecord[]> {
       console.warn(`  no physical radius found for ${spec.name}; defaulting to 0.`);
     }
 
+    // Every moon listed here is tidally locked, so its day is its orbit — as drawn, from these
+    // elements and the parent's mass by Kepler. Not every page says so: the Moon's gives a rate,
+    // the true sidereal month, 1.4% off the orbit these elements trace, so its face drifted five
+    // degrees an orbit; Titan's gives nothing, so it did not turn. Taking the orbit keeps one face
+    // towards the parent, which is what synchronous means.
+    const rotationPeriodHours = result.tidallyLocked || spec.kind === 'moon'
+      ? orbitalPeriodDays(result.orbit.semiMajorAxisAu, gmForParent(spec.parentBodyId)) * HOURS_PER_DAY
+      : result.rotationPeriodHours;
+    if (rotationPeriodHours === undefined) {
+      console.warn(`  no rotation period found for ${spec.name}; it will not turn.`);
+    }
+
     bodies.push({
       id: spec.id,
       systemStarId: SUN_STAR_ID,
@@ -63,7 +84,9 @@ export async function fetchSolarSystem(): Promise<BodyRecord[]> {
       kind: spec.kind,
       radiusKm: result.radiusKm ?? 0,
       orbit: result.orbit,
-      ...(spec.parentBodyId ? { parentBodyId: spec.parentBodyId } : {})
+      ...(spec.parentBodyId ? { parentBodyId: spec.parentBodyId } : {}),
+      ...(rotationPeriodHours !== undefined ? { rotationPeriodHours } : {}),
+      ...((result.obliquityDeg ?? spec.obliquityDeg) !== undefined ? { obliquityDeg: result.obliquityDeg ?? spec.obliquityDeg } : {})
     });
   }
 

@@ -406,6 +406,11 @@ export class StarFieldRenderer {
    * needed: each star is tested against the size it is actually drawn at, so the hit area matches
    * what the user sees at every zoom level instead of being over-permissive up close and
    * sub-pixel at the far end of the camera's range.
+   *
+   * Only stars on screen can be picked. The hit area is the drawn size plus a slop of
+   * {@link PICK_NDC_SLOP}, and near an edge that slop reaches past the frame: a click in the
+   * last few pixels of the view used to be able to fly into a system whose star was outside it,
+   * with nothing on screen to explain where it had gone.
    */
   pickAt(pointerNdc: THREE.Vector2, camera: SceneCamera, aspect: number): number | undefined {
     // What a unit of angular size is worth on screen. Under perspective the field of view sets
@@ -429,10 +434,16 @@ export class StarFieldRenderer {
       if (projected.z < -1 || projected.z > 1) {
         continue;
       }
-
       // A sprite square in view space projects to an ellipse in NDC: the same half-extent in y,
       // divided by the aspect ratio in x. Scaling dx by the aspect makes the comparison circular.
-      const ndcRadius = (0.5 * sizes[index]) / tanHalfFov + PICK_NDC_SLOP;
+      const drawnRadius = (0.5 * sizes[index]) / tanHalfFov;
+      // Off screen if no part of the drawn disc is inside the frame. Tested before the slop is
+      // added: the slop is forgiveness for an imprecise click on a star you can see, not a reach
+      // past the edge to one you cannot.
+      if (Math.abs(projected.x) - drawnRadius / aspect > 1 || Math.abs(projected.y) - drawnRadius > 1) {
+        continue;
+      }
+      const ndcRadius = drawnRadius + PICK_NDC_SLOP;
       const dx = (projected.x - pointerNdc.x) * aspect;
       const dy = projected.y - pointerNdc.y;
       const score = Math.hypot(dx, dy) / ndcRadius;

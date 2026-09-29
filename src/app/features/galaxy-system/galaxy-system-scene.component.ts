@@ -20,7 +20,7 @@ import {
   galacticCentrePositionPc,
   galacticToEquatorial,
 } from '../../shared/astro/galaxy';
-import { blackbodyColor, SOLAR_EFFECTIVE_TEMPERATURE_K } from '../../shared/astro/stellar';
+import { blackbodyColor } from '../../shared/astro/stellar';
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { EngineService, SceneCamera } from '../../core/engine/engine.service';
 import { BodyRecord } from '../../shared/models/body.model';
@@ -88,6 +88,14 @@ import { catalogueCensus, starReadouts, starSubtitle } from './star-readouts';
 
 /** Radius, in CSS pixels, below which a body in the system view is scaled up to be seen at all. */
 const MIN_MARKER_PIXELS = 3;
+
+/**
+ * What a star nothing gives a radius for is drawn at: 150 km, far under the pixel floor from any
+ * distance the camera can reach, so it is the floor's point, the size of no star in particular.
+ * Drawn at the Sun's radius, PSR J1719-1438 — a neutron star, 10 km across — swallowed the planet
+ * it holds at 0.0044 AU, and Procyon B, a white dwarf of 0.012 R☉, was drawn 81 times too wide.
+ */
+const UNMEASURED_STAR_RADIUS_AU = 1e-6;
 
 /**
  * The linear limb-darkening coefficient: a star's surface is I(μ) = I(1) (1 − u (1 − μ)) bright,
@@ -2221,7 +2229,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // measures exoplanet inclinations against. The Sun sits at the origin and has no
     // exoplanets, so it has no meaningful direction and the renderer falls back.
     // Every star at its own radius: the archive's for a planet host, otherwise derived from its
-    // colour and brightness — or the Sun's, for the 3 077 stars with no measured magnitude or with
+    // colour and brightness — or a point, for the 2 858 stars with no measured magnitude or with
     // neither a colour nor a type, which the card then gives no radius. Its temperature is the
     // colour of its disc and of the light it casts, and its luminosity — the archive's, or else
     // derived from its magnitude and distance — decides how hot each body in the system is, and
@@ -2237,7 +2245,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.systemGroup.add(this.systemRenderer.object);
     this.applyDisplay(this.display());
 
-    const starRadiusAu = (this.currentStarSurface.radiusSolar ?? 1) * SUN_RADIUS_AU;
+    const starRadiusAu = this.currentStarSurface.radiusSolar === null ? UNMEASURED_STAR_RADIUS_AU : this.currentStarSurface.radiusSolar * SUN_RADIUS_AU;
 
     // Framed against the grid's outer ring rather than the outermost orbit — the ring is always
     // the wider of the two — or against the star, for a giant wider than both; and against the
@@ -2255,10 +2263,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.starMarkerGeometry = new THREE.SphereGeometry(starRadiusAu, 64, 32);
 
     this.starMarkerMaterial ??= starSurfaceMaterial(this.starTint);
-    this.starTint.value.setRGB(
-      ...blackbodyColor(this.currentStarSurface.temperatureK ?? SOLAR_EFFECTIVE_TEMPERATURE_K),
-      THREE.LinearSRGBColorSpace,
-    );
+    // Grey, the photograph's own, where there is no temperature: the Sun's colour would say it is one.
+    const temperatureK = this.currentStarSurface.temperatureK;
+    const [red, green, blue] = temperatureK === null ? [1, 1, 1] : blackbodyColor(temperatureK);
+    this.starTint.value.setRGB(red, green, blue, THREE.LinearSRGBColorSpace);
     // No halo. It was a sprite sized against the arrival frame — 1.12 AU for the Sun — so it
     // stayed put as the camera closed in and ended up filling the screen with the flat gradient
     // that was meant to dress the star, over the photograph underneath it.

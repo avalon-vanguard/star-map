@@ -14,6 +14,8 @@ import { LinkBudget } from '../../shared/astro/jump-links';
 import { HudDisplay } from '../hud/hud-dock.component';
 import { GalaxySystemSceneComponent } from './galaxy-system-scene.component';
 import { galacticNormal } from './grid-plane';
+import { closestApproachAu, SUN_RADIUS_AU } from './system-framing';
+import { blackbodyColor, SOLAR_EFFECTIVE_TEMPERATURE_K } from '../../shared/astro/stellar';
 import { JumpLinkRenderer } from './jump-link-renderer';
 import { StarFieldRenderer } from './star-field-renderer';
 import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
@@ -31,8 +33,25 @@ const ALPHA_CENTAURI: StarRecord = { id: 1, name: 'Alpha Centauri', x: 1.34, y: 
 // Its id deliberately differs from its place in STARS, so a lookup by id cannot pass for one by index.
 const PROXIMA: StarRecord = { id: 42, name: 'Proxima Centauri', x: 0, y: 1.3, z: 0, magnitude: 11.1, spectralType: 'M5V', colorIndex: 1.8 };
 
-const STARS: StarRecord[] = [SUN, ALPHA_CENTAURI, PROXIMA];
+// A supergiant nothing publishes a radius for, and a white dwarf with neither a colour nor a type
+// the parser reads, for what the system view draws each star at; last, so the indices above hold.
+const ANTARES: StarRecord = { id: 80519, name: 'Antares', x: -58.54, y: -140.31, z: -75.57, magnitude: 1.06, magnitudeBand: 'V', spectralType: 'M1Ib + B2.5V', colorIndex: 1.865, colorSystem: 'B-V' };
+const PROCYON_B: StarRecord = { id: 37279, name: 'Gl 280B', x: -1.08, y: 3.19, z: 0.34, magnitude: 10.7, magnitudeBand: 'V', spectralType: 'DA', colorIndex: null };
+
+const STARS: StarRecord[] = [SUN, ALPHA_CENTAURI, PROXIMA, ANTARES, PROCYON_B];
 const STAR_POSITIONS = new Float32Array(STARS.flatMap((star) => [star.x, star.y, star.z]));
+
+// Proxima's planet as the archive gives it, with its host's radius, temperature and luminosity.
+const PROXIMA_B: ExoplanetRecord = {
+  id: 'Proxima Cen b',
+  hostStarId: PROXIMA.id,
+  hostStarName: 'Proxima Cen',
+  name: 'Proxima Cen b',
+  hostStarRadiusSolar: 0.141,
+  hostStarTemperatureK: 2900,
+  hostStarLuminositySolar: 0.00151,
+  orbit: { semiMajorAxisAu: 0.0485, eccentricity: 0.02 }
+};
 
 const DEEP_SKY_OBJECT: DeepSkyRecord = {
   id: 'NGC0224',
@@ -160,7 +179,7 @@ class FakeDataLoaderService {
   }
 
   loadExoplanets(): Promise<ExoplanetRecord[]> {
-    return Promise.resolve([]);
+    return Promise.resolve([PROXIMA_B]);
   }
 
   loadDeepSky(): Promise<DeepSkyRecord[]> {
@@ -270,8 +289,8 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(refocus).toHaveBeenCalledTimes(1);
       const [focus] = refocus.mock.calls[0];
       expect(focus.view).toBeDefined();
-      // The Sun has Earth, so it is a host; the others have nothing catalogued.
-      expect(Array.from(focus.hosts ?? [])).toEqual([1, 0, 0]);
+      // The Sun has Earth and Proxima its b, so both are hosts; the others have nothing catalogued.
+      expect(Array.from(focus.hosts ?? [])).toEqual([1, 0, 1, 0, 0]);
     });
 
     it('chooses again once the camera has turned half the margin, and not for less', async () => {
@@ -930,6 +949,54 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(component.currentStarId).toBeNull();
     expect(component.systemGroup.visible).toBe(false);
     expect(navigationStore.viewLevel()).toBe('galactic');
+  });
+
+  describe('each star at its own size and in its own colour', () => {
+    type DrawnStar = {
+      starMarkerGeometry: THREE.SphereGeometry;
+      starTint: { value: THREE.Color };
+      controls: { minDistance: number };
+      systemRenderer: { object: THREE.Object3D };
+      hudReadouts(): { label: string; value: string; derived?: boolean }[];
+    };
+
+    async function enter(star: StarRecord): Promise<DrawnStar> {
+      navigationStore.selectStar(star.id);
+      await flushAsync();
+      await advanceFrames(engine, 2.5);
+      return fixture.componentInstance as unknown as DrawnStar;
+    }
+
+    function expectColour(colour: THREE.Color, [red, green, blue]: readonly number[]): void {
+      expect([colour.r, colour.g, colour.b].map((channel) => channel.toFixed(4))).toEqual([red, green, blue].map((channel) => channel.toFixed(4)));
+    }
+
+    it('draws a host at the radius and in the colour the archive gives it, lights its planets in its light, and says how bright it is', async () => {
+      const scene = await enter(PROXIMA);
+      expect(scene.starMarkerGeometry.parameters.radius).toBeCloseTo(0.141 * SUN_RADIUS_AU, 12);
+      expectColour(scene.starTint.value, blackbodyColor(2900));
+      const light = scene.systemRenderer.object.children.find((child): child is THREE.PointLight => child instanceof THREE.PointLight)!;
+      expectColour(light.color, blackbodyColor(2900, SOLAR_EFFECTIVE_TEMPERATURE_K));
+      expect(scene.hudReadouts().find((readout) => readout.label === 'Luminosity')).toEqual({ label: 'Luminosity', value: '0.002 L☉' });
+      expect(scene.hudReadouts().find((readout) => readout.label === 'Radius')?.value).toBe('0.141 solar radii');
+    });
+
+    it('keeps the camera three radii out from a supergiant drawn at the radius its colour and brightness give', async () => {
+      const scene = await enter(ANTARES);
+      const radius = scene.starMarkerGeometry.parameters.radius;
+      // 690 R☉ against the 680 Ohnaka et al. (2013) measure: 3.2 AU.
+      expect(radius / SUN_RADIUS_AU).toBeGreaterThan(600);
+      expect(radius / SUN_RADIUS_AU).toBeLessThan(760);
+      expect(scene.controls.minDistance).toBeCloseTo(closestApproachAu(radius), 9);
+      expect(scene.controls.minDistance).toBeGreaterThan(9);
+    });
+
+    it('draws a star nothing gives a size or temperature for as a grey point, not as the Sun', async () => {
+      const scene = await enter(PROCYON_B);
+      expect(scene.starMarkerGeometry.parameters.radius).toBeLessThan(SUN_RADIUS_AU / 1000);
+      expectColour(scene.starTint.value, [1, 1, 1]);
+      expect(scene.hudReadouts().some((readout) => readout.label === 'Radius')).toBe(false);
+    });
   });
 
   it('ignores a new selection while a transition is already in flight, then resolves to the latest requested star once idle', async () => {

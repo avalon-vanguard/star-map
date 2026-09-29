@@ -181,6 +181,8 @@ export function spectralTypeFromColor(colorIndex: number | null, system: 'B-V' |
 
 /** What the dwarf sequence says of a star of a given colour. */
 export interface DwarfSequencePoint {
+  /** B−V, the colour in the other system's terms where it was read off BP−RP. */
+  bMinusV: number;
   temperatureK: number;
   /** Bolometric correction to V: what V leaves out of the star's total output, in magnitudes. */
   bolometricCorrectionV: number;
@@ -208,6 +210,7 @@ export function dwarfSequenceAtColor(colorIndex: number | null, system: 'B-V' | 
   const t = (colour - blue[column]!) / (red[column]! - blue[column]!);
   const lerp = (from: number, to: number): number => from + (to - from) * t;
   return {
+    bMinusV: lerp(blue[1], red[1]),
     temperatureK: lerp(blue[3], red[3]),
     bolometricCorrectionV: lerp(blue[4], red[4]),
     gMinusV: blue[5] === null || red[5] === null ? null : lerp(blue[5], red[5])

@@ -117,7 +117,11 @@ describe('systemFramingDistanceAu', () => {
 });
 
 describe('the grid and the framing together', () => {
-  /** What the scene actually composes: rings from the orbits, then a distance from the rings. */
+  /**
+   * The grid's half of what the scene composes: rings from the orbits, then a distance from the outer
+   * ring. The scene frames the larger of that ring and the furthest aphelion (`outermostRadiusAu`),
+   * which the Eris test below frames where it runs past the ring, and the scene's own spec checks.
+   */
   function fit(outermostOrbitAu: number, viewport?: SystemViewport): { ring: number; frame: number } {
     const rings = systemGridRingsAu(outermostOrbitAu);
     const ring = rings[rings.length - 1];

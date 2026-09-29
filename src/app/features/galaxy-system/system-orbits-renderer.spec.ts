@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_EPOCH_JD, GM_SUN_AU3_PER_DAY2, TT_MINUS_UTC_DAYS, ttMinusUtSeconds } from '../../shared/astro/constants';
 import { keplerRates } from '../../shared/astro/kepler';
@@ -463,6 +463,13 @@ describe('derived surfaces', () => {
     await nextTask();
     expect(maps(renderer).every(Boolean)).toBe(true);
     renderer.dispose();
+  });
+
+  it('builds a body still waiting for its surface without three warning of an undefined map', () => {
+    const warn = vi.spyOn(console, 'warn');
+    twoPlanets().dispose();
+    expect(warn.mock.calls.flat().join(' ')).not.toContain("parameter 'map'");
+    warn.mockRestore();
   });
 
   it('paints nothing once the system is left', async () => {

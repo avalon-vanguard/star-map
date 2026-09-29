@@ -180,7 +180,9 @@ function buildMarker(
 ): THREE.Mesh {
   const geometry = new THREE.SphereGeometry(bodyMarkerRadiusAu(radiusKm), MARKER_WIDTH_SEGMENTS, MARKER_HEIGHT_SEGMENTS);
   const photograph = id ? bodyTexturePath(id) : undefined;
-  const map = photograph ? loadCachedTexture(photograph) : undefined;
+  // null, not undefined, where there is none yet: three warns "parameter 'map' has value of
+  // undefined" for every body built so, eleven of them on entering the Sun's system.
+  const map = photograph ? loadCachedTexture(photograph) : null;
   const material = new THREE.MeshStandardMaterial({
     map,
     color: map ? 0xffffff : colorForKind(kind),

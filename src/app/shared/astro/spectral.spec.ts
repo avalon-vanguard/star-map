@@ -99,19 +99,22 @@ describe('spectralTypeToColorIndex', () => {
 });
 
 describe('temperatureToColorIndex', () => {
-  it("puts the Sun's temperature at its own B-V and a cool dwarf redder", () => {
+  it("puts the Sun's temperature at its own B-V and a cool dwarf where the dwarf sequence has it", () => {
     expect(temperatureToColorIndex(5772)).toBeCloseTo(0.65, 2);
-    expect(temperatureToColorIndex(3400)).toBeCloseTo(1.79, 2);
+    // Two thirds of the way from M2 (3 560 K, B−V 1.505) to M2.5 (3 470 K, 1.522).
+    expect(temperatureToColorIndex(3500)).toBeCloseTo(1.5163, 4);
   });
 
-  it('stays inside the range the spectral classes span', () => {
-    expect(temperatureToColorIndex(2566)).toBe(2);
-    expect(temperatureToColorIndex(50000)).toBe(-0.33);
+  it('reads back as the temperature it came from, so the correction is the one at that temperature', () => {
+    for (const temperatureK of [31400, 12000, 7000, 5772, 4000, 3500, 3157, 2566, 2420]) {
+      expect(dwarfSequenceAtColor(temperatureToColorIndex(temperatureK))!.temperatureK).toBeCloseTo(temperatureK, 6);
+    }
   });
 
-  it('has no answer for a temperature that is not one', () => {
-    expect(temperatureToColorIndex(0)).toBeNull();
-    expect(temperatureToColorIndex(Number.NaN)).toBeNull();
+  it('has no answer outside the table, nor for a temperature that is not one', () => {
+    for (const temperatureK of [580, 2419, 31401, 50000, 0, Number.NaN]) {
+      expect(temperatureToColorIndex(temperatureK)).toBeNull();
+    }
   });
 });
 

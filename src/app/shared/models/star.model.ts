@@ -34,6 +34,11 @@ export interface StarRecord {
    */
   colorSystem?: 'B-V' | 'BP-RP';
   /**
+   * Whether `colorIndex` was read off the dwarf sequence at the star's effective temperature rather
+   * than measured: the 57 archive-placed hosts with a temperature and no B magnitude.
+   */
+  colorFromTemperature?: boolean;
+  /**
    * Relative uncertainty of the distance, σd/d: the relative error of the parallax it was
    * inverted from, which to first order is the same — or, for a star the Exoplanet Archive places,
    * the mean of the two one-sided errors it gives on the distance itself, which is often no

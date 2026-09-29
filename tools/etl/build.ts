@@ -74,7 +74,10 @@ function validateStars(stars: StarRecord[]): void {
     assertCondition(decoded[i].spectralType === stars[i].spectralType, `Star catalogue round-trip lost the spectral type of star ${stars[i].id}.`);
     assertCondition(decoded[i].colorIndex === null === (stars[i].colorIndex === null), `Star catalogue round-trip changed whether star ${stars[i].id} has a colour index.`);
     assertCondition(
-      decoded[i].magnitudeBand === stars[i].magnitudeBand && decoded[i].colorSystem === stars[i].colorSystem && decoded[i].distanceFromGaia === !!stars[i].distanceFromGaia,
+      decoded[i].magnitudeBand === stars[i].magnitudeBand &&
+        decoded[i].colorSystem === stars[i].colorSystem &&
+        decoded[i].distanceFromGaia === !!stars[i].distanceFromGaia &&
+        decoded[i].colorFromTemperature === !!stars[i].colorFromTemperature,
       `Star catalogue round-trip changed the photometry of star ${stars[i].id}.`
     );
     // Stored as its square root in 255ths, up to 100 %; see `star-catalog.ts`.

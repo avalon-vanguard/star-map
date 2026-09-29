@@ -170,26 +170,33 @@ function buildOrbitLine(elements: OrbitalElements, kind: SystemMemberKind, frame
  * system is built: at about 4.4 ms each, the twenty bodies the solar system gained with its dwarf
  * planets and smaller moons lengthened the task that enters it from 78-94 ms to 177-228. Until
  * then the body is its kind's flat colour.
+ *
+ * A photograph is handed to `deferPhotograph`, which puts it on the body once it has loaded, one a
+ * frame: a texture is copied to the GPU in the first frame that draws it, and the 28 maps, which
+ * arrive within 40 ms of each other, made that one frame a 160-210 ms task on entering the Sun's
+ * system (copyExternalImageToTexture, about 20 megapixels of JPEG).
  */
 function buildMarker(
   id: string | undefined,
   kind: SystemMemberKind,
   radiusKm: number | undefined,
   appearance: PlanetAppearance | undefined,
-  deferSurface: (paint: () => void) => void
+  deferSurface: (paint: () => void) => void,
+  deferPhotograph: (material: THREE.MeshStandardMaterial, texture: THREE.Texture) => void
 ): THREE.Mesh {
   const geometry = new THREE.SphereGeometry(bodyMarkerRadiusAu(radiusKm), MARKER_WIDTH_SEGMENTS, MARKER_HEIGHT_SEGMENTS);
   const photograph = id ? bodyTexturePath(id) : undefined;
-  // null, not undefined, where there is none yet: three warns "parameter 'map' has value of
+  // null, not undefined, until there is one: three warns "parameter 'map' has value of
   // undefined" for every body built so, eleven of them on entering the Sun's system.
-  const map = photograph ? loadCachedTexture(photograph) : null;
   const material = new THREE.MeshStandardMaterial({
-    map,
-    color: map ? 0xffffff : colorForKind(kind),
+    map: null,
+    color: colorForKind(kind),
     roughness: 1,
     metalness: 0
   });
-  if (!photograph && appearance) {
+  if (photograph) {
+    deferPhotograph(material, loadCachedTexture(photograph));
+  } else if (appearance) {
     deferSurface(() => {
       // 128 by 64, not the detail page's 512 by 256: that size costs about 60 ms a body on the
       // main thread, for a disc that is a few pixels across until the camera is on top of it.
@@ -348,6 +355,11 @@ export class SystemOrbitsRenderer {
     this.surfacesToPaint.shift()?.();
     this.surfaceTimer = this.surfacesToPaint.length > 0 ? setTimeout(this.paintNextSurface, 0) : undefined;
   };
+  /** Photographs still to put on their bodies, one a frame once loaded; see `buildMarker`. */
+  private readonly photographsToShow: Array<{ material: THREE.MeshStandardMaterial; texture: THREE.Texture }> = [];
+  private readonly deferPhotograph = (material: THREE.MeshStandardMaterial, texture: THREE.Texture): void => {
+    this.photographsToShow.push({ material, texture });
+  };
 
   constructor(
     bodies: readonly BodyRecord[],
@@ -474,6 +486,7 @@ export class SystemOrbitsRenderer {
    * the orbits are taken at its TDB, as the spins are. Call once per tick.
    */
   update(epochJd: number): void {
+    this.showNextPhotograph();
     const jdTdb = tdbFromUtc(epochJd);
     for (const body of this.topLevelBodies) {
       const current = meanElementsAt(body.elements, body.rates, jdTdb);
@@ -518,6 +531,18 @@ export class SystemOrbitsRenderer {
     this.tethers?.setTargets(this.tetherPoints);
   }
 
+  /** Puts the first photograph that has loaded on its body: one texture for the GPU a frame. */
+  private showNextPhotograph(): void {
+    const index = this.photographsToShow.findIndex(({ texture }) => texture.image);
+    if (index < 0) {
+      return;
+    }
+    const [{ material, texture }] = this.photographsToShow.splice(index, 1);
+    material.map = texture;
+    material.color.set(0xffffff);
+    material.needsUpdate = true;
+  }
+
   /**
    * Looks up which system member a marker object belongs to (e.g. from a raycast hit), or a part
    * of one: a ray through Saturn's rings picks Saturn.
@@ -549,6 +574,7 @@ export class SystemOrbitsRenderer {
   dispose(): void {
     clearTimeout(this.surfaceTimer);
     this.surfacesToPaint.length = 0;
+    this.photographsToShow.length = 0;
     this.grid?.dispose();
     this.tethers?.dispose();
     for (const { geometry, material } of this.disposables) {
@@ -574,7 +600,7 @@ export class SystemOrbitsRenderer {
     rotation?: { periodHours?: number; elements?: RotationalElements }
   ): TrackedTopLevelBody {
     const orbitLine = buildOrbitLine(elements, kind, frame);
-    const marker = buildMarker(id, kind, radiusKm, appearance, this.deferSurface);
+    const marker = buildMarker(id, kind, radiusKm, appearance, this.deferSurface, this.deferPhotograph);
     this.object.add(orbitLine, marker);
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);
     this.trackDisposable(marker.geometry, marker.material as THREE.Material);
@@ -597,7 +623,7 @@ export class SystemOrbitsRenderer {
   ): TrackedMoon {
     const pivot = new THREE.Group();
     const orbitLine = buildOrbitLine(elements, 'moon', frame);
-    const marker = buildMarker(id, 'moon', radiusKm, appearance, this.deferSurface);
+    const marker = buildMarker(id, 'moon', radiusKm, appearance, this.deferSurface, this.deferPhotograph);
     pivot.add(orbitLine, marker);
     this.object.add(pivot);
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);

@@ -40,6 +40,10 @@ const WINDOW_MS = {
   min: Date.parse(`${CLOCK_WINDOW.min}Z`),
   max: Date.parse(`${CLOCK_WINDOW.max}Z`),
 };
+const WINDOW_JD = {
+  min: WINDOW_MS.min / MS_PER_DAY + JULIAN_DATE_AT_EPOCH,
+  max: WINDOW_MS.max / MS_PER_DAY + JULIAN_DATE_AT_EPOCH,
+};
 
 /**
  * The date the map is drawn for.
@@ -65,9 +69,22 @@ export class TimeStore {
   private anchorJd = dateToJulianDate();
   private anchorWallMs = Date.now();
 
-  /** Julian date for this instant, at the rate the reader chose. */
+  /**
+   * Julian date for this instant, at the rate the reader chose, held to {@link CLOCK_WINDOW}: a
+   * clock run past either end stops there, at real time turned back into the window, as if the
+   * reader had set that date. Unheld, a month a second carried it past AD 3000, where the planets'
+   * elements were never fitted, and before AD 1, where `toISOString` writes a six-digit year the
+   * date strip, the note and the date field cut in the wrong places ("-000001-12-01 00 UTC").
+   */
   julianDate(): number {
-    return this.anchorJd + ((Date.now() - this.anchorWallMs) * this.rate()) / MS_PER_DAY;
+    const jd = this.anchorJd + ((Date.now() - this.anchorWallMs) * this.rate()) / MS_PER_DAY;
+    if (jd >= WINDOW_JD.min && jd <= WINDOW_JD.max) {
+      return jd;
+    }
+    this.anchorJd = jd < WINDOW_JD.min ? WINDOW_JD.min : WINDOW_JD.max;
+    this.anchorWallMs = Date.now();
+    this.rate.set(jd < WINDOW_JD.min ? 1 : -1);
+    return this.anchorJd;
   }
 
   /**

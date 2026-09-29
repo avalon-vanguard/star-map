@@ -27,9 +27,10 @@ export interface ExoplanetRecord {
   hostStarMassSolar?: number;
   /**
    * The host's radius in solar radii (`st_rad`), effective temperature in kelvin (`st_teff`) and
-   * luminosity in solar luminosities (10^`st_lum`), where the archive gives them: the planet's
-   * default row first, then the composite table, whose columns may each come from a different
-   * reference. Measured, where `stellar.ts` otherwise derives a luminosity from V and distance.
+   * luminosity in solar luminosities (10^`st_lum`), where the archive gives them: from the
+   * composite table (pscomppars) alone, since the default-row query does not ask for these three,
+   * and each column of it may come from a different reference — Proxima's 0.141 R☉ is one.
+   * Preferred to what `stellar.ts` would derive; see `starSurfaceOf`.
    */
   hostStarRadiusSolar?: number;
   hostStarTemperatureK?: number;

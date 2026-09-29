@@ -43,7 +43,7 @@ export function starReadouts(star: StarRecord, surface?: StarSurface): HudReadou
   return [
     // Suppressed for the Sun rather than printed as `0.00 pc`, which is arithmetically right
     // and reads as a bug: the distance from here to here is not a measurement.
-    ...(distancePc > 0 ? [{ label: 'Distance', value: formatDistance(distancePc, star.distanceError) }] : []),
+    ...(distancePc > 0 ? [{ label: 'Distance', value: formatDistance(distancePc, star.distanceError, star.source === 'exoplanet-archive') }] : []),
     // A G magnitude and a V one are not comparable: a red dwarf is up to three brighter in G.
     { label: 'Magnitude', value: star.magnitudeBand ? `${star.magnitudeBand} ${star.magnitude.toFixed(2)}` : 'Not measured' },
     ...(star.colorIndex !== null

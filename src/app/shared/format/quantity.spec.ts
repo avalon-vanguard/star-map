@@ -31,6 +31,13 @@ describe('formatDistance', () => {
     expect(formatDistance(606.06, 0.45 / 1.65)).toBe('476 pc to 833 pc');
     expect(formatDistance(250, 1)).toBe('125 pc or more');
   });
+
+  it('keeps an error on the distance itself symmetric, however large', () => {
+    // AT2021ueyL: 1 040 +740 −440 pc in the archive, whose mean is 57 % of it.
+    expect(formatDistance(1040, 0.567, true)).toBe('1.0 ± 0.6 kpc');
+    expect(formatDistance(134, 0.319, true)).toBe('134 ± 43 pc');
+    expect(formatDistance(134, 0.005, true)).toBe('134 pc');
+  });
 });
 
 describe('formatAu', () => {

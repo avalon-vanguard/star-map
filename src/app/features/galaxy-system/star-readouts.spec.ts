@@ -60,6 +60,13 @@ describe('starReadouts', () => {
     expect(value(starReadouts(GAIA_STAR), 'Distance')).toBe('117 ± 12 pc');
   });
 
+  it("gives an archive star's distance error as the archive does, on the distance, not as a parallax range", () => {
+    // KMT-2016-BLG-1836L, 7 100 +800 −2 400 pc: a mean of 22.5 %.
+    const lens = { ...GAIA_STAR, x: 7100, magnitudeBand: undefined, colorIndex: null, colorSystem: undefined, distanceError: 0.2254, distanceFromGaia: false, source: 'exoplanet-archive' };
+    expect(value(starReadouts(lens), 'Distance')).toBe('7.1 ± 1.6 kpc');
+    expect(value(starReadouts({ ...lens, source: 'hyg' }), 'Distance')).toBe('5.8 kpc to 9.2 kpc');
+  });
+
   it('names the catalogue a star comes from, and whose distance it has', () => {
     expect(value(starReadouts(GAIA_STAR), 'Source')).toBe('Gaia DR3');
     expect(value(starReadouts(HYG_STAR), 'Source')).toBe('HYG');

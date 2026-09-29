@@ -35,7 +35,9 @@ export interface StarRecord {
   colorSystem?: 'B-V' | 'BP-RP';
   /**
    * Relative uncertainty of the distance, σd/d: the relative error of the parallax it was
-   * inverted from, which to first order is the same. Absent where none was published.
+   * inverted from, which to first order is the same — or, for a star the Exoplanet Archive places,
+   * the mean of the two one-sided errors it gives on the distance itself, which is often no
+   * parallax's. Absent where none was published.
    */
   distanceError?: number;
   /** Whether the distance is Gaia DR3's parallax, whichever catalogue describes the star. */

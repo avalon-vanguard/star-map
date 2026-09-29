@@ -1,6 +1,6 @@
 import { spectralClassification } from '../../shared/astro/spectral';
 import { formatDistance, formatLuminosity } from '../../shared/format/quantity';
-import { StarRecord } from '../../shared/models/star.model';
+import { StarRecord, SUN_STAR_ID } from '../../shared/models/star.model';
 import { StarSurface } from '../body-detail/body-view-model';
 import { HudReadout } from '../hud/hud-dock.component';
 
@@ -72,15 +72,20 @@ function radiusReadout(radiusSolar: number, derived: boolean): HudReadout {
 /**
  * Where the neighbourhood's positions come from: parallaxes, except for the stars only the
  * Exoplanet Archive places, which sit at its own distances — a lensing model's for the
- * microlensing hosts among them, OGLE-2005-BLG-390L's 6.6 kpc for one, with no parallax behind it.
+ * microlensing hosts among them, OGLE-2005-BLG-390L's 6.6 kpc for one, with no parallax behind it —
+ * and the HYG stars neither Hipparcos nor Gaia measured, which sit at the Gliese catalogue's. Those
+ * have no published error, and of the 313 on the map about 154 have a photometric or spectroscopic
+ * parallax in CNS3 (Gliese & Jahreiss 1991), none measured: GJ 3522 at 4.46 pc is 1000/224 mas.
  */
 export function positionsNote(stars: readonly StarRecord[]): string {
   const archive = stars.filter((star) => star.source === 'exoplanet-archive').length;
-  const where =
-    archive === 0
-      ? 'Positions from measured parallaxes.'
-      : `Positions from measured parallaxes, and for the ${archive.toLocaleString('en-GB')} planet hosts only the NASA Exoplanet Archive places, from its distances.`;
-  return `${where} Grid marks the galactic plane through the Sun.`;
+  const gliese = stars.filter((star) => star.source === 'hyg' && star.distanceError === undefined && star.id !== SUN_STAR_ID).length;
+  const where = [
+    'Positions from measured parallaxes',
+    ...(gliese === 0 ? [] : [`for the ${gliese.toLocaleString('en-GB')} stars only the Gliese catalogue places, from its distances, about half of them photometric`]),
+    ...(archive === 0 ? [] : [`for the ${archive.toLocaleString('en-GB')} planet hosts only the NASA Exoplanet Archive places, from its distances`])
+  ].join('; ');
+  return `${where}. Grid marks the galactic plane through the Sun.`;
 }
 
 /** What the catalogue holds, counted by the catalogue describing each star, largest first. */

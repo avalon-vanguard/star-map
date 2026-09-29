@@ -105,7 +105,17 @@ describe('positionsNote', () => {
   it("says which positions are the archive's distances rather than parallaxes, and how many", () => {
     expect(positionsNote([HYG_STAR, GAIA_STAR])).toBe('Positions from measured parallaxes. Grid marks the galactic plane through the Sun.');
     expect(positionsNote([HYG_STAR, { ...GAIA_STAR, source: 'exoplanet-archive' }])).toBe(
-      'Positions from measured parallaxes, and for the 1 planet hosts only the NASA Exoplanet Archive places, from its distances. Grid marks the galactic plane through the Sun.'
+      'Positions from measured parallaxes; for the 1 planet hosts only the NASA Exoplanet Archive places, from its distances. Grid marks the galactic plane through the Sun.'
+    );
+  });
+
+  it("says which stars sit at the Gliese catalogue's distances, many of them no parallax, and leaves the Sun out", () => {
+    // A HYG row with neither a Hipparcos nor a Gaia error: GJ 3522, at the 4.46 pc of a parallax CNS3 estimates.
+    const gliese: StarRecord = { ...HYG_STAR, id: 900, name: 'GJ 3522', distanceError: undefined };
+    const sun: StarRecord = { ...HYG_STAR, id: 0, name: 'Sol', distanceError: undefined };
+    expect(positionsNote([sun, HYG_STAR, gliese, { ...GAIA_STAR, source: 'exoplanet-archive' }])).toBe(
+      'Positions from measured parallaxes; for the 1 stars only the Gliese catalogue places, from its distances, about half of them photometric; ' +
+        'for the 1 planet hosts only the NASA Exoplanet Archive places, from its distances. Grid marks the galactic plane through the Sun.'
     );
   });
 });

@@ -9,7 +9,8 @@ import { ExoplanetRecord } from '../../src/app/shared/models/exoplanet.model';
 import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model';
 import { fetchDeepSky } from './fetchDeepSky';
 import { fetchExoplanets } from './fetchExoplanets';
-import { fetchSolarSystem, FREELY_SPINNING_MOONS } from './fetchSolarSystem';
+import { fetchSolarSystem, FREELY_SPINNING_MOONS, offsetFromTrackDeg } from './fetchSolarSystem';
+import { TrackPoint } from './lib/horizons';
 import { BYTES_PER_STAR_META, BYTES_PER_STAR_POSITION, decodeStarCatalog, encodeStarCatalog } from '../../src/app/shared/models/star-catalog';
 import { fetchStars } from './fetchStars';
 import { describeSources } from './sources/registry';
@@ -152,27 +153,37 @@ const KM_PER_AU = 149597870.7;
 const DEG_TO_RAD = Math.PI / 180;
 
 /**
- * The moons whose table row cannot come within that on this one date, each for a reason no mean
- * ellipse carries, with a ceiling just above its offset here. What each reaches elsewhere is
- * larger, and neither this check nor twelve New Year's Days sampled from 1980 to 2100 see it:
- *
- * - Hyperion, 9.4 degrees here and 22.2 at worst, sampled every other day from 1980 to 2100: held
- *   in a 4:3 resonance by Titan; the row's eccentricity, 0.0232, is less than a quarter of the
- *   0.105 JPL's current table gives.
- * - Iapetus, 9.6 here and 10.1 at worst: the row sits 9.4 degrees behind Horizons at its own epoch,
- *   2000 Jan 1.5, and keeps that offset; its plane agrees with Horizons' to 0.07 degrees and its
- *   period to 0.001 per cent, so the fault is in the row's longitude, which this has no second
- *   source to correct.
- * - Nereid, 2.6 here and 11.2 at worst, sampled daily: an eccentricity of 0.75, the largest here,
- *   which a mean ellipse follows least well near periapsis, where the true anomaly runs ten times
- *   faster than the mean. Its 360-day year put all twelve New Year's Days, under 2.6, far from
- *   periapsis; sampled daily it is past 2.6 on 92 days in 2010-2020 and on 295 in 2040-2050, each
- *   near a periapsis, and under 0.4 on most days.
- *
- * Mimas's swing of 44 degrees either way, the libration of its resonance with Tethys, which also
- * needed a ceiling here once, is now in its orbit; see `orbitFromW` in `fetchSolarSystem.ts`.
+ * The moons whose table row cannot come within that on this one date, each with a ceiling just
+ * above its offset here; see {@link TRACK_OFFSET_CEILINGS_DEG} for what they reach from 1950 to 2100.
  */
 const MOON_OFFSET_CEILINGS_DEG: Record<string, number> = { hyperion: 21, iapetus: 11, nereid: 3 };
+
+/**
+ * How far a moon's or dwarf planet's orbit may stray from Horizons from 1950 to 2100, sampled every
+ * other day (Nereid and Hyperion daily). One date showed each at its best: twelve New Year's Days
+ * gave Nereid 2.6 degrees, and 2025-01-01 alone is all the check above sees. Each card says how
+ * far its own orbit strays over the span (`fetchSolarSystem`), and this holds that figure to
+ * account.
+ *
+ * Measured on this catalogue: at most 2.62 degrees (the Moon, 2010 March 27: no mean ellipse has
+ * its evection or variation; Phoebe reaches 2.58 in 1969, where "within 2.0" was once claimed for
+ * it). Five need their own:
+ *
+ * - Hyperion, 22.23 (2055 Feb 26): held in a 4:3 resonance by Titan; the row's eccentricity,
+ *   0.0232, is less than a quarter of the 0.105 JPL's current table gives.
+ * - Nereid, 11.19 (2039 Nov 1): an eccentricity of 0.75, the largest here, which a mean ellipse
+ *   follows least well near periapsis, where the true anomaly runs ten times faster than the mean;
+ *   its 360-day year kept every New Year's Day far from one.
+ * - Iapetus, 10.34: the row sits 9.4 degrees behind Horizons at its own epoch, 2000 Jan 1.5, and
+ *   keeps that offset; its plane agrees with Horizons' to 0.07 degrees and its period to 0.001 per
+ *   cent, so the fault is in the row's longitude, which this has no second source to correct.
+ * - Mimas, 7.43: its orbit carries the 44-degree libration of its resonance with Tethys (see
+ *   `orbitFromW` in `fetchSolarSystem.ts`), but not the rest of what Horizons integrates.
+ * - Ceres, 7.12 (1953): the SBDB's elements are osculating, exact at 2026 Jun 9 and drifting
+ *   either side; 1.9 by 2050, 5.3 by 2100, and 39 at 1600 on Horizons' own figures.
+ */
+const MAX_TRACK_OFFSET_DEG = 3;
+const TRACK_OFFSET_CEILINGS_DEG: Record<string, number> = { hyperion: 23, nereid: 12, iapetus: 11, mimas: 8, ceres: 8 };
 
 /**
  * The bodies the IAU WGCCRE 2015 report gives no rotational elements for: Hyperion tumbles, and
@@ -236,7 +247,7 @@ function angleBetweenDeg(a: { x: number; y: number; z: number }, b: { x: number;
   return (Math.acos(Math.min(1, Math.max(-1, cosine))) * 180) / Math.PI;
 }
 
-function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, OrbitalElements>): void {
+function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, OrbitalElements>, horizonsTracks: Map<string, TrackPoint[]>): void {
   assertCondition(bodies.length > 0, 'No solar-system bodies were produced.');
 
   const ids = new Set(bodies.map((body) => body.id));
@@ -261,6 +272,23 @@ function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, Orbita
       `${body.name}'s mean elements put it ${offset.toFixed(2)} degrees from where Horizons has it (at most ${ceiling} expected) — the elements were read wrongly.`
     );
     offsets.push(`${body.id} ${offset.toFixed(3)}`);
+
+    // Standish's fit names its own span; every other orbit is measured over 1950-2100, and says so.
+    const track = horizonsTracks.get(body.id);
+    assertCondition(
+      (track !== undefined) === !body.orbitSource.startsWith('JPL approximate mean elements (Standish)'),
+      `${body.name}'s orbit, "${body.orbitSource}", ${track ? 'names its own span' : 'names no span it holds over'}.`
+    );
+    if (track) {
+      const worst = Math.max(...track.map((point) => offsetFromTrackDeg(body, point)));
+      const trackCeiling = TRACK_OFFSET_CEILINGS_DEG[body.id] ?? MAX_TRACK_OFFSET_DEG;
+      const stated = Number(body.orbitSource.match(/within ([\d.]+) degrees of Horizons/)?.[1]);
+      assertCondition(
+        worst <= trackCeiling && stated >= worst,
+        `${body.name}'s mean elements put it up to ${worst.toFixed(2)} degrees from Horizons between 1950 and 2100 (at most ${trackCeiling} expected), and its card says "${body.orbitSource}".`
+      );
+      offsets.push(`${body.id} ${worst.toFixed(2)} at worst`);
+    }
     // The card prints this under "Measured". An osculating eccentricity swings about its mean — the
     // Moon's by 0.015 here, Phoebe's by as much — but not by the 0.087 Hyperion's older row was out.
     const printed = body.measuredEccentricity ?? body.orbit.eccentricity;
@@ -440,7 +468,7 @@ async function build(): Promise<void> {
 
   const stars = await fetchStars();
   console.log();
-  const { bodies, horizonsOrbits } = await fetchSolarSystem();
+  const { bodies, horizonsOrbits, horizonsTracks } = await fetchSolarSystem();
   console.log();
   const exoplanets = await fetchExoplanets(stars);
   console.log();
@@ -450,7 +478,7 @@ async function build(): Promise<void> {
   console.log('Validating output...');
   validateStars(stars);
   validateMerge(stars);
-  validateBodies(bodies, horizonsOrbits);
+  validateBodies(bodies, horizonsOrbits, horizonsTracks);
   validateExoplanets(exoplanets, new Set(stars.map((star) => star.id)));
   validateDeepSky(deepSky);
 

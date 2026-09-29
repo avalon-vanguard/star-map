@@ -2,7 +2,9 @@ import { writeFileSync } from 'node:fs';
 
 import { BodyRecord, OrbitalElements } from '../../src/app/shared/models/body.model';
 import { SUN_STAR_ID } from '../../src/app/shared/models/star.model';
-import { fetchHorizonsBody } from './lib/horizons';
+import { fetchHorizonsBody, fetchHorizonsTrack, TRACK_START_YEAR, TRACK_STOP_YEAR, TrackPoint } from './lib/horizons';
+import { eclipticToEquatorial, laplacePlaneToEquatorial } from '../../src/app/shared/astro/coordinates';
+import { meanElementsAt, positionAtEpoch } from '../../src/app/shared/astro/kepler';
 import { MeanOrbit, parsePlanetMeanElements, parseSatelliteMeanElements, parseSmallBodyElements } from '../../src/app/shared/astro/mean-elements';
 import { fetchPlanetMeanElementsText, fetchSatelliteMeanElementsHtml, fetchSmallBodyAnswer } from './lib/mean-elements';
 import { MIN_PERIODIC_TERM_DEG, orbitalTermsOfPrimeMeridian, parsePckRotationalElements, SUN_ROTATIONAL_ELEMENTS } from '../../src/app/shared/astro/rotational-elements';
@@ -52,6 +54,14 @@ interface BodySpec {
    * given. See `orbitalTermsOfPrimeMeridian`.
    */
   orbitFromW?: { angleRateDegPerCentury?: number };
+  /**
+   * Days between the Horizons positions the orbit is checked against from 1950 to 2100; 2 unless
+   * the error changes faster than that. Nereid, at an eccentricity of 0.75, sweeps through its
+   * periapsis, where the mean ellipse is furthest out, in days; Hyperion, on a row whose
+   * eccentricity is a quarter of its real one, peaks within a day too (22.23 degrees sampled daily
+   * where every other day gave 22.14).
+   */
+  trackStepDays?: number;
 }
 
 /** S5 in pck00011.tpc, 316.45 + 506.2 T: the libration of Mimas and Tethys in their 4:2 resonance. */
@@ -114,13 +124,13 @@ const BODY_SPECS: BodySpec[] = [
   { id: 'titan', name: 'Titan', kind: 'moon', horizonsCommand: '606', center: '500@699', parentBodyId: 'saturn' },
   // Hyperion tumbles ("Rotational period = Chaotic") and Phoebe, captured, turns in 9.27 hours.
   // Hyperion's eccentricity is 0.105 in JPL's current table (ssd.jpl.nasa.gov/sats/elem, SAT441).
-  { id: 'hyperion', name: 'Hyperion', kind: 'moon', horizonsCommand: '607', center: '500@699', parentBodyId: 'saturn', spinsFreely: true, measuredEccentricity: 0.105 },
+  { id: 'hyperion', name: 'Hyperion', kind: 'moon', horizonsCommand: '607', center: '500@699', parentBodyId: 'saturn', spinsFreely: true, measuredEccentricity: 0.105, trackStepDays: 1 },
   { id: 'iapetus', name: 'Iapetus', kind: 'moon', horizonsCommand: '608', center: '500@699', parentBodyId: 'saturn' },
   // Phoebe's row gives a mean motion of 0.6569114 degrees a day, a 548.02-day year, where its
   // Horizons page and JPL's current table (SAT441) give 550.30: the table's own note warns that
   // its source misstated the mean motions of retrograde moons. On the row's figure Phoebe was
-  // 25 degrees from Horizons by 2025 and 100 by 2075; on the current period, within 2.0 from 1980
-  // to 2100.
+  // 25 degrees from Horizons by 2025 and 100 by 2075; on the current period, within 2.6 from 1950
+  // to 2100 (2.58 in 1969).
   { id: 'phoebe', name: 'Phoebe', kind: 'moon', horizonsCommand: '609', center: '500@699', parentBodyId: 'saturn', spinsFreely: true, periodDays: 550.30391 },
   { id: 'miranda', name: 'Miranda', horizonsCommand: '705', ...URANUS_MOON },
   { id: 'ariel', name: 'Ariel', horizonsCommand: '701', ...URANUS_MOON },
@@ -129,7 +139,7 @@ const BODY_SPECS: BodySpec[] = [
   { id: 'oberon', name: 'Oberon', horizonsCommand: '704', ...URANUS_MOON },
   { id: 'triton', name: 'Triton', kind: 'moon', horizonsCommand: '801', center: '500@899', parentBodyId: 'neptune' },
   // Nereid's eccentric orbit, 0.75, cannot hold a face to Neptune; its page states no spin.
-  { id: 'nereid', name: 'Nereid', kind: 'moon', horizonsCommand: '802', center: '500@899', parentBodyId: 'neptune', spinsFreely: true },
+  { id: 'nereid', name: 'Nereid', kind: 'moon', horizonsCommand: '802', center: '500@899', parentBodyId: 'neptune', spinsFreely: true, trackStepDays: 1 },
   { id: 'proteus', name: 'Proteus', kind: 'moon', horizonsCommand: '808', center: '500@899', parentBodyId: 'neptune' },
   // Pluto's section prints its epoch as 2000 Jan 1.0; JPL's current table gives Charon's as
   // 2000-01-01.5, and read at 1.0 Charon sat 27.8 to 28.2 degrees — half a day of its motion is
@@ -148,10 +158,11 @@ export const FREELY_SPINNING_MOONS = new Set(BODY_SPECS.filter((spec) => spec.sp
  * point and which face is where. Horizons' osculating elements for the same date come back
  * alongside, for `build.ts` to check the mean ones against.
  */
-export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizonsOrbits: Map<string, OrbitalElements> }> {
+export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizonsOrbits: Map<string, OrbitalElements>; horizonsTracks: Map<string, TrackPoint[]> }> {
   console.log(`Fetching ${BODY_SPECS.length} solar-system bodies from JPL (mean elements, Horizons, NAIF's PCK)...`);
   const bodies: BodyRecord[] = [];
   const horizonsOrbits = new Map<string, OrbitalElements>();
+  const horizonsTracks = new Map<string, TrackPoint[]>();
   const planetElements = await fetchPlanetMeanElementsText();
   const satelliteElements = await fetchSatelliteMeanElementsHtml();
   const pck = await fetchPckText();
@@ -207,6 +218,18 @@ export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizo
           rates: { ...corrected.rates, meanMotionDegPerDay: corrected.rates.meanMotionDegPerDay + fromW.meanMotionDegPerDay, meanAnomalyTerms: fromW.meanAnomalyTerms }
         }
       : corrected;
+
+    // Standish's fit states its own span, 3000 BC to AD 3000. The moons' table and the SBDB state
+    // none, and hold for far less: each card says how far its orbit stays from Horizons over the
+    // span it was measured, where the clock reaches AD 1 to AD 3000.
+    let orbitSource = mean.orbitSource;
+    if (parentName || smallBody) {
+      const stepDays = spec.trackStepDays ?? 2;
+      const track = await fetchHorizonsTrack(spec.horizonsCommand, spec.center, stepDays, `horizons-track-${spec.id}-${stepDays}d.txt`);
+      horizonsTracks.set(spec.id, track);
+      const worst = Math.max(...track.map((point) => offsetFromTrackDeg(mean, point)));
+      orbitSource += `, within ${(Math.ceil(worst * 10) / 10).toFixed(1)} degrees of Horizons from ${TRACK_START_YEAR} to ${TRACK_STOP_YEAR}`;
+    }
     const radiusKm = smallBody?.radiusKm ?? spec.radiusKm ?? result.radiusKm;
     if (radiusKm === undefined) {
       console.warn(`  no physical radius found for ${spec.name}; defaulting to 0.`);
@@ -238,7 +261,7 @@ export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizo
       orbit: mean.orbit,
       rates: mean.rates,
       ...(mean.laplacePole ? { laplacePole: mean.laplacePole } : {}),
-      orbitSource: mean.orbitSource,
+      orbitSource,
       ...(spec.measuredEccentricity !== undefined ? { measuredEccentricity: spec.measuredEccentricity } : {}),
       ...(spec.parentBodyId ? { parentBodyId: spec.parentBodyId } : {}),
       ...(parentGm !== undefined ? { massRatio: result.gmKm3PerS2! / parentGm } : {}),
@@ -251,7 +274,15 @@ export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizo
   ensureDataDir();
   writeFileSync(dataPath('bodies.json'), JSON.stringify(bodies, null, 2));
   console.log(`  wrote ${bodies.length} bodies.`);
-  return { bodies, horizonsOrbits };
+  return { bodies, horizonsOrbits, horizonsTracks };
+}
+
+/** Degrees between where a moon's or dwarf planet's mean elements put it and where Horizons has it. */
+export function offsetFromTrackDeg(mean: Pick<MeanOrbit, 'orbit' | 'rates' | 'laplacePole'>, point: TrackPoint): number {
+  const own = positionAtEpoch(meanElementsAt(mean.orbit, mean.rates, point.jd));
+  const place = mean.laplacePole ? laplacePlaneToEquatorial(own, mean.laplacePole) : eclipticToEquatorial(own);
+  const cosine = (place.x * point.x + place.y * point.y + place.z * point.z) / (Math.hypot(place.x, place.y, place.z) * Math.hypot(point.x, point.y, point.z));
+  return (Math.acos(Math.min(1, Math.max(-1, cosine))) * 180) / Math.PI;
 }
 
 if (require.main === module) {

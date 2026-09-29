@@ -31,9 +31,11 @@ const JULIAN_DATE_AT_EPOCH = 2440587.5;
  * The end is where Standish's Table 2, the mean elements that carry the planets, stops being
  * fitted: it covers 3000 BC to AD 3000, and every planet was within 0.29 degrees of Horizons at
  * each date measured out to 3000. The start is not the fit's but the date input's, which cannot
- * go before 0001-01-01. Both are proleptic Gregorian, as a `Date` is, so before 1582 they run
- * ahead of the Julian-calendar dates history gives: two days at AD 1, ten by 1582. The moons and
- * dwarf planets hold for far less of it: Phobos is 11 degrees out by 2100, Ceres 11.6 by 2200.
+ * go before 0001-01-01. Both are proleptic Gregorian, as a `Date` is, so before 1582 they part from
+ * the Julian-calendar dates history gives: two days behind them at AD 1, level from AD 200 to 300,
+ * ten days ahead by 1582. The moons and dwarf planets hold for far less of it: each card says how
+ * far its orbit strays from Horizons from 1950 to 2100 (Ceres 7.1 degrees there, 11.6 by 2200 and
+ * 39 by 1600).
  */
 export const CLOCK_WINDOW = { min: '0001-01-01T00:00', max: '3000-01-01T00:00' } as const;
 const WINDOW_MS = {

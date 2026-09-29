@@ -1,4 +1,4 @@
-import { spectralTypeFromColor } from '../../shared/astro/spectral';
+import { spectralClassification } from '../../shared/astro/spectral';
 import { formatDistance, formatLuminosity } from '../../shared/format/quantity';
 import { StarRecord } from '../../shared/models/star.model';
 import { StarSurface } from '../body-detail/body-view-model';
@@ -24,11 +24,8 @@ export function describingCatalogue(star: StarRecord): string {
  * estimate. Empty with neither, rather than the ETL's literal "Unknown".
  */
 export function starSubtitle(star: StarRecord): string {
-  if (star.spectralType && star.spectralType !== 'Unknown') {
-    return `Spectral type ${star.spectralType}`;
-  }
-  const estimate = spectralTypeFromColor(star.colorIndex, star.colorSystem);
-  return estimate ? `Spectral type ~${estimate}, from colour` : '';
+  const classification = spectralClassification(star);
+  return !classification ? '' : `Spectral type ${classification}${classification.startsWith('~') ? ', from colour' : ''}`;
 }
 
 /**
@@ -64,6 +61,20 @@ function radiusReadout(radiusSolar: number, derived: boolean): HudReadout {
   return derived
     ? { label: 'Radius', value: `~${figure} solar radii, from colour and brightness`, derived: true }
     : { label: 'Radius', value: `${figure} solar radii` };
+}
+
+/**
+ * Where the neighbourhood's positions come from: parallaxes, except for the stars only the
+ * Exoplanet Archive places, which sit at its own distances — a lensing model's for the
+ * microlensing hosts among them, OGLE-2005-BLG-390L's 6.6 kpc for one, with no parallax behind it.
+ */
+export function positionsNote(stars: readonly StarRecord[]): string {
+  const archive = stars.filter((star) => star.source === 'exoplanet-archive').length;
+  const where =
+    archive === 0
+      ? 'Positions from measured parallaxes.'
+      : `Positions from measured parallaxes, and for the ${archive.toLocaleString('en-GB')} planet hosts only the NASA Exoplanet Archive places, from its distances.`;
+  return `${where} Grid marks the galactic plane through the Sun.`;
 }
 
 /** What the catalogue holds, counted by the catalogue describing each star, largest first. */

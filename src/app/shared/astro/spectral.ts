@@ -179,6 +179,19 @@ export function spectralTypeFromColor(colorIndex: number | null, system: 'B-V' |
   return nearest[0];
 }
 
+/**
+ * A star's classification as a row or an option lists it: the catalogue's type, or the dwarf type
+ * its colour matches, marked `~` as an estimate; empty with neither, rather than the ETL's literal
+ * "Unknown", which 383 695 stars carry and search rows and route options used to print.
+ */
+export function spectralClassification(star: { spectralType: string; colorIndex: number | null; colorSystem?: 'B-V' | 'BP-RP' }): string {
+  if (star.spectralType && star.spectralType !== 'Unknown') {
+    return star.spectralType;
+  }
+  const estimate = spectralTypeFromColor(star.colorIndex, star.colorSystem);
+  return estimate ? `~${estimate}` : '';
+}
+
 /** What the dwarf sequence says of a star of a given colour. */
 export interface DwarfSequencePoint {
   /** B−V, the colour in the other system's terms where it was read off BP−RP. */

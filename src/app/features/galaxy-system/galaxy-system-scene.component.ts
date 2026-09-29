@@ -20,6 +20,7 @@ import {
   galacticCentrePositionPc,
   galacticToEquatorial,
 } from '../../shared/astro/galaxy';
+import { spectralClassification } from '../../shared/astro/spectral';
 import { blackbodyColor } from '../../shared/astro/stellar';
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { EngineService, SceneCamera } from '../../core/engine/engine.service';
@@ -84,7 +85,7 @@ import { JumpLinkRenderer } from './jump-link-renderer';
 import { ReservedBox, ringPlacement } from './label-ring';
 import { LabeledPoint, LabelSide, StarLabelOverlay } from './star-label-overlay';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
-import { catalogueCensus, starReadouts, starSubtitle } from './star-readouts';
+import { catalogueCensus, positionsNote, starReadouts, starSubtitle } from './star-readouts';
 
 /** Radius, in CSS pixels, below which a body in the system view is scaled up to be seen at all. */
 const MIN_MARKER_PIXELS = 3;
@@ -572,6 +573,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private stars: readonly StarRecord[] = [];
   /** The neighbourhood's subtitle: what the catalogue holds, by the catalogue describing it. */
   private catalogueCensus = '';
+  private positionsNote = '';
   private starsById = new Map<number, StarRecord>();
   private bodies: readonly BodyRecord[] = [];
   private exoplanets: readonly ExoplanetRecord[] = [];
@@ -721,6 +723,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     ]);
     this.stars = stars;
     this.catalogueCensus = catalogueCensus(stars);
+    this.positionsNote = positionsNote(stars);
     this.starsById = new Map(stars.map((star) => [star.id, star]));
     this.neighbourhood = new StarNeighbourhood(stars);
     this.routing = new RoutingClient(stars, positions, this.neighbourhood);
@@ -730,7 +733,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         stars.map((star) => ({
           kind: 'star' as const,
           name: star.name,
-          subtitle: star.spectralType,
+          subtitle: spectralClassification(star),
           starId: star.id,
         })),
       ),
@@ -1848,9 +1851,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       // The one thing the field itself cannot show: which of those points can be flown into.
       { label: 'Systems', value: `${this.enterableSystems}` },
     ]);
-    this.hudNote.set(
-      'Positions from measured parallaxes. Grid marks the galactic plane through the Sun.',
-    );
+    this.hudNote.set(this.positionsNote);
   }
 
   /** Where the current press started, so a drag can be told apart from a click. */
@@ -1959,7 +1960,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   readonly currentStarOption = computed<RouteStarOption | null>(() => {
     const starId = this.navigationStore.selectedStarId();
     const star = starId === null ? undefined : this.starsById.get(starId);
-    return star ? { id: star.id, name: star.name, subtitle: star.spectralType } : null;
+    return star ? { id: star.id, name: star.name, subtitle: spectralClassification(star) } : null;
   });
 
   onRouteQuery(query: string): void {

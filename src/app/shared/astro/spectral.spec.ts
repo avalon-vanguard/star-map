@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { dwarfSequenceAtColor, isGiant, parseSpectralClass, SPECTRAL_CLASSES, spectralTypeFromColor, spectralTypeToColorIndex, temperatureToColorIndex } from './spectral';
+import { dwarfSequenceAtColor, isGiant, parseSpectralClass, spectralClassification, SPECTRAL_CLASSES, spectralTypeFromColor, spectralTypeToColorIndex, temperatureToColorIndex } from './spectral';
 
 describe('parseSpectralClass', () => {
   it('reads a clean class and subclass', () => {
@@ -140,6 +140,14 @@ describe('spectralTypeFromColor', () => {
     expect(spectralTypeFromColor(5.5, 'BP-RP')).toBeNull();
     expect(spectralTypeFromColor(null, 'B-V')).toBeNull();
     expect(spectralTypeFromColor(-0.301, 'B-V')).toBe('B0');
+  });
+});
+
+describe('spectralClassification', () => {
+  it("gives the catalogue's type, else the colour's marked as an estimate, else nothing", () => {
+    expect(spectralClassification({ spectralType: 'M5Ve', colorIndex: 1.807, colorSystem: 'B-V' })).toBe('M5Ve');
+    expect(spectralClassification({ spectralType: 'Unknown', colorIndex: 4.902, colorSystem: 'BP-RP' })).toBe('~M8');
+    expect(spectralClassification({ spectralType: 'Unknown', colorIndex: null })).toBe('');
   });
 });
 

@@ -6,6 +6,7 @@ import { planetTexture } from '../../shared/rendering/procedural-planet-texture'
 import { bodyTexturePath, loadCachedTexture, saturnRing } from '../../shared/rendering/texture-catalog';
 import { isPropagatableOrbit, keplerRates, meanElementsAt, orbitEllipsePoints, positionAtEpoch, resolveGravitationalParameter, resolveOrbitalElements } from '../../shared/astro/kepler';
 import { CartesianCoordinates, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
+import { tdbFromUtc } from '../../shared/astro/constants';
 import { BodyRecord, MeanElementRates, OrbitalElements, RotationalElements } from '../../shared/models/body.model';
 import { bodyOrientation, poleFrame } from '../../shared/rendering/body-orientation';
 import { bodyMarkerRadiusAu, systemGridRingsAu } from './system-framing';
@@ -466,10 +467,14 @@ export class SystemOrbitsRenderer {
     this.object.add(starLight());
   }
 
-  /** Recomputes every marker's position for the given Julian date. Call once per tick. */
+  /**
+   * Recomputes every marker's position for the given Julian date, UTC as the map's clock gives it:
+   * the orbits are taken at its TDB, as the spins are. Call once per tick.
+   */
   update(epochJd: number): void {
+    const jdTdb = tdbFromUtc(epochJd);
     for (const body of this.topLevelBodies) {
-      const current = meanElementsAt(body.elements, body.rates, epochJd);
+      const current = meanElementsAt(body.elements, body.rates, jdTdb);
       const orbital = positionAtEpoch(current);
       body.position.set(orbital.x, orbital.y, orbital.z).applyQuaternion(body.frame);
       body.marker.position.copy(body.position);
@@ -477,7 +482,7 @@ export class SystemOrbitsRenderer {
       if (body.rotationalElements) {
         bodyOrientation(body.rotationalElements, epochJd, body.marker.quaternion);
       } else if (body.rotationPeriodHours) {
-        body.marker.quaternion.copy(spinFor(current, body.frame, body.rotationPeriodHours, epochJd - body.elements.epochJd));
+        body.marker.quaternion.copy(spinFor(current, body.frame, body.rotationPeriodHours, jdTdb - body.elements.epochJd));
       }
     }
 
@@ -487,7 +492,7 @@ export class SystemOrbitsRenderer {
         continue;
       }
       moon.pivot.position.copy(parent.position);
-      const current = meanElementsAt(moon.elements, moon.rates, epochJd);
+      const current = meanElementsAt(moon.elements, moon.rates, jdTdb);
       const orbital = positionAtEpoch(current);
       moon.marker.position.set(orbital.x, orbital.y, orbital.z).applyQuaternion(moon.frame);
       orientOrbit(moon.orbitLine.quaternion, current, moon.frame);
@@ -502,7 +507,7 @@ export class SystemOrbitsRenderer {
       if (moon.rotationalElements) {
         bodyOrientation(moon.rotationalElements, epochJd, moon.marker.quaternion);
       } else if (moon.rotationPeriodHours) {
-        moon.marker.quaternion.copy(spinFor(current, moon.frame, moon.rotationPeriodHours, epochJd - moon.elements.epochJd));
+        moon.marker.quaternion.copy(spinFor(current, moon.frame, moon.rotationPeriodHours, jdTdb - moon.elements.epochJd));
       }
     }
 

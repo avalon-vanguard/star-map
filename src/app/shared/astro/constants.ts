@@ -27,6 +27,17 @@ export const GM_SUN_AU3_PER_DAY2 = 0.01720209895 * 0.01720209895;
  */
 export const TT_MINUS_UTC_DAYS = 69.184 / 86400;
 
+/**
+ * The TDB date every element set here is evaluated at, for a date on the map's clock, which is
+ * UTC: Standish's T_eph, the SSD satellite and SBDB epochs and the IAU's d and T all run on TDB.
+ * Positions and spins both go through this, so a locked moon's face and the orbit it is drawn on
+ * are taken at the same instant; taken at the clock's date, the orbits ran 69 s behind the spins,
+ * which is 0.9 degrees of Phobos's orbit and 0.16 of Io's.
+ */
+export function tdbFromUtc(jdUtc: number): number {
+  return jdUtc + TT_MINUS_UTC_DAYS;
+}
+
 /** Converts a JS `Date` into a Julian date (days), for driving the Kepler propagator "now". */
 export function dateToJulianDate(date: Date = new Date()): number {
   return date.getTime() / 86400000 + 2440587.5;

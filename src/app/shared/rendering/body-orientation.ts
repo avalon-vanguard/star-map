@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 
-import { TT_MINUS_UTC_DAYS } from '../astro/constants';
+import { tdbFromUtc } from '../astro/constants';
 import { CartesianCoordinates, eclipticToEquatorial, laplacePlaneToEquatorial } from '../astro/coordinates';
 import { meanElementsAt, positionAtEpoch } from '../astro/kepler';
 import { orientationAt } from '../astro/rotational-elements';
@@ -51,10 +51,10 @@ export function poleFrame(pole: { raDeg: number; decDeg: number }, target = new 
  * and on to where the pole points.
  *
  * The clock is UTC and the IAU's elements run on TDB, 69.184 s ahead; in that time Earth turns
- * 0.29 degrees, Jupiter 0.70 and Phobos 0.90, so the difference is added here.
+ * 0.29 degrees, Jupiter 0.70 and Phobos 0.90, so the date is taken to TDB here (see `tdbFromUtc`).
  */
 export function bodyOrientation(elements: RotationalElements, jdUtc: number, target = new THREE.Quaternion()): THREE.Quaternion {
-  const { poleRaDeg, poleDecDeg, primeMeridianDeg } = orientationAt(elements, jdUtc + TT_MINUS_UTC_DAYS);
+  const { poleRaDeg, poleDecDeg, primeMeridianDeg } = orientationAt(elements, tdbFromUtc(jdUtc));
   return poleFrame({ raDeg: poleRaDeg, decDeg: poleDecDeg }, target)
     .multiply(scratchTurn.setFromAxisAngle(Z_AXIS, primeMeridianDeg * DEG_TO_RAD))
     .multiply(MAP_TO_BODY);
@@ -62,13 +62,14 @@ export function bodyOrientation(elements: RotationalElements, jdUtc: number, tar
 
 /** Where a body is from the Sun at a date, in the ICRF, AU: a moon's planet's place plus its own. */
 function heliocentricPosition(body: BodyRecord, bodies: readonly BodyRecord[], jdUtc: number): CartesianCoordinates {
-  const own = positionAtEpoch(meanElementsAt(body.orbit, body.rates, jdUtc));
+  const jdTdb = tdbFromUtc(jdUtc);
+  const own = positionAtEpoch(meanElementsAt(body.orbit, body.rates, jdTdb));
   const parent = body.parentBodyId ? bodies.find((candidate) => candidate.id === body.parentBodyId) : undefined;
   if (!parent) {
     return eclipticToEquatorial(own);
   }
   const offset = body.laplacePole ? laplacePlaneToEquatorial(own, body.laplacePole) : eclipticToEquatorial(own);
-  const centre = eclipticToEquatorial(positionAtEpoch(meanElementsAt(parent.orbit, parent.rates, jdUtc)));
+  const centre = eclipticToEquatorial(positionAtEpoch(meanElementsAt(parent.orbit, parent.rates, jdTdb)));
   return { x: centre.x + offset.x, y: centre.y + offset.y, z: centre.z + offset.z };
 }
 
@@ -92,7 +93,7 @@ export function bodyPageView(body: BodyRecord, bodies: readonly BodyRecord[], jd
   if (!elements) {
     return false;
   }
-  const { poleRaDeg, poleDecDeg } = orientationAt(elements, jdUtc + TT_MINUS_UTC_DAYS);
+  const { poleRaDeg, poleDecDeg } = orientationAt(elements, tdbFromUtc(jdUtc));
   // From the ICRF into the body's frame with its pole on +Y, before the turn about that pole.
   const toPage = poleFrame({ raDeg: poleRaDeg, decDeg: poleDecDeg }, scratchPage).multiply(MAP_TO_BODY).invert();
   const position = heliocentricPosition(body, bodies, jdUtc);

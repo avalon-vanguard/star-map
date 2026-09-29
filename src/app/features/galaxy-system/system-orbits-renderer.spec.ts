@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_EPOCH_JD, GM_SUN_AU3_PER_DAY2 } from '../../shared/astro/constants';
+import { DEFAULT_EPOCH_JD, GM_SUN_AU3_PER_DAY2, TT_MINUS_UTC_DAYS } from '../../shared/astro/constants';
 import { keplerRates } from '../../shared/astro/kepler';
 import { eclipticToEquatorial, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
 import { BodyRecord, RotationalElements } from '../../shared/models/body.model';
@@ -203,7 +203,8 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
       // A body at ecliptic longitude 0 sits on the +X axis in both frames, so it must not move.
       const atEquinox: BodyRecord = { ...EARTH, orbit: { ...EARTH.orbit, eccentricity: 0 } };
       const renderer = new SystemOrbitsRenderer([atEquinox], []);
-      renderer.update(DEFAULT_EPOCH_JD);
+      // The clock's UTC date whose TDB is the elements' epoch.
+      renderer.update(DEFAULT_EPOCH_JD - TT_MINUS_UTC_DAYS);
 
       const p = renderer.members[0].marker.position;
       expect(p.x).toBeCloseTo(1, 6);
@@ -489,7 +490,8 @@ describe('solar-system bodies against Horizons', () => {
   // Real records from bodies.json, and Horizons' own positions for them (ICRF, AU; heliocentric
   // for the planets, planet-centred for the moons) at dates across 1950-2100, so the whole path —
   // mean elements, their rates, the Laplace planes and the scene's frame — is checked against
-  // JPL's ephemeris rather than against itself.
+  // JPL's ephemeris rather than against itself. Horizons' dates are TDB and the renderer's are the
+  // clock's UTC, so each is handed over 69.184 s earlier.
   const RECORDS: Record<string, Pick<BodyRecord, 'kind' | 'orbit' | 'rates' | 'laplacePole' | 'parentBodyId' | 'massRatio'>> = {
     earth: {kind: 'planet', orbit: {semiMajorAxisAu: 1.00000018, eccentricity: 0.01673163, inclinationDeg: -0.00054346, longitudeOfAscendingNodeDeg: -5.11260389, argumentOfPeriapsisDeg: 108.04266274, meanAnomalyAtEpochDeg: -2.4631431299999917, epochJd: 2451545}, rates: {meanMotionDegPerDay: 0.9856091187759068, longitudeOfAscendingNodeDegPerDay: -0.000006604751813826146, argumentOfPeriapsisDegPerDay: 0.000015309819575633124, semiMajorAxisAuPerDay: -8.213552361396303e-13, eccentricityPerDay: -1.002327173169062e-9, inclinationDegPerDay: -3.6609938398357287e-7}},
     jupiter: {kind: 'planet', orbit: {semiMajorAxisAu: 5.20248019, eccentricity: 0.0485359, inclinationDeg: 1.29861416, longitudeOfAscendingNodeDeg: 100.29282654, argumentOfPeriapsisDeg: -86.0178741, meanAnomalyAtEpochDeg: 20.059839080000003, epochJd: 2451545}, rates: {meanMotionDegPerDay: 0.08309113532019165, longitudeOfAscendingNodeDegPerDay: 0.0000035659463381245725, argumentOfPeriapsisDegPerDay: 0.0000014167219712525667, semiMajorAxisAuPerDay: -7.841204654346339e-10, eccentricityPerDay: 4.935249828884326e-9, inclinationDegPerDay: -8.83501711156742e-8, meanAnomalyTerms: {b: -0.00012452, c: 0.0606406, s: -0.35635438, f: 38.35125}}},
@@ -517,6 +519,7 @@ describe('solar-system bodies against Horizons', () => {
     earth: {poleRaDeg: [0, -0.641, 0], poleDecDeg: [90, -0.557, 0], primeMeridianDeg: [190.147, 360.9856235, 0]},
     mars: {poleRaDeg: [317.269202, -0.10927547, 0], poleDecDeg: [54.432516, -0.05827105, 0], primeMeridianDeg: [176.049863, 350.891982443297, 0], terms: [{angleDeg: [79.398797, 0.5042615, 0], ra: 0.419057, dec: 0, pm: 0}, {angleDeg: [166.325722, 0.5042615, 0], ra: 0, dec: 1.591274, pm: 0}, {angleDeg: [95.391654, 0.5042615, 0], ra: 0, dec: 0, pm: 0.584542}]},
     jupiter: {poleRaDeg: [268.056595, -0.006499, 0], poleDecDeg: [64.495303, 0.002413, 0], primeMeridianDeg: [284.95, 870.536, 0]},
+    io: {poleRaDeg: [268.05, -0.009, 0], poleDecDeg: [64.5, 0.003, 0], primeMeridianDeg: [200.39, 203.4889538, 0], terms: [{angleDeg: [283.9, 4850.7], ra: 0.094, dec: 0.04, pm: -0.085}, {angleDeg: [355.8, 1191.3], ra: 0.024, dec: 0.011, pm: -0.022}]},
     saturn: {poleRaDeg: [40.589, -0.036, 0], poleDecDeg: [83.537, -0.004, 0], primeMeridianDeg: [38.9, 810.7939024, 0]},
     uranus: {poleRaDeg: [257.311, 0, 0], poleDecDeg: [-15.175, 0, 0], primeMeridianDeg: [203.81, -501.1600928, 0]},
     pluto: {poleRaDeg: [132.993, 0, 0], poleDecDeg: [-6.163, 0, 0], primeMeridianDeg: [302.695, 56.3625225, 0]},
@@ -552,7 +555,7 @@ describe('solar-system bodies against Horizons', () => {
 
   for (const [id, jd, x, y, z, maxDeg] of HORIZONS) {
     it(`puts ${id} within ${maxDeg} degrees of Horizons on JD ${jd}`, () => {
-      renderer.update(jd);
+      renderer.update(jd - TT_MINUS_UTC_DAYS);
       const drawn = renderer.members.find((member) => member.id === id)!.marker.position;
       const angleDeg = (drawn.angleTo(new THREE.Vector3(x, y, z)) * 180) / Math.PI;
       expect(angleDeg).toBeLessThan(maxDeg);
@@ -560,9 +563,9 @@ describe('solar-system bodies against Horizons', () => {
   }
 
   it('puts Pluto where Horizons has it round its barycentre with Charon, 2 131 km out and opposite Charon', () => {
-    // Horizons, Pluto (999) from the Pluto-system barycentre (9), on JD 2488069.5 (2100).
+    // Horizons, Pluto (999) from the Pluto-system barycentre (9), on JD 2488069.5 TDB (2100).
     const horizons = new THREE.Vector3(0.000003313612032581019, 0.000001023040948538272, -0.00001381793390079716);
-    renderer.update(2488069.5);
+    renderer.update(2488069.5 - TT_MINUS_UTC_DAYS);
     const charon = renderer.members.find((member) => member.id === 'charon')!.marker;
     const barycentre = charon.parent!.position;
     const pluto = renderer.members.find((member) => member.id === 'pluto')!.marker.position.clone().sub(barycentre);
@@ -712,12 +715,14 @@ describe('solar-system bodies against Horizons', () => {
   //
   // Measured: every longitude within 0.09 degrees and every latitude within 0.03, but for the
   // Moon's face towards Earth, 0.70 and 0.09 out because its mean orbit is (its evection alone is
-  // 1.27 degrees); its face towards the Sun is within 0.002.
+  // 1.27 degrees); its face towards the Sun is within 0.002. Io's face towards Jupiter is 0.012 out:
+  // with its orbit taken at the clock's UTC and its spin at TDB it was 0.175, the 69 s between them.
   const SUB_POINTS: Array<[id: string, observer: string | undefined, lightMinutes: number, west: boolean, flattening: number, observerLon: number, observerLat: number, sunLon: number, sunLat: number, maxObserverDeg: number]> = [
     ['earth', undefined, 8.43351424, false, 1 / 298.257, 1.5855, 22.261204, 1.579501, 22.260426, 0.1],
     ['mars', 'earth', 14.13295841, true, 1 - 3376.2 / 3396.19, 307.365389, 21.27653, 269.287887, 25.451264, 0.1],
     ['moon', 'earth', 0.02150549, false, 0, 7.256763, -3.462104, 116.285934, 1.503004, 0.8],
-    ['jupiter', 'earth', 50.70337676, true, 1 - 66854 / 71492, 251.139846, 2.58787, 247.855871, 2.572658, 0.1]
+    ['jupiter', 'earth', 50.70337676, true, 1 - 66854 / 71492, 251.139846, 2.58787, 247.855871, 2.572658, 0.1],
+    ['io', 'jupiter', 0.02340584, true, 0, 359.964094, -0.002537, 355.673108, 2.26528, 0.05]
   ];
 
   for (const [id, observer, lightMinutes, west, flattening, observerLon, observerLat, sunLon, sunLat, maxObserverDeg] of SUB_POINTS) {

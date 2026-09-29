@@ -13,6 +13,11 @@ export interface ExoplanetRecord {
   massEarth?: number;
   discoveryYear?: number;
   /**
+   * True where the archive flags the planet as detected by imaging (`ima_flag`): photographed as a
+   * point of light beside its star, as HR 8799's four planets were. Absent for every other planet.
+   */
+  imaged?: true;
+  /**
    * Measured orbital period in days (`pl_orbper`). Together with the semi-major axis this
    * pins the host star's gravitational parameter exactly, so the planet can be propagated at
    * its real rate instead of as though it orbited the Sun — see `resolveGravitationalParameter`.

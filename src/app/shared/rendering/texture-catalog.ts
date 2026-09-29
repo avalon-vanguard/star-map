@@ -5,7 +5,8 @@ import * as THREE from 'three/webgpu';
  * keyed by the same ids used in `bodies.json`.
  *
  * Only surface *maps* belong here: equirectangular images, twice as wide as tall, that wrap a
- * sphere. Everything else — every exoplanet, since not one has ever been imaged, and every moon
+ * sphere. Everything else — every exoplanet, since the few imaged were seen only as points of
+ * light, and every moon
  * or dwarf planet with no such map in the repository — falls through to
  * `procedural-planet-texture.ts`, which derives a surface from the body's own measured size,
  * mass, orbit and host star instead.

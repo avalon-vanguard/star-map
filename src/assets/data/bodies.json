@@ -540,7 +540,7 @@
       "argumentOfPeriapsisDegPerDay": 0
     },
     "orbitSource": "JPL SBDB osculating elements, epoch 2026 Jun 9",
-    "rotationPeriodHours": 25.9
+    "rotationPeriodHours": 378.504
   },
   {
     "id": "haumea",

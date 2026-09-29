@@ -335,6 +335,13 @@ function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, Orbita
   assertCondition(planetCount === 8, `Expected 8 planets, found ${planetCount}.`);
   const dwarfCount = bodies.filter((body) => body.kind === 'dwarf').length;
   assertCondition(dwarfCount === 5, `Expected the IAU's 5 dwarf planets, found ${dwarfCount}.`);
+  // Eris keeps one face to Dysnomia, whose orbit takes 15.78590 days (Holler et al. 2021); its light
+  // curve gives 15.771 +/- 0.008 (Bernstein et al. 2023). The SBDB still gives 25.9 hours.
+  const erisDays = (bodies.find((body) => body.id === 'eris')?.rotationPeriodHours ?? NaN) / 24;
+  assertCondition(
+    Math.abs(erisDays / 15.7859 - 1) < 0.002,
+    `Eris turns once in ${erisDays.toFixed(3)} days; it is locked to Dysnomia's 15.786-day orbit — the SBDB's 25.9-hour period, which it flags as possibly 30 per cent wrong, was taken.`
+  );
   console.log(`  mean elements against Horizons, degrees: ${offsets.join(', ')}.`);
   console.log(`  IAU rotation against Horizons (day as a fraction of it, tilt in degrees): ${spins.join(', ')}.`);
 }

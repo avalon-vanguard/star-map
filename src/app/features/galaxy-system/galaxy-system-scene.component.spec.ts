@@ -14,6 +14,7 @@ import { LinkBudget } from '../../shared/astro/jump-links';
 import { HudDisplay } from '../hud/hud-dock.component';
 import { GalaxySystemSceneComponent } from './galaxy-system-scene.component';
 import { galacticNormal } from './grid-plane';
+import { catalogueCensus, positionsNote } from './star-readouts';
 import { closestApproachAu, SUN_RADIUS_AU } from './system-framing';
 import { blackbodyColor, SOLAR_EFFECTIVE_TEMPERATURE_K } from '../../shared/astro/stellar';
 import { JumpLinkRenderer } from './jump-link-renderer';
@@ -38,7 +39,10 @@ const PROXIMA: StarRecord = { id: 42, name: 'Proxima Centauri', x: 0, y: 1.3, z:
 const ANTARES: StarRecord = { id: 80519, name: 'Antares', x: -58.54, y: -140.31, z: -75.57, magnitude: 1.06, magnitudeBand: 'V', spectralType: 'M1Ib + B2.5V', colorIndex: 1.865, colorSystem: 'B-V' };
 const PROCYON_B: StarRecord = { id: 37279, name: 'Gl 280B', x: -1.08, y: 3.19, z: 0.34, magnitude: 10.7, magnitudeBand: 'V', spectralType: 'DA', colorIndex: null };
 
-const STARS: StarRecord[] = [SUN, ALPHA_CENTAURI, PROXIMA, ANTARES, PROCYON_B];
+// A host only the archive places, at the stand-in magnitude, with no type and no colour.
+const LENS: StarRecord = { id: 1070000536, name: 'KMT-2016-BLG-1107L', x: 6651, y: 0, z: 0, magnitude: 15, spectralType: 'Unknown', colorIndex: null, source: 'exoplanet-archive' };
+
+const STARS: StarRecord[] = [SUN, ALPHA_CENTAURI, PROXIMA, ANTARES, PROCYON_B, LENS];
 const STAR_POSITIONS = new Float32Array(STARS.flatMap((star) => [star.x, star.y, star.z]));
 
 // Proxima's planet as the archive gives it, with its host's radius, temperature and luminosity.
@@ -290,7 +294,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       const [focus] = refocus.mock.calls[0];
       expect(focus.view).toBeDefined();
       // The Sun has Earth and Proxima its b, so both are hosts; the others have nothing catalogued.
-      expect(Array.from(focus.hosts ?? [])).toEqual([1, 0, 1, 0, 0]);
+      expect(Array.from(focus.hosts ?? [])).toEqual([1, 0, 1, 0, 0, 0]);
     });
 
     it('chooses again once the camera has turned half the margin, and not for less', async () => {
@@ -949,6 +953,24 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(component.currentStarId).toBeNull();
     expect(component.systemGroup.visible).toBe(false);
     expect(navigationStore.viewLevel()).toBe('galactic');
+  });
+
+  it('names what the neighbourhood holds, and where the positions of the stars in it come from', async () => {
+    await advanceFrames(engine, 0.3);
+    const component = fixture.componentInstance as unknown as { hudSubtitle(): string; hudNote(): string };
+    expect(component.hudSubtitle()).toBe(catalogueCensus(STARS));
+    expect(component.hudNote()).toBe(positionsNote(STARS));
+    expect(component.hudNote()).toContain('1 planet hosts only the NASA Exoplanet Archive places, from its distances');
+  });
+
+  it('offers a star for a route by its classification, and a star with none by its name alone', () => {
+    const component = fixture.componentInstance as unknown as { starSearchIndex(): { entry: { starId?: number; subtitle: string } }[]; currentStarOption(): { subtitle: string } | null };
+    expect(component.starSearchIndex().find(({ entry }) => entry.starId === LENS.id)?.entry.subtitle).toBe('');
+    expect(component.starSearchIndex().find(({ entry }) => entry.starId === PROXIMA.id)?.entry.subtitle).toBe('M5V');
+    navigationStore.selectStar(LENS.id);
+    expect(component.currentStarOption()?.subtitle).toBe('');
+    navigationStore.selectStar(PROXIMA.id);
+    expect(component.currentStarOption()?.subtitle).toBe('M5V');
   });
 
   describe('each star at its own size and in its own colour', () => {

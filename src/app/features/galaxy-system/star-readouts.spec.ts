@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { StarRecord } from '../../shared/models/star.model';
-import { catalogueCensus, describingCatalogue, starReadouts, starSubtitle } from './star-readouts';
+import { catalogueCensus, describingCatalogue, positionsNote, starReadouts, starSubtitle } from './star-readouts';
 
 /** Three kinds of star the catalogue holds, each as the decoder gives it back. */
 const HYG_STAR: StarRecord = {
@@ -91,6 +91,15 @@ describe('starReadouts', () => {
     expect(starReadouts(HYG_STAR, { ...surface, luminositySolar: 25.4, luminosityDerived: true }).find((readout) => readout.label === 'Luminosity')).toEqual({ label: 'Luminosity', value: '25.40 L☉', derived: true });
     expect(starReadouts(PLACED_BY_GAIA, { ...surface, luminositySolar: 0.00151, luminosityDerived: false }).find((readout) => readout.label === 'Luminosity')).toEqual({ label: 'Luminosity', value: '0.002 L☉' });
     expect(starReadouts(HYG_STAR, { ...surface, luminositySolar: null, luminosityDerived: true }).some((readout) => readout.label === 'Luminosity')).toBe(false);
+  });
+});
+
+describe('positionsNote', () => {
+  it("says which positions are the archive's distances rather than parallaxes, and how many", () => {
+    expect(positionsNote([HYG_STAR, GAIA_STAR])).toBe('Positions from measured parallaxes. Grid marks the galactic plane through the Sun.');
+    expect(positionsNote([HYG_STAR, { ...GAIA_STAR, source: 'exoplanet-archive' }])).toBe(
+      'Positions from measured parallaxes, and for the 1 planet hosts only the NASA Exoplanet Archive places, from its distances. Grid marks the galactic plane through the Sun.'
+    );
   });
 });
 

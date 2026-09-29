@@ -16,7 +16,10 @@ function starRecord(id: number, name: string): StarRecord {
 /** Enough "Iot ..." stars to fill the result list ahead of the moon Io, as the real index does. */
 const STARS: StarRecord[] = [
   ...Array.from({ length: 12 }, (_, i) => starRecord(100 + i, `Iot Star ${i}`)),
-  starRecord(1, 'Proxima Centauri')
+  starRecord(1, 'Proxima Centauri'),
+  // As the ETL files a Gaia star: no type, a BP−RP colour; and a star with neither.
+  { ...starRecord(2, 'TRAPPIST-1'), spectralType: 'Unknown', colorIndex: 4.902, colorSystem: 'BP-RP' },
+  { ...starRecord(3, 'KMT-2016-BLG-1107L'), spectralType: 'Unknown', colorIndex: null }
 ];
 
 const IO: BodyRecord = {
@@ -107,6 +110,14 @@ describe('SearchComponent', () => {
     await type('Proxima');
     expect(resultNames()[0]).toBe('Proxima Centauri');
     expect(resultNames()).toContain('Proxima Cen b');
+  });
+
+  it("lists a star by the type its colour gives it where it has none, and never as \"Unknown\"", async () => {
+    const kindLine = (): string => (element.querySelector('[data-testid="search-results"] button span:last-child')?.textContent ?? '').trim();
+    await type('TRAPPIST-1');
+    expect(kindLine()).toBe('Star · ~M8');
+    await type('KMT-2016-BLG-1107L');
+    expect(kindLine()).toBe('Star');
   });
 
   it('shows nothing for a query that matches nothing', async () => {

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 
 import { propagateProperMotion, raDegDecDistanceToXyz } from '../../src/app/shared/astro/coordinates';
-import { archiveStarId, buildStarNameIndex, resolveHostStarId } from '../../src/app/shared/astro/host-star-matching';
+import { ARCHIVE_EPOCH, archiveStarId, buildStarNameIndex, CATALOGUE_EPOCH, resolveHostStarId } from '../../src/app/shared/astro/host-star-matching';
 import { temperatureToColorIndex } from '../../src/app/shared/astro/spectral';
 import { ExoplanetRecord } from '../../src/app/shared/models/exoplanet.model';
 import { isDesignation } from '../../src/app/shared/models/star-catalog';
@@ -87,12 +87,12 @@ const DISTANCE_ERRORS_CACHE_FILE = `exoplanet-archive-disterr-${createHash('sha1
 
 const ARCHIVE_SOURCE = 'exoplanet-archive';
 /**
- * The archive's positions are at Gaia's epoch, J2016, not the catalogue's J2000: of the 746
- * matched hosts moving over 100 mas a year, 741 sit nearer their star once carried back sixteen
- * years (a median 0.11″ from it, against 3.47″ as published). The matcher tries both epochs; a
- * star placed from the archive has to pick one.
+ * The archive's positions are at Gaia DR2's epoch, J2015.5, not the catalogue's J2000 (see
+ * `ARCHIVE_EPOCH`): of the 746 matched hosts moving over 100 mas a year, 741 sit nearer their star
+ * once carried back (a median 0.11″ from it, against 3.47″ as published). The matcher tries both
+ * epochs; a star placed from the archive has to pick one.
  */
-const ARCHIVE_TO_CATALOGUE_YEARS = 2000 - 2016;
+const ARCHIVE_TO_CATALOGUE_YEARS = CATALOGUE_EPOCH - ARCHIVE_EPOCH;
 /** As in `fetchStars`: faint, for a host the archive gives neither a V nor a G magnitude. */
 const UNKNOWN_MAGNITUDE = 15;
 

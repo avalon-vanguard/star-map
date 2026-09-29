@@ -80,15 +80,17 @@ export const HOST_TRANSVERSE_TOLERANCE_PC = 0.01;
 /**
  * The archive does not say which epoch a row's position is for, and they are demonstrably
  * mixed: alf Tau and GJ 273 publish J2000 (the raw position sits under an arcsecond from our
- * star, and carrying it back doubles the error), HD 133131 and TOI-2459 publish Gaia's J2016
- * (the carried-back position lands to 0.1″). So every query is tried at both ends — as
- * published, and carried back sixteen years with the archive's own proper motion — and a star
- * is judged on whichever is closer. Guessing one epoch picks companions: assume J2016 and
- * Aldebaran's planet lands on Gl 171.1B, assume J2000 and GJ 15 A's land on a Gaia entry
- * 15.9″ out.
+ * star, and carrying it back doubles the error), HD 133131 and TOI-2459 publish Gaia DR2's J2015.5
+ * (the carried-back position lands to 0.1″). DR2's, not DR3's J2016, although the archive names
+ * the DR3 source: Barnard's star, Teegarden's Star, TRAPPIST-1 and 66 of the 67 archive-placed
+ * stars moving over 100 mas a year equal their DR2 position to a milliarcsecond and none their
+ * DR3 one. So every query is tried at both ends — as published, and carried back fifteen and a
+ * half years with the archive's own proper motion — and a star is judged on whichever is closer.
+ * Guessing one epoch picks companions: assume the later one and Aldebaran's planet lands on Gl
+ * 171.1B, assume J2000 and GJ 15 A's land on a Gaia entry 15.9″ out.
  */
-const CATALOGUE_EPOCH = 2000.0;
-const ARCHIVE_LATEST_EPOCH = 2016.0;
+export const CATALOGUE_EPOCH = 2000.0;
+export const ARCHIVE_EPOCH = 2015.5;
 
 function knownMotion(masPerYear: number | undefined): number {
   return Number.isFinite(masPerYear) ? (masPerYear as number) : 0;
@@ -140,7 +142,7 @@ export function resolveHostStarId(
     // star would pass the direction test and the last one in array order would win.
     knownMotion(query.pmRaMasPerYear),
     knownMotion(query.pmDecMasPerYear),
-    CATALOGUE_EPOCH - ARCHIVE_LATEST_EPOCH
+    CATALOGUE_EPOCH - ARCHIVE_EPOCH
   );
   const carried = raDegDecDistanceToXyz(carriedBack.raDeg, carriedBack.decDeg, 1);
 

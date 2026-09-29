@@ -72,12 +72,17 @@ export function bodyReadouts(body: BodyDetailViewModel): BodyReadouts {
 /**
  * The derived surface is a reasoned illustration, and a panel of real measurements sitting next
  * to it is exactly the context in which it could be mistaken for another one.
+ *
+ * Only an exoplanet has never been imaged. A moon or dwarf planet drawn this way has been — Voyager
+ * 2 photographed Uranus's five large moons, Proteus and Nereid, Cassini Hyperion, and Hubble sees
+ * Eris, Haumea and Makemake as points — but has no global map this app can use.
  */
 function provenanceFor(body: BodyDetailViewModel): string {
   if (body.hasPhotography) {
     return 'Surface: NASA/ESA/USGS photography.';
   }
+  const why = body.kind === 'exoplanet' ? 'no image of this world exists' : 'no global map of this world is used here';
   return body.appearance.equilibriumTemperatureK === null
-    ? 'Surface illustrated from this body’s measured size and mass. Its host star is not in the catalogue, so no temperature could be derived. Not an observation — no image of this world exists.'
-    : 'Surface illustrated from the measurements above — size, density and the temperature derived from its star’s output and its orbit. Not an observation — no image of this world exists.';
+    ? `Surface illustrated from this body’s measured size and mass. Its host star is not in the catalogue, so no temperature could be derived. Not an observation — ${why}.`
+    : `Surface illustrated from the measurements above — size, density and the temperature derived from its star’s output and its orbit. Not an observation — ${why}.`;
 }

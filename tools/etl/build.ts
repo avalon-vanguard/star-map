@@ -438,10 +438,17 @@ function validateExoplanets(exoplanets: ExoplanetRecord[], starIds: Set<number>)
   console.log(`  ${withPeriod}/${exoplanets.length} have a measured period, ${withHostMass} a host star mass.`);
 
   // The planets photographed by direct imaging, whose card must not say no image of them exists.
-  // Measured: 102 of 102 flagged in the archive are in the catalogue. What this catches is the
-  // join by name failing, which would put every one of them back under "no image".
+  // Measured: 101 of 101 flagged in the archive, and not transiting, are in the catalogue. What this
+  // catches is the join by name failing, which would put every one of them back under "no image".
   const imaged = exoplanets.filter((exoplanet) => exoplanet.imaged).length;
   assertCondition(imaged >= MIN_IMAGED_EXOPLANETS, `Only ${imaged} exoplanets are marked as imaged (at least ${MIN_IMAGED_EXOPLANETS} expected).`);
+  // And the one the flag is wrong on, which the count cannot see: a 2.68-day transiting hot Jupiter
+  // 0.15 mas from its star, flagged for the companion star a survey imaged beside it. Its record
+  // carries neither a period nor an axis, so no separation check could catch it either.
+  assertCondition(
+    !exoplanets.some((exoplanet) => exoplanet.id === 'WASP-108 b' && exoplanet.imaged),
+    'WASP-108 b is marked as imaged; it transits, and only a companion star beside it was imaged (Bohn et al. 2020).'
+  );
   console.log(`  ${imaged} were imaged directly.`);
 }
 

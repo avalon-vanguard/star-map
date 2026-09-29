@@ -101,7 +101,7 @@ describe('buildBodyViewModel', () => {
     // HR 8799 b: photographed beside its star at Gemini and Keck (Marois et al. 2008).
     const exoplanet: ExoplanetRecord = { id: 'HR 8799 b', hostStarId: SUN_STAR_ID, hostStarName: 'HR 8799', name: 'HR 8799 b', imaged: true, orbit: { semiMajorAxisAu: 68 } };
     const provenance = bodyReadouts(buildBodyViewModel('HR 8799 b', { bodies: [], exoplanets: [exoplanet], stars: [sun] })!).provenance;
-    expect(provenance).toContain('Not an observation — it has been imaged only as a point of light beside its star, and no map of it exists.');
+    expect(provenance).toContain('Not an observation — it has been imaged only as a point of light beside its star, and no map of it is used here.');
     expect(provenance).not.toContain('no image of this world exists');
   });
 

@@ -79,7 +79,9 @@ export function bodyReadouts(body: BodyDetailViewModel): BodyReadouts {
  * large moons, Proteus and Nereid, Cassini Hyperion, and Hubble sees Eris, Haumea and Makemake as
  * points — but has no global map this app can use. So have the hundred or so exoplanets the
  * archive flags as imaged, HR 8799's four among them, though only as points of light beside their
- * star. Only the other exoplanets, known from what they do to starlight, have no image at all.
+ * star — and one of them has a map, not used here: Luhman 16 b, a brown dwarf, mapped by Doppler
+ * imaging (Crossfield et al. 2014, Nature 505, 654). Only the other exoplanets, known from what they
+ * do to starlight, have no image at all.
  */
 function provenanceFor(body: BodyDetailViewModel): string {
   if (body.hasPhotography) {
@@ -89,7 +91,7 @@ function provenanceFor(body: BodyDetailViewModel): string {
     body.kind !== 'exoplanet'
       ? 'no global map of this world is used here'
       : body.imaged
-        ? 'it has been imaged only as a point of light beside its star, and no map of it exists'
+        ? 'it has been imaged only as a point of light beside its star, and no map of it is used here'
         : 'no image of this world exists';
   return body.appearance.equilibriumTemperatureK === null
     ? `Surface illustrated from this body’s measured size and mass. Its host star is not in the catalogue, so no temperature could be derived. Not an observation — ${why}.`

@@ -175,8 +175,8 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     }
 
     // Real photography wherever it exists, and a surface derived from the body's own measured
-    // properties wherever it does not — which is every exoplanet, since none has ever been
-    // imaged, and the handful of moons no probe returned a usable map of.
+    // properties wherever it does not — which is every exoplanet, since none has had its
+    // surface imaged, and the handful of moons no probe returned a usable map of.
     const realTexturePath = bodyTexturePath(viewModel.id);
     this.planetMaterial.map = realTexturePath ? loadCachedTexture(realTexturePath) : planetTexture(viewModel.appearance);
     // The texture supplies its own colour, so the base stays white rather than tinting it twice.

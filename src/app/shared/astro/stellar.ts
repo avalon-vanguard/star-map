@@ -1,4 +1,4 @@
-import { DwarfSequencePoint, dwarfSequenceAtColor, isGiant, parseSpectralClass, SpectralClass, spectralTypeToColorIndex } from './spectral';
+import { DwarfSequencePoint, dwarfSequenceAtColor, dwarfSequenceAtTemperature, dwarfSequenceAtType, isGiant, parseSpectralClass, SpectralClass, spectralTypeToColorIndex } from './spectral';
 
 /**
  * Stellar luminosity, derived from the two things the star catalogue actually measures.
@@ -129,14 +129,12 @@ export function luminositySolar(star: StellarPhotometry): number | null {
   // the archive's own figure for 1 449 hosts, the worst tenth was off by 0.29 dex or more, and is
   // now off by 0.12.
   //
-  // Not for a star its type says is a giant, though: at its colour the dwarf sequence is a cooler
-  // dwarf, whose correction is larger. Antares, M1 Ib at B−V 1.87, read as an M5 dwarf's −3.26
-  // came out 1 516 R☉ against the 680 Ohnaka et al. (2013) measure, and 119 Tau 2 838 against 587;
-  // its type's −1.55 gives 690.
+  // Not for a star its type says is a giant, though, whose correction is read off its type along
+  // with its temperature: see giantSurface.
   const sequence = sequenceAtColour(star);
   const absoluteV = absolute - (star.magnitudeBand === 'G' ? (sequence?.gMinusV ?? 0) : 0);
-  const bolometric =
-    absoluteV + (sequence && !isGiant(star.spectralType) ? sequence.bolometricCorrectionV : bolometricCorrection(star.spectralType));
+  const correction = giantSurface(star.spectralType)?.bolometricCorrectionV ?? sequence?.bolometricCorrectionV ?? bolometricCorrection(star.spectralType);
+  const bolometric = absoluteV + correction;
   const luminosity = Math.pow(10, (SOLAR_BOLOMETRIC_MAGNITUDE - bolometric) / 2.5);
   return Math.min(Math.max(luminosity, MIN_LUMINOSITY_SOLAR), MAX_LUMINOSITY_SOLAR);
 }
@@ -163,17 +161,71 @@ export const SOLAR_EFFECTIVE_TEMPERATURE_K = 5772;
 
 /**
  * Effective temperature, off the dwarf sequence at the star's colour, or at the colour its
- * spectral type implies where it has none. Exactly the Sun's for the Sun, which is at zero
- * distance here. A giant is read as the dwarf of its colour: a few hundred kelvin too cool at K,
- * and Antares, an M1 supergiant, 3 019 K against the 3 660 Ohnaka et al. (2013) measure.
+ * spectral type implies where it has none; a giant's off its type (giantSurface). Exactly the
+ * Sun's for the Sun, which is at zero distance here.
  */
 export function effectiveTemperatureK(star: StellarPhotometry): number | null {
   if (star.distancePc === 0) {
     return SOLAR_EFFECTIVE_TEMPERATURE_K;
   }
   // A type's colour past the table is an O star's, which B−V no longer tells apart from B0.
-  return (sequenceAtColour(star) ?? dwarfSequenceAtColor(spectralTypeToColorIndex(star.spectralType), 'B-V', true))?.temperatureK ?? null;
+  return (
+    giantSurface(star.spectralType)?.temperatureK ??
+    (sequenceAtColour(star) ?? dwarfSequenceAtColor(spectralTypeToColorIndex(star.spectralType), 'B-V', true))?.temperatureK ??
+    null
+  );
 }
+
+/**
+ * What a giant's type says of its surface: its effective temperature, and the bolometric
+ * correction the dwarf sequence has at that temperature — both off the type, so that the two a
+ * radius is drawn from come from the same place. `null` for a star that is not a giant, or whose
+ * class the parser cannot read.
+ *
+ * Read off the colour, a giant is the dwarf of its colour, too cool: Antares, M1 Ib at B−V 1.87,
+ * came out 3 019 K against the 3 660 Ohnaka et al. (2013) measure, and the 610 M giants a median
+ * 3 275 K where M2 III is about 3 650. Worse, a hot giant behind dust reads as a far cooler star:
+ * Menkib, O7.5 Iab at B−V 0.02, was 9 517 K, and with its type's correction beside that colour's
+ * temperature it was drawn at 95 R☉, and Alp Cam, O9.5 Ia, at 338, where 14 and 21 are published.
+ *
+ * G to M giants take van Belle et al.'s (2021, ApJ 922, 163, table 8) interferometric scale, fitted
+ * to 191 giants from G1 to M7.75 III: 4 692 K at K0, 3 816 at M0, 3 472 at M4, held at 3 134 past
+ * M7.75. O to F giants take the dwarf of their type, which a supergiant of the same type is within
+ * a few per cent of from B8 on, and a few thousand kelvin cooler than at B0 (Alnilam, B0 Ia, about
+ * 27 000 K against B0 V's 31 400). Carbon and S stars take {@link CARBON_STAR}.
+ */
+export function giantSurface(spectralType: string | null | undefined): { temperatureK: number; bolometricCorrectionV: number } | null {
+  if (!isGiant(spectralType)) {
+    return null;
+  }
+  const primary = (spectralType ?? '').split('+')[0].trim();
+  if (/^[CNRS]/.test(primary)) {
+    return CARBON_STAR;
+  }
+  const parsed = parseSpectralClass(primary);
+  if (!parsed) {
+    return null;
+  }
+  const { spectralClass, subclass } = parsed;
+  if (spectralClass === 'G' || spectralClass === 'K' || spectralClass === 'M') {
+    // van Belle's index: G0 at 50, K0 at 60, K5 at 65 and M0 at 66, so a K later than K5 falls between.
+    const index = spectralClass === 'G' ? 50 + subclass : spectralClass === 'K' ? 60 + Math.min(subclass, 5) + Math.max(subclass - 5, 0) / 5 : 66 + subclass;
+    const temperatureK = index <= 61 ? 7856 - 52.74 * index : index <= 64 ? 16751 - 199.41 * index : Math.max(9491 - 85.98 * index, 3134);
+    return { temperatureK, bolometricCorrectionV: dwarfSequenceAtTemperature(temperatureK).bolometricCorrectionV };
+  }
+  const dwarf = dwarfSequenceAtType(primary)!;
+  return { temperatureK: dwarf.temperatureK, bolometricCorrectionV: dwarf.bolometricCorrectionV };
+}
+
+/**
+ * A carbon or S star's temperature and bolometric correction to V: the medians of Bergeat, Knapik &
+ * Rutily (2001, A&A 369, 178) over the 441 carbon stars of their table 10, and over the 383 of
+ * those with a V magnitude. No type in the table reads for them, and they were given the Sun's
+ * −0.06 at the M8.5 dwarf's 2 420 K: La Superba came out 544 L☉ and 133 R☉, where Bergeat's own
+ * figures give 8 090 L☉ at the same distance and McDonald et al. (2017) 315 R☉. S stars, between M
+ * and C, are given the carbon stars' figures for want of their own.
+ */
+const CARBON_STAR = { temperatureK: 2990, bolometricCorrectionV: -2.83 } as const;
 
 /**
  * Radius in solar radii from luminosity and temperature — Stefan-Boltzmann, L = 4πR²σT⁴, in solar

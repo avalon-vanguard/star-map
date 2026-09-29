@@ -114,20 +114,25 @@ export function spectralTypeToColorIndex(spectralType: string | null | undefined
  * J145829+101343, a 580 K brown dwarf, read as B−V 2.00 and "~M6".
  */
 export function temperatureToColorIndex(temperatureK: number): number | null {
-  const [hottest, coolest] = [DWARF_SEQUENCE[0], DWARF_SEQUENCE[DWARF_SEQUENCE.length - 1]];
+  const [hottest, coolest] = [ROWS_WITH_COLOUR[1][0], DWARF_SEQUENCE[DWARF_SEQUENCE.length - 1]];
   return temperatureK <= hottest[3] && temperatureK >= coolest[3] ? dwarfSequenceAtTemperature(temperatureK).bMinusV : null;
 }
 
 /**
  * The mean dwarf sequence: B−V, Gaia BP−RP, effective temperature (K), bolometric correction to V
  * and Gaia G−V by spectral type, from Pecaut & Mamajek (2013, ApJS 208, 9, table 5) as Mamajek
- * maintains it online (version 2022.04.16), where the Gaia columns were added. From B0, where B−V
- * stops telling types apart — the whole O sequence spans 0.03 of it — to M8.5, past which BP−RP
- * turns back; BP−RP starts at B9, the bluest it is tabulated for, and G−V at B1.5.
+ * maintains it online (version 2022.04.16), where the Gaia columns were added. From O3 to M8.5,
+ * past which BP−RP turns back. The O rows, read by type only, carry no colour: B−V stops telling
+ * types apart there, the whole O sequence spanning 0.03 of it. BP−RP starts at B9, the bluest it
+ * is tabulated for, and G−V at B1.5.
  */
-type SequenceRow = readonly [string, number, number | null, number, number, number | null];
+type SequenceRow = readonly [string, number | null, number | null, number, number, number | null];
 
 const DWARF_SEQUENCE: readonly SequenceRow[] = [
+  ['O3', null, null, 44900, -4.01, null], ['O4', null, null, 42900, -3.89, null], ['O5', null, null, 41400, -3.76, null],
+  ['O5.5', null, null, 40500, -3.67, null], ['O6', null, null, 39500, -3.57, null], ['O6.5', null, null, 38300, -3.49, null],
+  ['O7', null, null, 37100, -3.41, null], ['O7.5', null, null, 36100, -3.33, null], ['O8', null, null, 35100, -3.24, null],
+  ['O8.5', null, null, 34300, -3.18, null], ['O9', null, null, 33300, -3.11, null], ['O9.5', null, null, 31900, -3.01, null],
   ['B0', -0.301, null, 31400, -2.99, null], ['B0.5', -0.289, null, 29000, -2.83, null], ['B1', -0.278, null, 26000, -2.58, null],
   ['B1.5', -0.252, null, 24500, -2.44, -0.021], ['B2', -0.215, null, 20600, -2.03, -0.008], ['B2.5', -0.198, null, 18500, -1.77, -0.003],
   ['B3', -0.178, null, 17000, -1.54, 0.001], ['B4', -0.165, null, 16400, -1.49, 0.004], ['B5', -0.156, null, 15700, -1.34, 0.007],
@@ -199,8 +204,8 @@ export function spectralClassification(star: { spectralType: string; colorIndex:
 
 /** What the dwarf sequence says of a star of a given colour. */
 export interface DwarfSequencePoint {
-  /** B−V, the colour in the other system's terms where it was read off BP−RP. */
-  bMinusV: number;
+  /** B−V, the colour in the other system's terms where it was read off BP−RP; `null` among the O rows. */
+  bMinusV: number | null;
   temperatureK: number;
   /** Bolometric correction to V: what V leaves out of the star's total output, in magnitudes. */
   bolometricCorrectionV: number;
@@ -243,6 +248,22 @@ const WHITE_DWARF_BP_RP: readonly (readonly [number, number])[] = [
   [-0.4, 28585], [-0.35, 24521], [-0.3, 22090], [-0.25, 19012], [-0.2, 17079], [-0.15, 15369], [-0.12, 10700]
 ];
 
+/**
+ * The dwarf sequence at a spectral type, between the two rows it falls between, O3 to M8.5; the end
+ * row past either end. `null` for a type with no class the parser reads.
+ */
+export function dwarfSequenceAtType(spectralType: string | null | undefined): DwarfSequencePoint | null {
+  const parsed = parseSpectralClass(spectralType);
+  return parsed && sequenceWhere(DWARF_SEQUENCE, (row) => TYPE_INDEX.get(row)!, typeIndex(parsed));
+}
+
+/** A type as a number rising down the table: ten to a class, O0 at 0. */
+function typeIndex({ spectralClass, subclass }: { spectralClass: SpectralClass; subclass: number }): number {
+  return SPECTRAL_CLASSES.indexOf(spectralClass) * 10 + subclass;
+}
+
+const TYPE_INDEX = new Map(DWARF_SEQUENCE.map((row) => [row, typeIndex(parseSpectralClass(row[0])!)]));
+
 /** The dwarf sequence at an effective temperature, between the two types it falls between; the end row past either end. */
 export function dwarfSequenceAtTemperature(temperatureK: number): DwarfSequencePoint {
   return sequenceWhere(ROWS_WITH_COLOUR[1], (row) => -row[3], -temperatureK);
@@ -255,7 +276,7 @@ function sequenceWhere(rows: readonly SequenceRow[], key: (row: SequenceRow) => 
   const t = Math.min(Math.max((value - key(first)) / (key(second) - key(first)), 0), 1);
   const lerp = (from: number, to: number): number => from + (to - from) * t;
   return {
-    bMinusV: lerp(first[1], second[1]),
+    bMinusV: first[1] === null || second[1] === null ? null : lerp(first[1], second[1]),
     temperatureK: lerp(first[3], second[3]),
     bolometricCorrectionV: lerp(first[4], second[4]),
     gMinusV: first[5] === null || second[5] === null ? null : lerp(first[5], second[5])

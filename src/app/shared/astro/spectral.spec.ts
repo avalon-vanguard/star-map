@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { dwarfSequenceAtColor, dwarfSequenceAtTemperature, isGiant, parseSpectralClass, spectralClassification, SPECTRAL_CLASSES, spectralTypeFromColor, spectralTypeToColorIndex, temperatureToColorIndex } from './spectral';
+import { dwarfSequenceAtColor, dwarfSequenceAtTemperature, dwarfSequenceAtType, isGiant, parseSpectralClass, spectralClassification, SPECTRAL_CLASSES, spectralTypeFromColor, spectralTypeToColorIndex, temperatureToColorIndex } from './spectral';
 
 describe('parseSpectralClass', () => {
   it('reads a clean class and subclass', () => {
@@ -192,6 +192,16 @@ describe('dwarfSequenceAtColor', () => {
     expect(point.bolometricCorrectionV).toBeCloseTo(-1.13 - 0.21 * (869 / 1200), 6);
     expect(dwarfSequenceAtColor(-0.13, 'BP-RP', true)!.temperatureK).toBeCloseTo(15369 - 4669 * (2 / 3), 6);
     expect(dwarfSequenceAtColor(-0.6, 'BP-RP', true)!.temperatureK).toBeCloseTo(28585, 6);
+  });
+});
+
+describe('dwarfSequenceAtType', () => {
+  it("reads an O type off Mamajek's O rows, which carry no colour, and any other off its own row", () => {
+    expect(dwarfSequenceAtType('O7.5Iab:')).toEqual({ bMinusV: null, temperatureK: 36100, bolometricCorrectionV: -3.33, gMinusV: null });
+    expect(dwarfSequenceAtType('B8Ia')!.temperatureK).toBe(12300);
+    expect(dwarfSequenceAtType('O9.7')!.temperatureK).toBeCloseTo(31900 - 500 * (0.2 / 0.5), 6);
+    expect(dwarfSequenceAtType('M9')!.temperatureK).toBe(2420);
+    expect(dwarfSequenceAtType('Unknown')).toBeNull();
   });
 });
 

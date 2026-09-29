@@ -1014,14 +1014,15 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(scene.hudReadouts().find((readout) => readout.label === 'Radius')?.value).toBe('0.141 solar radii');
     });
 
-    it('keeps the camera three radii out from a supergiant drawn at the radius its colour and brightness give', async () => {
+    it('keeps the camera three radii out from a supergiant drawn at the radius its type and brightness give', async () => {
       const scene = await enter(ANTARES);
       const radius = scene.starMarkerGeometry.parameters.radius;
-      // 690 R☉ against the 680 Ohnaka et al. (2013) measure: 3.2 AU.
-      expect(radius / SUN_RADIUS_AU).toBeGreaterThan(600);
-      expect(radius / SUN_RADIUS_AU).toBeLessThan(760);
+      // 410 R☉, 1.9 AU, at M1's 3 730 K: short of the 680 Ohnaka et al. (2013) measure, whose
+      // luminosity is 0.4 dex above what V gives at the catalogue's distance.
+      expect(radius / SUN_RADIUS_AU).toBeGreaterThan(350);
+      expect(radius / SUN_RADIUS_AU).toBeLessThan(480);
       expect(scene.controls.minDistance).toBeCloseTo(closestApproachAu(radius), 9);
-      expect(scene.controls.minDistance).toBeGreaterThan(9);
+      expect(scene.controls.minDistance).toBeGreaterThan(5);
       // Settled where its disc stays inside the ring of its neighbours' names, not pressed up to it.
       expect(engine.getCamera().position.length()).toBeGreaterThan(1.2 * scene.controls.minDistance);
     });

@@ -258,7 +258,8 @@ const HOURS_PER_DAY = 24;
 
 /**
  * How a body the IAU gives no rotational elements for is turned at a given date — Eris, Haumea
- * and Makemake, whose periods are known and whose poles are not: at its own sidereal rate, about
+ * and Makemake, whose periods are measured (Makemake's only to a factor of two, see its spec in
+ * `fetchSolarSystem.ts`) and whose poles are not: at its own sidereal rate, about
  * its orbit's normal, backwards for a negative period. None of them has an obliquity, so none is
  * applied. The phase is arbitrary: each body starts at its elements' epoch in the shortest
  * rotation of +Y onto its axis, and turns from there. Exoplanets have no published rotation at

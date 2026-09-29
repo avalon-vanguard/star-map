@@ -63,6 +63,17 @@ describe('systemFramingDistanceAu', () => {
     expect(systemFramingDistanceAu(0, undefined, 0.00465)).toBe(systemFramingDistanceAu(0));
   });
 
+  it("holds a giant's disc inside the ring its neighbours are named on, and the camera clear of its closest approach", () => {
+    // The ring is at 0.74 of the tighter half-extent; the disc is kept to half of it, in either window.
+    const betelgeuseAu = 2.72;
+    for (const viewport of [{ fovDegrees: 50, aspect: 1.6 }, { fovDegrees: 50, aspect: 0.6 }]) {
+      const distance = systemFramingDistanceAu(0, viewport, betelgeuseAu);
+      const tight = Math.tan((25 * Math.PI) / 180) * Math.min(1, viewport.aspect);
+      expect(Math.tan(Math.asin(betelgeuseAu / distance)) / tight).toBeCloseTo(0.5, 9);
+      expect(distance).toBeGreaterThan(closestApproachAu(betelgeuseAu));
+    }
+  });
+
   it('caps the distance so a far-flung companion cannot shrink the star to nothing', () => {
     expect(systemFramingDistanceAu(1000)).toBe(systemFramingDistanceAu(5000));
   });

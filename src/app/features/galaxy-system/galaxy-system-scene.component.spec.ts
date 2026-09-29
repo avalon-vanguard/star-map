@@ -989,6 +989,8 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(radius / SUN_RADIUS_AU).toBeLessThan(760);
       expect(scene.controls.minDistance).toBeCloseTo(closestApproachAu(radius), 9);
       expect(scene.controls.minDistance).toBeGreaterThan(9);
+      // Settled where its disc stays inside the ring of its neighbours' names, not pressed up to it.
+      expect(engine.getCamera().position.length()).toBeGreaterThan(1.2 * scene.controls.minDistance);
     });
 
     it('draws a star nothing gives a size or temperature for as a grey point, not as the Sun', async () => {

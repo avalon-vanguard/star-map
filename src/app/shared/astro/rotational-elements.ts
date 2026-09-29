@@ -102,6 +102,13 @@ export function parsePckRotationalElements(text: string, naifId: number): { elem
   };
 }
 
+/**
+ * The Sun's, which is no `BodyRecord` but the system's star marker: NAIF body 10 in pck00011.tpc,
+ * the WGCCRE 2015 pole at RA 286.13, Dec 63.87 and W = 84.176 + 14.1844 d, a sidereal day of 25.38
+ * days at the Carrington latitude. The ETL checks them against the kernel.
+ */
+export const SUN_ROTATIONAL_ELEMENTS: RotationalElements = { poleRaDeg: [286.13, 0, 0], poleDecDeg: [63.87, 0, 0], primeMeridianDeg: [84.176, 14.1844, 0] };
+
 function polynomial(coefficients: readonly number[], x: number): number {
   return (coefficients[0] ?? 0) + (coefficients[1] ?? 0) * x + (coefficients[2] ?? 0) * x * x;
 }

@@ -12,6 +12,13 @@ prime meridian (W) then turns longitude 0 to where it belongs at any date.
 and the skybox come from the Solar System Scope texture pack, and `jupiter` from its 8k pack, via
 Wikimedia Commons. See each file's Commons page for the original credit line.
 
+`venus.jpg` is kept turned 180 degrees from the pack's file, which is the Magellan radar map with
+south up and east to the left: there Maxwell Montes (65.2 N, 3.3 E in the IAU Gazetteer), the
+brightest feature north or south of 50 degrees, sat at 63 S, 9 W, with Lakshmi Planum east of it
+instead of west. Turned back (PIL `ROTATE_180`, re-saved on the file's own quantisation tables, 0.03
+grey levels from the exact turn), its brightest point is at 63.7 N, 8.3 E, with Lakshmi to the west.
+`texture-catalog.spec.ts` pins the checked file's SHA-256.
+
 `saturn_ring.png` is a 1 280 by 78 px strip. Its x axis runs straight out from Saturn: read off its
 alpha, the C ring's inner edge (74 490 km) is at px 91, the B ring's inner and outer edges (92 000
 and 117 580 km) at 404.5 and 860, the A ring's outer edge (136 775 km) at 1 204 and the F ring

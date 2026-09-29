@@ -19,7 +19,9 @@ const Z_AXIS = new THREE.Vector3(0, 0, 1);
  * Greenwich is in the middle of Earth's; on Mars's, Olympus Mons (226.2 E, which is -133.8) sits a
  * little over a third of the width left of centre; on the Moon's, Mare Crisium (59 E) is right of
  * centre and Mare Orientale (95 W) left of it; on Mercury's, the rayed crater Kuiper (31.5 W, 11 S)
- * is just left of centre and below the equator. A map labelled in west longitude, as most planets'
+ * is just left of centre and below the equator; on Venus's, Maxwell Montes (65.2 N, 3.3 E) is the
+ * brightest spot, high and just right of centre — Solar System Scope ships that map turned half
+ * round, south up, and it is kept turned back. A map labelled in west longitude, as most planets'
  * are, is still drawn with east to the right, as any map of a sphere seen from outside is; only its
  * numbers run the other way. So longitude 0 is +X and 90 E is -Z, and a quarter turn about X
  * carries that onto the IAU's body-fixed frame: pole +Z, prime meridian +X, 90 E +Y.

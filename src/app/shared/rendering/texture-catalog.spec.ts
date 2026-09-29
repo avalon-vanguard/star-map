@@ -54,6 +54,14 @@ describe('saturnRing', () => {
     }
   });
 
+  it('is lit, and seen from either face', () => {
+    // An unlit ring shows no day and night; one drawn from its front face alone vanishes when Earth
+    // is on its south side, as on 24 September 2026.
+    const material = saturnRing(SATURN_RADIUS_KM, 1).material as THREE.Material;
+    expect(material).toBeInstanceOf(THREE.MeshStandardMaterial);
+    expect(material.side).toBe(THREE.DoubleSide);
+  });
+
   it('lies in the equator of a sphere built round +Y', () => {
     for (const { y } of radiiAndU(saturnRing(SATURN_RADIUS_KM, 1), SATURN_RADIUS_KM)) {
       expect(Math.abs(y)).toBeLessThan(1e-12);

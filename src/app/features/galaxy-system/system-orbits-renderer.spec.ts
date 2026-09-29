@@ -537,6 +537,11 @@ describe('solar-system bodies against Horizons', () => {
   // tidal acceleration).
   const HORIZONS: Array<[id: string, jd: number, x: number, y: number, z: number, maxDeg: number]> = [
     ['earth', 2488069.5, -0.1574071329883954, 0.890666220858489, 0.3859132211165683, 0.02],
+    // AD 3000, the end of the clock's window and of Standish's fit: the Earth-Moon barycentre and
+    // Saturn's, 0.005 and 0.065 degrees out. Without Standish's rates for a, e and i they were 0.129
+    // and 0.412, which no date between 1950 and 2100 shows (at most 0.036, Saturn in 2100).
+    ['earth', 2816787.5, 0.06574092668156256, 0.9022934196570718, 0.3887693148519465, 0.02],
+    ['saturn', 2816787.5, 8.434780522117482, 3.87565654130078, 1.235068259814154, 0.1],
     ['jupiter', 2433282.5, 3.406605247558555, -3.425997624196318, -1.551719750032203, 0.1],
     ['saturn', 2478938.5, -3.51309768447752, -8.723317933082274, -3.452662390556131, 0.25],
     ['pluto', 2442413.5, -29.2488165026956, -7.1421817246801, 6.58403957591589, 0.1],
@@ -593,6 +598,18 @@ describe('solar-system bodies against Horizons', () => {
       // A near-circle 2 131 km across, a ninth of Charon's.
       expect(Math.abs(plutoLine.scale.x) * 0.00013095774631236113).toBeCloseTo(pluto.length(), 8);
       expect(charonLine.scale.x / Math.abs(plutoLine.scale.x)).toBeCloseTo(1 / 0.1220485755631374, 9);
+    }
+  });
+
+  it('turns a planet’s drawn orbit with its node, so Mars stays on its own line two thousand years out', () => {
+    // At AD 1 a line fixed at J2000 has Mars 3.3 million km from it, 0.5 million out of its plane.
+    const mars = renderer.members.find((member) => member.id === 'mars')!.marker;
+    const line = renderer.object.children[renderer.object.children.indexOf(mars) - 1];
+    expect(line.name).toBe('orbit-line');
+    for (const days of [0, -730000]) {
+      renderer.update(DEFAULT_EPOCH_JD + days);
+      const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(line.quaternion);
+      expect(Math.abs(mars.position.clone().normalize().dot(normal))).toBeLessThan(1e-9);
     }
   });
 

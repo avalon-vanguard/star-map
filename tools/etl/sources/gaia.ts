@@ -295,25 +295,25 @@ export async function fetchGaiaDistancesByHip(): Promise<Map<number, { distanceP
 const MIN_HIPPARCOS_ERRORS = 110_000;
 
 /**
- * The relative error of every Hipparcos parallax, keyed by HIP number: to choose between it and
+ * Every Hipparcos parallax with its relative error, keyed by HIP number: to choose between it and
  * Gaia's, and for the stars that keep their Hipparcos distance — Rigel and Deneb, which Gaia has
  * no usable parallax for, and the few hundred bright stars where Gaia's is the less precise.
  *
  * From van Leeuwen's 2007 reduction, which the ESA archive hosts beside Gaia and HYG's distances
  * are the inverse of. HYG publishes the distance and not its error.
  */
-export async function fetchHipparcosParallaxErrors(): Promise<Map<number, number>> {
+export async function fetchHipparcosParallaxErrors(): Promise<Map<number, { parallaxMas: number; relativeError: number }>> {
   const url = `${GAIA_TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=${encodeURIComponent('select top 200000 hip, plx, e_plx from public.hipparcos_newreduction order by hip')}`;
   console.log('Fetching Hipparcos parallax errors (new reduction)...');
   const rows = parseCsvObjects(await fetchTextCached(url, `hipparcos-errors-${createHash('sha1').update(url).digest('hex').slice(0, 8)}.csv`));
 
-  const errors = new Map<number, number>();
+  const errors = new Map<number, { parallaxMas: number; relativeError: number }>();
   for (const row of rows) {
     const hip = parseOptionalNumber(row['hip']);
     const parallaxMas = parseOptionalNumber(row['plx']);
     const errorMas = parseOptionalNumber(row['e_plx']);
     if (hip !== undefined && parallaxMas !== undefined && parallaxMas > 0 && errorMas !== undefined) {
-      errors.set(hip, errorMas / parallaxMas);
+      errors.set(hip, { parallaxMas, relativeError: errorMas / parallaxMas });
     }
   }
   if (errors.size < MIN_HIPPARCOS_ERRORS) {

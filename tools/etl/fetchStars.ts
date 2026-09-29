@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 
-import { mergeStarCatalogues, placementDistancePc } from '../../src/app/shared/astro/star-merge';
+import { hipparcosDistancePc, mergeStarCatalogues, placementDistancePc } from '../../src/app/shared/astro/star-merge';
 import { encodeStarCatalog } from '../../src/app/shared/models/star-catalog';
 import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model';
 import { fetchGaiaDistancesByHip, fetchHipparcosParallaxErrors, GaiaAnswerError } from './sources/gaia';
@@ -11,7 +11,6 @@ import { fetchTextCached } from './lib/http';
 import { dataPath, ensureDataDir } from './lib/paths';
 
 const HYG_CSV_URL = 'https://raw.githubusercontent.com/astronexus/HYG-Database/main/hyg/CURRENT/hygdata_v41.csv';
-const HYG_UNKNOWN_DISTANCE_PC = 100000; // HYG's placeholder for unmeasured/unreliable parallax
 
 /**
  * Stand-in magnitude for a star with no photometry. Faint rather than 0, because 0 would mean
@@ -96,12 +95,13 @@ export async function fetchStars(): Promise<StarRecord[]> {
     }
 
     const hygPc = Number(row['dist']);
-    const hipparcosPc = Number.isFinite(hygPc) && hygPc > 0 && hygPc < HYG_UNKNOWN_DISTANCE_PC ? hygPc : undefined;
+    const hipparcos = row['hip'] ? hipparcosErrors.get(Number(row['hip'])) : undefined;
+    const hipparcosPc = hipparcosDistancePc(hygPc, hipparcos);
     const gaia = row['hip'] ? gaiaByHip.get(Number(row['hip'])) : undefined;
     const gaiaPc = gaia?.distancePc;
     const magnitudeV = parseOptionalNumber(row['mag']);
     const magnitude = magnitudeV ?? UNKNOWN_MAGNITUDE;
-    const hipparcosError = row['hip'] ? hipparcosErrors.get(Number(row['hip'])) : undefined;
+    const hipparcosError = hipparcos?.relativeError;
     const distancePc = placementDistancePc(hipparcosPc, gaiaPc, magnitude, DISTANCE_CUTOFF_PC, hipparcosError, gaia?.relativeError);
     if (distancePc === null) {
       continue;

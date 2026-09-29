@@ -86,6 +86,26 @@ export const MERGE_BRIGHTER_TOLERANCE = 1;
  */
 export const MERGE_DISTANCE_RATIO_TOLERANCE = 0.5;
 
+/** HYG's distance for a star whose parallax it does not give one for. */
+export const HYG_UNKNOWN_DISTANCE_PC = 100000;
+
+/** How many times its error a parallax HYG leaves out must be to place a star by: a 40 % error. */
+const MIN_HIPPARCOS_PARALLAX_OVER_ERROR = 2.5;
+
+/**
+ * A HYG star's Hipparcos distance: HYG's own, which is the inverse of van Leeuwen's 2007 parallax,
+ * or where HYG gives its placeholder instead, that inverse if the parallax is at least 2.5 times its
+ * error. HYG gives no distance under 1 mas whatever the error, while keeping less certain parallaxes
+ * above it: 41 naked-eye stars were left off the map as having no distance, HD 74180 at
+ * 0.67 ± 0.16 mas and Mu Cep at 0.55 ± 0.20 among them, while Alnilam at 1.65 ± 0.45 was drawn.
+ */
+export function hipparcosDistancePc(hygPc: number, parallax?: { parallaxMas: number; relativeError: number }): number | undefined {
+  if (Number.isFinite(hygPc) && hygPc > 0 && hygPc < HYG_UNKNOWN_DISTANCE_PC) {
+    return hygPc;
+  }
+  return parallax && parallax.relativeError <= 1 / MIN_HIPPARCOS_PARALLAX_OVER_ERROR ? 1000 / parallax.parallaxMas : undefined;
+}
+
 /** The faintest star, in V, the naked eye sees under a dark sky: the traditional limit of 6.5. */
 export const NAKED_EYE_MAGNITUDE = 6.5;
 

@@ -221,8 +221,9 @@ export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizo
 
     // Standish's fit states its own span, 3000 BC to AD 3000. The moons' table and the SBDB state
     // none, and hold for far less: each card says how far its orbit stays from Horizons over the
-    // span it was measured, where the clock reaches AD 1 to AD 3000.
-    let orbitSource = mean.orbitSource;
+    // span it was measured, where the clock reaches AD 1 to AD 3000. An orbit that took terms from
+    // its IAU W says so first: they move Mimas by up to 44.85 degrees, and are none of JPL's table.
+    let orbitSource = fromW ? `${mean.orbitSource}, with the orbital terms of its IAU W (NAIF pck00011)` : mean.orbitSource;
     if (parentName || smallBody) {
       const stepDays = spec.trackStepDays ?? 2;
       const track = await fetchHorizonsTrack(spec.horizonsCommand, spec.center, stepDays, `horizons-track-${spec.id}-${stepDays}d.txt`);

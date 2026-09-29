@@ -450,7 +450,7 @@ describe('rotation without IAU elements', () => {
 });
 
 describe('photographs', () => {
-  it('puts them on their bodies once loaded, one a frame, so the GPU is not handed every map at once', () => {
+  it('puts them on their bodies once loaded, one a frame, so the GPU is not handed every map at once, and in their own colours', () => {
     // Ids no other test here draws, since the loaded textures are shared through the cache.
     const ids = ['ganymede', 'callisto'];
     const records: BodyRecord[] = ids.map((id, index) => ({
@@ -459,10 +459,14 @@ describe('photographs', () => {
       rates: keplerRates(1 + index, GM_SUN_AU3_PER_DAY2)
     }));
     const renderer = new SystemOrbitsRenderer(records, []);
-    const maps = (): Array<THREE.Texture | null> => renderer.members.map((member) => ((member.marker as THREE.Mesh).material as THREE.MeshStandardMaterial).map);
+    const materials = (): THREE.MeshStandardMaterial[] => renderer.members.map((member) => (member.marker as THREE.Mesh).material as THREE.MeshStandardMaterial);
+    const maps = (): Array<THREE.Texture | null> => materials().map((material) => material.map);
+    const colours = (): number[] => materials().map((material) => material.color.getHex());
 
     renderer.update(DEFAULT_EPOCH_JD);
     expect(maps()).toEqual([null, null]); // not loaded yet: jsdom never loads an image
+    // Until then each is its kind's flat colour, a planet's pale blue.
+    expect(colours()).toEqual([new THREE.Color(0.55, 0.75, 1).getHex(), new THREE.Color(0.55, 0.75, 1).getHex()]);
 
     for (const id of ids) {
       loadCachedTexture(bodyTexturePath(id)!).image = { width: 2, height: 1 };
@@ -471,6 +475,9 @@ describe('photographs', () => {
     expect(maps().filter(Boolean)).toHaveLength(1);
     renderer.update(DEFAULT_EPOCH_JD);
     expect(maps()).toEqual(ids.map((id) => loadCachedTexture(bodyTexturePath(id)!)));
+    // The material multiplies its map by its colour: left pale blue, every planet's photograph would
+    // be tinted, Mars's red cut by 45 per cent.
+    expect(colours()).toEqual([0xffffff, 0xffffff]);
     renderer.dispose();
   });
 });

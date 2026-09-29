@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { describe, expect, it, vi } from 'vitest';
 
-import { DEFAULT_EPOCH_JD, GM_SUN_AU3_PER_DAY2, TT_MINUS_UTC_DAYS, ttMinusUtSeconds } from '../../shared/astro/constants';
+import { DEFAULT_EPOCH_JD, GM_SUN_AU3_PER_DAY2, ttMinusUtSeconds } from '../../shared/astro/constants';
 import { keplerRates } from '../../shared/astro/kepler';
 import { eclipticToEquatorial, laplacePlaneToEquatorial, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
 import { orientationAt } from '../../shared/astro/rotational-elements';
@@ -734,15 +734,17 @@ describe('solar-system bodies against Horizons', () => {
     expect((drawnPrimeMeridian('jupiter').angleTo(iauPrimeMeridian('jupiter', jdUt + 1574.1 / 86400)) * 180) / Math.PI).toBeLessThan(0.01);
   });
 
-  it('turns Earth by the UT the clock names, which is its turning: at AD 1000 its W is not moved on by ΔT', () => {
-    const jdUt = 2086307.5;
-    renderer.update(jdUt);
-    expect((drawnPrimeMeridian('earth').angleTo(iauPrimeMeridian('earth', jdUt + TT_MINUS_UTC_DAYS)) * 180) / Math.PI).toBeLessThan(0.01);
+  it('turns Earth by the UT the clock names, which is its turning: at AD 1000 the Sun stands over Horizons’ point', () => {
+    // Horizons' sub-solar longitude from the Sun (observer quantity 14, TIME_TYPE=UT) on JD 2086455,
+    // 1.0510 E, is Earth as it was 8.454 minutes before. Turned by the IAU's W at UT the drawn face
+    // was 2.3 degrees off; taken at TDB, 6.6.
+    renderer.update(2086455 - 8.45437443 / 1440);
+    expect(apart(facing('earth', new THREE.Vector3()).eastDeg, 1.05101)).toBeLessThan(0.15);
   });
 
   it('lights Earth where the Sun really stands: within 4 degrees of Greenwich at noon UTC', () => {
     // The equation of time is all that separates them: on 1 June 2025 it puts the Sun over 0.53 W,
-    // and the drawn sphere has it over 0.43 W.
+    // and the drawn sphere has it over 0.52 W.
     renderer.update(JUNE_1_2025_NOON_UTC);
     expect(Math.abs(facing('earth', new THREE.Vector3()).eastDeg)).toBeLessThan(4);
   });

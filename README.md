@@ -283,7 +283,7 @@ the line of sight is always known precisely, and the objects are drawn as a fixe
 backdrop shell where true distance would be unusable anyway. `distancePc` is optional metadata,
 derived from parallax for galactic objects or the Hubble law for genuinely distant galaxies,
 and left `null` — with its `distanceMethod` — whenever neither is trustworthy. 340 of
-the 490 cataloged objects get a distance; the rest honestly report none.
+the 488 cataloged objects get a distance; the rest honestly report none.
 
 ## Layout
 

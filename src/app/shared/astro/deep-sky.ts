@@ -38,7 +38,10 @@ const MAX_PARALLAX_DISTANCE_PC = 100000;
 /**
  * OpenNGC object-type codes grouped into the three kinds the backdrop distinguishes.
  * Codes not listed here (`Dup` duplicates, `NonEx` non-existent entries, plain stars `*`,
- * doubles `**`, `Nova`, `Other`) are not deep-sky objects and are dropped.
+ * doubles `**`, `Nova`, `Other`) are not deep-sky objects and are dropped. Nor is `DrkN`, a dark
+ * nebula, drawn: it is dust in front of the light behind it, and the backdrop's sprites can only
+ * add light — the Coalsack and the Horsehead, which OpenNGC's addendum brought in, glowed pink
+ * where the sky has a hole.
  */
 const KIND_BY_OPENNGC_TYPE: Readonly<Record<string, DeepSkyKind>> = {
   // Galaxies, and multi-galaxy systems.
@@ -52,7 +55,6 @@ const KIND_BY_OPENNGC_TYPE: Readonly<Record<string, DeepSkyKind>> = {
   EmN: 'nebula',
   RfN: 'nebula',
   Neb: 'nebula',
-  DrkN: 'nebula',
   SNR: 'nebula',
   'Cl+N': 'nebula',
   // Star clusters and associations.

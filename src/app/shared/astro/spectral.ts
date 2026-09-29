@@ -115,12 +115,7 @@ export function spectralTypeToColorIndex(spectralType: string | null | undefined
  */
 export function temperatureToColorIndex(temperatureK: number): number | null {
   const [hottest, coolest] = [DWARF_SEQUENCE[0], DWARF_SEQUENCE[DWARF_SEQUENCE.length - 1]];
-  if (!(temperatureK <= hottest[3] && temperatureK >= coolest[3])) {
-    return null;
-  }
-  const cooler = Math.max(1, DWARF_SEQUENCE.findIndex((row) => row[3] <= temperatureK));
-  const [hot, cool] = [DWARF_SEQUENCE[cooler - 1], DWARF_SEQUENCE[cooler]];
-  return hot[1] + ((cool[1] - hot[1]) * (hot[3] - temperatureK)) / (hot[3] - cool[3]);
+  return temperatureK <= hottest[3] && temperatureK >= coolest[3] ? dwarfSequenceAtTemperature(temperatureK).bMinusV : null;
 }
 
 /**
@@ -130,7 +125,9 @@ export function temperatureToColorIndex(temperatureK: number): number | null {
  * stops telling types apart — the whole O sequence spans 0.03 of it — to M8.5, past which BP−RP
  * turns back; BP−RP starts at B9, the bluest it is tabulated for, and G−V at B1.5.
  */
-const DWARF_SEQUENCE: readonly (readonly [string, number, number | null, number, number, number | null])[] = [
+type SequenceRow = readonly [string, number, number | null, number, number, number | null];
+
+const DWARF_SEQUENCE: readonly SequenceRow[] = [
   ['B0', -0.301, null, 31400, -2.99, null], ['B0.5', -0.289, null, 29000, -2.83, null], ['B1', -0.278, null, 26000, -2.58, null],
   ['B1.5', -0.252, null, 24500, -2.44, -0.021], ['B2', -0.215, null, 20600, -2.03, -0.008], ['B2.5', -0.198, null, 18500, -1.77, -0.003],
   ['B3', -0.178, null, 17000, -1.54, 0.001], ['B4', -0.165, null, 16400, -1.49, 0.004], ['B5', -0.156, null, 15700, -1.34, 0.007],
@@ -216,7 +213,8 @@ export interface DwarfSequencePoint {
  * same table the spectral estimate reads, so a star's temperature and its estimated type agree.
  * Linear rather than nearest, because the red end is steep: B−V runs 1.495 to 1.53 from M1.5 to
  * M3, over which the temperature drops 190 K and the correction 0.4 magnitudes. `null` outside
- * the table, as for the estimate — or, with `clampToTable`, the row at the end the colour is past.
+ * the table, as for the estimate — or, with `clampToTable`, the row at the end the colour is past,
+ * except bluer than BP−RP's end, where it is read off {@link WHITE_DWARF_BP_RP}.
  */
 export function dwarfSequenceAtColor(colorIndex: number | null, system: 'B-V' | 'BP-RP' = 'B-V', clampToTable = false): DwarfSequencePoint | null {
   const column = system === 'B-V' ? 1 : 2;
@@ -225,15 +223,41 @@ export function dwarfSequenceAtColor(colorIndex: number | null, system: 'B-V' | 
   if (colorIndex === null || !Number.isFinite(colorIndex) || (!clampToTable && !(colorIndex >= bluest && colorIndex <= reddest))) {
     return null;
   }
-  const colour = Math.min(Math.max(colorIndex, bluest), reddest);
-  const above = Math.max(1, rows.findIndex((row) => row[column]! >= colour));
-  const [blue, red] = [rows[above - 1], rows[above]];
-  const t = (colour - blue[column]!) / (red[column]! - blue[column]!);
+  if (system === 'BP-RP' && colorIndex < bluest) {
+    const next = Math.max(1, WHITE_DWARF_BP_RP.findIndex(([colour]) => colour >= colorIndex));
+    const [[blueColour, blueK], [redColour, redK]] = [WHITE_DWARF_BP_RP[next - 1], WHITE_DWARF_BP_RP[next]];
+    return dwarfSequenceAtTemperature(blueK + (redK - blueK) * Math.max((colorIndex - blueColour) / (redColour - blueColour), 0));
+  }
+  return sequenceWhere(rows, (row) => row[column]!, Math.min(Math.max(colorIndex, bluest), reddest));
+}
+
+/**
+ * Effective temperature by BP−RP past the blue end of the table, which is B9's −0.12: the median
+ * pure-hydrogen temperature Gentile Fusillo et al. (2021, MNRAS 508, 3877) fit, in bins of ±0.025,
+ * to the 104 of the map's stars there that their white dwarf catalogue has, all white dwarfs; with
+ * the table's end, 10 700 K, and their bluest bin held past it. Every one of them was drawn at B9's
+ * 10 700 K where they measure 14 266 to 39 304, and at a median 1.53 times the radius their mass
+ * and gravity give.
+ */
+const WHITE_DWARF_BP_RP: readonly (readonly [number, number])[] = [
+  [-0.4, 28585], [-0.35, 24521], [-0.3, 22090], [-0.25, 19012], [-0.2, 17079], [-0.15, 15369], [-0.12, 10700]
+];
+
+/** The dwarf sequence at an effective temperature, between the two types it falls between; the end row past either end. */
+export function dwarfSequenceAtTemperature(temperatureK: number): DwarfSequencePoint {
+  return sequenceWhere(ROWS_WITH_COLOUR[1], (row) => -row[3], -temperatureK);
+}
+
+/** The sequence where `key`, rising down `rows`, reaches `value`: linear between the two rows either side, the end row past either end. */
+function sequenceWhere(rows: readonly SequenceRow[], key: (row: SequenceRow) => number, value: number): DwarfSequencePoint {
+  const next = rows.findIndex((row) => key(row) >= value);
+  const [first, second] = next === -1 ? [rows[rows.length - 2], rows[rows.length - 1]] : [rows[Math.max(next, 1) - 1], rows[Math.max(next, 1)]];
+  const t = Math.min(Math.max((value - key(first)) / (key(second) - key(first)), 0), 1);
   const lerp = (from: number, to: number): number => from + (to - from) * t;
   return {
-    bMinusV: lerp(blue[1], red[1]),
-    temperatureK: lerp(blue[3], red[3]),
-    bolometricCorrectionV: lerp(blue[4], red[4]),
-    gMinusV: blue[5] === null || red[5] === null ? null : lerp(blue[5], red[5])
+    bMinusV: lerp(first[1], second[1]),
+    temperatureK: lerp(first[3], second[3]),
+    bolometricCorrectionV: lerp(first[4], second[4]),
+    gMinusV: first[5] === null || second[5] === null ? null : lerp(first[5], second[5])
   };
 }

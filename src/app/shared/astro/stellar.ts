@@ -142,13 +142,14 @@ export function luminositySolar(star: StellarPhotometry): number | null {
 }
 
 /**
- * The dwarf sequence at a star's colour — at the end of the table a colour is past, where the star
- * has no type to go by instead. Past the red end are the ultracool dwarfs Gaia measures redder than
- * BP−RP 5.1, M8.5; past the blue end, its white dwarfs and hot stars bluer than −0.12, B9, and
- * B−V's O stars. Unclamped, they had no temperature and were drawn at the Sun's: Gaia DR3
- * 6439125097427143808, an ultracool dwarf 4.0 pc away, and 110 white dwarfs within 50 pc, all at
- * 1 R☉. Beside a type, an off-table colour is more often a bad one than an extreme star — HD
- * 49748, G5 V, at B−V −0.32 — and the type is read instead.
+ * The dwarf sequence at a star's colour — past the table's end, where the star has no type to go
+ * by instead, at the end a colour is past. Past the red end are the ultracool dwarfs Gaia measures
+ * redder than BP−RP 5.1, M8.5, and past B−V's blue end its O stars; Gaia's white dwarfs, bluer
+ * than BP−RP −0.12, are read at the temperature white dwarfs of their colour are measured at.
+ * Unread, they had no temperature and were drawn at the Sun's: Gaia DR3 6439125097427143808, an
+ * ultracool dwarf 4.0 pc away, and 110 white dwarfs within 50 pc, all at 1 R☉. Beside a type, an
+ * off-table colour is more often a bad one than an extreme star — HD 49748, G5 V, at B−V −0.32 —
+ * and the type is read instead.
  */
 function sequenceAtColour(star: StellarPhotometry): DwarfSequencePoint | null {
   if (star.colorIndex == null) {

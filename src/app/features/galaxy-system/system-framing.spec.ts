@@ -18,6 +18,8 @@ import {
 const TRAPPIST_1 = { innermost: 0.01154, outermost: 0.06189 };
 const GL_357 = { innermost: 0.035, outermost: 0.204 };
 const SOLAR = { innermost: 0.387, outermost: 30.07 };
+/** The solar system as the map draws it: out to Eris's semi-major axis, 67.93 AU. */
+const SOLAR_TO_ERIS = { innermost: 0.387, outermost: 67.93 };
 
 describe('starMarkerRadiusAu', () => {
   it('never reaches the innermost orbit', () => {
@@ -123,14 +125,15 @@ describe('the grid and the framing together', () => {
   const VIEWPORTS: SystemViewport[] = [
     { fovDegrees: 50, aspect: 1.78 },
     { fovDegrees: 50, aspect: 1 },
-    { fovDegrees: 50, aspect: 0.6 }
+    { fovDegrees: 50, aspect: 0.6 },
+    { fovDegrees: 50, aspect: 390 / 844 } // a phone held upright
   ];
 
   it('leaves the outermost ring clear of the frame edge at every scale and window shape', () => {
     // The whole point of framing against the grid rather than the orbits: before this, 368 of
     // the 371 systems in the datasets drew a grid wider than the view that was meant to hold it.
     for (const viewport of VIEWPORTS) {
-      for (const { outermost } of [TRAPPIST_1, GL_357, SOLAR, { outermost: 1 }, { outermost: 12.4 }]) {
+      for (const { outermost } of [TRAPPIST_1, GL_357, SOLAR, SOLAR_TO_ERIS, { outermost: 1 }, { outermost: 12.4 }]) {
         const { ring, frame } = fit(outermost, viewport);
         expect(ring).toBeLessThan(frame);
         expect(ring / frame).toBeLessThan(0.93);

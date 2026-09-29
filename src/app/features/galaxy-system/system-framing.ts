@@ -61,13 +61,15 @@ const MIN_FRAMING_DISTANCE_AU = 0.06;
 /**
  * Ceiling on the framing distance, so a distant companion does not push the star to a dot.
  *
- * Generous enough to frame the solar system out to Pluto in any window shape, which needs 120 AU
- * on a landscape display and 140 on a portrait one once the camera's real field of view is
- * accounted for. Only genuinely pathological systems reach it now — the handful with
+ * Generous enough to frame the solar system out to Eris in any window a reader holds: its grid's
+ * outer ring, 80 AU, needs 192 AU on a landscape display and 416 on a 390 by 844 phone once the
+ * camera's real field of view is accounted for, and 500 holds it down to an aspect of 0.385. At
+ * 200, which framed Pluto's 40 AU ring, a portrait window arrived with Eris off screen, and a
+ * phone with Makemake too. Only genuinely pathological systems reach it now — the handful with
  * directly-imaged companions hundreds of AU out — and those still arrive framed on their inner
  * region, with the orbit controls reaching far enough to pull back to the rest.
  */
-const MAX_FRAMING_DISTANCE_AU = 200;
+const MAX_FRAMING_DISTANCE_AU = 500;
 
 /** Framing for a star with no known planets, where there is nothing to fit. */
 const EMPTY_SYSTEM_FRAMING_DISTANCE_AU = 3;

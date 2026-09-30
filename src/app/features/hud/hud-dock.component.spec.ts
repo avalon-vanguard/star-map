@@ -485,10 +485,51 @@ describe('HudDockComponent', () => {
       // At 360 px the system view's five tabs take 397 px, and pushed the strip past the right
       // edge, where nothing scrolls: after Go on a phone the date was nowhere on screen.
       fixture.componentRef.setInput('date', '2020-12-21');
+      fixture.componentRef.setInput('range', '417 AU');
       fixture.detectChanges();
       const tabs = host().querySelector('[role="tablist"]')!.classList;
       expect(tabs.contains('min-w-0') && tabs.contains('overflow-x-auto')).toBe(true);
+      // Its own scrollbar, where the browser draws one, thin and dark: a desktop's default was a
+      // light bar 15 px tall across the dock.
+      expect(tabs.contains('scheme-dark') && tabs.contains('[scrollbar-width:thin]')).toBe(true);
       expect(host().querySelector('[data-testid="hud-date"]')!.classList.contains('shrink-0')).toBe(true);
+      // The range keeps its width where it is shown, or '417 AU' wraps and the row grows 20 px; on a
+      // phone it is not shown, where at the present it took the Display tab out of sight.
+      const range = [...host().querySelectorAll('p')].find((p) => p.textContent?.includes('Range'))!.classList;
+      expect(range.contains('shrink-0') && range.contains('max-sm:hidden')).toBe(true);
+    });
+
+    it('brings the tab that matters back into view once the date strip has narrowed the tabs', () => {
+      // jsdom lays nothing out; what is checked is which tab is asked to be in view, and when.
+      const scrolled: string[] = [];
+      HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+        scrolled.push(this.id);
+      };
+      try {
+        // On a phone: the tab focus went back to, which after Go sat wholly out of sight.
+        viewport.wide = false;
+        host().querySelector<HTMLInputElement>('#clock-date')!.value = '2020-12-21T18:00';
+        button('Go').click();
+        fixture.detectChanges();
+        scrolled.length = 0;
+        fixture.componentRef.setInput('date', '2020-12-21');
+        fixture.detectChanges();
+        expect(scrolled).toEqual(['dock-tab-display']);
+        // On a wider window, where the panel stays open: its tab, focus being in the panel.
+        viewport.wide = true;
+        fixture.componentRef.setInput('date', '');
+        fixture.detectChanges();
+        tab('Display').click();
+        fixture.detectChanges();
+        host().querySelector<HTMLInputElement>('#clock-date')!.focus();
+        scrolled.length = 0;
+        fixture.componentRef.setInput('date', '2020-12-21');
+        fixture.detectChanges();
+        expect(scrolled).toEqual(['dock-tab-display']);
+      } finally {
+        viewport.wide = true;
+        delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+      }
     });
 
     it('keeps the panel open on a wide screen, where it covers little of the scene', () => {

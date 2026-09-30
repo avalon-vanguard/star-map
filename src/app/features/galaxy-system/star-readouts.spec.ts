@@ -88,7 +88,13 @@ describe('starReadouts', () => {
       derived: true
     });
     expect(value(starReadouts(PLACED_BY_GAIA, { radiusSolar: 0.141, radiusDerived: false, temperatureK: 2900, luminositySolar: null, luminosityDerived: true }), 'Radius')).toBe('0.141 solar radii');
-    expect(value(starReadouts(HYG_STAR, { radiusSolar: 584.3, radiusDerived: true, temperatureK: 3590, luminositySolar: null, luminosityDerived: true }), 'Radius')).toBe('~580 solar radii, from colour and brightness');
+    // A giant's temperature is its type's whatever its colour, and so is a dwarf's with no colour.
+    const betelgeuse = { ...HYG_STAR, name: 'Betelgeuse', spectralType: 'M1-M2Ia-Iab', colorIndex: 1.85 };
+    expect(value(starReadouts(betelgeuse, { radiusSolar: 584.3, radiusDerived: true, temperatureK: 3590, luminositySolar: null, luminosityDerived: true }), 'Radius')).toBe('~580 solar radii, from its type and brightness');
+    const gj3655 = { ...HYG_STAR, name: 'GJ 3655', spectralType: 'M8', colorIndex: null, colorSystem: undefined };
+    expect(value(starReadouts(gj3655, { radiusSolar: 0.106, radiusDerived: true, temperatureK: 2570, luminositySolar: null, luminosityDerived: true }), 'Radius')).toBe('~0.11 solar radii, from its type and brightness');
+    const kepler445 = { ...HYG_STAR, spectralType: 'M4', colorIndex: 1.66, colorFromTemperature: true, source: 'exoplanet-archive' };
+    expect(value(starReadouts(kepler445, { radiusSolar: 0.21, radiusDerived: true, temperatureK: 3157, luminositySolar: null, luminosityDerived: true }), 'Radius')).toBe('~0.21 solar radii, from its temperature and brightness');
     expect(value(starReadouts(HYG_STAR, { radiusSolar: 1, radiusDerived: false, temperatureK: 5772, luminositySolar: null, luminosityDerived: true }), 'Radius')).toBe('1.00 solar radii');
     expect(starReadouts(HYG_STAR, { radiusSolar: null, radiusDerived: true, temperatureK: null, luminositySolar: null, luminosityDerived: true }).some((readout) => readout.label === 'Radius')).toBe(false);
   });

@@ -151,7 +151,7 @@ export function luminositySolar(star: StellarPhotometry): number | null {
  * off-table colour is more often a bad one than an extreme star — HD 49748, G5 V, at B−V −0.32 —
  * and the type is read instead.
  */
-function sequenceAtColour(star: StellarPhotometry): DwarfSequencePoint | null {
+function sequenceAtColour(star: Pick<StellarPhotometry, 'spectralType' | 'colorIndex' | 'colorSystem'>): DwarfSequencePoint | null {
   if (star.colorIndex == null) {
     return null;
   }
@@ -173,6 +173,15 @@ export function effectiveTemperatureK(star: StellarPhotometry): number | null {
     return SOLAR_EFFECTIVE_TEMPERATURE_K;
   }
   return giantSurface(star.spectralType)?.temperatureK ?? (sequenceAtColour(star) ?? dwarfSequenceAtType(star.spectralType))?.temperatureK ?? null;
+}
+
+/**
+ * Whether {@link effectiveTemperatureK} reads the star off its colour rather than off its type: not
+ * for a giant, nor for a star with no colour the table reads, which since 206e88a is 821 dwarfs
+ * placed at their type's row. The card said their radii came "from colour and brightness".
+ */
+export function temperatureFromColour(star: Pick<StellarPhotometry, 'spectralType' | 'colorIndex' | 'colorSystem'>): boolean {
+  return giantSurface(star.spectralType) === null && sequenceAtColour(star) !== null;
 }
 
 /**

@@ -923,7 +923,7 @@ describe('locked moons across the clock’s window', () => {
   }
 
   it('keeps Proteus, Miranda, Mimas and Iapetus facing their planets at AD 1 and AD 3000', () => {
-    // Measured: Proteus 2.6 degrees at most over AD 1-3000, Miranda 2.8, Mimas 8.9, Iapetus 16 (9.4
+    // Measured: Proteus 2.6 degrees at most over AD 1-3000, Miranda 2.4, Mimas 8.9, Iapetus 16 (9.4
     // of it the lag of the row its orbit is drawn from). On the IAU's own W and Iapetus's straight
     // pole they were 146, 23, 49 and 87 degrees at AD 1.
     for (const jd of [1721425.5, 2816787.4]) {
@@ -932,6 +932,23 @@ describe('locked moons across the clock’s window', () => {
       expect(Math.abs(facingPlanet('miranda'))).toBeLessThan(3);
       expect(Math.abs(facingPlanet('mimas'))).toBeLessThan(9.5);
       expect(Math.abs(facingPlanet('iapetus'))).toBeLessThan(16.5);
+    }
+  });
+
+  it('keeps the axes of Miranda, Mimas and Iapetus on their drawn orbits’ normals, as a Cassini state holds them, at AD 1, today and AD 3000', () => {
+    // Measured over AD 1-3000: Miranda 0.42 degrees at most, Mimas 0.47, Iapetus 0.74. With their
+    // poles going round at the IAU's node rates, Miranda was 7.6 off at AD 1 and Mimas 2.6; with
+    // Iapetus's pole on its Laplace pole, 8.3 off at every date.
+    for (const jd of [1721425.5, 2460676.5, 2816787.4]) {
+      renderer.update(jd);
+      for (const id of ['miranda', 'mimas', 'iapetus']) {
+        const moon = renderer.members.find((member) => member.id === id)!.marker;
+        const line = moon.parent!.children.find((child) => child.name === 'orbit-line')!;
+        const axis = new THREE.Vector3(0, 1, 0).applyQuaternion(moon.quaternion);
+        const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(line.quaternion);
+        // A line, not a direction: Miranda turns backwards against the IAU's pole.
+        expect((Math.acos(Math.min(1, Math.abs(axis.dot(normal)))) * 180) / Math.PI).toBeLessThan(1);
+      }
     }
   });
 });

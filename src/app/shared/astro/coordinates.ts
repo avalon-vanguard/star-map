@@ -59,8 +59,8 @@ export const OBLIQUITY_J2000_DEG = 23.4392911;
  *
  * The app has to span both because its two sources disagree. Star positions come from HYG as
  * equatorial coordinates, which `raDecDistanceToXyz` produces and which the galaxy view renders
- * directly. Orbital elements come from JPL Horizons, whose default reference plane for element
- * output is the ecliptic — the ETL never overrides it. The two are tilted
+ * directly. The planets' and the Moon's orbital elements are JPL mean elements against the J2000
+ * ecliptic. The two are tilted
  * {@link OBLIQUITY_J2000_DEG} apart about the shared vernal-equinox axis, so orbits have to be
  * rotated before they can share a scene with the stars.
  */
@@ -75,6 +75,29 @@ export function eclipticToEquatorial(position: CartesianCoordinates): CartesianC
     x: position.x,
     y: position.y * cos - position.z * sin,
     z: position.y * sin + position.z * cos
+  };
+}
+
+/**
+ * Rotates a vector from a moon's local **Laplace plane** frame into the equatorial one.
+ *
+ * JPL gives the giant planets' moons against the plane their orbits precess about, which lies
+ * between the planet's equator and its orbit, and names it by its pole. The frame's x axis is
+ * where that plane rises through the ICRF equator, at right ascension 90 degrees past the pole's,
+ * which is what the node is counted from; its z axis is the pole, 90 degrees less its declination
+ * away from the celestial one. Read against the ecliptic instead, Io was up to 2.8 degrees from
+ * where Horizons has it between 1950 and 2100, Phobos 54 and Titan 127: their nodes are counted
+ * from a different line altogether.
+ */
+export function laplacePlaneToEquatorial(position: CartesianCoordinates, pole: { raDeg: number; decDeg: number }): CartesianCoordinates {
+  const tilt = (90 - pole.decDeg) * DEG_TO_RAD;
+  const node = (pole.raDeg + 90) * DEG_TO_RAD;
+  const y = position.y * Math.cos(tilt) - position.z * Math.sin(tilt);
+  const z = position.y * Math.sin(tilt) + position.z * Math.cos(tilt);
+  return {
+    x: position.x * Math.cos(node) - y * Math.sin(node),
+    y: position.x * Math.sin(node) + y * Math.cos(node),
+    z
   };
 }
 

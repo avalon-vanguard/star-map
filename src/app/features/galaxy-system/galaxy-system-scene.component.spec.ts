@@ -6,10 +6,13 @@ import { afterEach, beforeEach, describe, expect, it, MockInstance, vi } from 'v
 import { DataLoaderService, StarField } from '../../core/data/data-loader.service';
 import { EngineService, EngineTickCallback } from '../../core/engine/engine.service';
 import { BodyRecord } from '../../shared/models/body.model';
+import { GM_SUN_AU3_PER_DAY2 } from '../../shared/astro/constants';
+import { keplerRates } from '../../shared/astro/kepler';
 import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
 import { NavigationStore } from '../../shared/state/navigation.store';
+import { TimeStore } from '../../shared/state/time.store';
 import { LinkBudget } from '../../shared/astro/jump-links';
 import { HudDisplay } from '../hud/hud-dock.component';
 import { GalaxySystemSceneComponent } from './galaxy-system-scene.component';
@@ -23,6 +26,7 @@ import { planetTexture } from '../../shared/rendering/procedural-planet-texture'
 import { loadCachedTexture, SUN_TEXTURE_PATH } from '../../shared/rendering/texture-catalog';
 import { JumpLinkRenderer } from './jump-link-renderer';
 import { StarFieldRenderer } from './star-field-renderer';
+import { SystemOrbitsRenderer } from './system-orbits-renderer';
 import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
 
 // jsdom does not implement ResizeObserver; the component only uses it to react to real
@@ -93,7 +97,8 @@ const EARTH: BodyRecord = {
     argumentOfPeriapsisDeg: 0,
     meanAnomalyAtEpochDeg: 0,
     epochJd: 2451545.0
-  }
+  },
+  rates: keplerRates(1, GM_SUN_AU3_PER_DAY2), orbitSource: 'test'
 };
 
 /** Minimal stand-in for `EngineService` that skips real WebGPU/WebGL initialization entirely,
@@ -863,6 +868,111 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(component.systemGroup.visible).toBe(true);
     expect(engine.getCamera().near).toBeCloseTo(0.002, 9);
     expect(navigationStore.viewLevel()).toBe('system');
+  });
+
+  it('says where a system’s orbits come from, and for the Sun how long they hold', async () => {
+    const note = (): string => (fixture.componentInstance as unknown as { hudNote: () => string }).hudNote();
+    navigationStore.selectStar(SUN.id);
+    await flushAsync();
+    await advanceFrames(engine, 2.5);
+    expect(note()).toMatch(/^Orbits propagated from JPL mean elements, the planets’ fit for 3000 BC to AD 3000 and the moons’ checked from 1950 to 2100, and the SBDB’s osculating ones for Ceres, Eris, Haumea and Makemake, checked over the same span, to now, \d{4}-\d\d-\d\d \d\d:\d\d UTC\.$/);
+
+    navigationStore.selectStar(ALPHA_CENTAURI.id);
+    await flushAsync();
+    await advanceFrames(engine, 5);
+    expect(note()).toMatch(/^Orbits propagated from published elements to now, \d{4}-\d\d-\d\d \d\d:\d\d UTC\.$/);
+  });
+
+  it('turns the Sun about its IAU pole, once in 25.38 days', async () => {
+    const time = TestBed.inject(TimeStore);
+    time.setRate(0);
+    time.setDate(new Date('2026-01-01T00:00Z'));
+    navigationStore.selectStar(SUN.id);
+    await flushAsync();
+    await advanceFrames(engine, 2.5);
+    const sun = (): THREE.Object3D => (fixture.componentInstance as unknown as { starMarker: THREE.Object3D }).starMarker;
+    const turned = (local: THREE.Vector3): THREE.Vector3 => local.applyQuaternion(sun().getWorldQuaternion(new THREE.Quaternion()));
+
+    // The sphere's +Y, which MAP_TO_BODY carries onto the body's pole, at RA 286.13, Dec 63.87.
+    const ra = (286.13 * Math.PI) / 180;
+    const dec = (63.87 * Math.PI) / 180;
+    const pole = new THREE.Vector3(Math.cos(dec) * Math.cos(ra), Math.cos(dec) * Math.sin(ra), Math.sin(dec));
+    expect(turned(new THREE.Vector3(0, 1, 0)).angleTo(pole)).toBeLessThan(1e-6);
+
+    const before = turned(new THREE.Vector3(1, 0, 0));
+    time.setDate(new Date('2026-01-02T00:00Z'));
+    await advanceFrames(engine, 0.1);
+    expect((turned(new THREE.Vector3(1, 0, 0)).angleTo(before) * 180) / Math.PI).toBeCloseTo(14.1844, 3);
+  });
+
+  it('names the date the system is drawn for once the clock is set to one', async () => {
+    const note = (): string => (fixture.componentInstance as unknown as { hudNote: () => string }).hudNote();
+    TestBed.inject(TimeStore).setDate(new Date('2020-12-21T18:00Z'));
+    navigationStore.selectStar(SUN.id);
+    await flushAsync();
+    await advanceFrames(engine, 2.5);
+    // The great conjunction, to the minute: not "now", and not a date the reader has to find.
+    expect(note()).toMatch(/ to 2020-12-21 18:00 UTC\.$/);
+  });
+
+  describe('with Eris, whose aphelion runs past the grid', () => {
+    type FramedScene = { bodies: BodyRecord[]; controls: { target: THREE.Vector3 }; systemRenderer: SystemOrbitsRenderer; systemGroup: THREE.Group };
+    // Its 67.9 AU axis gives the grid an 80 AU outer ring; at aphelion it is 97.7 AU out.
+    const ERIS: BodyRecord = {
+      ...EARTH, id: 'eris', name: 'Eris', kind: 'dwarf', radiusKm: 1163,
+      orbit: { ...EARTH.orbit, semiMajorAxisAu: 67.934, eccentricity: 0.4382 }, rates: keplerRates(67.934, GM_SUN_AU3_PER_DAY2)
+    };
+
+    async function enterTheSun(aspect: number): Promise<FramedScene> {
+      const component = fixture.componentInstance as unknown as FramedScene;
+      component.bodies = [EARTH, ERIS];
+      engine.getPerspectiveCamera().aspect = aspect;
+      navigationStore.selectStar(SUN.id);
+      await flushAsync();
+      await advanceFrames(engine, 2.5);
+      return component;
+    }
+
+    it('frames the furthest the system draws, Eris’s aphelion, not the ring inside it nor its semi-major axis', async () => {
+      const component = await enterTheSun(1);
+      const camera = engine.getPerspectiveCamera();
+      expect(component.systemRenderer.outermostRadiusAu).toBeCloseTo(67.934 * 1.4382, 9);
+      // 234.7 AU; framed on the 67.9 AU axis the camera would stand at 163 AU and Eris arrive off screen.
+      expect(camera.position.distanceTo(component.controls.target)).toBeCloseTo(
+        systemFramingDistanceAu(component.systemRenderer.outermostRadiusAu, { fovDegrees: camera.fov, aspect: camera.aspect }),
+        6
+      );
+    });
+
+    it('holds Earth to its 3-pixel floor at the arrival framing, where its true radius is far under a pixel', async () => {
+      Object.defineProperty((fixture.nativeElement as HTMLElement).querySelector('canvas')!, 'clientHeight', { value: 1000 });
+      const component = await enterTheSun(1.6);
+      const earth = component.systemRenderer.members.find((member) => member.id === 'earth')!.marker as THREE.Mesh;
+      const pixelAu = (2 * engine.visibleHalfHeight(engine.getCamera().position.distanceTo(earth.getWorldPosition(new THREE.Vector3())))) / 1000;
+      expect((earth.scale.x * (earth.geometry as THREE.SphereGeometry).parameters.radius) / pixelAu).toBeCloseTo(3, 3);
+    });
+
+    it('leaves the system outwards even from a phone’s framing, which stands past the 400 AU it used to fly to', async () => {
+      const component = await enterTheSun(390 / 844);
+      const camera = engine.getCamera();
+      const arrival = camera.position.length();
+      expect(arrival).toBeGreaterThan(500);
+
+      navigationStore.selectStar(null);
+      await flushAsync(1);
+      // Until the swap: it flew 508 AU in to 400, and the system grew on screen while the reader left it.
+      let previous = arrival;
+      for (let frame = 0; frame < 100 && component.systemGroup.visible; frame++) {
+        engine.tick(0.05);
+        await flushAsync(1);
+        if (component.systemGroup.visible) {
+          expect(camera.position.length()).toBeGreaterThanOrEqual(previous - 1e-9);
+          previous = camera.position.length();
+        }
+      }
+      expect(component.systemGroup.visible).toBe(false);
+      expect(previous).toBeGreaterThan(arrival);
+    });
   });
 
   it('performs the floating-origin recenter: the camera lands close to the AU-space origin, not out at parsec-scale coordinates', async () => {

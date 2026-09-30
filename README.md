@@ -53,9 +53,19 @@ in it is measured and what is not.
 ![The solar system: orbit ellipses over a dashed reference grid marking 5 AU rings out to 35 AU](docs/screenshots/system-view.jpg)
 
 **System view** — selecting a star flies the camera continuously into its system rather than
-cutting to a new scene. The Sun gets the real solar-system bodies from JPL Horizons; other
+cutting to a new scene. The Sun gets the real solar-system bodies, moving on JPL's mean orbital
+elements — Standish's for the planets, JPL SSD's satellite table for the moons, the Small-Body
+Database for Ceres, Eris, Haumea and Makemake — and turned by the IAU's rotational elements
+(Eris, Haumea, Makemake and Nereid, which have none, at their measured days about their orbit
+normals, and Hyperion, which tumbles, not at all), Earth by the IERS Earth Rotation Angle; a
+tidally locked moon's prime meridian turns at its JPL mean motion, and its pole's terms that turn
+within 5 per cent of a multiple of its node's rate at that multiple of its JPL node rate, both
+re-phased to the IAU's values on 2025-01-01 (the Moon's and Phobos's are left as the IAU has them,
+and so are the circles Ariel's, Umbriel's, Titania's and Oberon's poles go round on, at rates none
+of their nodes has), and Iapetus's pole follows its orbit normal
+(`lockedToOrbit`), so each keeps its face to its planet from AD 1 to 3000; other
 stars get their confirmed exoplanets. Orbits are drawn as ellipses and bodies are propagated
-along them by a Kepler solver against the current epoch. Under them, a dashed grid marks out
+along them by a Kepler solver to the date on the map's clock. Under them, a dashed grid marks out
 round distances in AU — 5 AU rings for the solar system, 0.01 AU rings for TRAPPIST-1 — with a
 drop line from each body, so eccentricity and inclination read against a circular reference
 instead of having to be inferred from a shape in space. The camera frames that grid rather than
@@ -113,7 +123,8 @@ its own readout, so a stale image is visible as one.
   both backends. Their size is angular rather than world-space — real stars are unresolvable
   point sources, so apparent size should follow brightness, not distance.
 - **One reference frame, from three sources.** HYG gives star positions in equatorial J2000.
-  JPL Horizons reports orbital elements against the ecliptic, tilted 23.4° away. The Exoplanet
+  JPL gives the planets' orbital elements against the ecliptic, tilted 23.4° away, and the moons'
+  against the ecliptic (the Moon), a Laplace plane, or their planet's equator (Uranus's and Pluto's). The Exoplanet
   Archive measures inclination from the *plane of the sky* — perpendicular to our line of sight
   to each host star, which is why transiting planets cluster at 90°. Each set of elements is
   rotated from its own reference plane into the scene's equatorial frame, so a direction means
@@ -138,9 +149,11 @@ its own readout, so a stale image is visible as one.
 
 ### On surfaces that were never photographed
 
-Fifteen bodies here have a real photograph. Everything else does not, and never will on current
-instruments: no exoplanet's surface has ever been imaged, and a few of the solar system's own
-moons have no usable map in this asset set either.
+Twenty-eight bodies here are wrapped in real photography: the Sun, the eight planets and the Moon,
+and eighteen moons and dwarf planets in mission mosaics, grey where no probe has seen them
+(`src/assets/textures/README.md`). Everything else is not, and no exoplanet ever will be on
+current instruments: none has had its surface imaged. The five large moons of Uranus and a few
+small bodies have no map in this asset set either.
 
 Those bodies get a surface reasoned from what *has* been measured, in a chain that is worth
 following because every link is standard:
@@ -204,7 +217,7 @@ re-runs are cheap and offline-friendly; set `ETL_FORCE_REFRESH=1` to bypass the 
 | Script | Source | Output |
 | --- | --- | --- |
 | `fetchStars.ts` | HYG database, plus any other positional catalogue wired in (see below) | the catalogue stars, handed to `fetchExoplanets.ts` |
-| `fetchSolarSystem.ts` | JPL Horizons / SSD | `bodies.json` |
+| `fetchSolarSystem.ts` | JPL SSD mean elements (Standish's planets, the satellite table), the Small-Body Database, NAIF's PCK, JPL Horizons | `bodies.json` |
 | `fetchExoplanets.ts` | NASA Exoplanet Archive (TAP), and the stars above with the hosts it adds | `exoplanets.json`, `stars.bin`, `stars-meta.bin`, `stars-index.json` |
 | `fetchDeepSky.ts` | OpenNGC | `deepsky.json` |
 
@@ -330,7 +343,7 @@ plugin's own files are kept so it can be listed from a marketplace of its own la
 ## Data credits
 
 Star catalogue: [HYG database](https://github.com/astronexus/HYG-Database) (Hipparcos, Yale
-Bright Star, Gliese) — 68 388 stars within 250 pc. Solar-system ephemerides: NASA/JPL Horizons. Exoplanets: NASA Exoplanet
+Bright Star, Gliese) — 68 388 stars within 250 pc. Solar-system orbits: JPL approximate planetary mean elements (Standish), JPL SSD satellite mean elements and the JPL Small-Body Database; rotation: the IAU WGCCRE 2015 report via NAIF's pck00011, with a locked moon's W and its pole's terms within 5 per cent of its node's rate re-rated to its JPL mean elements (but the Moon's and Phobos's) and Iapetus's pole carried round its orbit normal, and for Earth the IERS Conventions 2010; physical data, and the positions the orbits are checked against: NASA/JPL Horizons. Exoplanets: NASA Exoplanet
 Archive. Deep-sky objects: [OpenNGC](https://github.com/mattiaverga/OpenNGC). Body and skybox
 imagery: NASA/JPL/USGS public domain and Solar System Scope (CC BY 4.0) — per-file provenance
-is recorded in `src/app/shared/rendering/texture-catalog.ts`.
+is recorded in `src/assets/textures/README.md`.

@@ -11,6 +11,7 @@ import {
   SOLAR_BOLOMETRIC_MAGNITUDE,
   SOLAR_EFFECTIVE_TEMPERATURE_K
 } from './stellar';
+import { dwarfSequenceAtType } from './spectral';
 
 /** Real catalogue rows, with the published luminosity each one should reproduce. */
 const SIRIUS = { magnitude: -1.44, distancePc: 2.6371, spectralType: 'A0m...', publishedLuminosity: 25.4 };
@@ -213,6 +214,15 @@ describe('a dwarf with a type and no colour', () => {
     const radius = radiusFromLuminositySolar(luminositySolar(gj3655)!, effectiveTemperatureK(gj3655)!);
     expect(radius / 0.114).toBeGreaterThan(1 / 1.2);
     expect(radius / 0.114).toBeLessThan(1.2);
+  });
+
+  it("carries a G magnitude to V at its type's G−V", () => {
+    // The same star measured in G, which for an M8 dwarf reads 3.11 magnitudes brighter than V: taken
+    // as V, it came out 17 times as luminous. One published star takes this path, Oph 11 (M9, G 18.91).
+    const inV = { magnitude: 19.57, distancePc: 14.35, spectralType: 'M8', magnitudeBand: 'V', colorIndex: null } as const;
+    const inG = { ...inV, magnitude: 19.57 + dwarfSequenceAtType('M8')!.gMinusV!, magnitudeBand: 'G' } as const;
+    expect(dwarfSequenceAtType('M8')!.gMinusV).toBeLessThan(-3);
+    expect(luminositySolar(inG)!).toBeCloseTo(luminositySolar(inV)!, 12);
   });
 });
 

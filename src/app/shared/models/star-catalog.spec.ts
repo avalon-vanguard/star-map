@@ -103,7 +103,7 @@ describe('the photometry and distance error columns', () => {
     { id: 1, name: 'Sirius', x: 1, y: 0, z: 0, magnitude: -1.44, magnitudeBand: 'V', spectralType: 'A0m', colorIndex: 0.009, colorSystem: 'B-V', distanceError: 0.0036, source: 'hyg' },
     { id: 2, name: 'Gaia DR3 2', x: 0, y: 117, z: 0, magnitude: 11.2, magnitudeBand: 'G', spectralType: 'Unknown', colorIndex: 1.43, colorSystem: 'BP-RP', distanceError: 0.199, distanceFromGaia: true, source: 'gaia' },
     // A HYG star at Gaia's distance, and one no survey gave a magnitude, a colour or an error.
-    { id: 3, name: 'HD 3', x: 0, y: 0, z: 300, magnitude: 7, magnitudeBand: 'V', spectralType: 'K0', colorIndex: 1.0, colorSystem: 'B-V', distanceError: 0.000001, distanceFromGaia: true, source: 'hyg' },
+    { id: 3, name: 'HD 3', x: 0, y: 0, z: 300, magnitude: 7, magnitudeBand: 'V', spectralType: 'K0', colorIndex: 1.0, colorSystem: 'B-V', distanceError: 1e-12, distanceFromGaia: true, source: 'hyg' },
     { id: 4, name: 'Gaia DR3 4', x: 5, y: 5, z: 0, magnitude: 12, spectralType: 'Unknown', colorIndex: null, distanceFromGaia: true, source: 'gaia' },
     // A Hipparcos parallax smaller than its own error.
     { id: 5, name: 'HIP 5', x: 0, y: 200, z: 0, magnitude: 6, magnitudeBand: 'V', spectralType: 'B8', colorIndex: -0.1, colorSystem: 'B-V', distanceError: 1.4, source: 'hyg' },
@@ -124,7 +124,8 @@ describe('the photometry and distance error columns', () => {
     // A step is 0.05 % of distance at Sirius's 0.36 %, and 0.35 % at the 20 % Gaia's cut allows.
     expect(Math.abs(decoded[0].distanceError! - 0.0036)).toBeLessThan(0.0003);
     expect(Math.abs(decoded[1].distanceError! - 0.199)).toBeLessThan(0.002);
-    // Too small to round to a step, but published, so not read back as unpublished.
+    // Too small to round to a step — √(10⁻¹²) is 0.07 of one in 65 535 — but published, so not read
+    // back as unpublished. 10⁻⁶ was, at 255 steps; at 65 535 it rounds to 66 and never needed the floor.
     expect(decoded[2].distanceError).toBeGreaterThan(0);
     expect(decoded[3].distanceError).toBeUndefined();
     // Past the parallax itself there is no upper bound on the distance, which is what 100 % says.

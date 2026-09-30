@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { BodyRecord, OrbitalElements } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord, SUN_STAR_ID } from '../../shared/models/star.model';
-import { buildBodyViewModel, heliocentricPeriodDays, luminosityOf, starSurfaceOf } from './body-view-model';
+import { buildBodyViewModel, heliocentricPeriodDays, luminosityOf, publishedTemperaturesK, starSurfaceOf } from './body-view-model';
 
 const orbit = (overrides: Partial<OrbitalElements> = {}): OrbitalElements => ({
   semiMajorAxisAu: 1,
@@ -161,6 +161,19 @@ describe('starSurfaceOf', () => {
     expect(buildBodyViewModel('proxima-cen-b', catalogues)?.appearance.equilibriumTemperatureK).toBeCloseTo(228, 0);
     // d's own row gives none; its host's luminosity is still the archive's, from b's.
     expect(buildBodyViewModel('proxima-cen-d', catalogues)?.appearance.equilibriumTemperatureK).toBeCloseTo(296, 0);
+  });
+
+  it("gives the star field the temperature the disc is drawn at, where a host's planets give it different ones", () => {
+    // 193 hosts do: host 1070876212's three rows give 4 094, 4 094 and 3 640 K. The field is tinted
+    // from one map of every host and the disc from the host's own planets, so both must take the same row.
+    const rows = [
+      { ...proximaB, id: 'd', hostStarTemperatureK: undefined },
+      { ...proximaB, id: 'b', hostStarTemperatureK: 4094 },
+      { ...proximaB, id: 'c', hostStarTemperatureK: 3640 },
+    ];
+    const other = { ...proximaB, id: 'other', hostStarId: 1, hostStarTemperatureK: 5000 };
+    expect(starSurfaceOf(proxima, rows).temperatureK).toBe(4094);
+    expect(publishedTemperaturesK([...rows, other]).get(proxima.id)).toBe(starSurfaceOf(proxima, rows).temperatureK);
   });
 
   it('derives both otherwise, and says the radius is derived', () => {

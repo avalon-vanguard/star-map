@@ -9,6 +9,7 @@ import { MeanOrbit, parsePlanetMeanElements, parseSatelliteMeanElements, parseSm
 import { fetchPlanetMeanElementsText, fetchSatelliteMeanElementsHtml, fetchSmallBodyAnswer } from './lib/mean-elements';
 import { MIN_PERIODIC_TERM_DEG, orbitalTermsOfPrimeMeridian, parsePckRotationalElements, SUN_ROTATIONAL_ELEMENTS } from '../../src/app/shared/astro/rotational-elements';
 import { fetchPckText } from './lib/pck';
+import { lockedToOrbit } from './lib/locked-spin';
 import { dataPath, ensureDataDir } from './lib/paths';
 
 const HOURS_PER_DAY = 24;
@@ -54,6 +55,8 @@ interface BodySpec {
    * given. See `orbitalTermsOfPrimeMeridian`.
    */
   orbitFromW?: { angleRateDegPerCentury?: number };
+  /** A locked moon whose pole is carried round with its orbit's, as Iapetus's; see `lockedToOrbit`. */
+  poleFollowsOrbit?: boolean;
   /**
    * Days between the Horizons positions the orbit is checked against from 1950 to 2100; 2 unless
    * the error changes faster than that. Nereid, at an eccentricity of 0.75, sweeps through its
@@ -131,7 +134,7 @@ const BODY_SPECS: BodySpec[] = [
   // Hyperion tumbles ("Rotational period = Chaotic") and Phoebe, captured, turns in 9.27 hours.
   // Hyperion's eccentricity is 0.105 in JPL's current table (ssd.jpl.nasa.gov/sats/elem, SAT441).
   { id: 'hyperion', name: 'Hyperion', kind: 'moon', horizonsCommand: '607', center: '500@699', parentBodyId: 'saturn', spinsFreely: true, measuredEccentricity: 0.105, trackStepDays: 1 },
-  { id: 'iapetus', name: 'Iapetus', kind: 'moon', horizonsCommand: '608', center: '500@699', parentBodyId: 'saturn' },
+  { id: 'iapetus', name: 'Iapetus', kind: 'moon', horizonsCommand: '608', center: '500@699', parentBodyId: 'saturn', poleFollowsOrbit: true },
   // Phoebe's row gives a mean motion of 0.6569114 degrees a day, a 548.02-day year, where its
   // Horizons page and JPL's current table (SAT441) give 550.30: the table's own note warns that
   // its source misstated the mean motions of retrograde moons. On the row's figure Phoebe was
@@ -245,10 +248,11 @@ export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizo
     // A moon listed here is tidally locked unless its spec says otherwise, so its day is its
     // orbit: the sidereal period from the same mean motion that carries it round. Not every page
     // says so — the Moon's gives a rate, Titan's and Proteus's nothing. Every locked moon here is
-    // turned by its IAU W rather than by this day, and `build.ts` checks that W and the orbit keep
-    // its face to its planet from 1950 to 2100; this day is what the renderer would turn a moon
-    // without W by.
-    const rotationPeriodHours = result.tidallyLocked || (spec.kind === 'moon' && !spec.spinsFreely)
+    // turned by its IAU W, at this same rate (see `lockedToOrbit`), and `build.ts` checks that W and
+    // the orbit keep its face to its planet from AD 1 to 3000; this day is what the renderer would
+    // turn a moon without W by.
+    const locked = spec.kind === 'moon' && !spec.spinsFreely;
+    const rotationPeriodHours = result.tidallyLocked || locked
       ? (360 / mean.rates.meanMotionDegPerDay) * HOURS_PER_DAY
       : (spec.rotationPeriodHours ?? (smallBody ? smallBody.rotationPeriodHours : result.rotationPeriodHours));
     const parentGm = spec.barycentric && spec.parentBodyId ? gmById.get(spec.parentBodyId) : undefined;
@@ -274,7 +278,7 @@ export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizo
       ...(parentGm !== undefined ? { massRatio: result.gmKm3PerS2! / parentGm } : {}),
       ...(rotationPeriodHours !== undefined ? { rotationPeriodHours } : {}),
       ...((result.obliquityDeg ?? spec.obliquityDeg) !== undefined ? { obliquityDeg: result.obliquityDeg ?? spec.obliquityDeg } : {}),
-      ...(rotation ? { rotationalElements: rotation.elements } : {})
+      ...(rotation ? { rotationalElements: locked ? lockedToOrbit(rotation.elements, mean, spec.name, spec.poleFollowsOrbit) : rotation.elements } : {})
     });
   }
 

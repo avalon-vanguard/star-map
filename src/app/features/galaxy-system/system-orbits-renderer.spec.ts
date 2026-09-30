@@ -8,7 +8,7 @@ import { DEFAULT_EPOCH_JD, GM_SUN_AU3_PER_DAY2, ttMinusUtSeconds } from '../../s
 import { keplerRates } from '../../shared/astro/kepler';
 import { eclipticToEquatorial, laplacePlaneToEquatorial, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
 import { orientationAt } from '../../shared/astro/rotational-elements';
-import { BodyRecord, RotationalElements } from '../../shared/models/body.model';
+import { BodyRecord } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
 import { bodyTexturePath, loadCachedTexture } from '../../shared/rendering/texture-catalog';
@@ -593,29 +593,18 @@ describe('exoplanet size without a measured radius', () => {
 });
 
 describe('solar-system bodies against Horizons', () => {
-  // The records the app ships, read from bodies.json, and Horizons' own positions for them (ICRF,
-  // AU; heliocentric for the planets, planet-centred for the moons) at dates across 1950-2100, so the
-  // whole path — the ETL's reading of the mean elements, their rates, the Laplace planes and the
-  // scene's frame — is checked against JPL's ephemeris rather than against itself. A hand copy of the
-  // records stood here, and an ETL that dropped Standish's a, e and i rates or Io's and Europa's
-  // backward periapses passed the whole suite on the data it wrote. Horizons' dates are TDB and the
-  // renderer's are the clock's UT, so each is handed over TT - UT earlier: 69.184 s today, 29 in 1950.
+  // The records the app ships, read from bodies.json with their IAU rotational elements, and
+  // Horizons' own positions for them (ICRF, AU; heliocentric for the planets, planet-centred for the
+  // moons) at dates across 1950-2100, so the whole path — the ETL's reading of the mean elements,
+  // their rates, the Laplace planes and the scene's frame — is checked against JPL's ephemeris rather
+  // than against itself. A hand copy of the records stood here, and an ETL that dropped Standish's a,
+  // e and i rates or Io's and Europa's backward periapses passed the whole suite on the data it
+  // wrote. Horizons' dates are TDB and the renderer's are the clock's UT, so each is handed over
+  // TT - UT earlier: 69.184 s today, 29 in 1950.
   const SHIPPED: BodyRecord[] = JSON.parse(readFileSync(`${process.cwd()}/src/assets/data/bodies.json`, 'utf8'));
   // Mimas and Phobos among them for the terms of their IAU W that are motion along the orbit: the
   // Mimas-Tethys libration and Phobos's tidal acceleration (see `orbitalTermsOfPrimeMeridian`).
   const IDS = ['earth', 'jupiter', 'saturn', 'neptune', 'pluto', 'moon', 'io', 'europa', 'titan', 'triton', 'uranus', 'titania', 'charon', 'venus', 'mars', 'mimas', 'phobos'];
-  // The IAU WGCCRE 2015 rotational elements bodies.json carries for them, from pck00011.tpc.
-  const ROTATION: Record<string, RotationalElements> = {
-    venus: {poleRaDeg: [272.76, 0, 0], poleDecDeg: [67.16, 0, 0], primeMeridianDeg: [160.2, -1.4813688, 0]},
-    earth: {poleRaDeg: [0, -0.641, 0], poleDecDeg: [90, -0.557, 0], primeMeridianDeg: [190.147, 360.9856235, 0]},
-    mars: {poleRaDeg: [317.269202, -0.10927547, 0], poleDecDeg: [54.432516, -0.05827105, 0], primeMeridianDeg: [176.049863, 350.891982443297, 0], terms: [{angleDeg: [79.398797, 0.5042615, 0], ra: 0.419057, dec: 0, pm: 0}, {angleDeg: [166.325722, 0.5042615, 0], ra: 0, dec: 1.591274, pm: 0}, {angleDeg: [95.391654, 0.5042615, 0], ra: 0, dec: 0, pm: 0.584542}]},
-    jupiter: {poleRaDeg: [268.056595, -0.006499, 0], poleDecDeg: [64.495303, 0.002413, 0], primeMeridianDeg: [284.95, 870.536, 0]},
-    io: {poleRaDeg: [268.05, -0.009, 0], poleDecDeg: [64.5, 0.003, 0], primeMeridianDeg: [200.39, 203.4889538, 0], terms: [{angleDeg: [283.9, 4850.7], ra: 0.094, dec: 0.04, pm: -0.085}, {angleDeg: [355.8, 1191.3], ra: 0.024, dec: 0.011, pm: -0.022}]},
-    saturn: {poleRaDeg: [40.589, -0.036, 0], poleDecDeg: [83.537, -0.004, 0], primeMeridianDeg: [38.9, 810.7939024, 0]},
-    uranus: {poleRaDeg: [257.311, 0, 0], poleDecDeg: [-15.175, 0, 0], primeMeridianDeg: [203.81, -501.1600928, 0]},
-    pluto: {poleRaDeg: [132.993, 0, 0], poleDecDeg: [-6.163, 0, 0], primeMeridianDeg: [302.695, 56.3625225, 0]},
-    moon: {poleRaDeg: [269.9949, 0.0031, 0], poleDecDeg: [66.5392, 0.013, 0], primeMeridianDeg: [38.3213, 13.17635815, -1.4e-12], terms: [{angleDeg: [125.045, -1935.5364525], ra: -3.8787, dec: 1.5419, pm: 3.561}, {angleDeg: [250.089, -3871.072905], ra: -0.1204, dec: 0.0239, pm: 0.1208}, {angleDeg: [260.008, 475263.3328725], ra: 0.07, dec: -0.0278, pm: -0.0642}, {angleDeg: [176.625, 487269.629985], ra: -0.0172, dec: 0.0068, pm: 0.0158}, {angleDeg: [357.529, 35999.0509575], ra: 0, dec: 0, pm: 0.0252}]},
-  };
   // Each ceiling sits just above what these elements measure on that date: Earth 0.003 degrees,
   // Jupiter 0.063, Saturn 0.164, Pluto 0.054, the Moon 0.72 (no mean ellipse has its evection or
   // variation), Io 0.021, Europa 0.036, Titan 0.014, Triton 0.137, Titania 0.62 (against Uranus's
@@ -644,8 +633,8 @@ describe('solar-system bodies against Horizons', () => {
   ];
 
   function record(id: string): BodyRecord {
-    const { kind, orbit, rates, laplacePole, parentBodyId, massRatio } = SHIPPED.find((body) => body.id === id)!;
-    return { id, systemStarId: 0, name: id, radiusKm: 1000, orbitSource: 'test', kind, orbit, rates, laplacePole, parentBodyId, massRatio, rotationalElements: ROTATION[id] };
+    const { kind, orbit, rates, laplacePole, parentBodyId, massRatio, rotationalElements } = SHIPPED.find((body) => body.id === id)!;
+    return { id, systemStarId: 0, name: id, radiusKm: 1000, orbitSource: 'test', kind, orbit, rates, laplacePole, parentBodyId, massRatio, rotationalElements };
   }
 
   const renderer = new SystemOrbitsRenderer(IDS.map(record), []);
@@ -796,7 +785,7 @@ describe('solar-system bodies against Horizons', () => {
 
   /** Where the IAU puts a body's prime meridian at a TDB date, in the scene. */
   function iauPrimeMeridian(id: string, jdTdb: number): THREE.Vector3 {
-    const { poleRaDeg, poleDecDeg, primeMeridianDeg } = orientationAt(ROTATION[id], jdTdb);
+    const { poleRaDeg, poleDecDeg, primeMeridianDeg } = orientationAt(SHIPPED.find((body) => body.id === id)!.rotationalElements!, jdTdb);
     const w = (primeMeridianDeg * Math.PI) / 180;
     const meridian = laplacePlaneToEquatorial({ x: Math.cos(w), y: Math.sin(w), z: 0 }, { raDeg: poleRaDeg, decDeg: poleDecDeg });
     return new THREE.Vector3(meridian.x, meridian.y, meridian.z);
@@ -906,4 +895,33 @@ describe('solar-system bodies against Horizons', () => {
       expect(Math.abs(planetodetic(lit.latDeg) - sunLat)).toBeLessThan(0.05);
     });
   }
+});
+
+describe('locked moons across the clock’s window', () => {
+  // As shipped, pole, W and all: the IAU gives each a W fitted near the present, and its rate is
+  // not quite its orbit's, nor Iapetus's pole a line for twenty centuries.
+  const shipped: BodyRecord[] = JSON.parse(readFileSync(`${process.cwd()}/src/assets/data/bodies.json`, 'utf8'));
+  const renderer = new SystemOrbitsRenderer(shipped.filter((body) => ['saturn', 'uranus', 'neptune', 'mimas', 'iapetus', 'miranda', 'proteus'].includes(body.id)), []);
+
+  /** East longitude, on its map, of the point on a moon's drawn sphere that faces its planet. */
+  function facingPlanet(id: string): number {
+    const moon = renderer.members.find((member) => member.id === id)!.marker;
+    // Its position is from the planet, which is its pivot; SphereGeometry wraps u = atan2(z, -x) / 2 pi.
+    const toPlanet = moon.position.clone().negate().applyQuaternion(moon.quaternion.clone().invert());
+    const u = Math.atan2(toPlanet.z, -toPlanet.x) / (2 * Math.PI);
+    return ((((u - 0.5) * 360) % 360) + 540) % 360 - 180;
+  }
+
+  it('keeps Proteus, Miranda, Mimas and Iapetus facing their planets at AD 1 and AD 3000', () => {
+    // Measured: Proteus 2.6 degrees at most over AD 1-3000, Miranda 2.8, Mimas 8.9, Iapetus 16 (9.4
+    // of it the lag of the row its orbit is drawn from). On the IAU's own W and Iapetus's straight
+    // pole they were 146, 23, 49 and 87 degrees at AD 1.
+    for (const jd of [1721425.5, 2816787.4]) {
+      renderer.update(jd);
+      expect(Math.abs(facingPlanet('proteus'))).toBeLessThan(3);
+      expect(Math.abs(facingPlanet('miranda'))).toBeLessThan(3);
+      expect(Math.abs(facingPlanet('mimas'))).toBeLessThan(9.5);
+      expect(Math.abs(facingPlanet('iapetus'))).toBeLessThan(16.5);
+    }
+  });
 });

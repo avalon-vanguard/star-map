@@ -95,10 +95,12 @@ export interface BodyRecord {
   obliquityDeg?: number;
   /**
    * Where the body's pole points and which way its prime meridian faces at any date, from the IAU
-   * WGCCRE 2015 report (Archinal et al. 2018) as NAIF's `pck00011.tpc` carries it. Where present
-   * it alone sets how the body is drawn, and the ETL checks the period and obliquity above against
-   * it. Absent where the report gives none: Hyperion tumbles, and Nereid, Eris, Haumea and
-   * Makemake have no model.
+   * WGCCRE 2015 report (Archinal et al. 2018) as NAIF's `pck00011.tpc` carries it, but that a locked
+   * moon's W turns at its drawn orbit's rate and Iapetus's pole goes round with its orbit's, so they
+   * keep their faces to their planets over the clock's AD 1 to 3000 (see `lockedToOrbit` in the
+   * ETL). Where present it alone sets how the body is drawn, and the ETL checks the period and
+   * obliquity above against it. Absent where the report gives none: Hyperion tumbles, and Nereid,
+   * Eris, Haumea and Makemake have no model.
    */
   rotationalElements?: RotationalElements;
 }

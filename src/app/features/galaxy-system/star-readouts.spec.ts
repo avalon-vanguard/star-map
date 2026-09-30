@@ -130,6 +130,12 @@ describe('starSubtitle', () => {
     expect(starSubtitle(GAIA_STAR)).toBe('Spectral type ~K5, from colour');
   });
 
+  it('says an estimate came from the temperature where the colour was read off it', () => {
+    // PSR J1719-1438: no magnitude in any colour, st_teff 4 500 K, B−V 1.13 off the dwarf sequence.
+    const pulsar = { ...GAIA_STAR, source: 'exoplanet-archive', colorIndex: 1.128, colorSystem: 'B-V', colorFromTemperature: true } as const;
+    expect(starSubtitle(pulsar)).toBe('Spectral type ~K5, from its temperature');
+  });
+
   it('prints nothing rather than "Unknown" when there is neither', () => {
     expect(starSubtitle({ ...GAIA_STAR, colorIndex: null, colorSystem: undefined })).toBe('');
   });

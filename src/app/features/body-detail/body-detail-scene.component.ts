@@ -28,6 +28,16 @@ const GAS_GIANT_IDS = new Set(['jupiter', 'saturn', 'uranus', 'neptune']);
 const GLOW_SCALE = 2.6;
 /** Where the page's light stands, and the Sun with it wherever the body's real one is known. */
 const SUN_LIGHT_POSITION = new THREE.Vector3(4, 3, 5);
+/**
+ * How far from the equator the Sun must stand, as the sine of its latitude, before the camera
+ * follows it across: 3 degrees. The side is for Saturn's rings, lit on one face only, whose Sun
+ * goes 26.7 degrees either side. Mercury's never leaves the equator by more than 0.034 degrees
+ * and crosses it 8.3 times a year, which moved the camera from one side to the other every 1.45
+ * seconds at a month a second, both sides lit alike; Venus's reaches 2.6 and the Moon's 1.6.
+ * Earth's and Saturn's pages still follow their seasons, a week and half a year after each
+ * equinox (2025-03-28 and 2039-08-03, measured).
+ */
+const SUN_SIDE_MIN_SINE = Math.sin((3 * Math.PI) / 180);
 
 /**
  * Separate, focused route for inspecting a single planet/moon/exoplanet: its own scene/camera
@@ -302,13 +312,14 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     } else if (!this.body) {
       this.planet.rotation.y += deltaSeconds * 0.08;
     }
-    const sunSide = this.sunLight.position.y < 0 ? -1 : 1;
+    const sunLatitudeSine = this.sunLight.position.y / this.sunLight.position.length();
+    const sunSide = this.sunSide !== 0 && Math.abs(sunLatitudeSine) < SUN_SIDE_MIN_SINE ? this.sunSide : sunLatitudeSine < 0 ? -1 : 1;
     if (sunSide !== this.sunSide) {
       // Above or below the equator, whichever side the Sun is on, when a body is shown and again
-      // whenever the Sun crosses it, as the clock runs or is set: held above it, the page opened
-      // Saturn on the unlit face of its rings from 2025 until 2039, while the Sun is south of them —
-      // the face Earth does not see either — and the Clock set to 2045 left it on the other one.
-      // Between crossings the camera is the reader's to orbit where they like.
+      // whenever the Sun is well across it (SUN_SIDE_MIN_SINE), as the clock runs or is set: held
+      // above it, the page opened Saturn on the unlit face of its rings from 2025 until 2039, while
+      // the Sun is south of them — the face Earth does not see either — and the Clock set to 2045
+      // left it on the other one. Between crossings the camera is the reader's to orbit where they like.
       this.sunSide = sunSide;
       const camera = this.engine.getCamera();
       camera.position.y = Math.abs(camera.position.y) * sunSide;

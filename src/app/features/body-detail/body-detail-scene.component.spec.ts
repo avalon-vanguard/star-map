@@ -34,9 +34,11 @@ const SATURN: BodyRecord = {
   rates: {meanMotionDegPerDay: 0.033459683702669406, longitudeOfAscendingNodeDegPerDay: -0.000006848734291581108, argumentOfPeriapsisDegPerDay: 0.000021682266940451745},
   rotationalElements: {poleRaDeg: [40.589, -0.036, 0], poleDecDeg: [83.537, -0.004, 0], primeMeridianDeg: [38.9, 810.7939024, 0]}
 };
-// Eris as it is shipped for this page's purposes: no IAU model, so its page keeps its own light.
-const ERIS: BodyRecord = { ...EARTH, id: 'eris', name: 'Eris', kind: 'dwarf', radiusKm: 1163, rotationalElements: undefined };
-const BODIES = [EARTH, SATURN, ERIS];
+// Eris and Hyperion as they are shipped for this page's purposes: no IAU model, so their pages keep
+// their own light; Eris's day is measured, and Hyperion tumbles and has none.
+const ERIS: BodyRecord = { ...EARTH, id: 'eris', name: 'Eris', kind: 'dwarf', radiusKm: 1163, rotationalElements: undefined, rotationPeriodHours: 378.504 };
+const HYPERION: BodyRecord = { ...ERIS, id: 'hyperion', name: 'Hyperion', kind: 'moon', radiusKm: 135, parentBodyId: 'saturn', rotationPeriodHours: undefined };
+const BODIES = [EARTH, SATURN, ERIS, HYPERION];
 
 /** Stands in for the WebGPU engine: a scene, a camera, and the tick hook, driven by hand. */
 class FakeEngineService {
@@ -153,6 +155,30 @@ describe('BodyDetailSceneComponent', () => {
     await flushAsync();
     engine.tick(0.016);
     expect(page.sunLight.position.distanceTo(new THREE.Vector3(4, 3, 5))).toBeLessThan(1e-9);
+  });
+
+  it('puts the sphere back at rest when the next body shown does not turn: Hyperion after Earth', async () => {
+    await open('earth');
+    expect(page.planet.quaternion.angleTo(new THREE.Quaternion())).toBeGreaterThan(0.1);
+    route.next(convertToParamMap({ id: 'hyperion' }));
+    await flushAsync();
+    engine.tick(0.016);
+    engine.tick(0.016);
+    expect(page.planet.quaternion.angleTo(new THREE.Quaternion())).toBeLessThan(1e-9);
+  });
+
+  it('turns a body whose day is measured but not its pole at that day on the map’s clock: Eris a sixth of a turn in 63.084 hours', async () => {
+    await open('eris');
+    const start = page.planet.rotation.y;
+    // The clock stands (the page is opened at rate 0): so does Eris, where it used to turn for show.
+    engine.tick(1);
+    expect(page.planet.rotation.y).toBe(start);
+    time.setDate(new Date(Date.parse('2025-06-01T12:00Z') + (378.504 / 6) * 3600000));
+    engine.tick(0.016);
+    const turned = (((page.planet.rotation.y - start) / (2 * Math.PI)) % 1 + 1) % 1;
+    expect(turned).toBeCloseTo(1 / 6, 6);
+    // Pole up, as the system view turns it about its orbit's normal.
+    expect(new THREE.Vector3(0, 1, 0).applyQuaternion(page.planet.quaternion).y).toBeCloseTo(1, 12);
   });
 
   it('says on its dock the date the body is drawn for, and nothing at the present, and offers the clock', async () => {

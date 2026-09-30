@@ -63,8 +63,9 @@ const SUN_LIGHT_POSITION = new THREE.Vector3(4, 3, 5);
         </div>
       }
       <!-- Search, what has been kept and the clock: there is no scene readout here, the info
-           panel is the reading, and the panel's own control is what keeps this body. The body is
-           drawn at the clock's date and turns at its rate, so both are shown and can be set here. -->
+           panel is the reading, and the panel's own control is what keeps this body. A solar-system
+           body is drawn at the clock's date and turns at its rate, so both are shown and can be set
+           here; an exoplanet, whose day no one has measured, turns for show whatever the clock says. -->
       <app-hud-dock [date]="date()" [clock]="true" (bookmarkChosen)="goToBookmark($event)" />
     </div>
   `
@@ -280,8 +281,10 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
 
   /**
    * A body the IAU gives rotational elements for is turned as it is at the map's date, under its
-   * real Sun, at the rate the map's clock runs (see `bodyPageView`). Any other — an exoplanet, or
-   * Eris, Haumea or Makemake — turns slowly for show, as the page always turned them.
+   * real Sun, at the rate the map's clock runs (see `bodyPageView`). Eris, Haumea, Makemake and
+   * Nereid, whose day is measured but whose pole is not, turn pole up at that day on the same
+   * clock, as the system view turns them; Hyperion, which tumbles, is left still, as it is there.
+   * An exoplanet turns slowly for show, as the page always turned it.
    */
   private tick(deltaSeconds: number): void {
     this.controls?.update();
@@ -292,7 +295,11 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     const sunAzimuth = Math.atan2(SUN_LIGHT_POSITION.x, SUN_LIGHT_POSITION.z);
     if (this.body && bodyPageView(this.body, this.bodies, this.time.julianDate(), sunAzimuth, this.planet.quaternion, this.sunLight.position)) {
       this.sunLight.position.multiplyScalar(SUN_LIGHT_POSITION.length());
-    } else {
+    } else if (this.body?.rotationPeriodHours !== undefined) {
+      // Counted from the orbit's epoch, as `spinFor` counts: where the meridian starts is unknown.
+      const turns = ((this.time.julianDate() - this.body.orbit.epochJd) * 24) / this.body.rotationPeriodHours;
+      this.planet.rotation.set(0, (turns % 1) * 2 * Math.PI, 0);
+    } else if (!this.body) {
       this.planet.rotation.y += deltaSeconds * 0.08;
     }
     const sunSide = this.sunLight.position.y < 0 ? -1 : 1;

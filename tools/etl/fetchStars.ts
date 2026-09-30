@@ -1,10 +1,11 @@
 import { writeFileSync } from 'node:fs';
 
-import { hipparcosDistancePc, mergeStarCatalogues, placementDistancePc } from '../../src/app/shared/astro/star-merge';
+import { foldByIdentity, hipparcosDistancePc, mergeStarCatalogues, placementDistancePc } from '../../src/app/shared/astro/star-merge';
 import { encodeStarCatalog } from '../../src/app/shared/models/star-catalog';
 import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model';
 import { fetchGaiaDistancesByHip, fetchHipparcosParallaxErrors, GaiaAnswerError } from './sources/gaia';
 import { positionalSources } from './sources/registry';
+import { fetchGaiaDesignationsByGj } from './sources/simbad';
 import { PARALLAX_PRECISION_MAS } from './sources/star-sources';
 import { parseCsvObjects, parseOptionalNumber } from './lib/csv';
 import { fetchTextCached } from './lib/http';
@@ -163,9 +164,33 @@ export async function fetchStars(): Promise<StarRecord[]> {
 
   console.log(`  kept ${stars.length} stars (of ${rows.length} in the catalog): ${atGaiaDistance} at Gaia's distance, ${pastCutoff} of them past ${DISTANCE_CUTOFF_PC} pc.`);
 
-  const merged = await mergeWithOtherSources(stars);
+  const { stars: merged, folded } = foldByIdentity(await mergeWithOtherSources(stars), await glieseGaiaDesignations(rows));
+  console.log(`  ${folded} Gliese entries folded into the Gaia source SIMBAD names them as.`);
   merged.sort((a, b) => a.id - b.id);
   return merged;
+}
+
+/** HYG's Gliese designation as SIMBAD writes it: "Gl 734B" is "GJ 734 B". */
+function simbadGliese(gl: string): string {
+  return gl.trim().replace(/^Gl\s+/, 'GJ ').replace(/^(GJ \d+(?:\.\d+)?)\s*([A-Z]+)$/, '$1 $2');
+}
+
+/**
+ * The Gaia DR3 designation SIMBAD gives each HYG star with a Gliese number, by HYG id: what the
+ * merge folds its Gliese-only rows by, and what build.ts checks it did. `rows` are HYG's, read
+ * again from the cache when not given.
+ */
+export async function glieseGaiaDesignations(rows?: Record<string, string>[]): Promise<Map<number, string>> {
+  const hyg = rows ?? parseCsvObjects(await fetchTextCached(HYG_CSV_URL, 'hygdata_v41.csv'));
+  const byGj = await fetchGaiaDesignationsByGj();
+  const designations = new Map<number, string>();
+  for (const row of hyg) {
+    const designation = row['gl'] ? byGj.get(simbadGliese(row['gl'])) : undefined;
+    if (designation) {
+      designations.set(Number(row['id']), designation);
+    }
+  }
+  return designations;
 }
 
 /**

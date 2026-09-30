@@ -200,9 +200,9 @@ re-runs are cheap and offline-friendly; set `ETL_FORCE_REFRESH=1` to bypass the 
 
 | Script | Source | Output |
 | --- | --- | --- |
-| `fetchStars.ts` | HYG database, plus any other positional catalogue wired in (see below) | `stars.bin`, `stars-meta.bin`, `stars-index.json` |
+| `fetchStars.ts` | HYG database, plus any other positional catalogue wired in (see below) | the catalogue stars, handed to `fetchExoplanets.ts` |
 | `fetchSolarSystem.ts` | JPL Horizons / SSD | `bodies.json` |
-| `fetchExoplanets.ts` | NASA Exoplanet Archive (TAP) | `exoplanets.json` |
+| `fetchExoplanets.ts` | NASA Exoplanet Archive (TAP), and the stars above with the hosts it adds | `exoplanets.json`, `stars.bin`, `stars-meta.bin`, `stars-index.json` |
 | `fetchDeepSky.ts` | OpenNGC | `deepsky.json` |
 
 The star catalogue ships as two binary column stores plus a small JSON file, not as an array of

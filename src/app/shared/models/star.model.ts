@@ -35,7 +35,8 @@ export interface StarRecord {
   colorSystem?: 'B-V' | 'BP-RP';
   /**
    * Whether `colorIndex` was read off the dwarf sequence at the star's effective temperature rather
-   * than measured: the 57 archive-placed hosts with a temperature and no B magnitude.
+   * than measured: 54 archive-placed hosts with a temperature and no B or V magnitude. Three more,
+   * whose temperatures are outside the table, have no colour at all.
    */
   colorFromTemperature?: boolean;
   /**

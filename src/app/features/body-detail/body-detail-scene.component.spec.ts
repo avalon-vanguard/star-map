@@ -46,6 +46,8 @@ const MERCURY: BodyRecord = {
   rotationalElements: {poleRaDeg: [281.0103, -0.0328, 0], poleDecDeg: [61.4155, -0.0049, 0], primeMeridianDeg: [329.5988, 6.1385108, 0]}
 };
 const BODIES = [EARTH, SATURN, ERIS, HYPERION, MERCURY];
+// An exoplanet round the Sun's record, which is all the page needs of its host.
+const EXOPLANET: ExoplanetRecord = { id: 'x b', hostStarId: 0, hostStarName: 'Sol', name: 'X b', orbit: { semiMajorAxisAu: 0.05 } };
 
 /** Stands in for the WebGPU engine: a scene, a camera, and the tick hook, driven by hand. */
 class FakeEngineService {
@@ -82,7 +84,7 @@ class FakeDataLoaderService {
     return Promise.resolve(BODIES);
   }
   loadExoplanets(): Promise<ExoplanetRecord[]> {
-    return Promise.resolve([]);
+    return Promise.resolve([EXOPLANET]);
   }
 }
 
@@ -188,6 +190,14 @@ describe('BodyDetailSceneComponent', () => {
     expect(new THREE.Vector3(0, 1, 0).applyQuaternion(page.planet.quaternion).y).toBeCloseTo(1, 12);
   });
 
+  it('turns an exoplanet slowly for show, clock or no clock: the catalogue carries no day for it', async () => {
+    await open('x b');
+    const start = page.planet.rotation.y;
+    // The clock stands; a second of the page's own time is 0.08 radians.
+    engine.tick(1);
+    expect(page.planet.rotation.y - start).toBeCloseTo(0.08, 12);
+  });
+
   it('says on its dock the date the body is drawn for, and nothing at the present, and offers the clock', async () => {
     await open('saturn', '2032-06-01T12:00Z', true);
     fixture.detectChanges();
@@ -228,6 +238,23 @@ describe('BodyDetailSceneComponent', () => {
     // degrees off the middle of the view.
     const toSaturn = new THREE.Vector3().sub(camera.position);
     expect(camera.getWorldDirection(new THREE.Vector3()).angleTo(toSaturn)).toBeLessThan(1e-9);
+  });
+
+  it('opens the next body shown on its own Sun’s side, wherever the reader left the camera: Earth after Saturn in December', async () => {
+    await open('saturn', '2032-12-01T12:00Z');
+    const camera = engine.getCamera();
+    expect(camera.position.y).toBeLessThan(0);
+    // Taken north by the reader, over Saturn's unlit ring face.
+    camera.position.y = 0.6;
+    engine.tick(0.016);
+    expect(camera.position.y).toBeGreaterThan(0);
+
+    route.next(convertToParamMap({ id: 'earth' }));
+    await flushAsync();
+    engine.tick(0.016);
+    // December: Earth's Sun is south, as Saturn's was, so only the side chosen afresh moves the camera.
+    expect(page.sunLight.position.y).toBeLessThan(0);
+    expect(camera.position.y).toBeLessThan(0);
   });
 
   it('leaves the camera on its side while the Sun only grazes the equator: Mercury through two crossings', async () => {

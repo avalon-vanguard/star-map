@@ -75,7 +75,8 @@ const SUN_SIDE_MIN_SINE = Math.sin((3 * Math.PI) / 180);
       <!-- Search, what has been kept and the clock: there is no scene readout here, the info
            panel is the reading, and the panel's own control is what keeps this body. A solar-system
            body is drawn at the clock's date and turns at its rate, so both are shown and can be set
-           here; an exoplanet, whose day no one has measured, turns for show whatever the clock says. -->
+           here; an exoplanet, whose day the catalogue does not carry, turns for show whatever the
+           clock says. -->
       <app-hud-dock [date]="date()" [clock]="true" (bookmarkChosen)="goToBookmark($event)" />
     </div>
   `

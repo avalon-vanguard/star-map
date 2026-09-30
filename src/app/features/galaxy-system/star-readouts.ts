@@ -91,8 +91,8 @@ function radiusReadout(radiusSolar: number, derived: boolean, basis: string): Hu
  * Exoplanet Archive places, which sit at its own distances — a lensing model's for the
  * microlensing hosts among them, OGLE-2005-BLG-390L's 6.6 kpc for one, with no parallax behind it —
  * and the HYG stars neither Hipparcos nor Gaia measured, which sit at the Gliese catalogue's. Those
- * have no published error, and of the 313 on the map before 49 were folded into the Gaia source SIMBAD names
- * them as (264 now), about 154 had a photometric or spectroscopic parallax in CNS3 (Gliese &
+ * have no published error, and of the 313 on the map before 63 were folded into the Gaia source SIMBAD names
+ * them as (250 now), about 154 had a photometric or spectroscopic parallax in CNS3 (Gliese &
  * Jahreiss 1991), none measured: GJ 3522 at 4.46 pc is 1000/224 mas.
  */
 export function positionsNote(stars: readonly StarRecord[]): string {

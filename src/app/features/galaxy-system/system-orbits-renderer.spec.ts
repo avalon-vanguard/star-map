@@ -1,3 +1,6 @@
+/// <reference types="node" />
+
+import { readFileSync } from 'node:fs';
 import * as THREE from 'three/webgpu';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -590,32 +593,17 @@ describe('exoplanet size without a measured radius', () => {
 });
 
 describe('solar-system bodies against Horizons', () => {
-  // Real records from bodies.json, and Horizons' own positions for them (ICRF, AU; heliocentric
-  // for the planets, planet-centred for the moons) at dates across 1950-2100, so the whole path —
-  // mean elements, their rates, the Laplace planes and the scene's frame — is checked against
-  // JPL's ephemeris rather than against itself. Horizons' dates are TDB and the renderer's are the
-  // clock's UT, so each is handed over TT - UT earlier: 69.184 s today, 29 in 1950.
-  const RECORDS: Record<string, Pick<BodyRecord, 'kind' | 'orbit' | 'rates' | 'laplacePole' | 'parentBodyId' | 'massRatio'>> = {
-    earth: {kind: 'planet', orbit: {semiMajorAxisAu: 1.00000018, eccentricity: 0.01673163, inclinationDeg: -0.00054346, longitudeOfAscendingNodeDeg: -5.11260389, argumentOfPeriapsisDeg: 108.04266274, meanAnomalyAtEpochDeg: -2.4631431299999917, epochJd: 2451545}, rates: {meanMotionDegPerDay: 0.9856091187759068, longitudeOfAscendingNodeDegPerDay: -0.000006604751813826146, argumentOfPeriapsisDegPerDay: 0.000015309819575633124, semiMajorAxisAuPerDay: -8.213552361396303e-13, eccentricityPerDay: -1.002327173169062e-9, inclinationDegPerDay: -3.6609938398357287e-7}},
-    jupiter: {kind: 'planet', orbit: {semiMajorAxisAu: 5.20248019, eccentricity: 0.0485359, inclinationDeg: 1.29861416, longitudeOfAscendingNodeDeg: 100.29282654, argumentOfPeriapsisDeg: -86.0178741, meanAnomalyAtEpochDeg: 20.059839080000003, epochJd: 2451545}, rates: {meanMotionDegPerDay: 0.08309113532019165, longitudeOfAscendingNodeDegPerDay: 0.0000035659463381245725, argumentOfPeriapsisDegPerDay: 0.0000014167219712525667, semiMajorAxisAuPerDay: -7.841204654346339e-10, eccentricityPerDay: 4.935249828884326e-9, inclinationDegPerDay: -8.83501711156742e-8, meanAnomalyTerms: {b: -0.00012452, c: 0.0606406, s: -0.35635438, f: 38.35125}}},
-    saturn: {kind: 'planet', orbit: {semiMajorAxisAu: 9.54149883, eccentricity: 0.05550825, inclinationDeg: 2.49424102, longitudeOfAscendingNodeDeg: 113.63998702, argumentOfPeriapsisDeg: -20.778626390000014, meanAnomalyAtEpochDeg: -42.78564733999999, epochJd: 2451545}, rates: {meanMotionDegPerDay: 0.033459683702669406, longitudeOfAscendingNodeDegPerDay: -0.000006848734291581108, argumentOfPeriapsisDegPerDay: 0.000021682266940451745, semiMajorAxisAuPerDay: -8.391512662559891e-10, eccentricityPerDay: -8.773169062286106e-9, inclinationDegPerDay: 1.2374236824093085e-7, meanAnomalyTerms: {b: 0.00025899, c: -0.13434469, s: 0.87320147, f: 38.35125}}},
-    neptune: {kind: 'planet', orbit: {semiMajorAxisAu: 30.06952752, eccentricity: 0.00895439, inclinationDeg: 1.7700552, longitudeOfAscendingNodeDeg: 131.78635853, argumentOfPeriapsisDeg: -85.10477129, meanAnomalyAtEpochDeg: 257.54130563, epochJd: 2451545}, rates: {meanMotionDegPerDay: 0.005981249914852841, longitudeOfAscendingNodeDegPerDay: -1.6599644079397672e-7, argumentOfPeriapsisDegPerDay: 4.4250239561943875e-7, semiMajorAxisAuPerDay: 1.7650924024640657e-9, eccentricityPerDay: 2.2395619438740589e-10, inclinationDegPerDay: 6.132785763175907e-9, meanAnomalyTerms: {b: -0.00041348, c: 0.68346318, s: -0.10162547, f: 7.67025}}},
-    pluto: {kind: 'dwarf', orbit: {semiMajorAxisAu: 39.48686035, eccentricity: 0.24885238, inclinationDeg: 17.1410426, longitudeOfAscendingNodeDeg: 110.30167986, argumentOfPeriapsisDeg: 113.79534612000002, meanAnomalyAtEpochDeg: 14.86832412999999, epochJd: 2451545}, rates: {meanMotionDegPerDay: 0.003974823518959616, longitudeOfAscendingNodeDegPerDay: -2.2176071184120468e-7, argumentOfPeriapsisDegPerDay: -4.3489664613278575e-8, semiMajorAxisAuPerDay: 1.2313511293634495e-7, eccentricityPerDay: 1.6470910335386722e-9, inclinationDegPerDay: 1.3716632443531827e-10, meanAnomalyTerms: {b: -0.01262724, c: 0, s: 0, f: 0}}},
-    moon: {kind: 'moon', orbit: {semiMajorAxisAu: 0.0025695552897999907, eccentricity: 0.0554, inclinationDeg: 5.16, longitudeOfAscendingNodeDeg: 125.08, argumentOfPeriapsisDeg: 318.15, meanAnomalyAtEpochDeg: 135.27, epochJd: 2451545}, rates: {meanMotionDegPerDay: 13.176358, longitudeOfAscendingNodeDegPerDay: -0.052990660396105185, argumentOfPeriapsisDegPerDay: 0.164353223839846}, parentBodyId: 'earth'},
-    io: {kind: 'moon', orbit: {semiMajorAxisAu: 0.0028195588481728304, eccentricity: 0.0041, inclinationDeg: 0.036, longitudeOfAscendingNodeDeg: 43.977, argumentOfPeriapsisDeg: 84.129, meanAnomalyAtEpochDeg: 342.021, epochJd: 2450464.5}, rates: {meanMotionDegPerDay: 203.4889583, longitudeOfAscendingNodeDegPerDay: -0.1328337309120696, argumentOfPeriapsisDegPerDay: -0.6065392513031117}, laplacePole: {raDeg: 268.057, decDeg: 64.495}, parentBodyId: 'jupiter'},
-    europa: {kind: 'moon', orbit: {semiMajorAxisAu: 0.004486026417754354, eccentricity: 0.0094, inclinationDeg: 0.466, longitudeOfAscendingNodeDeg: 219.106, argumentOfPeriapsisDeg: 88.97, meanAnomalyAtEpochDeg: 171.016, epochJd: 2450464.5}, rates: {meanMotionDegPerDay: 101.3747242, longitudeOfAscendingNodeDegPerDay: -0.03265393199600969, argumentOfPeriapsisDegPerDay: -0.7070489837643877}, laplacePole: {raDeg: 268.084, decDeg: 64.506}, parentBodyId: 'jupiter'},
-    titan: {kind: 'moon', orbit: {semiMajorAxisAu: 0.008167663044150534, eccentricity: 0.0288, inclinationDeg: 0.306, longitudeOfAscendingNodeDeg: 28.06, argumentOfPeriapsisDeg: 180.532, meanAnomalyAtEpochDeg: 163.31, epochJd: 2451545}, rates: {meanMotionDegPerDay: 22.5769756, longitudeOfAscendingNodeDegPerDay: -0.001398845136769169, argumentOfPeriapsisDegPerDay: 0.002799120423059061}, laplacePole: {raDeg: 36.214, decDeg: 83.949}, parentBodyId: 'saturn'},
-    triton: {kind: 'moon', orbit: {semiMajorAxisAu: 0.002371417442908832, eccentricity: 0, inclinationDeg: 156.865, longitudeOfAscendingNodeDeg: 177.608, argumentOfPeriapsisDeg: 66.142, meanAnomalyAtEpochDeg: 352.257, epochJd: 2451545}, rates: {meanMotionDegPerDay: 61.2572638, longitudeOfAscendingNodeDegPerDay: 0.001433750844964632, argumentOfPeriapsisDegPerDay: 0.0025509841146658433}, laplacePole: {raDeg: 299.456, decDeg: 43.414}, parentBodyId: 'neptune'},
-    uranus: {kind: 'planet', orbit: {semiMajorAxisAu: 19.18797948, eccentricity: 0.0468574, inclinationDeg: 0.77298127, longitudeOfAscendingNodeDeg: 73.96250215, argumentOfPeriapsisDeg: 98.47154226, meanAnomalyAtEpochDeg: 141.76872184, epochJd: 2451545}, rates: {meanMotionDegPerDay: 0.011731557178644764, longitudeOfAscendingNodeDegPerDay: 0.0000015714439425051334, argumentOfPeriapsisDegPerDay: 9.65718275154004e-7, semiMajorAxisAuPerDay: -5.600273785078713e-9, eccentricityPerDay: -4.2436687200547574e-10, inclinationDegPerDay: -4.932375085557837e-8, meanAnomalyTerms: {b: 0.00058331, c: -0.97731848, s: 0.17689245, f: 7.67025}}},
-    titania: {kind: 'moon', orbit: {semiMajorAxisAu: 0.002916485361445723, eccentricity: 0.0011, inclinationDeg: 0.079, longitudeOfAscendingNodeDeg: 279.771, argumentOfPeriapsisDeg: 284.4, meanAnomalyAtEpochDeg: 24.614, epochJd: 2444239.5}, rates: {meanMotionDegPerDay: 41.3514246, longitudeOfAscendingNodeDegPerDay: -0.005044947168524978, argumentOfPeriapsisDegPerDay: 0.006102004540272753}, laplacePole: {raDeg: 77.311, decDeg: 15.175}, parentBodyId: 'uranus'},
-    charon: {kind: 'moon', orbit: {semiMajorAxisAu: 0.00013095774631236113, eccentricity: 0.0002, inclinationDeg: 0.08, longitudeOfAscendingNodeDeg: 26.928, argumentOfPeriapsisDeg: 146.106, meanAnomalyAtEpochDeg: 131.07, epochJd: 2451545}, rates: {meanMotionDegPerDay: 56.362521, longitudeOfAscendingNodeDegPerDay: -0.00010926638529337138, argumentOfPeriapsisDegPerDay: 0.00009683851540842405}, laplacePole: {raDeg: 132.993, decDeg: -6.163}, parentBodyId: 'pluto', massRatio: 0.1220485755631374},
-    venus: {kind: 'planet', orbit: {semiMajorAxisAu: 0.72332102, eccentricity: 0.00676399, inclinationDeg: 3.39777545, longitudeOfAscendingNodeDeg: 76.67261496, argumentOfPeriapsisDeg: 55.094942169999996, meanAnomalyAtEpochDeg: 50.21215136999999, epochJd: 2451545}, rates: {meanMotionDegPerDay: 1.6021304750882956, longitudeOfAscendingNodeDegPerDay: -0.000007467261875427789, argumentOfPeriapsisDegPerDay: 0.000009022264750171116, semiMajorAxisAuPerDay: -7.118412046543463e-12, eccentricityPerDay: -1.398220396988364e-9, inclinationDegPerDay: 1.1908008213552361e-8}},
-    mars: {kind: 'planet', orbit: {semiMajorAxisAu: 1.52371243, eccentricity: 0.09336511, inclinationDeg: 1.85181869, longitudeOfAscendingNodeDeg: 49.71320984, argumentOfPeriapsisDeg: -73.63065768, meanAnomalyAtEpochDeg: 19.3493162, epochJd: 2451545}, rates: {meanMotionDegPerDay: 0.5240328362061601, longitudeOfAscendingNodeDegPerDay: -0.000007351794934976044, argumentOfPeriapsisDegPerDay: 0.00001973334866529774, semiMajorAxisAuPerDay: 2.6557152635181385e-11, eccentricityPerDay: 2.5048596851471597e-9, inclinationDegPerDay: -1.9842765229295004e-7}},
-    // Mimas and Phobos carry the terms of their IAU W that are motion along the orbit: the Mimas-Tethys
-    // libration and Phobos's tidal acceleration (see `orbitalTermsOfPrimeMeridian`).
-    mimas: {kind: 'moon', orbit: {semiMajorAxisAu: 0.0012402516100785653, eccentricity: 0.0196, inclinationDeg: 1.574, longitudeOfAscendingNodeDeg: 173.027, argumentOfPeriapsisDeg: 332.499, meanAnomalyAtEpochDeg: 14.848, epochJd: 2451545}, rates: {meanMotionDegPerDay: 381.9944948, longitudeOfAscendingNodeDegPerDay: -0.9996209770462032, argumentOfPeriapsisDegPerDay: 1.9992419540924065, meanAnomalyTerms: {b: 0, c: 30.901081394463684, s: -32.50608664008527, f: 506.2}}, laplacePole: {raDeg: 40.589, decDeg: 83.536}, parentBodyId: 'saturn'},
-    phobos: {kind: 'moon', orbit: {semiMajorAxisAu: 0.00006267468885838895, eccentricity: 0.0151, inclinationDeg: 1.075, longitudeOfAscendingNodeDeg: 207.784, argumentOfPeriapsisDeg: 150.057, meanAnomalyAtEpochDeg: 94.2394819925, epochJd: 2433282.5}, rates: {meanMotionDegPerDay: 1128.8444085925948, longitudeOfAscendingNodeDegPerDay: -0.43579001784832494, argumentOfPeriapsisDegPerDay: 0.871002371303956, meanAnomalyTerms: {b: 12.721927969999998, c: 0, s: 0, f: 0}}, laplacePole: {raDeg: 317.671, decDeg: 52.893}, parentBodyId: 'mars'},
-  };
+  // The records the app ships, read from bodies.json, and Horizons' own positions for them (ICRF,
+  // AU; heliocentric for the planets, planet-centred for the moons) at dates across 1950-2100, so the
+  // whole path — the ETL's reading of the mean elements, their rates, the Laplace planes and the
+  // scene's frame — is checked against JPL's ephemeris rather than against itself. A hand copy of the
+  // records stood here, and an ETL that dropped Standish's a, e and i rates or Io's and Europa's
+  // backward periapses passed the whole suite on the data it wrote. Horizons' dates are TDB and the
+  // renderer's are the clock's UT, so each is handed over TT - UT earlier: 69.184 s today, 29 in 1950.
+  const SHIPPED: BodyRecord[] = JSON.parse(readFileSync(`${process.cwd()}/src/assets/data/bodies.json`, 'utf8'));
+  // Mimas and Phobos among them for the terms of their IAU W that are motion along the orbit: the
+  // Mimas-Tethys libration and Phobos's tidal acceleration (see `orbitalTermsOfPrimeMeridian`).
+  const IDS = ['earth', 'jupiter', 'saturn', 'neptune', 'pluto', 'moon', 'io', 'europa', 'titan', 'triton', 'uranus', 'titania', 'charon', 'venus', 'mars', 'mimas', 'phobos'];
   // The IAU WGCCRE 2015 rotational elements bodies.json carries for them, from pck00011.tpc.
   const ROTATION: Record<string, RotationalElements> = {
     venus: {poleRaDeg: [272.76, 0, 0], poleDecDeg: [67.16, 0, 0], primeMeridianDeg: [160.2, -1.4813688, 0]},
@@ -656,10 +644,11 @@ describe('solar-system bodies against Horizons', () => {
   ];
 
   function record(id: string): BodyRecord {
-    return { id, systemStarId: 0, name: id, radiusKm: 1000, orbitSource: 'test', ...RECORDS[id], rotationalElements: ROTATION[id] };
+    const { kind, orbit, rates, laplacePole, parentBodyId, massRatio } = SHIPPED.find((body) => body.id === id)!;
+    return { id, systemStarId: 0, name: id, radiusKm: 1000, orbitSource: 'test', kind, orbit, rates, laplacePole, parentBodyId, massRatio, rotationalElements: ROTATION[id] };
   }
 
-  const renderer = new SystemOrbitsRenderer(Object.keys(RECORDS).map(record), []);
+  const renderer = new SystemOrbitsRenderer(IDS.map(record), []);
 
   for (const [id, jd, x, y, z, maxDeg] of HORIZONS) {
     it(`puts ${id} within ${maxDeg} degrees of Horizons on JD ${jd}`, () => {

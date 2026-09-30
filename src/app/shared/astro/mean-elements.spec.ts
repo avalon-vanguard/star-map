@@ -96,6 +96,13 @@ describe('parsePlanetMeanElements', () => {
     // 35 999.373 degrees a century is the sidereal year.
     expect(360 / rates.meanMotionDegPerDay).toBeCloseTo(365.2564, 4);
     expect(rates.argumentOfPeriapsisDegPerDay * 36525).toBeCloseTo(0.3179526 + 0.24123856, 8);
+    // And every other rate the row gives, a century's worth: dropped, Saturn moved 0.66 degrees by
+    // AD 1 without its node's and 0.36 by AD 3000 without its a, e and i, where no date from 1950 to
+    // 2100 shows more than 0.036.
+    expect(rates.longitudeOfAscendingNodeDegPerDay * 36525).toBeCloseTo(-0.24123856, 8);
+    expect(rates.semiMajorAxisAuPerDay! * 36525).toBeCloseTo(-0.00000003, 8);
+    expect(rates.eccentricityPerDay! * 36525).toBeCloseTo(-0.00003661, 8);
+    expect(rates.inclinationDegPerDay! * 36525).toBeCloseTo(-0.01337178, 8);
   });
 
   it('carries Table 2b’s terms for Jupiter and beyond, and none for the inner planets', () => {

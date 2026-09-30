@@ -7,6 +7,13 @@ import { BookmarksStore } from '../../shared/state/bookmarks.store';
 import { TimeStore } from '../../shared/state/time.store';
 import { DEFAULT_HUD_DISPLAY, HudDisplay, HudDockComponent } from './hud-dock.component';
 
+// jsdom has no matchMedia, which the dock reads once, at import: this one answers from `viewport`.
+const viewport = vi.hoisted(() => {
+  const state = { wide: true };
+  window.matchMedia = (() => ({ get matches() { return state.wide; } })) as unknown as typeof window.matchMedia;
+  return state;
+});
+
 class EmptyDataLoaderService {
   loadStars() {
     return Promise.resolve({ stars: [], positions: new Float32Array(0) });
@@ -427,9 +434,6 @@ describe('HudDockComponent', () => {
       expect(field.min).toBe('0001-01-01T00:00');
       expect(field.max).toBe('3000-01-01T00:00');
       expect(host().querySelector(`#${field.getAttribute('aria-describedby')}`)?.textContent).toContain('AD 1 to AD 3000');
-      // Only the moons and the four dwarf planets from the SBDB are measured against Horizons; Pluto
-      // is on Standish's planet elements, and its card gives their span instead.
-      expect(host().querySelector(`#${field.getAttribute('aria-describedby')}`)?.textContent).toContain('Each moon’s card, and Ceres’s, Eris’s, Haumea’s and Makemake’s, says how far its orbit strays from 1950 to 2100');
     });
 
     it('jumps the clock to the date submitted, read as UTC', () => {
@@ -449,6 +453,25 @@ describe('HudDockComponent', () => {
       fixture.detectChanges();
       expect(time.atNow()).toBe(true);
       expect(host().querySelector<HTMLInputElement>('#clock-date')!.value).toBe(time.date().toISOString().slice(0, 16));
+    });
+
+    it('folds the sheet away on a phone once a date is set, so the system it covered can be seen', () => {
+      viewport.wide = false;
+      try {
+        host().querySelector<HTMLInputElement>('#clock-date')!.value = '2020-12-21T18:00';
+        button('Go').click();
+        fixture.detectChanges();
+        expect(host().querySelector('#dock-panel-display')).toBeNull();
+      } finally {
+        viewport.wide = true;
+      }
+    });
+
+    it('keeps the panel open on a wide screen, where it covers little of the scene', () => {
+      host().querySelector<HTMLInputElement>('#clock-date')!.value = '2020-12-21T18:00';
+      button('Go').click();
+      fixture.detectChanges();
+      expect(host().querySelector('#dock-panel-display')).not.toBeNull();
     });
 
     it('fills the date field again with the clock’s date when the panel is opened again', () => {

@@ -370,7 +370,7 @@ function isWideViewport(): boolean {
                   [max]="clockWindow.max"
                   [value]="dateField()"
                   aria-describedby="clock-date-window"
-                  class="hud-surface px-2.5 py-1 text-sm text-text tabular-nums caret-accent scheme-dark focus:border-accent focus:outline-none"
+                  class="hud-surface min-w-0 flex-1 px-2.5 py-1 text-sm text-text tabular-nums caret-accent scheme-dark focus:border-accent focus:outline-none sm:flex-none"
                 />
                 <button
                   type="submit"
@@ -378,8 +378,10 @@ function isWideViewport(): boolean {
                 >
                   Go
                 </button>
+                <!-- One line: on a phone the panel is a sheet over the system it sets the date of, and
+                     each card already says how far its own orbit strays. -->
                 <p id="clock-date-window" class="w-full text-[10px] text-muted">
-                  AD 1 to AD 3000, where the planets’ and Pluto’s elements hold. Each moon’s card, and Ceres’s, Eris’s, Haumea’s and Makemake’s, says how far its orbit strays from 1950 to 2100.
+                  AD 1 to AD 3000, where the planets’ elements hold.
                 </p>
               </form>
             </section>
@@ -549,6 +551,11 @@ export class HudDockComponent implements OnInit {
       // The field now says what the signal behind it does, so a later reset that fills it with
       // the present is a change the binding writes back, not one it drops as the same value.
       this.dateField.set(field.value);
+      // On a phone the sheet covers the system it has just set the date of: at 360 by 640 every
+      // orbit lies behind it. The thing to look at is now the scene, as after a search.
+      if (!isWideViewport()) {
+        this.activeTab.set(null);
+      }
     }
   }
 

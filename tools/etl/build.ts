@@ -142,9 +142,9 @@ function validateMerge(stars: StarRecord[]): void {
  * Measured on this catalogue: the planets at most 0.10 degrees (Uranus; Standish's own stated
  * error for his fit is 2 000 arcseconds, 0.56 degrees), the moons at most 1.41 (the Moon, whose
  * evection and variation, 1.27 and 0.66 degrees, no mean ellipse has). What this catches is a
- * table read wrongly: a moon read against the ecliptic instead of its Laplace plane, a precession
- * run the wrong way, or a column taken for its neighbour, which put Triton 26 degrees out and Io
- * 0.9.
+ * table read wrongly: a moon read against the ecliptic instead of its Laplace plane, a node run the
+ * wrong way, or a column taken for its neighbour, which put Triton 26 degrees out. Io's periapsis
+ * run forwards put it 0.9 out here, which passes; {@link TRACK_OFFSET_CEILINGS_DEG} catches that.
  */
 const MAX_PLANET_OFFSET_DEG = 0.25;
 /** Measured on this catalogue: at most 0.0151 (Phoebe and the Moon) once Hyperion prints its current 0.105. */
@@ -155,9 +155,11 @@ const DEG_TO_RAD = Math.PI / 180;
 
 /**
  * The moons whose table row cannot come within that on this one date, each with a ceiling just
- * above its offset here; see {@link TRACK_OFFSET_CEILINGS_DEG} for what they reach from 1950 to 2100.
+ * above its offset here (Hyperion 9.41, Iapetus 9.56, Nereid 2.58); see
+ * {@link TRACK_OFFSET_CEILINGS_DEG} for what they reach from 1950 to 2100. Hyperion's was 21, its
+ * worst over twelve dates, which let a row misread by twice its offset through.
  */
-const MOON_OFFSET_CEILINGS_DEG: Record<string, number> = { hyperion: 21, iapetus: 11, nereid: 3 };
+const MOON_OFFSET_CEILINGS_DEG: Record<string, number> = { hyperion: 10, iapetus: 11, nereid: 3 };
 
 /**
  * How far a moon's or dwarf planet's orbit may stray from Horizons from 1950 to 2100, sampled every
@@ -183,12 +185,17 @@ const MOON_OFFSET_CEILINGS_DEG: Record<string, number> = { hyperion: 21, iapetus
  * - Ceres, 7.12 (1953): the SBDB's elements are osculating, exact at 2026 Jun 9 and drifting
  *   either side; 1.9 by 2050, 5.3 by 2100, and 39 at 1600 on Horizons' own figures.
  *
- * And one is held tighter than the rest: Tethys, 0.28, which takes the other half of that
- * libration, 2.23 degrees, from its W. Without it Tethys strays 2.09 degrees, under the general
- * ceiling, and its card would quietly restate itself as "within 2.1".
+ * And three are held tighter than the rest, each where one reading of its row is all that keeps it
+ * close, and without it the card would quietly restate itself under the general ceiling:
+ *
+ * - Tethys, 0.28, which takes the other half of that libration, 2.23 degrees, from its W. Without
+ *   it Tethys strays 2.09.
+ * - Io, 0.07, and Europa, 0.23, whose periapses turn backwards, held by the Laplace resonance at
+ *   2n(Europa) - n(Io), -0.7395 degrees a day (`apsidesRegress`). Read as advancing, Io strays 0.96
+ *   and Europa 2.24, and their cards said "within 1.0" and "within 2.3".
  */
 const MAX_TRACK_OFFSET_DEG = 3;
-const TRACK_OFFSET_CEILINGS_DEG: Record<string, number> = { hyperion: 23, nereid: 12, iapetus: 11, mimas: 8, ceres: 8, tethys: 0.5 };
+const TRACK_OFFSET_CEILINGS_DEG: Record<string, number> = { hyperion: 23, nereid: 12, iapetus: 11, mimas: 8, ceres: 8, tethys: 0.5, io: 0.2, europa: 0.5 };
 
 /**
  * The bodies the IAU WGCCRE 2015 report gives no rotational elements for: Hyperion tumbles, and

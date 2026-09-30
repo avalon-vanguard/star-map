@@ -261,9 +261,9 @@ export function isSameStar(kept: StarRecord, entry: StarRecord): boolean {
  * records, and so does the distance's error: Gaia's, not the Hipparcos one of a distance dropped —
  * unless the other entry's distance is the more precise, as the Hipparcos one of a bright star
  * `placementDistancePc` keeps at it is, which then sets the distance along Gaia's direction.
+ * `described` overrides that choice where an identity settles it (see {@link foldByIdentity}).
  */
-function combine(kept: StarRecord, other: StarRecord): StarRecord {
-  const described = isDesignation(kept) && !isDesignation(other) ? other : kept;
+function combine(kept: StarRecord, other: StarRecord, described = isDesignation(kept) && !isDesignation(other) ? other : kept): StarRecord {
   const otherBetter = other.distanceError !== undefined && kept.distanceError !== undefined && other.distanceError < kept.distanceError;
   const placed = otherBetter ? other : kept;
   const scale = otherBetter ? distanceOf(other) / distanceOf(kept) : 1;
@@ -282,8 +282,10 @@ function combine(kept: StarRecord, other: StarRecord): StarRecord {
 
 /**
  * How far apart in V a Gliese-only entry and the HYG star already on its Gaia entry may be and still
- * be one star. The ten such pairs agree within 0.12 (Gl 251 and HD 265866, 10.01 and 9.89); a
- * companion SIMBAD gives its primary's source differs by magnitudes.
+ * be one star. Of the 14 such folds, 11 agree within 0.12 (Gl 251 and HD 265866, 10.01 and 9.89);
+ * Gl 905.2B, Gl 225.2C and 69 Tau Oph differ by 0.21, 0.45 and 0.47, and on all three SIMBAD puts
+ * the HYG star already there on another source (see {@link foldByIdentity}). A companion SIMBAD gives
+ * its primary's source differs by magnitudes.
  */
 export const IDENTITY_FOLD_MAGNITUDE_TOLERANCE = 0.5;
 
@@ -311,6 +313,14 @@ export function foldsInto(target: StarRecord, entry: StarRecord): boolean {
  * HYG's name and type. Taking the Gliese row's, as {@link combine} would, put CNS3's V at Gaia's
  * distance: GJ 4285 at V 11.45, where its G 13.05 and BP−RP 2.74 give 14.4, drawn five times too
  * luminous, and six stars with no colour lost their temperature and radius, Gl 700.1C among them.
+ *
+ * Unless SIMBAD names the HYG star already there as another source: then HYG hung it on the wrong
+ * one, and the Gliese row is the star that source is, so its description — photometry included —
+ * replaces that one. HIP 117059 is LAWD 93, the white dwarf Gl 905.2B (DA, V 12.94 in SIMBAD), which
+ * HYG labels "Gl 905.2A", M5, V 13.11, B−V 1.55: kept, the white dwarf was drawn as a 3 384 K red
+ * dwarf 15 times its radius. Five of the 63 folds are of this kind, GJ 9490C, Gl 225.2C, 69 Tau Oph
+ * A and HD 65277 (Gl 293.1A) the others; each HYG star SIMBAD puts elsewhere loses its entry,
+ * having no source of its own on the map to carry it.
  */
 export function foldByIdentity(stars: readonly StarRecord[], gaiaDesignationById: ReadonlyMap<number, string>): { stars: StarRecord[]; folded: number } {
   const byDesignation = new Map<string, number>();
@@ -327,8 +337,12 @@ export function foldByIdentity(stars: readonly StarRecord[], gaiaDesignationById
     if (target === undefined || !foldsInto(result[target], star)) {
       return;
     }
+    const describer = gaiaDesignationById.get(result[target].id);
     const { magnitude, magnitudeBand, colorIndex, colorSystem } = result[target];
-    result[target] = { ...combine(result[target], star), magnitude, magnitudeBand, colorIndex, colorSystem };
+    result[target] =
+      describer !== undefined && describer !== designation
+        ? combine(result[target], star, star)
+        : { ...combine(result[target], star), magnitude, magnitudeBand, colorIndex, colorSystem };
     // One star each: a second Gliese row naming the same source is another star SIMBAD has not split.
     byDesignation.delete(designation!);
     folded.add(index);

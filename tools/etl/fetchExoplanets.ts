@@ -1,10 +1,13 @@
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 
-import { buildStarNameIndex, resolveHostStarId } from '../../src/app/shared/astro/host-star-matching';
+import { propagateProperMotion, raDegDecDistanceToXyz } from '../../src/app/shared/astro/coordinates';
+import { ARCHIVE_EPOCH, archiveDistancePc, archiveStarId, buildStarNameIndex, CATALOGUE_EPOCH, resolveHostStarId } from '../../src/app/shared/astro/host-star-matching';
+import { temperatureToColorIndex } from '../../src/app/shared/astro/spectral';
 import { ExoplanetRecord } from '../../src/app/shared/models/exoplanet.model';
+import { isDesignation } from '../../src/app/shared/models/star-catalog';
 import { StarRecord } from '../../src/app/shared/models/star.model';
-import { fetchStars } from './fetchStars';
+import { fetchStars, writeStarAssets } from './fetchStars';
 import { parseCsvObjects, parseOptionalNumber } from './lib/csv';
 import { fetchTextCached } from './lib/http';
 import { dataPath, ensureDataDir } from './lib/paths';
@@ -52,35 +55,140 @@ const IMAGED_URL = `${TAP_BASE_URL}?query=select+pl_name+from+ps+where+default_f
 const IMAGED_CACHE_FILE = `exoplanet-archive-imaged-${createHash('sha1').update(IMAGED_URL).digest('hex').slice(0, 8)}.csv`;
 
 /**
- * Downloads confirmed exoplanets from the NASA Exoplanet Archive (`Planetary Systems` TAP
- * table), cross-references each host star to the HYG index, and writes `exoplanets.json`.
+ * The host's columns from the Planetary Systems Composite table, for the cells a planet's
+ * default row leaves blank and for the columns that query does not ask for.
+ *
+ * The default rows are one reference each, which is what keeps a planet's orbit coherent: its
+ * period, semi-major axis, eccentricity and periastron come from one fit. A composite row takes
+ * each column from wherever it is best measured, so an orbit read from it could pair one paper's
+ * eccentricity with another's argument of periastron; none of its orbital columns are asked for.
+ * Its system columns equal the default rows' wherever both are given (6 225 distances, 6 352
+ * positions, none different). What it adds is 100 of the 127 distances the default rows leave blank,
+ * TRAPPIST-1's seven among them, 870 host masses, and the parallax, photometry and stellar
+ * parameters below — each of which may come from a different reference.
  */
-export async function fetchExoplanets(stars?: StarRecord[]): Promise<ExoplanetRecord[]> {
+const COMPOSITE_COLUMNS = [
+  'pl_name',
+  'ra',
+  'dec',
+  'sy_dist',
+  'sy_plx',
+  'sy_pmra',
+  'sy_pmdec',
+  'sy_bmag',
+  'sy_vmag',
+  'sy_gaiamag',
+  'st_spectype',
+  'st_teff',
+  'st_rad',
+  'st_mass',
+  'st_lum'
+].join(',');
+// pl_name is unique here too, one row per planet.
+const COMPOSITE_URL = `${TAP_BASE_URL}?query=select+${COMPOSITE_COLUMNS}+from+pscomppars+order+by+pl_name&format=csv`;
+const COMPOSITE_CACHE_FILE = `exoplanet-archive-pscomppars-${createHash('sha1').update(COMPOSITE_URL).digest('hex').slice(0, 8)}.csv`;
+/**
+ * The same table's distance errors, for the stars placed from the archive. A query of its own,
+ * cached apart, so that asking for them did not refetch the columns above: the archive changes
+ * daily, and a new answer would have moved every figure the catalogue was checked against.
+ */
+const DISTANCE_ERRORS_URL = `${TAP_BASE_URL}?query=select+pl_name,sy_disterr1,sy_disterr2+from+pscomppars+order+by+pl_name&format=csv`;
+const DISTANCE_ERRORS_CACHE_FILE = `exoplanet-archive-disterr-${createHash('sha1').update(DISTANCE_ERRORS_URL).digest('hex').slice(0, 8)}.csv`;
+
+const ARCHIVE_SOURCE = 'exoplanet-archive';
+/**
+ * The archive's positions are at Gaia DR2's epoch, J2015.5, not the catalogue's J2000 (see
+ * `ARCHIVE_EPOCH`): of the 746 matched hosts moving over 100 mas a year, 741 sit nearer their star
+ * once carried back (a median 0.11″ from it, against 3.47″ as published). The matcher tries both
+ * epochs; a star placed from the archive has to pick one.
+ */
+const ARCHIVE_TO_CATALOGUE_YEARS = CATALOGUE_EPOCH - ARCHIVE_EPOCH;
+/** As in `fetchStars`: faint, for a host the archive gives neither a V nor a G magnitude. */
+const UNKNOWN_MAGNITUDE = 15;
+
+/**
+ * Downloads confirmed exoplanets from the NASA Exoplanet Archive (`Planetary Systems` TAP
+ * table), cross-references each host star to the star catalogue, adds a star from the archive's
+ * own figures for each host the catalogue lacks but the archive places, and writes
+ * `exoplanets.json` together with the star assets, which those additions change. Returns both.
+ */
+export async function fetchExoplanets(stars?: StarRecord[]): Promise<{ exoplanets: ExoplanetRecord[]; stars: StarRecord[] }> {
   console.log('Fetching confirmed exoplanets from the NASA Exoplanet Archive...');
   const knownStars = stars ?? (await fetchStars());
   const nameIndex = buildStarNameIndex(knownStars);
+  const knownById = new Map(knownStars.map((star) => [star.id, star]));
 
   const csv = await fetchTextCached(TAP_URL, CACHE_FILE);
   const rows = parseCsvObjects(csv);
+  const composite = new Map(parseCsvObjects(await fetchTextCached(COMPOSITE_URL, COMPOSITE_CACHE_FILE)).map((row) => [row['pl_name'], row]));
+  const distanceErrors = new Map(parseCsvObjects(await fetchTextCached(DISTANCE_ERRORS_URL, DISTANCE_ERRORS_CACHE_FILE)).map((row) => [row['pl_name'], row]));
   const imaged = new Set(parseCsvObjects(await fetchTextCached(IMAGED_URL, IMAGED_CACHE_FILE)).map((row) => row['pl_name']));
 
   let matched = 0;
+  // Catalogue stars known only by their Gaia designation, which take the archive's host name —
+  // the only way "TRAPPIST-1" or "Teegarden's Star" can be found by search.
+  const renamed = new Map<number, string>();
+  const archiveStars = new Map<string, StarRecord>();
+  const archiveIds = new Set<number>();
+  const bands = { V: 0, G: 0, none: 0 };
   const exoplanets: ExoplanetRecord[] = rows.map((row, index) => {
+    const compositeRow = composite.get(row['pl_name']);
     // `parseOptionalNumber`, not `Number`: a blank cell would otherwise become 0, which is a
     // finite, plausible-looking coordinate rather than the "not measured" it actually means.
-    const raDeg = parseOptionalNumber(row['ra']) ?? Number.NaN;
-    const decDeg = parseOptionalNumber(row['dec']) ?? Number.NaN;
-    const distancePc = parseOptionalNumber(row['sy_dist']) ?? Number.NaN;
-    const pmRaMasPerYear = parseOptionalNumber(row['sy_pmra']);
-    const pmDecMasPerYear = parseOptionalNumber(row['sy_pmdec']);
+    const host = (column: string) => parseOptionalNumber(row[column] || compositeRow?.[column]);
+    const raDeg = host('ra') ?? Number.NaN;
+    const decDeg = host('dec') ?? Number.NaN;
+    const distancePc = archiveDistancePc(host('sy_dist'), host('sy_plx'));
+    const pmRaMasPerYear = host('sy_pmra');
+    const pmDecMasPerYear = host('sy_pmdec');
 
-    const hostStarId = resolveHostStarId(
-      { hostname: row['hostname'], raDeg, decDeg, distancePc, pmRaMasPerYear, pmDecMasPerYear },
+    let hostStarId = resolveHostStarId(
+      { hostname: row['hostname'], raDeg, decDeg, distancePc, pmRaMasPerYear, pmDecMasPerYear, parallaxMas: host('sy_plx') },
       knownStars,
       nameIndex
     );
     if (hostStarId !== null) {
       matched++;
+      const star = knownById.get(hostStarId);
+      if (star?.source === 'gaia' && isDesignation(star) && !renamed.has(hostStarId)) {
+        renamed.set(hostStarId, row['hostname']);
+      }
+    } else if ([raDeg, decDeg, distancePc].every(Number.isFinite) && distancePc > 0) {
+      let archiveStar = archiveStars.get(row['hostname']);
+      if (!archiveStar) {
+        // Carried back from the archive's epoch like any Gaia row, and placed at `sy_dist`.
+        const j2000 = propagateProperMotion(raDeg, decDeg, pmRaMasPerYear ?? 0, pmDecMasPerYear ?? 0, ARCHIVE_TO_CATALOGUE_YEARS);
+        // V where the archive has it, as HYG's stars are; else Gaia's G, the band the catalogue's
+        // Gaia stars are already in.
+        const v = host('sy_vmag');
+        const g = host('sy_gaiamag');
+        const b = host('sy_bmag');
+        const temperatureK = host('st_teff');
+        const band = v !== undefined ? 'V' : g !== undefined ? 'G' : undefined;
+        bands[band ?? 'none']++;
+        // B-V where the archive has both magnitudes, else the effective temperature's; with
+        // neither, null leaves the colour to the spectral type, as for any other star.
+        const colorIndex = b !== undefined && v !== undefined ? b - v : temperatureK !== undefined ? temperatureToColorIndex(temperatureK) : null;
+        // The archive gives the distance's error as two one-sided ones; their mean, relative.
+        const errors = distanceErrors.get(row['pl_name']);
+        const [above, below] = [parseOptionalNumber(errors?.['sy_disterr1']), parseOptionalNumber(errors?.['sy_disterr2'])];
+        archiveStar = {
+          id: archiveStarId(row['hostname'], archiveIds),
+          name: row['hostname'],
+          ...raDegDecDistanceToXyz(j2000.raDeg, j2000.decDeg, distancePc),
+          magnitude: v ?? g ?? UNKNOWN_MAGNITUDE,
+          ...(band === undefined ? {} : { magnitudeBand: band }),
+          spectralType: compositeRow?.['st_spectype'] || 'Unknown',
+          colorIndex,
+          ...(colorIndex === null ? {} : { colorSystem: 'B-V' as const }),
+          ...(colorIndex !== null && (b === undefined || v === undefined) ? { colorFromTemperature: true } : {}),
+          ...(above === undefined || below === undefined ? {} : { distanceError: (Math.abs(above) + Math.abs(below)) / 2 / distancePc }),
+          source: ARCHIVE_SOURCE
+        };
+        archiveStars.set(row['hostname'], archiveStar);
+        archiveIds.add(archiveStar.id);
+      }
+      hostStarId = archiveStar.id;
     }
 
     return {
@@ -96,12 +204,16 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<ExoplanetRe
       // determines the host's gravitational parameter, so keeping it is the difference between
       // propagating a planet at its real rate and pretending every host is the Sun.
       periodDays: parseOptionalNumber(row['pl_orbper']),
-      hostStarMassSolar: parseOptionalNumber(row['st_mass']),
+      hostStarMassSolar: host('st_mass'),
+      hostStarRadiusSolar: host('st_rad'),
+      hostStarTemperatureK: host('st_teff'),
+      // Published as log10(L/L☉).
+      hostStarLuminositySolar: ((logLuminosity) => (logLuminosity === undefined ? undefined : 10 ** logLuminosity))(host('st_lum')),
       // Kept so the cross-reference can be redone without the archive; see the record's own
       // documentation. Undefined rather than NaN, which JSON cannot represent.
-      hostRaDeg: parseOptionalNumber(row['ra']),
-      hostDecDeg: parseOptionalNumber(row['dec']),
-      hostDistancePc: parseOptionalNumber(row['sy_dist']),
+      hostRaDeg: host('ra'),
+      hostDecDeg: host('dec'),
+      hostDistancePc: host('sy_dist'),
       hostPmRaMasPerYear: pmRaMasPerYear,
       hostPmDecMasPerYear: pmDecMasPerYear,
       orbit: {
@@ -113,10 +225,20 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<ExoplanetRe
     };
   });
 
+  // Appended after the catalogue, whose ids all sit below ARCHIVE_ID_BASE, and sorted, so the list
+  // stays in the id order `fetchStars` sorted it into.
+  const added = [...archiveStars.values()].sort((a, b) => a.id - b.id);
+  const allStars = [...knownStars.map((star) => (renamed.has(star.id) ? { ...star, name: renamed.get(star.id)! } : star)), ...added];
+  writeStarAssets(allStars);
+
   ensureDataDir();
   writeFileSync(dataPath('exoplanets.json'), JSON.stringify(exoplanets));
-  console.log(`  wrote ${exoplanets.length} exoplanets (${matched} cross-referenced to a HYG host star).`);
-  return exoplanets;
+  console.log(
+    `  wrote ${exoplanets.length} exoplanets: ${matched} on a catalogue star (${renamed.size} Gaia designations named after their host), ` +
+      `${exoplanets.filter((exoplanet) => exoplanet.hostStarId !== null).length - matched} on ${added.length} stars added from the archive ` +
+      `(${added.filter((star) => Math.hypot(star.x, star.y, star.z) <= 250).length} within 250 pc; magnitude in V for ${bands.V}, in G for ${bands.G}, none for ${bands.none}).`
+  );
+  return { exoplanets, stars: allStars };
 }
 
 if (require.main === module) {

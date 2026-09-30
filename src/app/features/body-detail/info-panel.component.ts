@@ -35,8 +35,10 @@ import { ReadoutSectionsComponent } from './readout-sections.component';
 
       <header class="flex items-start gap-2 px-4 pt-4 pb-3">
         <div class="min-w-0 flex-1">
-          <h1 class="truncate text-lg leading-tight font-bold tracking-[0.04em] text-text uppercase">{{ body().name }}</h1>
-          <p class="type-eyebrow mt-1 truncate text-accent">{{ readouts().kindLabel }} · {{ body().hostStarName }}</p>
+          <!-- Wrapped, not truncated: a designation's last digits are the ones that tell it from its
+               neighbours, and an ellipsis took exactly those off "2MASS J21252752-8138278 b". -->
+          <h1 class="text-lg leading-tight font-bold tracking-[0.04em] wrap-break-word text-text uppercase">{{ body().name }}</h1>
+          <p class="type-eyebrow mt-1 wrap-break-word text-accent">{{ readouts().kindLabel }} · {{ body().hostStarName }}</p>
         </div>
         <button
           type="button"

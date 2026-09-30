@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { BYTES_PER_STAR_META, BYTES_PER_STAR_POSITION, decodeStarCatalog, encodeStarCatalog, isDesignation } from './star-catalog';
 import { StarRecord } from './star.model';
+import { formatDistance } from '../format/quantity';
 
 const STARS: StarRecord[] = [
   { id: 0, name: 'Sol', x: 0, y: 0, z: 0, magnitude: -26.7, spectralType: 'G2V', colorIndex: 0.656 },
@@ -96,6 +97,50 @@ describe('encodeStarCatalog / decodeStarCatalog', () => {
   });
 });
 
+
+describe('the photometry and distance error columns', () => {
+  const MEASURED: StarRecord[] = [
+    { id: 1, name: 'Sirius', x: 1, y: 0, z: 0, magnitude: -1.44, magnitudeBand: 'V', spectralType: 'A0m', colorIndex: 0.009, colorSystem: 'B-V', distanceError: 0.0036, source: 'hyg' },
+    { id: 2, name: 'Gaia DR3 2', x: 0, y: 117, z: 0, magnitude: 11.2, magnitudeBand: 'G', spectralType: 'Unknown', colorIndex: 1.43, colorSystem: 'BP-RP', distanceError: 0.199, distanceFromGaia: true, source: 'gaia' },
+    // A HYG star at Gaia's distance, and one no survey gave a magnitude, a colour or an error.
+    { id: 3, name: 'HD 3', x: 0, y: 0, z: 300, magnitude: 7, magnitudeBand: 'V', spectralType: 'K0', colorIndex: 1.0, colorSystem: 'B-V', distanceError: 1e-12, distanceFromGaia: true, source: 'hyg' },
+    { id: 4, name: 'Gaia DR3 4', x: 5, y: 5, z: 0, magnitude: 12, spectralType: 'Unknown', colorIndex: null, distanceFromGaia: true, source: 'gaia' },
+    // A Hipparcos parallax smaller than its own error.
+    { id: 5, name: 'HIP 5', x: 0, y: 200, z: 0, magnitude: 6, magnitudeBand: 'V', spectralType: 'B8', colorIndex: -0.1, colorSystem: 'B-V', distanceError: 1.4, source: 'hyg' },
+    // An archive host whose B−V is its temperature's.
+    { id: 6, name: 'Kepler-445', x: 0, y: 0, z: 90, magnitude: 17.6, magnitudeBand: 'G', spectralType: 'M4', colorIndex: 1.66, colorSystem: 'B-V', colorFromTemperature: true, source: 'exoplanet-archive' }
+  ];
+  const encoded = encodeStarCatalog(MEASURED);
+  const decoded = decodeStarCatalog(encoded.index, encoded.positions, encoded.meta);
+
+  it('carries the band, which colour the colour index is, and whose parallax the distance is', () => {
+    expect(decoded.map((star) => star.magnitudeBand)).toEqual(['V', 'G', 'V', undefined, 'V', 'G']);
+    expect(decoded.map((star) => star.colorSystem)).toEqual(['B-V', 'BP-RP', 'B-V', undefined, 'B-V', 'B-V']);
+    expect(decoded.map((star) => star.distanceFromGaia)).toEqual([false, true, true, true, false, false]);
+    expect(decoded.map((star) => star.colorFromTemperature)).toEqual([false, false, false, false, false, true]);
+  });
+
+  it('keeps a distance error to within a step at both ends of its range, and none as none', () => {
+    // A step is 0.05 % of distance at Sirius's 0.36 %, and 0.35 % at the 20 % Gaia's cut allows.
+    expect(Math.abs(decoded[0].distanceError! - 0.0036)).toBeLessThan(0.0003);
+    expect(Math.abs(decoded[1].distanceError! - 0.199)).toBeLessThan(0.002);
+    // Too small to round to a step — √(10⁻¹²) is 0.07 of one in 65 535 — but published, so not read
+    // back as unpublished. 10⁻⁶ was, at 255 steps; at 65 535 it rounds to 66 and never needed the floor.
+    expect(decoded[2].distanceError).toBeGreaterThan(0);
+    expect(decoded[3].distanceError).toBeUndefined();
+    // Past the parallax itself there is no upper bound on the distance, which is what 100 % says.
+    expect(decoded[4].distanceError).toBe(1);
+  });
+
+  it('keeps an error close enough that the card prints the published one', () => {
+    // Rigel, 264.55 pc at van Leeuwen's 3.78 ± 0.34 mas: 23.8 pc, which one byte stored as 23.5.
+    const rigel: StarRecord = { id: 7, name: 'Rigel', x: 264.55, y: 0, z: 0, magnitude: 0.18, magnitudeBand: 'V', spectralType: 'B8Ia', colorIndex: -0.03, colorSystem: 'B-V', distanceError: 0.34 / 3.78, source: 'hyg' };
+    const packed = encodeStarCatalog([rigel]);
+    const [kept] = decodeStarCatalog(packed.index, packed.positions, packed.meta);
+    expect(formatDistance(264.55, kept.distanceError)).toBe('265 ± 24 pc');
+    expect(Math.abs(kept.distanceError! / rigel.distanceError! - 1)).toBeLessThan(1e-4);
+  });
+});
 
 describe('star catalogue provenance and derived names', () => {
   const MIXED: StarRecord[] = [

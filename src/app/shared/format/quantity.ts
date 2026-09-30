@@ -9,7 +9,41 @@
 
 /** Distance in parsecs, switching to kiloparsecs where the number would otherwise run long. */
 export function formatParsecs(distancePc: number): string {
-  return distancePc >= 1000 ? `${(distancePc / 1000).toFixed(1)} kpc` : `${distancePc.toFixed(distancePc < 10 ? 2 : 0)} pc`;
+  const { divisor, digits, unit } = parsecScale(distancePc);
+  return `${(distancePc / divisor).toFixed(digits)} ${unit}`;
+}
+
+function parsecScale(distancePc: number): { divisor: number; digits: number; unit: string } {
+  return distancePc >= 1000 ? { divisor: 1000, digits: 1, unit: 'kpc' } : { divisor: 1, digits: distancePc < 10 ? 2 : 0, unit: 'pc' };
+}
+
+/**
+ * A star's distance with its uncertainty, given as a fraction of it: `117 ± 12 pc`, to the
+ * digits the distance itself is shown to. Left off where it is 1 % or less, or would round to
+ * nothing at those digits, since the figure is then already as good as it reads.
+ *
+ * Past a fifth, a range: a distance inverted from a parallax takes the parallax's symmetric error
+ * bar as a lopsided one — Alnilam's 1.65 ± 0.45 mas is 476 to 833 pc, not 606 ± 165. Only a
+ * Hipparcos distance gets there; Gaia's query stops at a fifth. An error as large as the parallax
+ * leaves no upper bound at all.
+ *
+ * Not so where the error is on the distance itself, `onDistance`: the Exoplanet Archive's
+ * sy_disterr1 and 2, one-sided errors in parsecs, of which the catalogue keeps the mean. Many of
+ * those distances are no parallax at all — KMT-2016-BLG-1836L's 7.1 kpc comes from a lensing model
+ * — and read as one they gave 129 cards a range the archive does not: 5.8 to 9.2 kpc there, where
+ * it publishes 7 100 +800 −2 400 pc. They keep the ± at any size.
+ */
+export function formatDistance(distancePc: number, relativeError: number | undefined, onDistance = false): string {
+  if (relativeError === undefined || relativeError <= 0.01) {
+    return formatParsecs(distancePc);
+  }
+  if (relativeError < 0.2 || onDistance) {
+    const { divisor, digits, unit } = parsecScale(distancePc);
+    const error = ((distancePc * relativeError) / divisor).toFixed(digits);
+    return Number(error) === 0 ? formatParsecs(distancePc) : `${(distancePc / divisor).toFixed(digits)} ± ${error} ${unit}`;
+  }
+  const nearest = formatParsecs(distancePc / (1 + relativeError));
+  return relativeError >= 1 ? `${nearest} or more` : `${nearest} to ${formatParsecs(distancePc / (1 - relativeError))}`;
 }
 
 /** Distance in astronomical units, for anything inside a system. */
@@ -62,13 +96,18 @@ export function formatDensity(gramsPerCm3: number): string {
   return `${gramsPerCm3.toFixed(2)} g/cm³`;
 }
 
-/** Bolometric luminosity in solar units, which spans many orders of magnitude. */
+/**
+ * Bolometric luminosity in solar units, which spans many orders of magnitude. Two figures below a
+ * hundredth, as in the ×10ⁿ form below a thousandth: three decimals left one there, and Proxima's
+ * archive luminosity, 1.51×10⁻³ L☉, read 0.002, a third over; 23 of the 4 440 hosts the archive
+ * gives one for read more than 10 % off it.
+ */
 export function formatLuminosity(solar: number): string {
   if (solar >= 1000 || (solar > 0 && solar < 0.001)) {
     const exponent = Math.floor(Math.log10(solar));
     return `${(solar / Math.pow(10, exponent)).toFixed(1)}×10${superscript(exponent)} L☉`;
   }
-  return `${solar.toFixed(solar < 1 ? 3 : 2)} L☉`;
+  return `${solar < 0.01 ? solar.toPrecision(2) : solar.toFixed(solar < 1 ? 3 : 2)} L☉`;
 }
 
 function superscript(value: number): string {

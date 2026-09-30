@@ -16,7 +16,10 @@ function starRecord(id: number, name: string): StarRecord {
 /** Enough "Iot ..." stars to fill the result list ahead of the moon Io, as the real index does. */
 const STARS: StarRecord[] = [
   ...Array.from({ length: 12 }, (_, i) => starRecord(100 + i, `Iot Star ${i}`)),
-  starRecord(1, 'Proxima Centauri')
+  starRecord(1, 'Proxima Centauri'),
+  // As the ETL files a Gaia star: no type, a BP−RP colour; and a star with neither.
+  { ...starRecord(2, 'TRAPPIST-1'), spectralType: 'Unknown', colorIndex: 4.902, colorSystem: 'BP-RP' },
+  { ...starRecord(3, 'KMT-2016-BLG-1107L'), spectralType: 'Unknown', colorIndex: null }
 ];
 
 const IO: BodyRecord = {
@@ -109,6 +112,17 @@ describe('SearchComponent', () => {
     await type('Proxima');
     expect(resultNames()[0]).toBe('Proxima Centauri');
     expect(resultNames()).toContain('Proxima Cen b');
+  });
+
+  it("lists a star by the type its colour gives it where it has none, and never as \"Unknown\"", async () => {
+    const kindLine = (): string => (element.querySelector('[data-testid="search-results"] button span:last-child')?.textContent ?? '').trim();
+    await type('TRAPPIST-1');
+    expect(kindLine()).toBe('Star · ~M8');
+    await type('KMT-2016-BLG-1107L');
+    expect(kindLine()).toBe('Star');
+    // Classified for the rows shown only: over all 455 571 stars, each opening of the tab spent 140-230 ms on it.
+    const index = (fixture.componentInstance as unknown as { index(): { entry: { kind: string; subtitle: string } }[] }).index();
+    expect(index.filter(({ entry }) => entry.kind === 'star').every(({ entry }) => entry.subtitle === '')).toBe(true);
   });
 
   it('shows nothing for a query that matches nothing', async () => {

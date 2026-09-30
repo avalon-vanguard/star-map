@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 
+import { blackbodyColor, effectiveTemperatureK } from '../../shared/astro/stellar';
 import { StarRecord } from '../../shared/models/star.model';
 import { colorIndexToRgb, magnitudeToPointSize, selectDrawnStars, StarFieldRenderer } from './star-field-renderer';
 
@@ -63,9 +64,9 @@ describe('colorIndexToRgb', () => {
     });
 
     it('matches the colour the same spectral type would give explicitly', () => {
-      // K5 sits halfway between the K anchor (0.81) and the M anchor (1.40).
+      // K5's row of the dwarf sequence is at B−V 1.15.
       const derived = colorIndexToRgb(null, 'K5');
-      const explicit = colorIndexToRgb(1.105);
+      const explicit = colorIndexToRgb(1.15);
 
       expect(derived.r).toBeCloseTo(explicit.r, 6);
       expect(derived.g).toBeCloseTo(explicit.g, 6);
@@ -83,6 +84,36 @@ describe('colorIndexToRgb', () => {
       expect(color.g).toBeCloseTo(1, 6);
       expect(color.b).toBeCloseTo(1, 6);
     });
+  });
+
+  it('tints a G dwarf warm, in the colour its own disc is drawn in, and a giant at the temperature its type gives', () => {
+    // G2 V: a blackbody at 5 770 K against D65, (1, 0.878, 0.821). The B−V ramp this replaced was
+    // white at 0.8 and gave it (0.956, 0.969, 1), bluish beside its own disc.
+    const g2 = colorIndexToRgb(0.823, 'Unknown', 'BP-RP');
+    expect(g2.r).toBeGreaterThan(g2.b);
+    expect([g2.r, g2.g, g2.b].map((channel) => channel.toFixed(5))).toEqual(blackbodyColor(5770).map((channel) => channel.toFixed(5)));
+    const antares = { magnitude: 1.06, distancePc: 169.78, spectralType: 'M1Ib + B2.5V', colorIndex: 1.865, colorSystem: 'B-V' } as const;
+    const giant = colorIndexToRgb(antares.colorIndex, antares.spectralType, antares.colorSystem);
+    blackbodyColor(effectiveTemperatureK(antares)!).forEach((channel, i) => expect([giant.r, giant.g, giant.b][i]).toBeCloseTo(channel, 2));
+  });
+
+  it('reads a BP−RP colour as the B−V of the dwarf of that colour, so a type tints alike in either', () => {
+    // G2 V is B−V 0.65 or BP−RP 0.823, M0 V 1.42 or 1.84 (Pecaut & Mamajek).
+    for (const [bMinusV, bpRp] of [[0.65, 0.823], [1.42, 1.84]]) {
+      const [fromBpRp, fromBv] = [colorIndexToRgb(bpRp, undefined, 'BP-RP'), colorIndexToRgb(bMinusV)];
+      expect([fromBpRp.r, fromBpRp.g, fromBpRp.b].map((channel) => channel.toFixed(5))).toEqual([fromBv.r, fromBv.g, fromBv.b].map((channel) => channel.toFixed(5)));
+      expect(colorIndexToRgb(bpRp).b).toBeLessThan(fromBv.b);
+    }
+  });
+
+  it('draws a star measured in BP−RP in that colour', () => {
+    const gaia = star({ id: 5, x: 0, y: 0, z: -10, colorIndex: 1.84, colorSystem: 'BP-RP', spectralType: 'Unknown' });
+    const renderer = new StarFieldRenderer([gaia], packPositions([gaia]), 1);
+    renderer.refocus({ centre: { x: 0, y: 0, z: 0 } });
+    const { colorAttribute } = renderer as unknown as { colorAttribute: THREE.InstancedBufferAttribute };
+    expect(colorAttribute.getZ(0)).toBeCloseTo(colorIndexToRgb(1.42).b, 5);
+    expect(colorAttribute.getZ(0)).toBeCloseTo(blackbodyColor(3850)[2], 5);
+    renderer.dispose();
   });
 
   it('prefers a measured index over the spectral type', () => {
@@ -460,7 +491,7 @@ describe('StarFieldRenderer refocus', () => {
 
     for (let instance = 0; instance < renderer.drawnCount; instance++) {
       const drawnStar = catalogue.find((candidate) => candidate.id === renderer.starIdAt(instance))!;
-      const expected = colorIndexToRgb(drawnStar.colorIndex, drawnStar.spectralType);
+      const expected = colorIndexToRgb(drawnStar.colorIndex, drawnStar.spectralType, drawnStar.colorSystem);
       expect(colorAttribute.getX(instance)).toBeCloseTo(expected.r, 5);
       expect(colorAttribute.getZ(instance)).toBeCloseTo(expected.b, 5);
       expect(sizeAttribute.getX(instance)).toBeGreaterThan(0);

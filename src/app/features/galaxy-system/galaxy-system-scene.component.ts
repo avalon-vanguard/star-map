@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import * as THREE from 'three/webgpu';
+import { normalView, positionViewDirection, texture, uniform } from 'three/tsl';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import {
@@ -19,6 +20,8 @@ import {
   galacticCentrePositionPc,
   galacticToEquatorial,
 } from '../../shared/astro/galaxy';
+import { spectralClassification } from '../../shared/astro/spectral';
+import { blackbodyColor } from '../../shared/astro/stellar';
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { EngineService, SceneCamera } from '../../core/engine/engine.service';
 import { BodyRecord, RotationalElements } from '../../shared/models/body.model';
@@ -33,7 +36,7 @@ import {
   SUN_TEXTURE_PATH,
 } from '../../shared/rendering/texture-catalog';
 import { isDesignation } from '../../shared/models/star-catalog';
-import { StarRecord } from '../../shared/models/star.model';
+import { StarRecord, SUN_STAR_ID } from '../../shared/models/star.model';
 import { Bookmark } from '../../shared/state/bookmarks.store';
 import { NavigationStore, ViewLevel } from '../../shared/state/navigation.store';
 import { TimeStore } from '../../shared/state/time.store';
@@ -42,13 +45,14 @@ import { DeepSkyRenderer } from './deep-sky-renderer';
 import { galacticNormal, PolarGridPlane, TetherField } from './grid-plane';
 import { MilkyWayRenderer } from './milky-way-renderer';
 import {
-  starMarkerRadiusAu,
+  closestApproachAu,
+  NEIGHBOUR_RING_FRACTION,
   SUN_RADIUS_AU,
   systemFrameRadiusAu,
   systemFramingDistanceAu,
   systemViewDirection,
 } from './system-framing';
-import { formatAu, formatLuminosity, formatParsecs } from '../../shared/format/quantity';
+import { formatAu, formatParsecs } from '../../shared/format/quantity';
 import {
   distanceRings,
   formatRoundLength,
@@ -57,7 +61,7 @@ import {
   type ScaleBar,
 } from '../../shared/format/scale-bar';
 import { BodyDetailViewModel } from '../body-detail/body-detail.model';
-import { buildBodyViewModel, luminosityOf } from '../body-detail/body-view-model';
+import { buildBodyViewModel, publishedTemperaturesK, starSurfaceOf, StarSurface } from '../body-detail/body-view-model';
 import {
   DEFAULT_HUD_DISPLAY,
   HudDisplay,
@@ -65,12 +69,11 @@ import {
   HudReadout,
 } from '../hud/hud-dock.component';
 import { RouteRequest, RouteResult, RouteStarOption } from '../hud/routes-panel.component';
-import { buildSearchIndex, IndexedSearchEntry, rankSearchResults } from '../search/search-ranking';
+import { buildSearchIndex, entrySubtitle, IndexedSearchEntry, rankSearchResults } from '../search/search-ranking';
 import { StarmapHudComponent } from './starmap-hud.component';
 import { SystemObjectCardComponent } from './system-object-card.component';
 import { RoutingClient } from './routing-client';
 import {
-  colorIndexToRgb,
   FOCUS_RADIUS_PC,
   StarFieldRenderer,
   starRenderBudgetFromUrl,
@@ -85,11 +88,46 @@ import { JumpLinkRenderer } from './jump-link-renderer';
 import { ReservedBox, ringPlacement } from './label-ring';
 import { LabeledPoint, LabelSide, StarLabelOverlay } from './star-label-overlay';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
+import { catalogueCensus, positionsNote, starReadouts, starSubtitle } from './star-readouts';
 
-/** HYG catalog id for the Sun itself — the only star we have a real close-up photo of. */
-const SOL_STAR_ID = 0;
 /** Radius, in CSS pixels, below which a body in the system view is scaled up to be seen at all. */
 const MIN_MARKER_PIXELS = 3;
+
+/**
+ * What a star nothing gives a radius for is drawn at: 150 km, far under the pixel floor from any
+ * distance the camera can reach, so it is the floor's point, the size of no star in particular.
+ * Drawn at the Sun's radius, PSR J1719-1438 — a neutron star, 10 km across — swallowed the planet
+ * it holds at 0.0044 AU, and Procyon B, a white dwarf of 0.012 R☉, was drawn 81 times too wide.
+ */
+const UNMEASURED_STAR_RADIUS_AU = 1e-6;
+
+/**
+ * The linear limb-darkening coefficient: a star's surface is I(μ) = I(1) (1 − u (1 − μ)) bright,
+ * where μ is the cosine of the angle between the line of sight and the surface normal. The Sun's
+ * is about 0.6 in the visible, so its limb is 40 % as bright as its centre. Taken for every star,
+ * although a hotter star's limb is somewhat brighter and a cooler one's darker.
+ */
+const LIMB_DARKENING = 0.6;
+
+/**
+ * The surface every star is drawn with: the Sun's photograph in grey, in `tint` — the colour of a
+ * blackbody at the star's temperature — and darkened towards the limb. Unlit: it is the source.
+ *
+ * The pattern is the Sun's, standing in for a surface no telescope resolves on another star, at a
+ * contrast turned down to the Sun's own (see `SUN_TEXTURE_PATH`). Its colour was taken out, so
+ * the tint says what colour the star is rather than which filter the Sun was photographed in: the
+ * Sun itself comes out the warm white of 5 772 K, not the pack's orange.
+ *
+ * The tint is a uniform, so every star shares one shader, compiled on the first system entry.
+ */
+function starSurfaceMaterial(tint: THREE.Node<'color'>): THREE.MeshBasicNodeMaterial {
+  const material = new THREE.MeshBasicNodeMaterial();
+  const mu = normalView.dot(positionViewDirection).clamp(0, 1);
+  material.colorNode = texture(loadCachedTexture(SUN_TEXTURE_PATH))
+    .rgb.mul(tint)
+    .mul(mu.sub(1).mul(LIMB_DARKENING).add(1));
+  return material;
+}
 
 /**
  * How far from what the camera is looking at a star can be and still be named, as a fraction of
@@ -183,11 +221,6 @@ const ROUTE_RANGE_CEILING_PC = MAX_JUMP_RANGE_PC;
 
 /** How many neighbouring stars are named from inside a system. */
 const NEIGHBOUR_COUNT = 4;
-/**
- * How far out from the centre of the view a neighbour's name sits, as a fraction of the frame's
- * half-height. Clear of the scale rail at the top and the dock at the bottom.
- */
-const NEIGHBOUR_RING_NDC = 0.74;
 /**
  * How far in front of the camera a neighbour's name is planted, in AU. Any depth projects to
  * the same place on the ring, but not to the same stability: unprojecting at the middle of the
@@ -285,7 +318,6 @@ const GALACTIC_LEVEL_THRESHOLD = 0.5;
 
 const SYSTEM_NEAR_AU = 0.002;
 const SYSTEM_FAR_AU = 20000;
-const SYSTEM_MIN_DISTANCE_AU = 0.05;
 const SYSTEM_MAX_DISTANCE_AU = 5000;
 /** Where the camera lands (AU) immediately after swapping into system space, pre-settle. */
 const SYSTEM_ENTRY_DISTANCE_AU = 200;
@@ -420,8 +452,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private readonly raycaster = new THREE.Raycaster();
   private readonly galaxyGroup = new THREE.Group();
   private readonly systemGroup = new THREE.Group();
-  private readonly starMarkerMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  /** Rebuilt per system, since the star's radius is derived from that system's innermost orbit. */
+  /** The colour of the system's star, set on entering it; see `starSurfaceMaterial`. */
+  private readonly starTint = uniform(new THREE.Color(1, 1, 1));
+  /** One for every star, built on the first system entry, so its pipeline is compiled once. */
+  private starMarkerMaterial?: THREE.MeshBasicNodeMaterial;
+  /** Rebuilt per system, since every star has its own radius. */
   private starMarkerGeometry?: THREE.SphereGeometry;
 
   /** Readout panel contents, refreshed on the same cadence as the labels rather than per frame. */
@@ -494,7 +529,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     return rankSearchResults(index, query, ROUTE_OPTION_COUNT).flatMap((entry) =>
       entry.starId === undefined
         ? []
-        : [{ id: entry.starId, name: entry.name, subtitle: entry.subtitle }],
+        : [{ id: entry.starId, name: entry.name, subtitle: entrySubtitle(entry) }],
     );
   });
   private readonly routeQuery = signal('');
@@ -539,6 +574,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private galacticStrength = 0;
   private labelOverlay?: StarLabelOverlay;
   private stars: readonly StarRecord[] = [];
+  /** The neighbourhood's subtitle: what the catalogue holds, by the catalogue describing it. */
+  private catalogueCensus = '';
+  private positionsNote = '';
   private starsById = new Map<number, StarRecord>();
   private bodies: readonly BodyRecord[] = [];
   private exoplanets: readonly ExoplanetRecord[] = [];
@@ -555,6 +593,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private currentStarId: number | null = null;
   private systemRenderer?: SystemOrbitsRenderer;
   private starMarker?: THREE.Mesh;
+  /** The system's star's radius and temperature, worked out once on entering it. */
+  private currentStarSurface?: StarSurface;
   /** How the star marker is turned: the Sun's IAU elements for the Sun, nothing for any other star. */
   private starRotation?: RotationalElements;
 
@@ -604,9 +644,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.tethers?.dispose();
     this.labelOverlay?.dispose();
     this.systemRenderer?.dispose();
-    (this.starMarker?.material as THREE.Material | undefined)?.dispose();
     this.starMarkerGeometry?.dispose();
-    this.starMarkerMaterial.dispose();
+    this.starMarkerMaterial?.dispose();
     this.engine.dispose();
   }
 
@@ -688,6 +727,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       }),
     ]);
     this.stars = stars;
+    this.catalogueCensus = catalogueCensus(stars);
+    this.positionsNote = positionsNote(stars);
     this.starsById = new Map(stars.map((star) => [star.id, star]));
     this.neighbourhood = new StarNeighbourhood(stars);
     this.routing = new RoutingClient(stars, positions, this.neighbourhood);
@@ -697,7 +738,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         stars.map((star) => ({
           kind: 'star' as const,
           name: star.name,
-          subtitle: star.spectralType,
+          subtitle: '',
+          star,
           starId: star.id,
         })),
       ),
@@ -725,15 +767,17 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       positions,
       starRenderBudgetFromUrl(window.location.search),
       this.starsByBrightness,
+      publishedTemperaturesK(exoplanets),
     );
-    this.hostStars = Uint8Array.from(stars, (star) =>
-      this.starIdsWithBodies.has(star.id) ? 1 : 0,
-    );
+    // Ringed, and drawn ahead of the brightness tier, only inside the survey edge. The 2 883 hosts
+    // past it, 2 878 of them placed by the archive and 916 beyond a kiloparsec, mostly the Kepler
+    // field's, were a band of 1 687 fixed-size rings over the opening view's lower right, on the
+    // 250-350 pc grid labels, and read as neighbours; they still compete for the budget by brightness, and search
+    // still enters them.
+    const ringed = (star: StarRecord): boolean => this.starIdsWithBodies.has(star.id) && Math.hypot(star.x, star.y, star.z) <= SURVEY_EDGE_PC;
+    this.hostStars = Uint8Array.from(stars, (star) => (ringed(star) ? 1 : 0));
     this.galaxyGroup.add(this.starField.object);
-    this.hostRings = new HostStarRings(
-      stars.filter((star) => this.starIdsWithBodies.has(star.id)),
-      HUD_ACCENT,
-    );
+    this.hostRings = new HostStarRings(stars.filter(ringed), HUD_ACCENT);
     this.galaxyGroup.add(this.hostRings.object);
     this.jumpLinks = new JumpLinkRenderer(HUD_ACCENT);
     this.galaxyGroup.add(this.jumpLinks.object);
@@ -1492,7 +1536,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const canvas = this.canvasRef().nativeElement;
     const placed = ringPlacement(
       angle,
-      NEIGHBOUR_RING_NDC,
+      NEIGHBOUR_RING_FRACTION,
       { width: canvas.clientWidth, height: canvas.clientHeight },
       this.reserved,
     );
@@ -1758,23 +1802,15 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       const moonCount = this.bodies.filter(
         (body) => body.systemStarId === star.id && body.parentBodyId,
       ).length;
-      const distancePc = Math.hypot(star.x, star.y, star.z);
-      const luminosity = luminosityOf(star);
       this.hudEyebrow.set('System');
       this.hudTitle.set(star.name);
-      this.hudSubtitle.set(star.spectralType ? `Spectral type ${star.spectralType}` : '');
+      this.hudSubtitle.set(starSubtitle(star));
       this.hudReadouts.set([
         {
           label: 'Bodies',
           value: moonCount > 0 ? `${planetCount} + ${moonCount} moons` : `${planetCount}`,
         },
-        // Suppressed for the Sun rather than printed as `0.00 pc`, which is arithmetically right
-        // and reads as a bug: the distance from here to here is not a measurement.
-        ...(distancePc > 0 ? [{ label: 'Distance', value: formatParsecs(distancePc) }] : []),
-        { label: 'Magnitude', value: star.magnitude.toFixed(2) },
-        ...(luminosity !== null
-          ? [{ label: 'Luminosity', value: formatLuminosity(luminosity), derived: true }]
-          : []),
+        ...starReadouts(star, this.currentStarSurface),
       ]);
       // Where the orbits come from, and for the Sun how far from the present they hold: each
       // body's card names its own source, and for a moon or an SBDB dwarf planet how far it strays from
@@ -1819,7 +1855,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     this.hudEyebrow.set('Solar Neighbourhood');
     this.hudTitle.set('Local Stars');
-    this.hudSubtitle.set('Hipparcos · Yale Bright Star · Gliese');
+    this.hudSubtitle.set(this.catalogueCensus);
     this.hudReadouts.set([
       // Both numbers, because they differ: the catalogue is what the map knows and the first is
       // what it draws. See `STAR_RENDER_BUDGET`.
@@ -1837,9 +1873,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       // The one thing the field itself cannot show: which of those points can be flown into.
       { label: 'Systems', value: `${this.enterableSystems}` },
     ]);
-    this.hudNote.set(
-      'Positions from measured parallaxes. Grid marks the galactic plane through the Sun.',
-    );
+    this.hudNote.set(this.positionsNote);
   }
 
   /** Where the current press started, so a drag can be told apart from a click. */
@@ -1948,7 +1982,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   readonly currentStarOption = computed<RouteStarOption | null>(() => {
     const starId = this.navigationStore.selectedStarId();
     const star = starId === null ? undefined : this.starsById.get(starId);
-    return star ? { id: star.id, name: star.name, subtitle: star.spectralType } : null;
+    return star ? { id: star.id, name: star.name, subtitle: spectralClassification(star) } : null;
   });
 
   onRouteQuery(query: string): void {
@@ -2208,7 +2242,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.systemRenderer?.dispose();
     if (this.starMarker) {
       this.systemGroup.remove(this.starMarker);
-      (this.starMarker.material as THREE.Material).dispose();
     }
 
     const systemBodies = this.bodies.filter((body) => body.systemStarId === star.id);
@@ -2218,58 +2251,54 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // The star's own position is the line of sight to it, which is the plane the archive
     // measures exoplanet inclinations against. The Sun sits at the origin and has no
     // exoplanets, so it has no meaningful direction and the renderer falls back.
-    // The star's luminosity, derived from its own catalogued magnitude and distance, is what
-    // decides how hot each body in the system is — and so what each of them looks like.
-    const hostLuminosity = luminosityOf(star);
+    // Every star at its own radius: the archive's for a planet host, otherwise derived from its
+    // colour and brightness — or a point, for the 2 858 stars with no measured magnitude or with
+    // neither a colour nor a type, which the card then gives no radius. Its temperature is the
+    // colour of its disc and of the light it casts, and its luminosity — the archive's, or else
+    // derived from its magnitude and distance — decides how hot each body in the system is, and
+    // so what each of them looks like.
+    this.currentStarSurface = starSurfaceOf(star, systemExoplanets);
     this.systemRenderer = new SystemOrbitsRenderer(
       systemBodies,
       systemExoplanets,
       { x: star.x, y: star.y, z: star.z },
-      hostLuminosity,
+      this.currentStarSurface.luminositySolar,
+      this.currentStarSurface.temperatureK,
     );
     this.systemGroup.add(this.systemRenderer.object);
     this.applyDisplay(this.display());
 
+    const starRadiusAu = this.currentStarSurface.radiusSolar === null ? UNMEASURED_STAR_RADIUS_AU : this.currentStarSurface.radiusSolar * SUN_RADIUS_AU;
+
     // Framed against the outermost thing drawn — the grid's outer ring, or an eccentric orbit's
-    // aphelion where it runs past it — and against the camera this scene actually has, so the margin holds
-    // whatever the window shape. Computed before the star, because how far away the star will be
-    // seen from is what decides how big its halo has to be to stay visible.
+    // aphelion where it runs past it — or against the star, for a giant wider than both; and
+    // against the camera this scene actually has, so the margin holds whatever the window shape.
     // Framed against the perspective camera whichever is active: the framing distance is what
     // the orthographic frustum is then sized from, so both projections show the same extent.
     const framingCamera = this.engine.getPerspectiveCamera();
-    const viewport = { fovDegrees: framingCamera.fov, aspect: framingCamera.aspect };
+    const canvas = this.canvasRef().nativeElement;
+    const viewport = { fovDegrees: framingCamera.fov, aspect: framingCamera.aspect, shorterSidePx: Math.min(canvas.clientWidth, canvas.clientHeight) };
     const framingDistance = systemFramingDistanceAu(
       this.systemRenderer.outermostRadiusAu,
       viewport,
+      starRadiusAu,
     );
-
-    // The Sun at its own radius; every other star sized against its innermost orbit, which is all
-    // the catalogue supports, and which at least never lets it swallow its own planets.
-    const starRadiusAu =
-      star.id === SOL_STAR_ID
-        ? SUN_RADIUS_AU
-        : starMarkerRadiusAu(this.systemRenderer.minTopLevelSemiMajorAxisAu);
     this.starMarkerGeometry?.dispose();
     this.starMarkerGeometry = new THREE.SphereGeometry(starRadiusAu, 64, 32);
 
-    const starMarkerMaterial = this.starMarkerMaterial.clone();
-    const starColor = colorIndexToRgb(star.colorIndex, star.spectralType);
-    if (star.id === SOL_STAR_ID) {
-      // The Sun is the only star we have (and could ever have) a real photograph of; every
-      // other point in the galaxy view is far too distant to be resolved as a disk.
-      starMarkerMaterial.map = loadCachedTexture(SUN_TEXTURE_PATH);
-      starMarkerMaterial.color.set(0xffffff);
-    } else {
-      starMarkerMaterial.color.copy(starColor);
-    }
+    this.starMarkerMaterial ??= starSurfaceMaterial(this.starTint);
+    // Grey, the photograph's own, where there is no temperature: the Sun's colour would say it is one.
+    const temperatureK = this.currentStarSurface.temperatureK;
+    const [red, green, blue] = temperatureK === null ? [1, 1, 1] : blackbodyColor(temperatureK);
+    this.starTint.value.setRGB(red, green, blue, THREE.LinearSRGBColorSpace);
     // No halo. It was a sprite sized against the arrival frame — 1.12 AU for the Sun — so it
     // stayed put as the camera closed in and ended up filling the screen with the flat gradient
     // that was meant to dress the star, over the photograph underneath it.
-    this.starMarker = new THREE.Mesh(this.starMarkerGeometry, starMarkerMaterial);
+    this.starMarker = new THREE.Mesh(this.starMarkerGeometry, this.starMarkerMaterial);
     // Its pole 115 degrees from the one the IAU gives, and still, until it was turned like a planet.
     // The map's longitudes are Solar System Scope's, not Carrington's, so only the pole and the
     // 25.38-day turn are the Sun's own.
-    this.starRotation = star.id === SOL_STAR_ID ? SUN_ROTATIONAL_ELEMENTS : undefined;
+    this.starRotation = star.id === SUN_STAR_ID ? SUN_ROTATIONAL_ELEMENTS : undefined;
     this.systemGroup.add(this.starMarker);
 
     this.galaxyGroup.visible = false;
@@ -2286,7 +2315,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     depthCamera.near = SYSTEM_NEAR_AU;
     depthCamera.far = SYSTEM_FAR_AU;
     depthCamera.updateProjectionMatrix();
-    this.controls!.minDistance = SYSTEM_MIN_DISTANCE_AU;
+    this.controls!.minDistance = closestApproachAu(starRadiusAu);
     this.controls!.maxDistance = SYSTEM_MAX_DISTANCE_AU;
 
     this.resetZoom();

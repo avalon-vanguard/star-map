@@ -18,7 +18,7 @@ describe('classifyOpenNgcType', () => {
   });
 
   it('groups nebulae, remnants and cluster-with-nebulosity as nebulae', () => {
-    for (const type of ['PN', 'HII', 'EmN', 'RfN', 'Neb', 'DrkN', 'SNR', 'Cl+N']) {
+    for (const type of ['PN', 'HII', 'EmN', 'RfN', 'Neb', 'SNR', 'Cl+N']) {
       expect(classifyOpenNgcType(type)).toBe('nebula');
     }
   });
@@ -34,6 +34,10 @@ describe('classifyOpenNgcType', () => {
     for (const type of ['Dup', 'NonEx', '*', '**', 'Nova', 'Other']) {
       expect(classifyOpenNgcType(type)).toBeNull();
     }
+  });
+
+  it('leaves out a dark nebula, which a sprite that adds light cannot draw', () => {
+    expect(classifyOpenNgcType('DrkN')).toBeNull();
   });
 
   it('rejects missing or unknown types', () => {

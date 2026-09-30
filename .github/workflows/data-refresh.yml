@@ -41,12 +41,17 @@ jobs:
 
       # Gaia DR3 is a frozen release: the same query returns the same bytes (a live re-fetch has
       # reproduced stars.bin exactly), so its responses are carried from one run to the next
-      # rather than re-downloaded every week from an archive that times out under load. The key
-      # follows gaia.ts, where the queries are written, so a changed query is fetched afresh.
+      # rather than re-downloaded every week from an archive that times out under load. So is
+      # van Leeuwen's 2007 Hipparcos reduction, as frozen and on the same archive, whose parallax
+      # errors fetchStars requires: left out, it was fetched live every week, and an ESA outage would
+      # have failed the refresh with every Gaia answer cached. The key follows gaia.ts, where the
+      # queries are written, so a changed query is fetched afresh.
       - uses: actions/cache@v4
         with:
-          path: tools/etl/.cache/gaia-dr3-*.csv
-          key: gaia-dr3-${{ hashFiles('tools/etl/sources/gaia.ts') }}
+          path: |
+            tools/etl/.cache/gaia-dr3-*.csv
+            tools/etl/.cache/hipparcos-errors-*.csv
+          key: gaia-dr3-hipparcos-${{ hashFiles('tools/etl/sources/gaia.ts') }}
 
       # Every other source is fetched live on this fresh runner. A failed fetch fails the run by
       # design — no refresh is better than a partial one. That includes Gaia on a cold cache, by

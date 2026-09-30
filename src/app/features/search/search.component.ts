@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { NavigationStore } from '../../shared/state/navigation.store';
 import { ReticleIconComponent } from '../../shared/ui/reticle-icon.component';
-import { buildSearchIndex, IndexedSearchEntry, rankSearchResults, SearchEntry, SearchResultKind } from './search-ranking';
+import { buildSearchIndex, entrySubtitle, IndexedSearchEntry, rankSearchResults, SearchEntry, SearchResultKind } from './search-ranking';
 
 const MAX_RESULTS = 8;
 const MIN_QUERY_LENGTH = 2;
@@ -66,7 +66,7 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
                     class="flex w-full items-baseline gap-3 border-l border-transparent px-3 py-2 text-left transition-colors hover:border-l-accent hover:bg-accent/8 focus-visible:border-l-accent focus-visible:bg-accent/12 focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
                   >
                     <span class="min-w-0 flex-1 truncate text-sm text-text">{{ result.name }}</span>
-                    <span class="type-label max-w-[45%] shrink-0 truncate text-muted">{{ kindLabel(result.kind) }} · {{ result.subtitle }}</span>
+                    <span class="type-label max-w-[45%] shrink-0 truncate text-muted">{{ kindLabel(result.kind) }}@if (result.subtitle) { · {{ result.subtitle }}}</span>
                   </button>
                 </li>
               }
@@ -107,7 +107,7 @@ export class SearchComponent {
   });
 
   readonly matchTotal = computed(() => this.matches().length);
-  readonly results = computed(() => this.matches().slice(0, MAX_RESULTS));
+  readonly results = computed(() => this.matches().slice(0, MAX_RESULTS).map((entry) => ({ ...entry, subtitle: entrySubtitle(entry) })));
 
   constructor(
     private readonly dataLoader: DataLoaderService,
@@ -153,7 +153,7 @@ export class SearchComponent {
       ]);
 
       const entries: SearchEntry[] = [
-        ...stars.map((star): SearchEntry => ({ kind: 'star', name: star.name, subtitle: star.spectralType, starId: star.id })),
+        ...stars.map((star): SearchEntry => ({ kind: 'star', name: star.name, subtitle: '', star, starId: star.id })),
         ...bodies.map((body): SearchEntry => ({ kind: 'body', name: body.name, subtitle: body.kind, bodyId: body.id })),
         ...exoplanets.map((exoplanet): SearchEntry => ({ kind: 'exoplanet', name: exoplanet.name, subtitle: exoplanet.hostStarName, bodyId: exoplanet.id }))
       ];

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatAu, formatDensity, formatLuminosity, formatMassEarth, formatParsecs, formatPeriod, formatRadiusKm, formatTemperature } from './quantity';
+import { formatAu, formatDensity, formatDistance, formatLuminosity, formatMassEarth, formatParsecs, formatPeriod, formatRadiusKm, formatTemperature } from './quantity';
 
 describe('formatParsecs', () => {
   it('switches to kiloparsecs past a thousand parsecs', () => {
@@ -10,6 +10,33 @@ describe('formatParsecs', () => {
   it('keeps two decimals only while they carry information', () => {
     expect(formatParsecs(1.3)).toBe('1.30 pc');
     expect(formatParsecs(250)).toBe('250 pc');
+  });
+});
+
+describe('formatDistance', () => {
+  it('gives the error to the digits the distance is shown to', () => {
+    expect(formatDistance(117.3, 0.1)).toBe('117 ± 12 pc');
+    expect(formatDistance(4.2, 0.05)).toBe('4.20 ± 0.21 pc');
+    expect(formatDistance(1830, 0.15)).toBe('1.8 ± 0.3 kpc');
+  });
+
+  it('leaves off an error of a per cent or less, or one too small to show', () => {
+    expect(formatDistance(117.3, 0.01)).toBe('117 pc');
+    expect(formatDistance(12, 0.03)).toBe('12 pc');
+    expect(formatDistance(117.3, undefined)).toBe('117 pc');
+  });
+
+  it("gives a range once the error is a fifth of the parallax, and no upper end past all of it", () => {
+    // Alnilam: 1.65 ± 0.45 mas in Hipparcos.
+    expect(formatDistance(606.06, 0.45 / 1.65)).toBe('476 pc to 833 pc');
+    expect(formatDistance(250, 1)).toBe('125 pc or more');
+  });
+
+  it('keeps an error on the distance itself symmetric, however large', () => {
+    // AT2021ueyL: 1 040 +740 −440 pc in the archive, whose mean is 57 % of it.
+    expect(formatDistance(1040, 0.567, true)).toBe('1.0 ± 0.6 kpc');
+    expect(formatDistance(134, 0.319, true)).toBe('134 ± 43 pc');
+    expect(formatDistance(134, 0.005, true)).toBe('134 pc');
   });
 });
 
@@ -76,7 +103,11 @@ describe('formatTemperature and formatDensity', () => {
 describe('formatLuminosity', () => {
   it('stays decimal across the ordinary range', () => {
     expect(formatLuminosity(1)).toBe('1.00 L☉');
-    expect(formatLuminosity(0.0017)).toBe('0.002 L☉');
+    expect(formatLuminosity(0.0017)).toBe('0.0017 L☉');
+    // Proxima's archive figure, which three decimals read as 0.002, a third over.
+    expect(formatLuminosity(0.0015100106)).toBe('0.0015 L☉');
+    expect(formatLuminosity(0.0523)).toBe('0.052 L☉');
+    expect(formatLuminosity(0.523)).toBe('0.523 L☉');
   });
 
   it('goes to powers of ten at the extremes', () => {

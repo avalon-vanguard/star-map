@@ -15,6 +15,30 @@ export interface HostStarQuery {
   /** μα·cos δ in mas/yr, as the archive publishes it (`sy_pmra`); missing means unknown. */
   pmRaMasPerYear?: number;
   pmDecMasPerYear?: number;
+  /**
+   * The archive's parallax in mas (`sy_plx`), a second distance the ratio test accepts. Its
+   * `sy_dist` comes from TICv8 and contradicts its own parallax past the tolerance for 47 of the
+   * 5 959 systems that publish both — Lalande 21185 at 5.68 pc for 392 mas (2.55 pc), Luyten's
+   * Star at 5.92 for 263 mas, Struve 2398 B at 6.84 for 285 — and those three are in the
+   * catalogue, 0.1″ to 9″ from the archive's direction. A second chance rather than a
+   * replacement: past a few hundred parsecs the inverse of a low-S/N parallax is the worse
+   * estimate (K2-238, 538 pc by `sy_dist`, would be 6 779).
+   */
+  parallaxMas?: number;
+}
+
+/**
+ * A host's distance as the archive gives it: `sy_dist`, or where that is blank, the inverse of its
+ * parallax `sy_plx`; `NaN` with neither. mu2 Sco has no `sy_dist` and a 6.31 mas parallax, which
+ * finds Pipirima (HIP 82545) 0.4″ from the archive's direction; left blank, its planet had no star.
+ */
+export function archiveDistancePc(distancePc: number | undefined, parallaxMas: number | undefined): number {
+  return distancePc ?? (parallaxMas !== undefined && parallaxMas > 0 ? 1000 / parallaxMas : Number.NaN);
+}
+
+function distancesAgree(a: number, b: number): boolean {
+  const [near, far] = a < b ? [a, b] : [b, a];
+  return (far - near) / near <= MERGE_DISTANCE_RATIO_TOLERANCE;
 }
 
 /**
@@ -65,15 +89,17 @@ export const HOST_TRANSVERSE_TOLERANCE_PC = 0.01;
 /**
  * The archive does not say which epoch a row's position is for, and they are demonstrably
  * mixed: alf Tau and GJ 273 publish J2000 (the raw position sits under an arcsecond from our
- * star, and carrying it back doubles the error), HD 133131 and TOI-2459 publish Gaia's J2016
- * (the carried-back position lands to 0.1″). So every query is tried at both ends — as
- * published, and carried back sixteen years with the archive's own proper motion — and a star
- * is judged on whichever is closer. Guessing one epoch picks companions: assume J2016 and
- * Aldebaran's planet lands on Gl 171.1B, assume J2000 and GJ 15 A's land on a Gaia entry
- * 15.9″ out.
+ * star, and carrying it back doubles the error), HD 133131 and TOI-2459 publish Gaia DR2's J2015.5
+ * (the carried-back position lands to 0.1″). DR2's, not DR3's J2016, although the archive names
+ * the DR3 source: Barnard's star, Teegarden's Star, TRAPPIST-1 and 66 of the 67 archive-placed
+ * stars moving over 100 mas a year equal their DR2 position to a milliarcsecond and none their
+ * DR3 one. So every query is tried at both ends — as published, and carried back fifteen and a
+ * half years with the archive's own proper motion — and a star is judged on whichever is closer.
+ * Guessing one epoch picks companions: assume the later one and Aldebaran's planet lands on Gl
+ * 171.1B, assume J2000 and GJ 15 A's land on a Gaia entry 15.9″ out.
  */
-const CATALOGUE_EPOCH = 2000.0;
-const ARCHIVE_LATEST_EPOCH = 2016.0;
+export const CATALOGUE_EPOCH = 2000.0;
+export const ARCHIVE_EPOCH = 2015.5;
 
 function knownMotion(masPerYear: number | undefined): number {
   return Number.isFinite(masPerYear) ? (masPerYear as number) : 0;
@@ -125,10 +151,11 @@ export function resolveHostStarId(
     // star would pass the direction test and the last one in array order would win.
     knownMotion(query.pmRaMasPerYear),
     knownMotion(query.pmDecMasPerYear),
-    CATALOGUE_EPOCH - ARCHIVE_LATEST_EPOCH
+    CATALOGUE_EPOCH - ARCHIVE_EPOCH
   );
   const carried = raDegDecDistanceToXyz(carriedBack.raDeg, carriedBack.decDeg, 1);
 
+  const parallaxPc = query.parallaxMas !== undefined && query.parallaxMas > 0 ? 1000 / query.parallaxMas : Number.NaN;
   const minCosine = Math.cos(Math.min(Math.PI, HOST_TRANSVERSE_TOLERANCE_PC / query.distancePc));
   let best: StarRecord | null = null;
   let bestCosine = -2;
@@ -146,8 +173,7 @@ export function resolveHostStarId(
     if (cosine < minCosine || cosine <= bestCosine) {
       continue;
     }
-    const [near, far] = query.distancePc < starDistance ? [query.distancePc, starDistance] : [starDistance, query.distancePc];
-    if ((far - near) / near > MERGE_DISTANCE_RATIO_TOLERANCE) {
+    if (!distancesAgree(query.distancePc, starDistance) && !(parallaxPc > 0 && distancesAgree(parallaxPc, starDistance))) {
       continue;
     }
     best = star;
@@ -155,4 +181,31 @@ export function resolveHostStarId(
   }
 
   return best ? best.id : null;
+}
+
+/**
+ * Where the ids of the stars only the archive places begin: past Gaia's two ranges, and under
+ * the 2^30 `validateStars` holds every id to — which leaves 3.7 million.
+ */
+export const ARCHIVE_ID_BASE = 1_070_000_000;
+const ARCHIVE_ID_RANGE = 2 ** 30 - ARCHIVE_ID_BASE;
+
+/**
+ * The id of a star the ETL places from the archive, from its host's name rather than from its
+ * place in the answer. Numbered in pl_name order, a refresh that added or dropped one host
+ * renumbered every host after it — one row dropped renamed 3 276 of 3 277 ids, and a bookmark kept
+ * on Kepler-186 opened Kepler-1860 — while HYG's and Gaia's ids hold. FNV-1a over the name, into
+ * the range above; a name whose id is taken takes the next free one, the one case a refresh can
+ * still move, and only between the two names that collided.
+ */
+export function archiveStarId(hostname: string, taken: ReadonlySet<number>): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < hostname.length; i++) {
+    hash = Math.imul(hash ^ hostname.charCodeAt(i), 0x01000193) >>> 0;
+  }
+  let offset = hash % ARCHIVE_ID_RANGE;
+  while (taken.has(ARCHIVE_ID_BASE + offset)) {
+    offset = (offset + 1) % ARCHIVE_ID_RANGE;
+  }
+  return ARCHIVE_ID_BASE + offset;
 }

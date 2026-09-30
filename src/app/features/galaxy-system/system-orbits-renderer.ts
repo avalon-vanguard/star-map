@@ -7,6 +7,7 @@ import { bodyTexturePath, loadCachedTexture, saturnRing } from '../../shared/ren
 import { isPropagatableOrbit, keplerRates, meanElementsAt, orbitEllipsePoints, positionAtEpoch, resolveGravitationalParameter, resolveOrbitalElements } from '../../shared/astro/kepler';
 import { CartesianCoordinates, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
 import { tdbFromUtc } from '../../shared/astro/constants';
+import { blackbodyColor, SOLAR_EFFECTIVE_TEMPERATURE_K } from '../../shared/astro/stellar';
 import { BodyRecord, MeanElementRates, OrbitalElements, RotationalElements } from '../../shared/models/body.model';
 import { bodyOrientation, poleFrame } from '../../shared/rendering/body-orientation';
 import { bodyMarkerRadiusAu, systemGridRingsAu } from './system-framing';
@@ -258,12 +259,18 @@ function buildMarker(
  * floor makes for size. What the light does carry truthfully is which side is day: every body
  * shows its lit face toward the star, and the terminator falls where it really falls.
  *
- * White, at π: a Lambertian surface returns intensity / π of its texture where the light falls
- * square on it, so π gives back the photograph itself at the point facing the star, and less
- * towards the limb. A warm tint or a smaller figure darkened the photographs below what they are.
+ * At π: a Lambertian surface returns intensity / π of its texture where the light falls square on
+ * it, so π gives back the photograph itself at the point facing the star, and less towards the
+ * limb. A smaller figure darkened the photographs below what they are.
+ *
+ * In the star's own colour, against the Sun's: the photographs were taken in sunlight, so the
+ * Sun's light is white and gives them back as they are, and another star's shifts them as its
+ * spectrum differs from the Sun's — a 2 566 K M dwarf's is (1, 0.44, 0.10), orange-red, and a
+ * 9 600 K A star's (0.52, 0.67, 1), blue. A star with no temperature is lit as the Sun.
  */
-function starLight(): THREE.PointLight {
+function starLight(temperatureK: number | null | undefined): THREE.PointLight {
   const light = new THREE.PointLight(0xffffff, Math.PI, 0, 0);
+  light.color.setRGB(...blackbodyColor(temperatureK ?? SOLAR_EFFECTIVE_TEMPERATURE_K, SOLAR_EFFECTIVE_TEMPERATURE_K), THREE.LinearSRGBColorSpace);
   light.position.set(0, 0, 0);
   return light;
 }
@@ -364,8 +371,6 @@ export class SystemOrbitsRenderer {
   readonly members: readonly SystemMember[];
   /** Largest semi-major axis (AU) among top-level bodies/exoplanets; 0 if there are none. */
   readonly maxTopLevelSemiMajorAxisAu: number;
-  /** Smallest semi-major axis (AU) among top-level bodies/exoplanets; 0 if there are none. */
-  readonly minTopLevelSemiMajorAxisAu: number;
   /**
    * The plane this system is read against, as a rotation from XY into the scene's equatorial
    * frame: the ecliptic for the solar system, the plane of the sky for everything else.
@@ -416,7 +421,9 @@ export class SystemOrbitsRenderer {
      * system is and therefore what it looks like. Omitted for a host that is not in the star
      * catalogue, leaving its bodies classified on size and density alone.
      */
-    hostLuminositySolar?: number | null
+    hostLuminositySolar?: number | null,
+    /** The host star's effective temperature, which is the colour of the light it casts. */
+    hostTemperatureK?: number | null
   ) {
     const members: SystemMember[] = [];
     const topLevelBodiesById = new Map<string, BodyRecord>();
@@ -427,7 +434,6 @@ export class SystemOrbitsRenderer {
     ].filter(({ axis }) => Number.isFinite(axis) && axis > 0);
     const topLevelAxes = topLevelOrbits.map(({ axis }) => axis);
     this.maxTopLevelSemiMajorAxisAu = topLevelAxes.length > 0 ? Math.max(...topLevelAxes) : 0;
-    this.minTopLevelSemiMajorAxisAu = topLevelAxes.length > 0 ? Math.min(...topLevelAxes) : 0;
 
     for (const body of bodies) {
       if (!body.parentBodyId) {
@@ -525,7 +531,7 @@ export class SystemOrbitsRenderer {
     }
     // The star lights its own system. The star marker itself is unlit — it is the source, not a
     // surface — so nothing here changes how it is drawn.
-    this.object.add(starLight());
+    this.object.add(starLight(hostTemperatureK));
   }
 
   /**

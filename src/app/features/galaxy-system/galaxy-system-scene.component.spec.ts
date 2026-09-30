@@ -16,10 +16,16 @@ import { TimeStore } from '../../shared/state/time.store';
 import { LinkBudget } from '../../shared/astro/jump-links';
 import { HudDisplay } from '../hud/hud-dock.component';
 import { GalaxySystemSceneComponent } from './galaxy-system-scene.component';
+import { normalView, positionViewDirection } from 'three/tsl';
 import { galacticNormal } from './grid-plane';
+import { catalogueCensus, positionsNote } from './star-readouts';
+import { closestApproachAu, SUN_RADIUS_AU, systemFramingDistanceAu } from './system-framing';
+import { blackbodyColor, SOLAR_EFFECTIVE_TEMPERATURE_K } from '../../shared/astro/stellar';
+import { appearanceForExoplanet } from '../../shared/astro/body-appearance';
+import { planetTexture } from '../../shared/rendering/procedural-planet-texture';
+import { loadCachedTexture, SUN_TEXTURE_PATH } from '../../shared/rendering/texture-catalog';
 import { JumpLinkRenderer } from './jump-link-renderer';
 import { StarFieldRenderer } from './star-field-renderer';
-import { systemFramingDistanceAu } from './system-framing';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
 import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
 
@@ -36,8 +42,31 @@ const ALPHA_CENTAURI: StarRecord = { id: 1, name: 'Alpha Centauri', x: 1.34, y: 
 // Its id deliberately differs from its place in STARS, so a lookup by id cannot pass for one by index.
 const PROXIMA: StarRecord = { id: 42, name: 'Proxima Centauri', x: 0, y: 1.3, z: 0, magnitude: 11.1, spectralType: 'M5V', colorIndex: 1.8 };
 
-const STARS: StarRecord[] = [SUN, ALPHA_CENTAURI, PROXIMA];
+// A supergiant nothing publishes a radius for, and a white dwarf with neither a colour nor a type
+// the parser reads, for what the system view draws each star at; last, so the indices above hold.
+const ANTARES: StarRecord = { id: 80519, name: 'Antares', x: -58.54, y: -140.31, z: -75.57, magnitude: 1.06, magnitudeBand: 'V', spectralType: 'M1Ib + B2.5V', colorIndex: 1.865, colorSystem: 'B-V' };
+const PROCYON_B: StarRecord = { id: 37279, name: 'Gl 280B', x: -1.08, y: 3.19, z: 0.34, magnitude: 10.7, magnitudeBand: 'V', spectralType: 'DA', colorIndex: null };
+
+// A host only the archive places, at the stand-in magnitude, with no type and no colour.
+const LENS: StarRecord = { id: 1070000536, name: 'KMT-2016-BLG-1107L', x: 6651, y: 0, z: 0, magnitude: 15, spectralType: 'Unknown', colorIndex: null, source: 'exoplanet-archive' };
+
+const STARS: StarRecord[] = [SUN, ALPHA_CENTAURI, PROXIMA, ANTARES, PROCYON_B, LENS];
 const STAR_POSITIONS = new Float32Array(STARS.flatMap((star) => [star.x, star.y, star.z]));
+
+// Proxima's planet as the archive gives it, with its host's radius, temperature and luminosity.
+const PROXIMA_B: ExoplanetRecord = {
+  id: 'Proxima Cen b',
+  hostStarId: PROXIMA.id,
+  hostStarName: 'Proxima Cen',
+  name: 'Proxima Cen b',
+  hostStarRadiusSolar: 0.141,
+  hostStarTemperatureK: 2900,
+  hostStarLuminositySolar: 0.00151,
+  orbit: { semiMajorAxisAu: 0.0485, eccentricity: 0.02 }
+};
+
+// A microlensing planet, whose host the archive places 6.7 kpc out.
+const LENS_B: ExoplanetRecord = { id: 'KMT-2016-BLG-1107L b', hostStarId: LENS.id, hostStarName: 'KMT-2016-BLG-1107L', name: 'KMT-2016-BLG-1107L b', orbit: {} };
 
 const DEEP_SKY_OBJECT: DeepSkyRecord = {
   id: 'NGC0224',
@@ -166,7 +195,7 @@ class FakeDataLoaderService {
   }
 
   loadExoplanets(): Promise<ExoplanetRecord[]> {
-    return Promise.resolve([]);
+    return Promise.resolve([PROXIMA_B, LENS_B]);
   }
 
   loadDeepSky(): Promise<DeepSkyRecord[]> {
@@ -215,6 +244,12 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     fixture = TestBed.createComponent(GalaxySystemSceneComponent);
     fixture.detectChanges(); // triggers ngAfterViewInit -> bootstrap()
     await flushAsync();
+  });
+
+  it('rings the systems inside the survey edge, and puts them first in the draw budget, not a host kiloparsecs out', () => {
+    const scene = fixture.componentInstance as unknown as { hostRings: { count: number }; hostStars: Uint8Array };
+    expect(scene.hostRings.count).toBe(2);
+    expect([...scene.hostStars]).toEqual(STARS.map((star) => (star === SUN || star === PROXIMA ? 1 : 0)));
   });
 
   it('starts in the galaxy view with the system group hidden', () => {
@@ -276,8 +311,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(refocus).toHaveBeenCalledTimes(1);
       const [focus] = refocus.mock.calls[0];
       expect(focus.view).toBeDefined();
-      // The Sun has Earth, so it is a host; the others have nothing catalogued.
-      expect(Array.from(focus.hosts ?? [])).toEqual([1, 0, 0]);
+      // The Sun has Earth and Proxima its b, so both are hosts; the lens has a planet too, but 6.7 kpc
+      // out, past the survey edge; the others have nothing catalogued.
+      expect(Array.from(focus.hosts ?? [])).toEqual([1, 0, 1, 0, 0, 0]);
     });
 
     it('chooses again once the camera has turned half the margin, and not for less', async () => {
@@ -1041,6 +1077,189 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(component.currentStarId).toBeNull();
     expect(component.systemGroup.visible).toBe(false);
     expect(navigationStore.viewLevel()).toBe('galactic');
+  });
+
+  it('names what the neighbourhood holds, and where the positions of the stars in it come from', async () => {
+    await advanceFrames(engine, 0.3);
+    const component = fixture.componentInstance as unknown as { hudSubtitle(): string; hudNote(): string };
+    expect(component.hudSubtitle()).toBe(catalogueCensus(STARS));
+    expect(component.hudNote()).toBe(positionsNote(STARS));
+    expect(component.hudNote()).toContain('1 planet hosts only the NASA Exoplanet Archive places, from its distances');
+  });
+
+  it('offers a star for a route by its classification, and a star with none by its name alone', () => {
+    const component = fixture.componentInstance as unknown as {
+      starSearchIndex(): { entry: { starId?: number; subtitle: string } }[];
+      routeOptions(): { id: number; subtitle: string }[];
+      onRouteQuery(query: string): void;
+      currentStarOption(): { subtitle: string } | null;
+    };
+    const optionFor = (query: string, id: number): string | undefined => {
+      component.onRouteQuery(query);
+      return component.routeOptions().find((option) => option.id === id)?.subtitle;
+    };
+    expect(optionFor('KMT-2016', LENS.id)).toBe('');
+    expect(optionFor('Proxima', PROXIMA.id)).toBe('M5V');
+    // Classified for the options shown only: the index holds none, where all 455 571 stars cost 140-230 ms at boot.
+    expect(component.starSearchIndex().every(({ entry }) => entry.subtitle === '')).toBe(true);
+    navigationStore.selectStar(LENS.id);
+    expect(component.currentStarOption()?.subtitle).toBe('');
+    navigationStore.selectStar(PROXIMA.id);
+    expect(component.currentStarOption()?.subtitle).toBe('M5V');
+  });
+
+  describe('each star at its own size and in its own colour', () => {
+    type DrawnStar = {
+      starMarkerGeometry: THREE.SphereGeometry;
+      starTint: { value: THREE.Color };
+      controls: { minDistance: number };
+      systemRenderer: { object: THREE.Object3D };
+      hudReadouts(): { label: string; value: string; derived?: boolean }[];
+    };
+
+    async function enter(star: StarRecord): Promise<DrawnStar> {
+      navigationStore.selectStar(star.id);
+      await flushAsync();
+      await advanceFrames(engine, 2.5);
+      return fixture.componentInstance as unknown as DrawnStar;
+    }
+
+    function expectColour(colour: THREE.Color, [red, green, blue]: readonly number[]): void {
+      expect([colour.r, colour.g, colour.b].map((channel) => channel.toFixed(4))).toEqual([red, green, blue].map((channel) => channel.toFixed(4)));
+    }
+
+    it('draws a host at the radius and in the colour the archive gives it, lights its planets in its light, and says how bright it is', async () => {
+      const scene = await enter(PROXIMA);
+      expect(scene.starMarkerGeometry.parameters.radius).toBeCloseTo(0.141 * SUN_RADIUS_AU, 12);
+      expectColour(scene.starTint.value, blackbodyColor(2900));
+      const light = scene.systemRenderer.object.children.find((child): child is THREE.PointLight => child instanceof THREE.PointLight)!;
+      expectColour(light.color, blackbodyColor(2900, SOLAR_EFFECTIVE_TEMPERATURE_K));
+      expect(scene.hudReadouts().find((readout) => readout.label === 'Luminosity')).toEqual({ label: 'Luminosity', value: '0.0015 L☉' });
+      expect(scene.hudReadouts().find((readout) => readout.label === 'Radius')?.value).toBe('0.141 solar radii');
+    });
+
+    it("draws the disc as the Sun's photograph in the star's colour, darkened towards the limb", async () => {
+      // The disc's parts, read off the material's node graph: the tint the star's temperature sets
+      // and the photograph, times the limb factor, which is worked out below at a few angles.
+      // Checking only that 0.6 was somewhere in the graph passed a limb brighter than the centre.
+      const scene = await enter(PROXIMA);
+      const colorNode = (scene as unknown as { starMarkerMaterial: THREE.MeshBasicNodeMaterial }).starMarkerMaterial.colorNode!;
+      const nodes = new Set<THREE.Node>();
+      const walk = (node: THREE.Node): void => {
+        if (!nodes.has(node)) {
+          nodes.add(node);
+          for (const child of node.getChildren()) {
+            walk(child);
+          }
+        }
+      };
+      walk(colorNode);
+      const values = [...nodes].map((node) => (node as { value?: unknown }).value);
+      expect(values).toContain(scene.starTint.value);
+      expect(values).toContain(loadCachedTexture(SUN_TEXTURE_PATH));
+
+      // The factor the photograph is multiplied by, as the shader computes it where the cosine
+      // between the surface normal and the line of sight is `cosine`. Only the operations a limb
+      // law is written with are known; anything else fails rather than being guessed at.
+      type Graph = { isConstNode?: boolean; isVarNode?: boolean; value?: number; op?: string; method?: string; node: Graph; aNode: Graph; bNode: Graph; cNode: Graph };
+      const factorAt = (node: Graph, cosine: number): number => {
+        const at = (child: Graph): number => factorAt(child, cosine);
+        if (node.isVarNode) {
+          return at(node.node);
+        }
+        if (node.isConstNode) {
+          return node.value!;
+        }
+        switch (node.op ?? node.method) {
+          case '+': return at(node.aNode) + at(node.bNode);
+          case '-': return at(node.aNode) - at(node.bNode);
+          case '*': return at(node.aNode) * at(node.bNode);
+          case 'oneMinus': return 1 - at(node.aNode);
+          case 'negate': return -at(node.aNode);
+          case 'clamp': return Math.min(at(node.cNode), Math.max(at(node.bNode), at(node.aNode)));
+          case 'dot':
+            expect(node.aNode).toBe(normalView);
+            expect(node.bNode).toBe(positionViewDirection);
+            return cosine;
+          default: throw new Error(`the limb factor has an operation the test cannot work out: ${node.op ?? node.method}`);
+        }
+      };
+      // The graph is (photograph × tint) × factor, each step held in a variable.
+      const factor = (colorNode as unknown as Graph).node.bNode;
+      // The Sun's linear law, 1 − 0.6 (1 − μ): the centre at full brightness, the limb at 40 %, and
+      // past the silhouette, where the normal turns away, no darker than the limb.
+      expect(factorAt(factor, 1)).toBeCloseTo(1, 12);
+      expect(factorAt(factor, 0.5)).toBeCloseTo(0.7, 12);
+      expect(factorAt(factor, 0)).toBeCloseTo(0.4, 12);
+      expect(factorAt(factor, -0.3)).toBeCloseTo(0.4, 12);
+    });
+
+    it('tints a host in the star field the colour its disc is drawn in, at the temperature the archive gives it', async () => {
+      // Proxima's B−V 1.8 reads 3 070 K; its disc is drawn at the archive's 2 900.
+      const scene = await enter(PROXIMA);
+      const field = (scene as unknown as { starField: { catalogueColors: Float32Array } }).starField.catalogueColors;
+      const at = STARS.indexOf(PROXIMA) * 3;
+      const disc = scene.starTint.value;
+      expect([field[at], field[at + 1], field[at + 2]].map((channel) => channel.toFixed(4))).toEqual([disc.r, disc.g, disc.b].map((channel) => channel.toFixed(4)));
+    });
+
+    it("warms a host's planets by the luminosity the archive gives it, in the system as on their own page", async () => {
+      const scene = await enter(PROXIMA);
+      const planet = (scene.systemRenderer as unknown as { members: { id: string; marker: THREE.Mesh }[] }).members.find((member) => member.id === PROXIMA_B.id)!;
+      // The archive's 1.51×10⁻³ L☉ puts b at 228 K, temperate. The fixture has no measured band, so
+      // without it b gets no temperature and another class, as it does in the Sun's light.
+      const warmed = appearanceForExoplanet(PROXIMA_B, 0.00151);
+      expect(warmed.planetClass).not.toBe(appearanceForExoplanet(PROXIMA_B, null).planetClass);
+      expect(warmed.planetClass).not.toBe(appearanceForExoplanet(PROXIMA_B, 1).planetClass);
+      expect((planet.marker.material as THREE.MeshStandardMaterial).map).toBe(planetTexture(warmed, { width: 128, height: 64 }));
+    });
+
+    it('keeps the camera three radii out from a supergiant drawn at the radius its type and brightness give', async () => {
+      const scene = await enter(ANTARES);
+      const radius = scene.starMarkerGeometry.parameters.radius;
+      // 410 R☉, 1.9 AU, at M1's 3 730 K: short of the 680 Ohnaka et al. (2013) measure, whose
+      // luminosity is 0.4 dex above what V gives at the catalogue's distance.
+      expect(radius / SUN_RADIUS_AU).toBeGreaterThan(350);
+      expect(radius / SUN_RADIUS_AU).toBeLessThan(480);
+      expect(scene.controls.minDistance).toBeCloseTo(closestApproachAu(radius), 9);
+      expect(scene.controls.minDistance).toBeGreaterThan(5);
+      // Settled where its disc stays inside the ring of its neighbours' names, not pressed up to it.
+      expect(engine.getCamera().position.length()).toBeGreaterThan(1.2 * scene.controls.minDistance);
+    });
+
+    it("frames a supergiant on a phone by the canvas's own size, so its neighbours' names stay off its disc", async () => {
+      // A 390x844 canvas: framed as on a desktop, at half the half-side, the disc reached 98 px
+      // from the centre and the names hung in from their ring came to 70.
+      const canvas = (fixture.nativeElement as HTMLElement).querySelector('canvas')!;
+      Object.defineProperty(canvas, 'clientWidth', { value: 390 });
+      Object.defineProperty(canvas, 'clientHeight', { value: 844 });
+      const scene = await enter(ANTARES);
+      const camera = engine.getPerspectiveCamera();
+      const gridOuterRadiusAu = (scene.systemRenderer as unknown as { gridOuterRadiusAu: number }).gridOuterRadiusAu;
+      const radius = scene.starMarkerGeometry.parameters.radius;
+      const onPhone = systemFramingDistanceAu(gridOuterRadiusAu, { fovDegrees: camera.fov, aspect: camera.aspect, shorterSidePx: 390 }, radius);
+      expect(onPhone).toBeGreaterThan(1.5 * systemFramingDistanceAu(gridOuterRadiusAu, { fovDegrees: camera.fov, aspect: camera.aspect }, radius));
+      expect(engine.getCamera().position.length()).toBeCloseTo(onPhone, 6);
+    });
+
+    it('frames it by the shorter side on a phone held sideways too', async () => {
+      // 844x390: framed by the width, the disc took the desktop's half again, 8.49 AU out, not 14.97.
+      const canvas = (fixture.nativeElement as HTMLElement).querySelector('canvas')!;
+      Object.defineProperty(canvas, 'clientWidth', { value: 844 });
+      Object.defineProperty(canvas, 'clientHeight', { value: 390 });
+      const scene = await enter(ANTARES);
+      const camera = engine.getPerspectiveCamera();
+      const gridOuterRadiusAu = (scene.systemRenderer as unknown as { gridOuterRadiusAu: number }).gridOuterRadiusAu;
+      const radius = scene.starMarkerGeometry.parameters.radius;
+      expect(engine.getCamera().position.length()).toBeCloseTo(systemFramingDistanceAu(gridOuterRadiusAu, { fovDegrees: camera.fov, aspect: camera.aspect, shorterSidePx: 390 }, radius), 6);
+    });
+
+    it('draws a star nothing gives a size or temperature for as a grey point, not as the Sun', async () => {
+      const scene = await enter(PROCYON_B);
+      expect(scene.starMarkerGeometry.parameters.radius).toBeLessThan(SUN_RADIUS_AU / 1000);
+      expectColour(scene.starTint.value, [1, 1, 1]);
+      expect(scene.hudReadouts().some((readout) => readout.label === 'Radius')).toBe(false);
+    });
   });
 
   it('ignores a new selection while a transition is already in flight, then resolves to the latest requested star once idle', async () => {

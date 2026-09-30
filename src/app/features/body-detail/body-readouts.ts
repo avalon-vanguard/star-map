@@ -79,6 +79,12 @@ export function bodyReadouts(body: BodyDetailViewModel): BodyReadouts {
  * The derived surface is a reasoned illustration, and a panel of real measurements sitting next
  * to it is exactly the context in which it could be mistaken for another one.
  *
+ * With no temperature, it says what is missing without claiming which: the host's luminosity, or
+ * the orbit's size. It used to say the host was not in the catalogue, which is so for 27 of the
+ * 2 714 planets it was printed on. Of the rest, 2 420 have no semi-major axis, and since 869635b
+ * 267 have a host no survey measured the brightness of — OGLE-2005-BLG-390L b, read inside its
+ * own host's system.
+ *
  * A moon or dwarf planet drawn this way has been imaged — Voyager 2 photographed Uranus's five
  * large moons, Proteus and Nereid, Cassini Hyperion, and Hubble sees Eris, Haumea and Makemake as
  * points — but has no global map this app can use. So have the hundred or so exoplanets the
@@ -98,6 +104,6 @@ function provenanceFor(body: BodyDetailViewModel): string {
         ? 'it has been imaged only as a point of light beside its star, and no map of it is used here'
         : 'no image of this world exists';
   return body.appearance.equilibriumTemperatureK === null
-    ? `Surface illustrated from this body’s measured size and mass. Its host star is not in the catalogue, so no temperature could be derived. Not an observation — ${why}.`
+    ? `Surface illustrated from this body’s measured size and mass. No temperature could be derived: its star’s luminosity or its orbit’s size is not known. Not an observation — ${why}.`
     : `Surface illustrated from the measurements above — size, density and the temperature derived from its star’s output and its orbit. Not an observation — ${why}.`;
 }

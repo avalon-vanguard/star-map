@@ -72,15 +72,19 @@ instead of having to be inferred from a shape in space. The camera frames that g
 the orbits, from the field of view it actually has, so the outermost ring sits inside the frame
 with room around it at any system scale and any window shape.
 
-The star at the centre is sized against the system's *innermost* orbit, so it can never swallow
-its closest planet, while the camera is placed to frame the *outermost* ring — and in the solar
-system those differ by a factor of a hundred. At the distance that fits Pluto in view, a disc
-that stays clear of Mercury is about a pixel across, and no radius satisfies both. So the disc
-stays honest to the orbits and the star's halo carries its visibility, floored against the framed
-radius: light is not a surface, and a glow reaching past the innermost orbit says the star is
-bright rather than that it is large. That floor is bounded from both sides — large enough that
-the star reads at a glance, small enough that Venus's and Earth's orbits stay legible as rings
-around it. Mercury's, three pixels wide at that range, does not survive either way.
+The star at the centre is drawn at its own radius, to the same scale as its orbits: the
+archive's measured radius for a planet host, and otherwise one derived from its luminosity and
+temperature (Stefan-Boltzmann), which the card marks with what the temperature came from: "from
+colour and brightness", "from its type and brightness" for a giant or a star whose colour the
+dwarf table does not read, or "from its temperature and brightness" for an archive host whose
+colour was read off its temperature. Its surface is a limb-darkened disc in the colour of a
+blackbody at its temperature, and its planets are lit
+in that colour, relative to the Sun's, so the solar system's photographs stay as they were
+taken. A star nothing gives a size or a temperature for is a grey point. Like every marker, the
+disc is never drawn smaller than three pixels, so a red dwarf framed with its outermost orbit
+still shows; there is no halo. The camera comes no closer to its centre than 0.05 AU or three of
+its radii, whichever is further, and a giant is framed far enough back that its disc stays
+inside the ring its neighbours' names are drawn on.
 
 ![51 Pegasi b: a surface derived from its measured mass, orbit and host-star luminosity, beside the figures it was derived from](docs/screenshots/body-detail.jpg)
 
@@ -212,16 +216,18 @@ re-runs are cheap and offline-friendly; set `ETL_FORCE_REFRESH=1` to bypass the 
 
 | Script | Source | Output |
 | --- | --- | --- |
-| `fetchStars.ts` | HYG database, plus any other positional catalogue wired in (see below) | `stars.bin`, `stars-meta.bin`, `stars-index.json` |
+| `fetchStars.ts` | HYG database, plus any other positional catalogue wired in (see below) | the catalogue stars, handed to `fetchExoplanets.ts` |
 | `fetchSolarSystem.ts` | JPL SSD mean elements (Standish's planets, the satellite table), the Small-Body Database, NAIF's PCK, JPL Horizons | `bodies.json` |
-| `fetchExoplanets.ts` | NASA Exoplanet Archive (TAP) | `exoplanets.json` |
+| `fetchExoplanets.ts` | NASA Exoplanet Archive (TAP), and the stars above with the hosts it adds | `exoplanets.json`, `stars.bin`, `stars-meta.bin`, `stars-index.json` |
 | `fetchDeepSky.ts` | OpenNGC | `deepsky.json` |
 
 The star catalogue ships as two binary column stores plus a small JSON file, not as an array of
 objects. At 68 388 stars the old encoding — one JSON object per star, its eight key names
 repeated each time — would have been about 17 MB to download and parse before the first frame.
 Splitting it puts the numbers in `stars.bin` (positions, handed to the GPU verbatim) and
-`stars-meta.bin` (id, magnitude, colour index, spectral-type index), and leaves `stars-index.json`
+`stars-meta.bin` (id, magnitude, colour index, spectral-type index, the distance's relative
+error in two bytes, and the band and colour system those were measured in or whether the colour
+was read off a temperature), and leaves `stars-index.json`
 holding only the strings, with the ~2 600 distinct spectral classifications collapsed into a
 dictionary. The result is 2.6 MB for 7.8× the stars. `star-catalog.ts` defines the layout once
 and both the ETL and the app use it, so the writer and the reader cannot drift apart.
@@ -294,8 +300,8 @@ So deep-sky records store a **unit direction** on the celestial sphere rather th
 the line of sight is always known precisely, and the objects are drawn as a fixed-radius
 backdrop shell where true distance would be unusable anyway. `distancePc` is optional metadata,
 derived from parallax for galactic objects or the Hubble law for genuinely distant galaxies,
-and left `null` — with its `distanceMethod` — whenever neither is trustworthy. Roughly 330 of
-the 463 cataloged objects get a distance; the rest honestly report none.
+and left `null` — with its `distanceMethod` — whenever neither is trustworthy. 340 of
+the 488 cataloged objects get a distance; the rest honestly report none.
 
 ## Layout
 

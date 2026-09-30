@@ -28,8 +28,8 @@ export interface BodyDetailViewModel {
   /**
    * What this world is inferred to look like, and the quantities that inference rests on. Always
    * present — every body has measurements enough to place it somewhere — but its individual
-   * fields are nullable, since a body whose host star is not in the catalogue has no derived
-   * temperature.
+   * fields are nullable, since a body whose host star's luminosity or whose orbit's size is not
+   * known has no derived temperature.
    */
   appearance: PlanetAppearance;
   /** True when a real photograph is being shown rather than the derived surface. */

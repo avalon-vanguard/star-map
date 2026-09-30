@@ -54,7 +54,16 @@ const BODY_TEXTURE_PATHS: Record<string, string> = {
   charon: 'assets/textures/bodies/charon.jpg'
 };
 
-/** The Sun isn't a `BodyRecord` (it's the system's star marker), so it's looked up separately. */
+/**
+ * The Sun's surface, which every star's disc in the system view is drawn with, tinted to its own
+ * colour. Baked from the pack's 2048 by 1024 map (822 427 bytes) to 1024 by 512 in grey (31 306):
+ * the Sun reaches 216 px across at its closest approach on a 1080-line screen, and a sphere shows
+ * π times its diameter of the map round its equator, so this covers it to a 1440-line one. The
+ * tint supplies the colour. The map's brightness varied by 56 % rms, a mottled rock rather than a
+ * star; it is rescaled to 14 % rms about the display's white, of the order of the Sun's own
+ * granulation contrast, and the brighter half clipped there as in a photograph exposed for the
+ * disc, which leaves 6 %. Not a `BodyRecord`, so it is looked up separately.
+ */
 export const SUN_TEXTURE_PATH = 'assets/textures/bodies/sun.jpg';
 export const SATURN_RING_TEXTURE_PATH = 'assets/textures/bodies/saturn_ring.png';
 export const MILKY_WAY_SKYBOX_PATH = 'assets/textures/skybox/milkyway.jpg';

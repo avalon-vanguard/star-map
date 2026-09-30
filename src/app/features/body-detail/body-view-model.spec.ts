@@ -1,9 +1,13 @@
+/// <reference types="node" />
+
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { BodyRecord, OrbitalElements } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord, SUN_STAR_ID } from '../../shared/models/star.model';
-import { buildBodyViewModel, heliocentricPeriodDays } from './body-view-model';
+import { bodyReadouts } from './body-readouts';
+import { buildBodyViewModel } from './body-view-model';
 
 const orbit = (overrides: Partial<OrbitalElements> = {}): OrbitalElements => ({
   semiMajorAxisAu: 1,
@@ -34,6 +38,9 @@ const earth: BodyRecord = {
   kind: 'planet',
   radiusKm: 6371,
   orbit: orbit(),
+  // Standish's mean longitude rate, 35 999.373 degrees a century.
+  rates: { meanMotionDegPerDay: 35999.37306329 / 36525, longitudeOfAscendingNodeDegPerDay: 0, argumentOfPeriapsisDegPerDay: 0 },
+  orbitSource: 'JPL approximate mean elements (Standish), fit for 3000 BC to AD 3000',
 };
 const luna: BodyRecord = {
   id: 'luna',
@@ -43,45 +50,74 @@ const luna: BodyRecord = {
   radiusKm: 1737,
   parentBodyId: 'earth',
   orbit: orbit({ semiMajorAxisAu: 0.00257 }),
+  // JPL SSD's sidereal mean motion for the Moon.
+  rates: { meanMotionDegPerDay: 13.176358, longitudeOfAscendingNodeDegPerDay: -0.05299, argumentOfPeriapsisDegPerDay: 0.16435 },
+  orbitSource: 'JPL SSD satellite mean elements, epoch 2000 Jan 1',
 };
-
-describe('heliocentricPeriodDays', () => {
-  it('recovers a known period from the semi-major axis alone', () => {
-    // P² = a³ in these units, so Earth must come back a year.
-    expect(heliocentricPeriodDays(earth)).toBeCloseTo(365.25, 1);
-  });
-
-  it('scales as the three-halves power', () => {
-    const jupiter: BodyRecord = {
-      ...earth,
-      id: 'jupiter',
-      name: 'Jupiter',
-      orbit: orbit({ semiMajorAxisAu: 5.2044 }),
-    };
-    // Jupiter's real sidereal period is 4332.6 days.
-    expect(heliocentricPeriodDays(jupiter)).toBeCloseTo(4335, -1);
-  });
-
-  it('refuses to compute a period for a moon', () => {
-    // A moon's elements are relative to its planet, whose mass is not in the catalogue — the
-    // same arithmetic would be wrong by the ratio of that planet's mass to the Sun's.
-    expect(heliocentricPeriodDays(luna)).toBeUndefined();
-  });
-});
 
 describe('buildBodyViewModel', () => {
   const catalogues = { bodies: [earth, luna], exoplanets: [] as ExoplanetRecord[], stars: [sun] };
 
-  it('marks a period computed from the semi-major axis as derived', () => {
+  it('gives a planet the sidereal year its published mean motion goes round in', () => {
     const model = buildBodyViewModel('earth', catalogues);
-    expect(model?.orbitalPeriodSource).toBe('derived');
-    expect(model?.orbitalPeriodDays).toBeCloseTo(365.25, 1);
+    expect(model?.orbitalPeriodSource).toBe('measured');
+    expect(model?.orbitalPeriodDays).toBeCloseTo(365.2564, 4);
   });
 
-  it('leaves a moon without a period rather than inventing one', () => {
+  it('gives a moon its period too, from the same mean motion that carries it round', () => {
+    // The card used to refuse, while the scene turned the Moon round the Earth all the same.
     const model = buildBodyViewModel('luna', catalogues);
-    expect(model?.orbitalPeriodDays).toBeUndefined();
-    expect(model?.orbitalPeriodSource).toBeUndefined();
+    expect(model?.orbitalPeriodSource).toBe('measured');
+    expect(model?.orbitalPeriodDays).toBeCloseTo(27.32166, 5);
+  });
+
+  it('prints the size of an inclination fitted below zero, as the same orbit with its node turned half round', () => {
+    const tilted: BodyRecord = { ...earth, orbit: orbit({ inclinationDeg: -0.00054346 }) };
+    const model = buildBodyViewModel('earth', { ...catalogues, bodies: [tilted] })!;
+    expect(bodyReadouts(model).measured.find((row) => row.label === 'Inclination')?.value).toBe('0.00°');
+  });
+
+  it('prints the eccentricity measured for a moon whose orbit keeps an older one', () => {
+    const hyperion: BodyRecord = { ...luna, id: 'hyperion', orbit: orbit({ eccentricity: 0.0232 }), measuredEccentricity: 0.105 };
+    const model = buildBodyViewModel('hyperion', { ...catalogues, bodies: [earth, hyperion] })!;
+    expect(bodyReadouts(model).measured.find((row) => row.label === 'Eccentricity')?.value).toBe('0.105');
+  });
+
+  it('gives a triaxial body its semi-axes beside its mean radius, not a radius alone', () => {
+    // As shipped: Haumea's shape (Ortiz et al. 2017) travels from the ETL's spec to its card.
+    const shipped: BodyRecord[] = JSON.parse(readFileSync(`${process.cwd()}/src/assets/data/bodies.json`, 'utf8'));
+    const haumea = shipped.find((body) => body.id === 'haumea')!;
+    const measured = bodyReadouts(buildBodyViewModel('haumea', { ...catalogues, bodies: [earth, haumea] })!).measured;
+    expect(measured.find((row) => row.label === 'Mean radius')?.value).toBe('798 km');
+    expect(measured.find((row) => row.label === 'Semi-axes')?.value).toBe('1,161 × 852 × 513 km');
+    expect(measured.find((row) => row.label === 'Radius')).toBeUndefined();
+    // Every other body keeps its one radius.
+    expect(bodyReadouts(buildBodyViewModel('earth', catalogues)!).measured.find((row) => row.label === 'Radius')?.value).toBe('6,371 km');
+  });
+
+  it('says where the orbit comes from, in the card’s provenance', () => {
+    expect(bodyReadouts(buildBodyViewModel('luna', catalogues)!).provenance).toContain('Orbit: JPL SSD satellite mean elements, epoch 2000 Jan 1.');
+  });
+
+  it('says a moon without a map is illustrated, without saying it was never imaged', () => {
+    // luna has no map under that id. Voyager and Cassini photographed every moon drawn this way.
+    const provenance = bodyReadouts(buildBodyViewModel('luna', catalogues)!).provenance;
+    expect(provenance).toContain('Not an observation — no global map of this world is used here.');
+    expect(provenance).not.toContain('no image of this world exists');
+  });
+
+  it('says an exoplanet the archive does not flag as imaged has no image', () => {
+    const exoplanet: ExoplanetRecord = { id: 'x', hostStarId: SUN_STAR_ID, hostStarName: 'Sol', name: 'X b', orbit: { semiMajorAxisAu: 0.05 } };
+    const model = buildBodyViewModel('x', { bodies: [], exoplanets: [exoplanet], stars: [sun] })!;
+    expect(bodyReadouts(model).provenance).toContain('Not an observation — no image of this world exists.');
+  });
+
+  it('says a directly imaged exoplanet was seen as a point of light, not that no image of it exists', () => {
+    // HR 8799 b: photographed beside its star at Gemini and Keck (Marois et al. 2008).
+    const exoplanet: ExoplanetRecord = { id: 'HR 8799 b', hostStarId: SUN_STAR_ID, hostStarName: 'HR 8799', name: 'HR 8799 b', imaged: true, orbit: { semiMajorAxisAu: 68 } };
+    const provenance = bodyReadouts(buildBodyViewModel('HR 8799 b', { bodies: [], exoplanets: [exoplanet], stars: [sun] })!).provenance;
+    expect(provenance).toContain('Not an observation — it has been imaged only as a point of light beside its star, and no map of it is used here.');
+    expect(provenance).not.toContain('no image of this world exists');
   });
 
   it('marks a published exoplanet period as measured, not derived', () => {

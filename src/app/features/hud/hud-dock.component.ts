@@ -1,4 +1,5 @@
 import {
+  afterRenderEffect,
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -13,7 +14,7 @@ import {
 } from '@angular/core';
 
 import { Bookmark, BookmarksStore } from '../../shared/state/bookmarks.store';
-import { TIME_RATES, TimeStore } from '../../shared/state/time.store';
+import { CLOCK_WINDOW, TIME_RATES, TimeStore } from '../../shared/state/time.store';
 import { BookmarkIconComponent } from '../../shared/ui/bookmark-icon.component';
 import { SearchComponent } from '../search/search.component';
 import {
@@ -268,34 +269,36 @@ function isWideViewport(): boolean {
               aria-labelledby="dock-tab-display"
               class="hud-acquire hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-lg px-4 py-3"
             >
-              <p class="type-label text-muted">Layers</p>
-              <div class="mt-2 flex flex-wrap gap-2">
-                @for (layer of layers; track layer.key) {
-                  <button
-                    type="button"
-                    [attr.aria-pressed]="isOn(layer.key)"
-                    (click)="toggleLayer(layer.key)"
-                    class="type-label flex items-center gap-2 border px-3 py-1.5 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
-                    [class]="
-                      isOn(layer.key)
-                        ? 'border-accent/60 bg-accent/12 text-accent hover:bg-accent/18'
-                        : 'border-border/60 text-muted hover:border-border hover:text-text'
-                    "
-                  >
-                    <!-- The state mark: a filled tick when the layer is drawn, hollow when it is not. -->
-                    <span
-                      aria-hidden="true"
-                      class="h-1.5 w-1.5 border border-current"
-                      [class.bg-current]="isOn(layer.key)"
-                    ></span>
-                    {{ layer.label }}
-                  </button>
-                }
-              </div>
+              @if (display()) {
+                <p class="type-label text-muted">Layers</p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  @for (layer of layers; track layer.key) {
+                    <button
+                      type="button"
+                      [attr.aria-pressed]="isOn(layer.key)"
+                      (click)="toggleLayer(layer.key)"
+                      class="type-label flex items-center gap-2 border px-3 py-1.5 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+                      [class]="
+                        isOn(layer.key)
+                          ? 'border-accent/60 bg-accent/12 text-accent hover:bg-accent/18'
+                          : 'border-border/60 text-muted hover:border-border hover:text-text'
+                      "
+                    >
+                      <!-- The state mark: a filled tick when the layer is drawn, hollow when it is not. -->
+                      <span
+                        aria-hidden="true"
+                        class="h-1.5 w-1.5 border border-current"
+                        [class.bg-current]="isOn(layer.key)"
+                      ></span>
+                      {{ layer.label }}
+                    </button>
+                  }
+                </div>
+              }
 
               <!-- The clock. Orbits and rotations are both functions of a date, so this is the
                    difference between a still picture and an orrery. -->
-              <p class="type-label mt-4 text-muted">Clock</p>
+              <p class="type-label text-muted" [class.mt-4]="display()">Clock</p>
               <!-- Radios rather than buttons: the rates are one-of-four, and the native control
                    carries that to a screen reader and to the arrow keys without any script. -->
               <div
@@ -303,11 +306,13 @@ function isWideViewport(): boolean {
                 role="radiogroup"
                 aria-label="Clock rate"
               >
+                <!-- A rate is picked by its size and the toggle after the radios says which way it
+                     runs, so a month a second backwards is the same radio as forwards. -->
                 @for (rate of timeRates; track rate.secondsPerSecond) {
                   <label
                     class="type-label cursor-pointer border px-3 py-1.5 transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-1 has-[:focus-visible]:-outline-offset-1 has-[:focus-visible]:outline-accent"
                     [class]="
-                      time.rate() === rate.secondsPerSecond
+                      Math.abs(time.rate()) === rate.secondsPerSecond
                         ? 'border-accent/60 bg-accent/12 text-accent hover:bg-accent/18'
                         : 'border-border/60 text-muted hover:border-border hover:text-text'
                     "
@@ -317,22 +322,69 @@ function isWideViewport(): boolean {
                       name="clock-rate"
                       class="sr-only"
                       [value]="rate.secondsPerSecond"
-                      [checked]="time.rate() === rate.secondsPerSecond"
-                      (change)="time.setRate(rate.secondsPerSecond)"
+                      [checked]="Math.abs(time.rate()) === rate.secondsPerSecond"
+                      (change)="time.setRate(Math.sign(time.rate()) * rate.secondsPerSecond)"
                     />
                     {{ rate.label }}
                   </label>
                 }
+                <button
+                  type="button"
+                  [attr.aria-pressed]="time.rate() < 0"
+                  (click)="time.setRate(-time.rate())"
+                  class="type-label flex items-center gap-2 border px-3 py-1.5 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+                  [class]="
+                    time.rate() < 0
+                      ? 'border-accent/60 bg-accent/12 text-accent hover:bg-accent/18'
+                      : 'border-border/60 text-muted hover:border-border hover:text-text'
+                  "
+                >
+                  <span
+                    aria-hidden="true"
+                    class="h-1.5 w-1.5 border border-current"
+                    [class.bg-current]="time.rate() < 0"
+                  ></span>
+                  Backwards
+                </button>
                 @if (!time.atNow()) {
                   <button
                     type="button"
-                    (click)="time.reset()"
+                    (click)="backToNow()"
                     class="type-label border border-border/60 px-3 py-1.5 text-muted transition-colors hover:border-accent/70 hover:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
                   >
                     Back to now
                   </button>
                 }
               </div>
+              <!-- A form, so Enter in the field goes there and the browser holds the field to its
+                   min and max before anything is submitted. Submitted rather than applied on each
+                   change: Chrome reports a year typed digit by digit as 0002, 0020, 0202 and 2020,
+                   and the sky would jump through every one. -->
+              <form class="mt-2 flex flex-wrap items-center gap-2" (submit)="goToDate($event)">
+                <label for="clock-date" class="type-label text-muted">Date (UTC)</label>
+                <input
+                  id="clock-date"
+                  name="date"
+                  type="datetime-local"
+                  required
+                  [min]="clockWindow.min"
+                  [max]="clockWindow.max"
+                  [value]="dateField()"
+                  aria-describedby="clock-date-window"
+                  class="hud-surface min-w-0 flex-1 px-2.5 py-1 text-sm text-text tabular-nums caret-accent scheme-dark focus:border-accent focus:outline-none sm:flex-none"
+                />
+                <button
+                  type="submit"
+                  class="type-label border border-border/60 px-3 py-1.5 text-muted transition-colors hover:border-accent/70 hover:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+                >
+                  Go
+                </button>
+                <!-- One line: on a phone the panel is a sheet over the system it sets the date of, and
+                     each card already says how far its own orbit strays. -->
+                <p id="clock-date-window" class="w-full text-[10px] text-muted">
+                  AD 1 to AD 3000, where the planets’ elements hold.
+                </p>
+              </form>
             </section>
           }
         }
@@ -364,7 +416,15 @@ function isWideViewport(): boolean {
       }
 
       <div class="hud-brackets hud-surface pointer-events-auto flex w-full items-stretch">
-        <div role="tablist" aria-label="Dock" class="flex items-stretch divide-x divide-border/40">
+        <!-- The tabs give way to the date and the range, and scroll: the five of the system view
+             take 397 px, and on a portrait phone they pushed the date off the right edge. Where
+             the browser draws a scrollbar of its own, it is a thin dark one: on a desktop window
+             under 770 px wide its default was a light bar 15 px tall across the dark dock. -->
+        <div
+          role="tablist"
+          aria-label="Dock"
+          class="flex min-w-0 scheme-dark items-stretch divide-x divide-border/40 overflow-x-auto [scrollbar-width:thin]"
+        >
           @for (tab of tabs(); track tab) {
             <button
               type="button"
@@ -388,16 +448,18 @@ function isWideViewport(): boolean {
              today's, which the reader's own machine already says. -->
         @if (date()) {
           <p
-            class="ml-auto flex items-baseline gap-2 border-l border-border/40 px-3 py-2 sm:px-4"
+            class="ml-auto flex shrink-0 items-baseline gap-2 border-l border-border/40 px-3 py-2 sm:px-4"
             data-testid="hud-date"
           >
             <span class="type-label text-muted">Date</span>
             <span class="text-sm text-accent tabular-nums">{{ date() }}</span>
           </p>
         }
+        <!-- Not on a phone, where it never showed before the tabs gave way to it: kept, its 121 px
+             took the Display tab out of sight at the present, the state the map opens in. -->
         @if (range()) {
           <p
-            class="flex items-baseline gap-2 border-l border-border/40 px-3 py-2 sm:px-4"
+            class="flex shrink-0 items-baseline gap-2 border-l border-border/40 px-3 py-2 max-sm:hidden sm:px-4"
             [class.ml-auto]="!date()"
           >
             <span class="type-label text-muted">Range</span>
@@ -420,8 +482,13 @@ export class HudDockComponent implements OnInit {
   readonly range = input('');
   /** The date the sky is drawn for; empty while the map is drawn for the present. */
   readonly date = input('');
-  /** Layer state; `null` means the surface has no layers to toggle and no Display tab. */
+  /**
+   * Layer state; `null` means the surface has no layers to toggle, and no Display tab unless it
+   * has the clock.
+   */
   readonly display = input<HudDisplay | null>(null);
+  /** The clock without the layers, for a surface that is drawn at its date: the tab is then "Clock". */
+  readonly clock = input(false);
   /** Which panel is open on a wide viewport when the dock mounts. */
   readonly defaultTab = input<DockTab | null>(null);
   /** Routing: what the scene found, what it offers for the fields, and where the view is. */
@@ -450,7 +517,7 @@ export class HudDockComponent implements OnInit {
     // Always offered, even with nothing in it: it is the only place that says the map can keep
     // anything at all, and a tab that appears once you already know is a tab that never taught.
     'bookmarks',
-    ...(this.display() ? (['display'] as const) : []),
+    ...(this.display() || this.clock() ? (['display'] as const) : []),
   ]);
 
   readonly activeTab = signal<DockTab | null>(null);
@@ -458,16 +525,41 @@ export class HudDockComponent implements OnInit {
   readonly bookmarks = inject(BookmarksStore);
   readonly time = inject(TimeStore);
   readonly timeRates = TIME_RATES;
+  readonly clockWindow = CLOCK_WINDOW;
+  protected readonly Math = Math;
+  /**
+   * What the date field holds when the panel opens: the clock's date at that moment. Not bound to
+   * the running clock, which would rewrite the field under the reader's typing on every render.
+   */
+  readonly dateField = signal('');
 
   private readonly search = viewChild(SearchComponent);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
+  private readonly dateShown = computed(() => this.date() !== '');
+  /**
+   * The tab list gives way to the date strip but keeps its scroll, so once the strip is drawn the
+   * tab that matters can be wholly out of sight: after Go on a phone, the tab focus went back to
+   * (0 of its 79 px at 360, 390 and 412 wide), and on a desktop window 640 to 770 px wide, the tab
+   * of the panel left open. Brought back into view whenever the strip comes or goes: the focused
+   * tab, else the selected one.
+   */
+  private readonly keepTabInView = afterRenderEffect(() => {
+    this.dateShown();
+    const list = this.host.nativeElement.querySelector('[role="tablist"]');
+    const focused = document.activeElement;
+    const tab = focused && list?.contains(focused) ? focused : list?.querySelector('[aria-selected="true"]');
+    // Optional: jsdom, which the unit tests run in, lays nothing out and has no scrollIntoView.
+    tab?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  });
+
   ngOnInit(): void {
     this.activeTab.set(isWideViewport() ? this.defaultTab() : null);
+    this.fillDateField();
   }
 
   tabLabel(tab: DockTab): string {
-    return TAB_LABELS[tab];
+    return tab === 'display' && !this.display() ? 'Clock' : TAB_LABELS[tab];
   }
 
   isOn(key: keyof HudDisplay): boolean {
@@ -476,6 +568,35 @@ export class HudDockComponent implements OnInit {
 
   toggleTab(tab: DockTab): void {
     this.activeTab.set(this.activeTab() === tab ? null : tab);
+    this.fillDateField();
+  }
+
+  /** The field's value is read as UTC, which is what the strip and the note print dates in. */
+  goToDate(event: SubmitEvent): void {
+    event.preventDefault();
+    const field = (event.target as HTMLFormElement).elements.namedItem('date') as HTMLInputElement;
+    if (this.time.setDate(new Date(`${field.value}Z`))) {
+      // The field now says what the signal behind it does, so a later reset that fills it with
+      // the present is a change the binding writes back, not one it drops as the same value.
+      this.dateField.set(field.value);
+      // On a phone the sheet covers the system it has just set the date of: at 360 by 640 every
+      // orbit lies behind it. The thing to look at is now the scene, as after a search.
+      // Focus goes back to the tab that folded, not to the page: the form it was in is gone.
+      if (!isWideViewport()) {
+        const tab = this.activeTab();
+        this.activeTab.set(null);
+        this.host.nativeElement.querySelector<HTMLElement>(`#dock-tab-${tab}`)?.focus();
+      }
+    }
+  }
+
+  backToNow(): void {
+    this.time.reset();
+    this.fillDateField();
+  }
+
+  private fillDateField(): void {
+    this.dateField.set(this.time.date().toISOString().slice(0, 16));
   }
 
   toggleLayer(key: keyof HudDisplay): void {

@@ -21,7 +21,9 @@ import {
 } from '../../shared/astro/galaxy';
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { EngineService, SceneCamera } from '../../core/engine/engine.service';
-import { BodyRecord } from '../../shared/models/body.model';
+import { BodyRecord, RotationalElements } from '../../shared/models/body.model';
+import { SUN_ROTATIONAL_ELEMENTS } from '../../shared/astro/rotational-elements';
+import { bodyOrientation } from '../../shared/rendering/body-orientation';
 import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { applyMilkyWaySkybox } from '../../shared/rendering/skybox';
@@ -287,8 +289,13 @@ const SYSTEM_MIN_DISTANCE_AU = 0.05;
 const SYSTEM_MAX_DISTANCE_AU = 5000;
 /** Where the camera lands (AU) immediately after swapping into system space, pre-settle. */
 const SYSTEM_ENTRY_DISTANCE_AU = 200;
-/** How far out (AU) the camera flies before swapping back to galaxy/parsec space. */
+/**
+ * How far out (AU) the camera flies, at least, before swapping back to galaxy/parsec space. A camera
+ * already beyond it flies half as far again: a phone held upright frames the Sun's system from 508 AU,
+ * and flying to 400 drew the system 21 per cent nearer while the reader was leaving it.
+ */
 const SYSTEM_EXIT_DISTANCE_AU = 400;
+const SYSTEM_EXIT_PULL_BACK = 1.5;
 
 const APPROACH_DURATION_SECONDS = 1.0;
 const SETTLE_DURATION_SECONDS = 0.9;
@@ -548,6 +555,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private currentStarId: number | null = null;
   private systemRenderer?: SystemOrbitsRenderer;
   private starMarker?: THREE.Mesh;
+  /** How the star marker is turned: the Sun's IAU elements for the Sun, nothing for any other star. */
+  private starRotation?: RotationalElements;
 
   constructor(
     private readonly engine: EngineService,
@@ -820,6 +829,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     if (this.systemGroup.visible) {
       this.systemRenderer?.update(this.time.julianDate());
+      if (this.starMarker && this.starRotation) {
+        bodyOrientation(this.starRotation, this.time.julianDate(), this.starMarker.quaternion);
+      }
       this.keepMarkersLegible(camera);
     }
     this.updateSelectionMark(camera);
@@ -849,8 +861,12 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
     const world = new THREE.Vector3();
     const drawnRadiusAu = new Map<string, number>();
-    const radiusOf = (marker: THREE.Object3D): number | undefined =>
+    // A body's marker is a unit sphere scaled to its radius, kept in `userData.radiusAu`; the
+    // star's is built at its own.
+    const sphereRadius = (marker: THREE.Object3D): number | undefined =>
       ((marker as THREE.Mesh).geometry as THREE.SphereGeometry | undefined)?.parameters?.radius;
+    const radiusOf = (marker: THREE.Object3D): number | undefined =>
+      (marker.userData['radiusAu'] as number | undefined) ?? sphereRadius(marker);
     const floorFor = (marker: THREE.Object3D): number => {
       marker.getWorldPosition(world);
       return (
@@ -879,7 +895,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
           : Number.POSITIVE_INFINITY;
       const drawn = Math.min(Math.max(radiusAu, floorFor(marker)), Math.max(radiusAu, ceiling));
       drawnRadiusAu.set(id, drawn);
-      marker.scale.setScalar(drawn / radiusAu);
+      marker.scale.setScalar(drawn / sphereRadius(marker)!);
     }
   }
 
@@ -1760,7 +1776,14 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
           ? [{ label: 'Luminosity', value: formatLuminosity(luminosity), derived: true }]
           : []),
       ]);
-      this.hudNote.set(this.time.atNow() ? 'Orbits propagated from published elements to the current date.' : 'Orbits propagated from published elements to the date on the clock.');
+      // Where the orbits come from, and for the Sun how far from the present they hold: each
+      // body's card names its own source, and for a moon or an SBDB dwarf planet how far it strays from
+      // Horizons over the span it was checked.
+      const source = this.bodies.some((body) => body.systemStarId === star.id) ? 'JPL mean elements, the planets’ fit for 3000 BC to AD 3000 and the moons’ checked from 1950 to 2100, and the SBDB’s osculating ones for Ceres, Eris, Haumea and Makemake, checked over the same span,' : 'published elements';
+      // Named to the minute, in UTC like the date field: a jump to 18:00 on a given day is a
+      // question about that hour, and the note is where the answer says which sky it is.
+      const drawnFor = `${this.time.date().toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+      this.hudNote.set(`Orbits propagated from ${source} to ${this.time.atNow() ? 'now, ' : ''}${drawnFor}.`);
       this.hudRange.set(
         formatAu(
           this.engine.visibleHalfHeight(
@@ -2207,8 +2230,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.systemGroup.add(this.systemRenderer.object);
     this.applyDisplay(this.display());
 
-    // Framed against the grid's outer ring rather than the outermost orbit — the ring is always
-    // the wider of the two — and against the camera this scene actually has, so the margin holds
+    // Framed against the outermost thing drawn — the grid's outer ring, or an eccentric orbit's
+    // aphelion where it runs past it — and against the camera this scene actually has, so the margin holds
     // whatever the window shape. Computed before the star, because how far away the star will be
     // seen from is what decides how big its halo has to be to stay visible.
     // Framed against the perspective camera whichever is active: the framing distance is what
@@ -2216,7 +2239,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const framingCamera = this.engine.getPerspectiveCamera();
     const viewport = { fovDegrees: framingCamera.fov, aspect: framingCamera.aspect };
     const framingDistance = systemFramingDistanceAu(
-      this.systemRenderer.gridOuterRadiusAu,
+      this.systemRenderer.outermostRadiusAu,
       viewport,
     );
 
@@ -2243,6 +2266,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // stayed put as the camera closed in and ended up filling the screen with the flat gradient
     // that was meant to dress the star, over the photograph underneath it.
     this.starMarker = new THREE.Mesh(this.starMarkerGeometry, starMarkerMaterial);
+    // Its pole 115 degrees from the one the IAU gives, and still, until it was turned like a planet.
+    // The map's longitudes are Solar System Scope's, not Carrington's, so only the pole and the
+    // 25.38-day turn are the Sun's own.
+    this.starRotation = star.id === SOL_STAR_ID ? SUN_ROTATIONAL_ELEMENTS : undefined;
     this.systemGroup.add(this.starMarker);
 
     this.galaxyGroup.visible = false;
@@ -2303,7 +2330,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     this.rig.flyTo(
       {
-        position: direction.clone().multiplyScalar(SYSTEM_EXIT_DISTANCE_AU),
+        position: direction.clone().multiplyScalar(Math.max(SYSTEM_EXIT_DISTANCE_AU, SYSTEM_EXIT_PULL_BACK * camera.position.length())),
         target: new THREE.Vector3(0, 0, 0),
       },
       EXIT_DURATION_SECONDS,

@@ -6,14 +6,16 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { EngineService } from '../../core/engine/engine.service';
+import { bodyPageView } from '../../shared/rendering/body-orientation';
 import { planetTexture } from '../../shared/rendering/procedural-planet-texture';
 import { applyMilkyWaySkybox, createGlowSprite } from '../../shared/rendering/skybox';
-import { atmosphereColorFor, bodyTexturePath, loadCachedTexture, MILKY_WAY_SKYBOX_PATH, SATURN_RING_TEXTURE_PATH } from '../../shared/rendering/texture-catalog';
+import { atmosphereColorFor, bodyTexturePath, loadCachedTexture, MILKY_WAY_SKYBOX_PATH, saturnRing } from '../../shared/rendering/texture-catalog';
 import { BodyRecord } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
 import { Bookmark } from '../../shared/state/bookmarks.store';
 import { NavigationStore } from '../../shared/state/navigation.store';
+import { TimeStore } from '../../shared/state/time.store';
 import { ChevronIconComponent } from '../../shared/ui/chevron-icon.component';
 import { HudDockComponent } from '../hud/hud-dock.component';
 import { BodyDetailViewModel } from './body-detail.model';
@@ -24,6 +26,18 @@ import { InfoPanelComponent } from './info-panel.component';
 const GAS_GIANT_IDS = new Set(['jupiter', 'saturn', 'uranus', 'neptune']);
 /** The body is drawn at unit radius here, so the halo's extent is its multiple directly. */
 const GLOW_SCALE = 2.6;
+/** Where the page's light stands, and the Sun with it wherever the body's real one is known. */
+const SUN_LIGHT_POSITION = new THREE.Vector3(4, 3, 5);
+/**
+ * How far from the equator the Sun must stand, as the sine of its latitude, before the camera
+ * follows it across: 3 degrees. The side is for Saturn's rings, lit on one face only, whose Sun
+ * goes 26.7 degrees either side. Mercury's never leaves the equator by more than 0.034 degrees
+ * and crosses it 8.3 times a year, which moved the camera from one side to the other every 1.45
+ * seconds at a month a second, both sides lit alike; Venus's reaches 2.6 and the Moon's 1.6.
+ * Earth's and Saturn's pages still follow their seasons, a week and half a year after each
+ * equinox (2025-03-28 and 2039-08-03, measured).
+ */
+const SUN_SIDE_MIN_SINE = Math.sin((3 * Math.PI) / 180);
 
 /**
  * Separate, focused route for inspecting a single planet/moon/exoplanet: its own scene/camera
@@ -58,9 +72,12 @@ const GLOW_SCALE = 2.6;
           </a>
         </div>
       }
-      <!-- Search and what has been kept: there is no scene readout here, the info panel is
-           the reading, and the panel's own control is what keeps this body. -->
-      <app-hud-dock (bookmarkChosen)="goToBookmark($event)" />
+      <!-- Search, what has been kept and the clock: there is no scene readout here, the info
+           panel is the reading, and the panel's own control is what keeps this body. A solar-system
+           body is drawn at the clock's date and turns at its rate, so both are shown and can be set
+           here; an exoplanet, whose day the catalogue does not carry, turns for show whatever the
+           clock says. -->
+      <app-hud-dock [date]="date()" [clock]="true" (bookmarkChosen)="goToBookmark($event)" />
     </div>
   `
 })
@@ -81,6 +98,9 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
   private scene?: THREE.Scene;
   private planet?: THREE.Mesh;
   private planetMaterial?: THREE.MeshStandardMaterial;
+  private sunLight?: THREE.DirectionalLight;
+  /** The solar-system record behind the body shown, which is what can be turned by its real pole. */
+  private body?: BodyRecord;
   private ring?: THREE.Mesh;
   private glow?: THREE.Sprite;
   private resizeObserver?: ResizeObserver;
@@ -94,13 +114,18 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
 
   readonly viewModel = signal<BodyDetailViewModel | undefined>(undefined);
   readonly notFound = signal(false);
+  /** The date the body is drawn for, as the dock's strip prints it; empty at the present. */
+  readonly date = signal('');
+  /** The side of the equator the Sun stood on at the last frame, 1 north or -1 south; 0 once a body is shown. */
+  private sunSide = 0;
 
   constructor(
     private readonly engine: EngineService,
     private readonly dataLoader: DataLoaderService,
     private readonly route: ActivatedRoute,
     private readonly router: Router,
-    private readonly navigationStore: NavigationStore
+    private readonly navigationStore: NavigationStore,
+    private readonly time: TimeStore
   ) {}
 
   ngAfterViewInit(): void {
@@ -167,8 +192,8 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     }
 
     // Real photography wherever it exists, and a surface derived from the body's own measured
-    // properties wherever it does not — which is every exoplanet, since none has ever been
-    // imaged, and the handful of moons no probe returned a usable map of.
+    // properties wherever it does not — which is every exoplanet, since none has had its
+    // surface imaged, and the handful of moons no probe returned a usable map of.
     const realTexturePath = bodyTexturePath(viewModel.id);
     this.planetMaterial.map = realTexturePath ? loadCachedTexture(realTexturePath) : planetTexture(viewModel.appearance);
     // The texture supplies its own colour, so the base stays white rather than tinting it twice.
@@ -176,12 +201,19 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     // A fluid envelope scatters light more evenly than a solid surface does.
     this.planetMaterial.roughness = GAS_GIANT_IDS.has(viewModel.id) || viewModel.appearance.palette.structure === 'banded' ? 0.55 : 0.85;
     this.planetMaterial.needsUpdate = true;
+    // Back to the page's own light and a sphere at rest; `tick` turns both where the IAU says how.
+    this.body = this.bodies.find((body) => body.id === viewModel.id);
+    this.planet?.rotation.set(0, 0, 0);
+    this.sunLight?.position.copy(SUN_LIGHT_POSITION);
+    this.sunSide = 0;
 
     this.disposeRing();
     this.disposeGlow();
     if (this.scene) {
-      if (viewModel.id === 'saturn') {
-        this.ring = this.buildSaturnRing();
+      if (viewModel.id === 'saturn' && this.body) {
+        // Flat in the page's horizontal, which is Saturn's equator: the planet is drawn pole up, at
+        // unit radius. They used to reach 2.6 radii out; the outermost ring the texture draws is 2.42.
+        this.ring = saturnRing(this.body.radiusKm, 1);
         this.scene.add(this.ring);
       }
       const atmosphereColor = atmosphereColorFor(viewModel.id);
@@ -190,37 +222,6 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
         this.scene.add(this.glow);
       }
     }
-  }
-
-  /**
-   * Saturn's rings, built from a real ring-transparency map. `RingGeometry`'s default UVs wrap
-   * around the angle rather than the radius, so the per-vertex U is remapped to distance from
-   * center — the standard fix for sampling a radially-varying ring texture correctly.
-   */
-  private buildSaturnRing(): THREE.Mesh {
-    const geometry = new THREE.RingGeometry(1.4, 2.6, 128, 1);
-    const position = geometry.attributes['position'];
-    const uv = geometry.attributes['uv'];
-    const vertex = new THREE.Vector3();
-    for (let i = 0; i < position.count; i++) {
-      vertex.fromBufferAttribute(position, i);
-      const radialFraction = THREE.MathUtils.clamp((vertex.length() - 1.4) / (2.6 - 1.4), 0, 1);
-      uv.setXY(i, radialFraction, 1);
-    }
-
-    const ringTexture = loadCachedTexture(SATURN_RING_TEXTURE_PATH);
-    const material = new THREE.MeshBasicMaterial({
-      map: ringTexture,
-      alphaMap: ringTexture,
-      transparent: true,
-      opacity: 0.85,
-      side: THREE.DoubleSide,
-      depthWrite: false
-    });
-
-    const ring = new THREE.Mesh(geometry, material);
-    ring.rotation.x = Math.PI / 2 - THREE.MathUtils.degToRad(17);
-    return ring;
   }
 
   private disposeRing(): void {
@@ -268,9 +269,9 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     this.controls.maxDistance = 12;
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.35));
-    const sunLight = new THREE.DirectionalLight(0xfff4e0, 1.6);
-    sunLight.position.set(4, 3, 5);
-    scene.add(sunLight);
+    this.sunLight = new THREE.DirectionalLight(0xfff4e0, 1.6);
+    this.sunLight.position.copy(SUN_LIGHT_POSITION);
+    scene.add(this.sunLight);
 
     const geometry = new THREE.SphereGeometry(1, 64, 48);
     const viewModel = this.viewModel();
@@ -289,10 +290,45 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     this.engine.start();
   }
 
+  /**
+   * A body the IAU gives rotational elements for is turned as it is at the map's date, under its
+   * real Sun, at the rate the map's clock runs (see `bodyPageView`). Eris, Haumea, Makemake and
+   * Nereid, whose day is measured but whose pole is not, turn pole up at that day on the same
+   * clock, as the system view turns them; Hyperion, which tumbles, is left still, as it is there.
+   * An exoplanet turns slowly for show, as the page always turned it.
+   */
   private tick(deltaSeconds: number): void {
     this.controls?.update();
-    if (this.planet) {
+    this.date.set(this.time.atNow() ? '' : this.time.date().toISOString().slice(0, 10));
+    if (!this.planet || !this.sunLight) {
+      return;
+    }
+    const sunAzimuth = Math.atan2(SUN_LIGHT_POSITION.x, SUN_LIGHT_POSITION.z);
+    if (this.body && bodyPageView(this.body, this.bodies, this.time.julianDate(), sunAzimuth, this.planet.quaternion, this.sunLight.position)) {
+      this.sunLight.position.multiplyScalar(SUN_LIGHT_POSITION.length());
+    } else if (this.body?.rotationPeriodHours !== undefined) {
+      // Counted from the orbit's epoch, as `spinFor` counts: where the meridian starts is unknown.
+      const turns = ((this.time.julianDate() - this.body.orbit.epochJd) * 24) / this.body.rotationPeriodHours;
+      this.planet.rotation.set(0, (turns % 1) * 2 * Math.PI, 0);
+    } else if (!this.body) {
       this.planet.rotation.y += deltaSeconds * 0.08;
+    }
+    const sunLatitudeSine = this.sunLight.position.y / this.sunLight.position.length();
+    const sunSide = this.sunSide !== 0 && Math.abs(sunLatitudeSine) < SUN_SIDE_MIN_SINE ? this.sunSide : sunLatitudeSine < 0 ? -1 : 1;
+    if (sunSide !== this.sunSide) {
+      // Above or below the equator, whichever side the Sun is on, when a body is shown and again
+      // whenever the Sun is well across it (SUN_SIDE_MIN_SINE), as the clock runs or is set: held
+      // above it, the page opened Saturn on the unlit face of its rings from 2025 until 2039, while
+      // the Sun is south of them — the face Earth does not see either — and the Clock set to 2045
+      // left it on the other one. Between crossings the camera is the reader's to orbit where they like.
+      this.sunSide = sunSide;
+      const camera = this.engine.getCamera();
+      camera.position.y = Math.abs(camera.position.y) * sunSide;
+      // Aimed again before this frame is drawn: the controls aimed it from where it was, and the
+      // frame drawn from here otherwise had the body 22.6 degrees off the middle of the view.
+      if (this.controls) {
+        camera.lookAt(this.controls.target);
+      }
     }
   }
 

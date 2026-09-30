@@ -41,6 +41,16 @@ const TAP_URL = `${TAP_BASE_URL}?query=${TAP_QUERY}`;
 // silently wrong rather than visibly broken.
 const CACHE_FILE = `exoplanet-archive-ps-${createHash('sha1').update(TAP_URL).digest('hex').slice(0, 8)}.csv`;
 
+// The planets the archive flags as detected by imaging (`ima_flag`): 101 of them in September 2026,
+// HR 8799's four and 51 Eri b among them, and bet Pic c and eps Ind A b, found by radial velocity
+// and imaged since. Asked for on its own, so adding it did not refetch the table above and move
+// every other planet to a newer snapshot. A transiting planet is left out: the one flagged,
+// WASP-108 b, takes its flag from Bohn et al. 2020, a VLT/SPHERE survey of transiting planets' host
+// stars that imaged a 0.35 solar-mass companion 0.124" from its star. The planet goes round in 2.68
+// days, 0.04 AU out, 0.15 mas at its 259 pc, and no imager has resolved it.
+const IMAGED_URL = `${TAP_BASE_URL}?query=select+pl_name+from+ps+where+default_flag=1+and+ima_flag=1+and+tran_flag=0+order+by+pl_name&format=csv`;
+const IMAGED_CACHE_FILE = `exoplanet-archive-imaged-${createHash('sha1').update(IMAGED_URL).digest('hex').slice(0, 8)}.csv`;
+
 /**
  * Downloads confirmed exoplanets from the NASA Exoplanet Archive (`Planetary Systems` TAP
  * table), cross-references each host star to the HYG index, and writes `exoplanets.json`.
@@ -52,6 +62,7 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<ExoplanetRe
 
   const csv = await fetchTextCached(TAP_URL, CACHE_FILE);
   const rows = parseCsvObjects(csv);
+  const imaged = new Set(parseCsvObjects(await fetchTextCached(IMAGED_URL, IMAGED_CACHE_FILE)).map((row) => row['pl_name']));
 
   let matched = 0;
   const exoplanets: ExoplanetRecord[] = rows.map((row, index) => {
@@ -80,6 +91,7 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<ExoplanetRe
       radiusEarth: parseOptionalNumber(row['pl_rade']),
       massEarth: parseOptionalNumber(row['pl_bmasse']),
       discoveryYear: parseOptionalNumber(row['disc_year']),
+      imaged: imaged.has(row['pl_name']) || undefined,
       // The period was already being downloaded and thrown away. With the semi-major axis it
       // determines the host's gravitational parameter, so keeping it is the difference between
       // propagating a planet at its real rate and pretending every host is the Sun.

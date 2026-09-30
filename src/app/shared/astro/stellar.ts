@@ -194,7 +194,19 @@ export function effectiveTemperatureK(star: StellarPhotometry): number | null {
  * a few per cent of from B8 on, and a few thousand kelvin cooler than at B0 (Alnilam, B0 Ia, about
  * 27 000 K against B0 V's 31 400). Carbon and S stars take {@link CARBON_STAR}.
  */
-export function giantSurface(spectralType: string | null | undefined): { temperatureK: number; bolometricCorrectionV: number } | null {
+export function giantSurface(spectralType: string | null | undefined): GiantSurface | null {
+  // ponytail: kept per type string, unbounded; the catalogue has 2 888 of them. The star field asks
+  // for each of its 455 571 stars at boot, and the split and two regular expressions took 20-40 ms.
+  if (!GIANT_SURFACES.has(spectralType)) {
+    GIANT_SURFACES.set(spectralType, giantSurfaceOfType(spectralType));
+  }
+  return GIANT_SURFACES.get(spectralType)!;
+}
+
+type GiantSurface = { temperatureK: number; bolometricCorrectionV: number };
+const GIANT_SURFACES = new Map<string | null | undefined, GiantSurface | null>();
+
+function giantSurfaceOfType(spectralType: string | null | undefined): GiantSurface | null {
   if (!isGiant(spectralType)) {
     return null;
   }

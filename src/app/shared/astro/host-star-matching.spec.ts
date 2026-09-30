@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ARCHIVE_EPOCH, ARCHIVE_ID_BASE, archiveStarId, buildStarNameIndex, CATALOGUE_EPOCH, normalizeStarName, resolveHostStarId } from './host-star-matching';
+import { ARCHIVE_EPOCH, ARCHIVE_ID_BASE, archiveDistancePc, archiveStarId, buildStarNameIndex, CATALOGUE_EPOCH, normalizeStarName, resolveHostStarId } from './host-star-matching';
 import { propagateProperMotion, raDegDecDistanceToXyz } from './coordinates';
 import { StarRecord } from '../models/star.model';
 
@@ -205,6 +205,14 @@ describe('resolveHostStarId', () => {
       const id = resolveHostStarId({ hostname: 'Unmatched', raDeg: 217.4, decDeg: -62.68, distancePc: 1.2959 }, FIXTURE_STARS);
 
       expect(id).toBe(1);
+    });
+
+    it("takes the archive's parallax where it gives no distance, and nothing from a parallax that is none", () => {
+      // mu2 Sco: sy_dist blank, sy_plx 6.31 mas; the catalogue has Pipirima at 145.3 pc.
+      expect(archiveDistancePc(undefined, 6.31)).toBeCloseTo(158.48, 2);
+      expect(archiveDistancePc(145.35, 6.31)).toBe(145.35);
+      expect(archiveDistancePc(undefined, 0)).toBeNaN();
+      expect(archiveDistancePc(undefined, undefined)).toBeNaN();
     });
 
     it('lets a named host resolve even with no usable distance', () => {

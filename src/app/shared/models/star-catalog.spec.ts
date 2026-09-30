@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { BYTES_PER_STAR_META, BYTES_PER_STAR_POSITION, decodeStarCatalog, encodeStarCatalog, isDesignation } from './star-catalog';
 import { StarRecord } from './star.model';
+import { formatDistance } from '../format/quantity';
 
 const STARS: StarRecord[] = [
   { id: 0, name: 'Sol', x: 0, y: 0, z: 0, magnitude: -26.7, spectralType: 'G2V', colorIndex: 0.656 },
@@ -128,6 +129,15 @@ describe('the photometry and distance error columns', () => {
     expect(decoded[3].distanceError).toBeUndefined();
     // Past the parallax itself there is no upper bound on the distance, which is what 100 % says.
     expect(decoded[4].distanceError).toBe(1);
+  });
+
+  it('keeps an error close enough that the card prints the published one', () => {
+    // Rigel, 264.55 pc at van Leeuwen's 3.78 ± 0.34 mas: 23.8 pc, which one byte stored as 23.5.
+    const rigel: StarRecord = { id: 7, name: 'Rigel', x: 264.55, y: 0, z: 0, magnitude: 0.18, magnitudeBand: 'V', spectralType: 'B8Ia', colorIndex: -0.03, colorSystem: 'B-V', distanceError: 0.34 / 3.78, source: 'hyg' };
+    const packed = encodeStarCatalog([rigel]);
+    const [kept] = decodeStarCatalog(packed.index, packed.positions, packed.meta);
+    expect(formatDistance(264.55, kept.distanceError)).toBe('265 ± 24 pc');
+    expect(Math.abs(kept.distanceError! / rigel.distanceError! - 1)).toBeLessThan(1e-4);
   });
 });
 

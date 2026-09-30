@@ -120,10 +120,10 @@ function validateStars(stars: StarRecord[]): void {
         decoded[i].colorFromTemperature === !!stars[i].colorFromTemperature,
       `Star catalogue round-trip changed the photometry of star ${stars[i].id}.`
     );
-    // Stored as its square root in 255ths, up to 100 %; see `star-catalog.ts`.
+    // Stored as its square root in 65 535ths, up to 100 %; see `star-catalog.ts`.
     const error = stars[i].distanceError;
     assertCondition(
-      error === undefined ? decoded[i].distanceError === undefined : Math.abs(Math.sqrt(decoded[i].distanceError!) - Math.sqrt(Math.min(1, error))) <= 0.5 / 255 + 1e-9,
+      error === undefined ? decoded[i].distanceError === undefined : Math.abs(Math.sqrt(decoded[i].distanceError!) - Math.sqrt(Math.min(1, error))) <= 0.5 / 65_535 + 1e-9,
       `Star catalogue round-trip changed the distance error of star ${stars[i].id}.`
     );
   }

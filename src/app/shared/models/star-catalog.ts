@@ -37,7 +37,7 @@ export const BYTES_PER_STAR_META =
   Float32Array.BYTES_PER_ELEMENT +
   Float32Array.BYTES_PER_ELEMENT +
   Uint16Array.BYTES_PER_ELEMENT +
-  Uint8Array.BYTES_PER_ELEMENT +
+  Uint16Array.BYTES_PER_ELEMENT +
   Uint8Array.BYTES_PER_ELEMENT;
 
 /**
@@ -50,14 +50,19 @@ export const BYTES_PER_STAR_META =
 const PHOTOMETRY = { bandV: 1, bandG: 2, bandMask: 3, colorBpRp: 4, distanceFromGaia: 8, colorFromTemperature: 16 } as const;
 
 /**
- * The distance error column holds the square root of the relative error, in 255ths, and 0 where
+ * The distance error column holds the square root of the relative error, in 65 535ths, and 0 where
  * none was published. The errors span three orders of magnitude — Gaia's are a median 0.3 % and
  * at most 20 %, the cut its queries make, while a Hipparcos parallax the map keeps for a bright
- * star can be as large as itself — and the square root keeps a step small at each end: 0.08 % of
- * distance at 1 %, 0.35 % at 20 %, under 1 % at 100 %. Anything past 100 % is stored as that,
- * where it no longer bounds the distance from above.
+ * star can be as large as itself — and the square root keeps a step small at each end. Anything
+ * past 100 % is stored as that, where it no longer bounds the distance from above.
+ *
+ * In 255ths, one byte, a step was 0.35 % of the distance at a 20 % error, a few per cent of the
+ * error itself, and the card printed another error than the published one for 2 822 of the 53 209
+ * Gaia stars it prints one for; Rigel read ± 23 pc where van Leeuwen's 3.78 ± 0.34 mas gives 24.
+ * In two bytes, placed before the photometry byte so the column stays aligned for its view, 12 do,
+ * each on a rounding half.
  */
-const DISTANCE_ERROR_STEPS = 255;
+const DISTANCE_ERROR_STEPS = 65_535;
 
 /** `stars-index.json`: everything that is a string, plus the count the columns are sized by. */
 export interface StarCatalogIndex {
@@ -107,7 +112,7 @@ interface StarMetaColumns {
   colorIndices: Float32Array;
   spectralTypeIndices: Uint16Array;
   photometry: Uint8Array;
-  distanceErrors: Uint8Array;
+  distanceErrors: Uint16Array;
 }
 
 /** Lays typed-array views over the meta buffer at the offsets the format defines. */
@@ -121,9 +126,9 @@ function metaColumns(buffer: ArrayBuffer, count: number): StarMetaColumns {
   offset += count * Float32Array.BYTES_PER_ELEMENT;
   const spectralTypeIndices = new Uint16Array(buffer, offset, count);
   offset += count * Uint16Array.BYTES_PER_ELEMENT;
+  const distanceErrors = new Uint16Array(buffer, offset, count);
+  offset += count * Uint16Array.BYTES_PER_ELEMENT;
   const photometry = new Uint8Array(buffer, offset, count);
-  offset += count * Uint8Array.BYTES_PER_ELEMENT;
-  const distanceErrors = new Uint8Array(buffer, offset, count);
 
   return { ids, magnitudes, colorIndices, spectralTypeIndices, photometry, distanceErrors };
 }

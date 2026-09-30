@@ -209,9 +209,9 @@ The star catalogue ships as two binary column stores plus a small JSON file, not
 objects. At 68 388 stars the old encoding — one JSON object per star, its eight key names
 repeated each time — would have been about 17 MB to download and parse before the first frame.
 Splitting it puts the numbers in `stars.bin` (positions, handed to the GPU verbatim) and
-`stars-meta.bin` (id, magnitude, colour index, spectral-type index, the band and colour system
-those were measured in or whether the colour was read off a temperature, and the distance's
-relative error), and leaves `stars-index.json`
+`stars-meta.bin` (id, magnitude, colour index, spectral-type index, the distance's relative
+error in two bytes, and the band and colour system those were measured in or whether the colour
+was read off a temperature), and leaves `stars-index.json`
 holding only the strings, with the ~2 600 distinct spectral classifications collapsed into a
 dictionary. The result is 2.6 MB for 7.8× the stars. `star-catalog.ts` defines the layout once
 and both the ETL and the app use it, so the writer and the reader cannot drift apart.

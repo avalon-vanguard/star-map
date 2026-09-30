@@ -44,6 +44,7 @@ import { galacticNormal, PolarGridPlane, TetherField } from './grid-plane';
 import { MilkyWayRenderer } from './milky-way-renderer';
 import {
   closestApproachAu,
+  NEIGHBOUR_RING_FRACTION,
   SUN_RADIUS_AU,
   systemFrameRadiusAu,
   systemFramingDistanceAu,
@@ -218,11 +219,6 @@ const ROUTE_RANGE_CEILING_PC = MAX_JUMP_RANGE_PC;
 
 /** How many neighbouring stars are named from inside a system. */
 const NEIGHBOUR_COUNT = 4;
-/**
- * How far out from the centre of the view a neighbour's name sits, as a fraction of the frame's
- * half-height. Clear of the scale rail at the top and the dock at the bottom.
- */
-const NEIGHBOUR_RING_NDC = 0.74;
 /**
  * How far in front of the camera a neighbour's name is planted, in AU. Any depth projects to
  * the same place on the ring, but not to the same stability: unprojecting at the middle of the
@@ -1523,7 +1519,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const canvas = this.canvasRef().nativeElement;
     const placed = ringPlacement(
       angle,
-      NEIGHBOUR_RING_NDC,
+      NEIGHBOUR_RING_FRACTION,
       { width: canvas.clientWidth, height: canvas.clientHeight },
       this.reserved,
     );
@@ -2256,7 +2252,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // Framed against the perspective camera whichever is active: the framing distance is what
     // the orthographic frustum is then sized from, so both projections show the same extent.
     const framingCamera = this.engine.getPerspectiveCamera();
-    const viewport = { fovDegrees: framingCamera.fov, aspect: framingCamera.aspect };
+    const canvas = this.canvasRef().nativeElement;
+    const viewport = { fovDegrees: framingCamera.fov, aspect: framingCamera.aspect, shorterSidePx: Math.min(canvas.clientWidth, canvas.clientHeight) };
     const framingDistance = systemFramingDistanceAu(
       this.systemRenderer.gridOuterRadiusAu,
       viewport,

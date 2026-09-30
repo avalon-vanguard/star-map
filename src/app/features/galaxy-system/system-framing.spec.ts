@@ -63,6 +63,21 @@ describe('systemFramingDistanceAu', () => {
     expect(systemFramingDistanceAu(0, undefined, 0.00465)).toBe(systemFramingDistanceAu(0));
   });
 
+  it("keeps a giant's disc clear of its neighbours' names on a phone, which hang a fixed 78 px in from their ring", () => {
+    // Betelgeuse at 390x844 and at 1600x1000. Kept to half the half-side, its disc was 98 px on the
+    // phone, where the names come within 66 px of the centre.
+    const betelgeuseAu = 2.72;
+    for (const [width, height] of [[390, 844], [1600, 1000]]) {
+      const viewport = { fovDegrees: 50, aspect: width / height, shorterSidePx: Math.min(width, height) };
+      const distance = systemFramingDistanceAu(0, viewport, betelgeuseAu);
+      const tight = Math.tan((25 * Math.PI) / 180) * Math.min(1, viewport.aspect);
+      const halfSidePx = viewport.shorterSidePx / 2;
+      const discPx = (Math.tan(Math.asin(betelgeuseAu / distance)) / tight) * halfSidePx;
+      expect(discPx).toBeLessThan(0.74 * halfSidePx - 78);
+      expect(discPx).toBeGreaterThan(0.2 * halfSidePx);
+    }
+  });
+
   it("holds a giant's disc inside the ring its neighbours are named on, and the camera clear of its closest approach", () => {
     // The ring is at 0.74 of the tighter half-extent; the disc is kept to half of it, in either window.
     const betelgeuseAu = 2.72;

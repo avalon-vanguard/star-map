@@ -33,6 +33,8 @@ const FRAME_MARGIN = 0.12;
 export interface SystemViewport {
   fovDegrees: number;
   aspect: number;
+  /** The canvas's shorter side in CSS pixels, which a giant's disc is kept clear of its neighbours' names on. */
+  shorterSidePx?: number;
 }
 
 export const DEFAULT_SYSTEM_VIEWPORT: SystemViewport = { fovDegrees: 50, aspect: 1 };
@@ -61,12 +63,35 @@ const MAX_FRAMING_DISTANCE_AU = 200;
 
 /**
  * How much of the view's tighter half-extent a giant's disc may take on arrival: inside the ring
- * the system view names the star's neighbours on, at 0.74 of it, and clear of the names hung
- * inward from it, whose nearest corners come within 292 px of the centre on a 1 000 px view.
- * Framed to fill the frame instead, Betelgeuse settled at the three-radius closest approach with
- * a disc of 379 px, past the 370 px ring, and its neighbours' names on it.
+ * the system view names the star's neighbours on, and clear of the names hung inward from it,
+ * whose nearest corners come within 292 px of the centre on a 1 000 px view. Framed to fill the
+ * frame instead, Betelgeuse settled at the three-radius closest approach with a disc of 379 px,
+ * past the 370 px ring, and its neighbours' names on it.
  */
 const STAR_FRAME_FRACTION = 0.5;
+/**
+ * The ring the system view names a star's neighbours on, as a fraction of the frame's shorter
+ * half-side (see `ringPlacement`). Clear of the scale rail at the top and the dock at the bottom.
+ */
+export const NEIGHBOUR_RING_FRACTION = 0.74;
+/**
+ * How far a neighbour's name reaches in from that ring, in pixels whatever the window: its nearest
+ * corner measured 74 px in on a 390 px phone and 78 px on a 1 000 px view, and a margin on that.
+ * The fraction above left the names 0.24 of the half-side, 47 px on a phone, and at 390x844
+ * Betelgeuse's 98 px disc had HD 39374's name 70 px from its centre.
+ */
+const NAME_REACH_PX = 90;
+/** However small the window, the disc still takes this much of it. */
+const MIN_STAR_FRAME_FRACTION = 0.1;
+
+/** The fraction of the tighter half-extent a giant's disc may take in this viewport. */
+function starFrameFraction(viewport: SystemViewport): number {
+  if (!viewport.shorterSidePx) {
+    return STAR_FRAME_FRACTION;
+  }
+  const clear = NEIGHBOUR_RING_FRACTION - NAME_REACH_PX / (viewport.shorterSidePx / 2);
+  return Math.min(STAR_FRAME_FRACTION, Math.max(MIN_STAR_FRAME_FRACTION, clear));
+}
 
 /** Framing for a star with no known planets, where there is nothing to fit. */
 const EMPTY_SYSTEM_FRAMING_DISTANCE_AU = 3;
@@ -127,7 +152,7 @@ export function systemFramingDistanceAu(framedRadiusAu: number, viewport: System
   // A giant drawn at its own radius can be wider than the system around it — Betelgeuse's 584
   // solar radii are 2.7 AU — or than the empty framing. Its disc is a sphere's, whose silhouette
   // from d subtends asin(R / d): the distance that makes it the fraction above of the view.
-  const star = starRadiusAu * Math.sqrt(1 + 1 / (STAR_FRAME_FRACTION * tightHalfExtent(viewport)) ** 2);
+  const star = starRadiusAu * Math.sqrt(1 + 1 / (starFrameFraction(viewport) * tightHalfExtent(viewport)) ** 2);
   if (!Number.isFinite(framedRadiusAu) || framedRadiusAu <= 0) {
     return Math.max(EMPTY_SYSTEM_FRAMING_DISTANCE_AU, star);
   }

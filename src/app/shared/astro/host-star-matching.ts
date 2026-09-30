@@ -27,6 +27,15 @@ export interface HostStarQuery {
   parallaxMas?: number;
 }
 
+/**
+ * A host's distance as the archive gives it: `sy_dist`, or where that is blank, the inverse of its
+ * parallax `sy_plx`; `NaN` with neither. mu2 Sco has no `sy_dist` and a 6.31 mas parallax, which
+ * finds Pipirima (HIP 82545) 0.4″ from the archive's direction; left blank, its planet had no star.
+ */
+export function archiveDistancePc(distancePc: number | undefined, parallaxMas: number | undefined): number {
+  return distancePc ?? (parallaxMas !== undefined && parallaxMas > 0 ? 1000 / parallaxMas : Number.NaN);
+}
+
 function distancesAgree(a: number, b: number): boolean {
   const [near, far] = a < b ? [a, b] : [b, a];
   return (far - near) / near <= MERGE_DISTANCE_RATIO_TOLERANCE;

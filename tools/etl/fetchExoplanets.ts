@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 
 import { propagateProperMotion, raDegDecDistanceToXyz } from '../../src/app/shared/astro/coordinates';
-import { ARCHIVE_EPOCH, archiveStarId, buildStarNameIndex, CATALOGUE_EPOCH, resolveHostStarId } from '../../src/app/shared/astro/host-star-matching';
+import { ARCHIVE_EPOCH, archiveDistancePc, archiveStarId, buildStarNameIndex, CATALOGUE_EPOCH, resolveHostStarId } from '../../src/app/shared/astro/host-star-matching';
 import { temperatureToColorIndex } from '../../src/app/shared/astro/spectral';
 import { ExoplanetRecord } from '../../src/app/shared/models/exoplanet.model';
 import { isDesignation } from '../../src/app/shared/models/star-catalog';
@@ -127,7 +127,7 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<{ exoplanet
     const host = (column: string) => parseOptionalNumber(row[column] || compositeRow?.[column]);
     const raDeg = host('ra') ?? Number.NaN;
     const decDeg = host('dec') ?? Number.NaN;
-    const distancePc = host('sy_dist') ?? Number.NaN;
+    const distancePc = archiveDistancePc(host('sy_dist'), host('sy_plx'));
     const pmRaMasPerYear = host('sy_pmra');
     const pmDecMasPerYear = host('sy_pmdec');
 

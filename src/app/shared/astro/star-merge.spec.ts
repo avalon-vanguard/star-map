@@ -350,6 +350,24 @@ describe('foldByIdentity', () => {
     expect(stars[0]).toMatchObject({ id: 33139, name: 'HD 265866', magnitude: 9.89, magnitudeBand: 'V', colorIndex: 1.6, source: 'gaia' });
   });
 
+  it('describes the entry by the Gliese row where SIMBAD names the HYG star already there as another source', () => {
+    // HYG hangs "Gl 905.2A", M5, on HIP 117059; SIMBAD has HIP 117059 as LAWD 93, Gl 905.2B, a DA
+    // white dwarf at 53.76 mas, and Gl 905.2A as G 130-6, a source 3′ away with no parallax.
+    const hip117059 = at(116690, 355.96134, 32.54631, 17.13, { name: 'Gl 905.2A', source: 'hyg', magnitude: 13.11, magnitudeBand: 'V', spectralType: 'M5', colorIndex: 1.55, colorSystem: 'B-V', distanceError: 0.1 });
+    const lawd93 = at(1000116690, 355.96134, 32.54631, 18.6, { name: 'Gaia DR3 2871730307948650368', gaiaDesignation: 'Gaia DR3 2871730307948650368', source: 'gaia', magnitude: 12.97, magnitudeBand: 'G', colorIndex: -0.04, colorSystem: 'BP-RP', distanceError: 0.0006 });
+    const gl905b = at(119589, 355.96134 + arcsecOfRa(8, 32.54631), 32.54631, 16.64, { name: 'Gl 905.2B', source: 'hyg', magnitude: 12.9, magnitudeBand: 'V', spectralType: 'DA4', colorIndex: 0.15, colorSystem: 'B-V' });
+    const { stars: merged } = mergeStarCatalogues([{ ...HIPPARCOS, stars: [hip117059] }, { ...GAIA, stars: [lawd93] }]);
+    const identities = new Map([
+      [hip117059.id, 'Gaia DR3 2871730758921709952'],
+      [gl905b.id, lawd93.gaiaDesignation!]
+    ]);
+    const { stars, folded } = foldByIdentity([...merged, gl905b], identities);
+    expect(folded).toBe(1);
+    expect(stars).toHaveLength(1);
+    expect(stars[0]).toMatchObject({ id: 119589, name: 'Gl 905.2B', spectralType: 'DA4', magnitude: 12.9, colorIndex: 0.15, source: 'gaia' });
+    expect(Math.hypot(stars[0].x, stars[0].y, stars[0].z)).toBeCloseTo(18.6, 9);
+  });
+
   it('leaves a star with a Hipparcos error alone, and one of another brightness than the HYG star already there', () => {
     expect(foldByIdentity([{ ...gliese, distanceError: 0.05 }, gaia], identities).folded).toBe(0);
     // A companion SIMBAD gives its primary's source: two magnitudes apart.

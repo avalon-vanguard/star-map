@@ -8,7 +8,7 @@ import { fetchDeepSky } from './fetchDeepSky';
 import { fetchExoplanets } from './fetchExoplanets';
 import { fetchSolarSystem } from './fetchSolarSystem';
 import { BYTES_PER_STAR_META, BYTES_PER_STAR_POSITION, decodeStarCatalog, encodeStarCatalog, isDesignation } from '../../src/app/shared/models/star-catalog';
-import { fetchStars } from './fetchStars';
+import { fetchStars, glieseGaiaDesignations } from './fetchStars';
 import { ARCHIVE_EPOCH, archiveStarId, CATALOGUE_EPOCH } from '../../src/app/shared/astro/host-star-matching';
 import { propagateProperMotion, raDegDecDistanceToXyz } from '../../src/app/shared/astro/coordinates';
 import { describeSources } from './sources/registry';
@@ -240,10 +240,17 @@ function validateStars(stars: StarRecord[]): void {
  * with a row floor on each query.
  */
 const MAX_UNMERGED_TWINS = 100;
+/**
+ * Gliese-only rows beside the Gaia entry SIMBAD names as the same star, which no geometry saw:
+ * 49 before `foldByIdentity`, two of them false stars inside 10 pc (GJ 2097 at 6.41 pc and GJ 4285
+ * at 6.80, which Gaia has at 24.47 and 28.25). The twin count above does not see them, being up to
+ * minutes of arc apart.
+ */
+const MAX_GLIESE_ROWS_BESIDE_THEIR_GAIA_SOURCE = 0;
 const MAX_HYG_SURVIVORS = 15_000;
 const TWIN_TOLERANCE_RAD = (1 / 3600) * (Math.PI / 180);
 
-function validateMerge(stars: StarRecord[]): void {
+function validateMerge(stars: StarRecord[], gaiaDesignationById: ReadonlyMap<number, string>): void {
   // Checked first and on its own: an unreachable Gaia is skipped rather than thrown, and would
   // otherwise surface below as "68 000 HYG stars found no counterpart" — true, and no help.
   assertCondition(
@@ -287,7 +294,13 @@ function validateMerge(stars: StarRecord[]): void {
     twins <= MAX_UNMERGED_TWINS,
     `${twins} stars from different catalogues sit within an arcsecond of each other (at most ${MAX_UNMERGED_TWINS} expected), starting with ${example} — the merge is keeping the same star twice.`
   );
-  console.log(`  ${survivors} HYG stars have no Gaia counterpart; ${twins} unmerged cross-catalogue pairs within an arcsecond.`);
+  const bare = new Set(stars.filter((star) => star.source === 'gaia' && isDesignation(star)).map((star) => star.name));
+  const beside = stars.filter((star) => star.source === 'hyg' && star.distanceError === undefined && bare.has(gaiaDesignationById.get(star.id) ?? ''));
+  assertCondition(
+    beside.length <= MAX_GLIESE_ROWS_BESIDE_THEIR_GAIA_SOURCE,
+    `${beside.length} Gliese stars are drawn beside the Gaia source SIMBAD names them as, starting with ${beside[0]?.name} — the identity fold is not being made.`
+  );
+  console.log(`  ${survivors} HYG stars have no Gaia counterpart; ${twins} unmerged cross-catalogue pairs within an arcsecond; ${beside.length} Gliese stars beside their own Gaia source.`);
 }
 
 function validateBodies(bodies: BodyRecord[]): void {
@@ -490,7 +503,7 @@ async function build(): Promise<void> {
 
   console.log('Validating output...');
   validateStars(stars);
-  validateMerge(stars);
+  validateMerge(stars, await glieseGaiaDesignations());
   validateBodies(bodies);
   validateExoplanets(exoplanets, stars);
   validateDeepSky(deepSky);

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { raDegDecDistanceToXyz } from './coordinates';
 import { StarRecord } from '../models/star.model';
-import { directionCosine, hipparcosDistancePc, HYG_UNKNOWN_DISTANCE_PC, isSameStar, MERGE_ANGULAR_TOLERANCE_DEG, mergeStarCatalogues, NAKED_EYE_MAGNITUDE, placementDistancePc } from './star-merge';
+import { directionCosine, foldByIdentity, hipparcosDistancePc, HYG_UNKNOWN_DISTANCE_PC, isSameStar, MERGE_ANGULAR_TOLERANCE_DEG, mergeStarCatalogues, NAKED_EYE_MAGNITUDE, placementDistancePc } from './star-merge';
 
 /** A star at a given sky position and distance, which is how catalogues actually report them. */
 function at(id: number, raDeg: number, decDeg: number, distancePc: number, overrides: Partial<StarRecord> = {}): StarRecord {
@@ -306,6 +306,30 @@ describe('mergeStarCatalogues', () => {
 
     expect(stars).toHaveLength(20000);
     expect(Date.now() - started).toBeLessThan(10000);
+  });
+});
+
+describe('foldByIdentity', () => {
+  // GJ 4285 as HYG has it, at its Gliese photometric distance and a magnitude and a half brighter
+  // in V than Gaia's G, and the Gaia source SIMBAD names as the same star, L 119-44, 50.6″ away.
+  const gliese = at(119513, 339.5, -65.84, 6.8, { name: 'GJ 4285', source: 'hyg', magnitude: 11.45, magnitudeBand: 'V', spectralType: 'M4' });
+  const gaia = at(1050005263, 339.5 + arcsecOfRa(50.6, -65.84), -65.84, 28.25, { name: 'Gaia DR3 6392188629658709888', source: 'gaia', magnitude: 13.05, magnitudeBand: 'G', distanceError: 0.0004, distanceFromGaia: true });
+  const identities = new Map([[gliese.id, gaia.name]]);
+
+  it("folds a Gliese entry into the Gaia entry SIMBAD names it as, at Gaia's position and distance", () => {
+    expect(isSameStar(gaia, gliese)).toBe(false);
+    const { stars, folded } = foldByIdentity([gliese, gaia], identities);
+    expect(folded).toBe(1);
+    expect(stars).toHaveLength(1);
+    expect(stars[0]).toMatchObject({ id: gliese.id, name: 'GJ 4285', spectralType: 'M4', source: 'gaia', distanceError: 0.0004, distanceFromGaia: true });
+    expect(Math.hypot(stars[0].x, stars[0].y, stars[0].z)).toBeCloseTo(28.25, 9);
+    expect(directionCosine(stars[0], gaia)).toBeCloseTo(1, 12);
+  });
+
+  it('leaves a star with a Hipparcos error, and a Gaia entry already folded into, alone', () => {
+    expect(foldByIdentity([{ ...gliese, distanceError: 0.05 }, gaia], identities).folded).toBe(0);
+    expect(foldByIdentity([gliese, { ...gaia, name: 'L 119-44' }], identities).folded).toBe(0);
+    expect(foldByIdentity([gliese, gaia], new Map()).folded).toBe(0);
   });
 });
 

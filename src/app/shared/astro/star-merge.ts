@@ -279,6 +279,39 @@ function combine(kept: StarRecord, other: StarRecord): StarRecord {
 }
 
 /**
+ * Folds each Gliese-only entry — HYG's, with no Hipparcos astrometry and so no published error on
+ * its distance — into the Gaia entry of the source SIMBAD names it as, `gaiaDesignationById` by
+ * HYG id, where that entry is still bare. {@link isSameStar} cannot see these: 42 of them within
+ * 25 pc stayed beside their own Gaia entry, too far for their positions (GJ 3478, 16″), moving
+ * differently by HYG's motions (GJ 2097, 39 %), or brighter in HYG's V than Gaia's G by more than a
+ * primary may be (GJ 4285, 1.6 magnitudes). Two of those were stars that do not exist inside 10 pc:
+ * GJ 2097 at 6.41 pc and GJ 4285 at 6.80, which Gaia measures at 24.47 and 28.25. The fold keeps
+ * HYG's description and Gaia's position and distance, as {@link combine} does for any other pair.
+ */
+export function foldByIdentity(stars: readonly StarRecord[], gaiaDesignationById: ReadonlyMap<number, string>): { stars: StarRecord[]; folded: number } {
+  // A Gaia entry already folded into carries the other catalogue's name, not its designation.
+  const bare = new Map<string, number>();
+  stars.forEach((star, index) => {
+    if (star.source === 'gaia') {
+      bare.set(star.name, index);
+    }
+  });
+  const result = [...stars];
+  const folded = new Set<number>();
+  stars.forEach((star, index) => {
+    const designation = star.source === 'hyg' && star.distanceError === undefined ? gaiaDesignationById.get(star.id) : undefined;
+    const target = designation === undefined ? undefined : bare.get(designation);
+    if (target === undefined) {
+      return;
+    }
+    result[target] = combine(result[target], star);
+    bare.delete(designation!);
+    folded.add(index);
+  });
+  return { stars: result.filter((_, index) => !folded.has(index)), folded: folded.size };
+}
+
+/**
  * Unions the given catalogues, keeping one entry per star.
  *
  * Sources are taken in order of how precisely they measure parallax, best first. An entry that a

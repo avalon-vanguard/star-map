@@ -93,6 +93,9 @@ describe('starReadouts', () => {
     expect(value(starReadouts(betelgeuse, { radiusSolar: 584.3, radiusDerived: true, temperatureK: 3590, luminositySolar: null, luminosityDerived: true }), 'Radius')).toBe('~580 solar radii, from its type and brightness');
     const gj3655 = { ...HYG_STAR, name: 'GJ 3655', spectralType: 'M8', colorIndex: null, colorSystem: undefined };
     expect(value(starReadouts(gj3655, { radiusSolar: 0.106, radiusDerived: true, temperatureK: 2570, luminositySolar: null, luminosityDerived: true }), 'Radius')).toBe('~0.11 solar radii, from its type and brightness');
+    // Nor a dwarf's whose colour is off the table: HD 49748, G5 V at B−V −0.32.
+    const hd49748 = { ...HYG_STAR, name: 'HD 49748', spectralType: 'G5V', colorIndex: -0.32 };
+    expect(value(starReadouts(hd49748, { radiusSolar: 1.2, radiusDerived: true, temperatureK: 5660, luminositySolar: null, luminosityDerived: true }), 'Radius')).toBe('~1.2 solar radii, from its type and brightness');
     const kepler445 = { ...HYG_STAR, spectralType: 'M4', colorIndex: 1.66, colorFromTemperature: true, source: 'exoplanet-archive' };
     expect(value(starReadouts(kepler445, { radiusSolar: 0.21, radiusDerived: true, temperatureK: 3157, luminositySolar: null, luminosityDerived: true }), 'Radius')).toBe('~0.21 solar radii, from its temperature and brightness');
     expect(value(starReadouts(HYG_STAR, { radiusSolar: 1, radiusDerived: false, temperatureK: 5772, luminositySolar: null, luminosityDerived: true }), 'Radius')).toBe('1.00 solar radii');

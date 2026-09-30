@@ -11,6 +11,7 @@ import { fetchDeepSky } from './fetchDeepSky';
 import { fetchExoplanets } from './fetchExoplanets';
 import { fetchSolarSystem, FREELY_SPINNING_MOONS, offsetFromTrackDeg } from './fetchSolarSystem';
 import { TrackPoint } from './lib/horizons';
+import { subPlanetLongitudeDeg } from './lib/locked-spin';
 import { BYTES_PER_STAR_META, BYTES_PER_STAR_POSITION, decodeStarCatalog, encodeStarCatalog } from '../../src/app/shared/models/star-catalog';
 import { fetchStars } from './fetchStars';
 import { describeSources } from './sources/registry';
@@ -223,37 +224,29 @@ const MAX_OBLIQUITY_OFFSET_DEG = 0.1;
 /**
  * How far from its planet a locked moon's drawn face may turn: the east longitude, on the IAU's
  * body-fixed frame, of the direction to the planet from where the mean elements put the moon,
- * sampled every 135 days from 1950 to 2100, where both the tables and the IAU's elements hold.
+ * sampled every 135 days over the clock's AD 1 to 3000. Every locked moon's W turns at its orbit's
+ * own rate (see `lockedToOrbit`); at the IAU's own rates, and sampled only from 1950 to 2100, this
+ * let Proteus turn its far side to Neptune at AD 1 (146 degrees), Iapetus 87 degrees, Mimas 52 and
+ * Miranda 23, on dates the clock offers.
  *
- * Measured on this catalogue: at most 6.70 degrees (the Moon, whose longitude swings 6.3 either
- * way with its eccentricity; Horizons has the same). Three need their own. Mimas 10.15: its drawn
- * face runs from 2.5 to 10.15 degrees, about 6.3 off on average because the IAU's W and JPL's mean
- * longitude disagree, drifting 3.3 over the span because W turns 6.0e-5 degrees a day faster than
- * the row's n, and swung 2.3 either way (2e) by its eccentricity. None of that is Mimas: its
- * measured physical libration is 0.84 degrees (Tajeddine et al. 2014, Science 346, 322), and W
- * carries none; Horizons, on the same W against its integrated orbit, runs from -2.7 to 12.7
- * degrees over 1950-2100 with the 71-year S5 term the orbit here cancels. Iapetus
- * 18.33, whose row sits 9.4 degrees behind Horizons; and Proteus 8.18, whose W turns 6.3e-7 of
- * its rate slower than its orbit, a drift of 74 degrees by AD 3000. What this catches is an orbit
- * and a W that go round at different rates: the tidal acceleration W carried and the orbit did not
- * turned Phobos 13.8 degrees from Mars by 2100, and the Mimas-Tethys libration Mimas 54.5.
+ * Measured on this catalogue: at most 5.36 degrees (Titan) but for three. The Moon 7.62, at AD 1:
+ * its longitude swings 6.3 either way with its eccentricity, Horizons' too, and W's quadratic, the
+ * tidal slowing its orbit here does not carry, adds 0.75 by then. Mimas 8.94: about 6.3 off on
+ * average because the IAU's W and JPL's mean longitude disagree, and swung 2.3 either way (2e) by
+ * its eccentricity. None of that is Mimas: its measured physical libration is 0.84 degrees
+ * (Tajeddine et al. 2014, Science 346, 322), and W carries none; Horizons, on the same W against its
+ * integrated orbit, runs from -2.7 to 12.7 degrees over 1950-2100 with the 71-year S5 term the
+ * orbit here cancels. Iapetus 15.95, whose row sits 9.4 degrees behind Horizons. What this catches
+ * is an orbit and a W that go round at different rates: the tidal acceleration W carried and the
+ * orbit did not turned Phobos 13.8 degrees from Mars by 2100, and the Mimas-Tethys libration Mimas
+ * 54.5.
  */
 const MAX_SUB_PLANET_LONGITUDE_DEG = 7;
-const SUB_PLANET_CEILINGS_DEG: Record<string, number> = { mimas: 11, iapetus: 19, proteus: 9 };
-const LOCK_DATES_JD = Array.from({ length: 407 }, (_, index) => 2433282.5 + index * 135);
-
-/** The planet's east longitude on a moon's IAU body-fixed frame, from the moon's mean place, at a TDB date. */
-function subPlanetLongitudeDeg(body: BodyRecord, jd: number): number {
-  const own = positionAtEpoch(meanElementsAt(body.orbit, body.rates, jd));
-  const place = body.laplacePole ? laplacePlaneToEquatorial(own, body.laplacePole) : eclipticToEquatorial(own);
-  const { poleRaDeg, poleDecDeg, primeMeridianDeg } = orientationAt(body.rotationalElements!, jd);
-  const pole = { raDeg: poleRaDeg, decDeg: poleDecDeg };
-  const w = primeMeridianDeg * DEG_TO_RAD;
-  const meridian = laplacePlaneToEquatorial({ x: Math.cos(w), y: Math.sin(w), z: 0 }, pole);
-  const east = laplacePlaneToEquatorial({ x: -Math.sin(w), y: Math.cos(w), z: 0 }, pole);
-  const along = (axis: { x: number; y: number; z: number }) => -(place.x * axis.x + place.y * axis.y + place.z * axis.z);
-  return Math.atan2(along(east), along(meridian)) / DEG_TO_RAD;
-}
+const SUB_PLANET_CEILINGS_DEG: Record<string, number> = { moon: 8, mimas: 9.5, iapetus: 16.5 };
+/** The clock's window, AD 1 to 3000 (`CLOCK_WINDOW` in `time.store.ts`), as Julian dates. */
+const CLOCK_START_JD = Date.parse('0001-01-01T00:00Z') / 86400000 + 2440587.5;
+const CLOCK_END_JD = Date.parse('3000-01-01T00:00Z') / 86400000 + 2440587.5;
+const LOCK_DATES_JD = Array.from({ length: Math.floor((CLOCK_END_JD - CLOCK_START_JD) / 135) + 1 }, (_, index) => CLOCK_START_JD + index * 135);
 
 function angleBetweenDeg(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }): number {
   const cosine = (a.x * b.x + a.y * b.y + a.z * b.z) / (Math.hypot(a.x, a.y, a.z) * Math.hypot(b.x, b.y, b.z));
@@ -368,10 +361,10 @@ function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, Orbita
         // have to agree, or its face turns away from its planet.
         assertCondition(rotation !== undefined, `Moon ${body.id} is locked but has no W to keep its face to its planet by.`);
         const ceiling = SUB_PLANET_CEILINGS_DEG[body.id] ?? MAX_SUB_PLANET_LONGITUDE_DEG;
-        const worst = Math.max(...LOCK_DATES_JD.map((jd) => Math.abs(subPlanetLongitudeDeg(body, jd))));
+        const worst = Math.max(...LOCK_DATES_JD.map((jd) => Math.abs(subPlanetLongitudeDeg(body, rotation!, jd))));
         assertCondition(
           worst <= ceiling,
-          `Moon ${body.id} turns its face up to ${worst.toFixed(2)} degrees from its planet between 1950 and 2100 (at most ${ceiling} expected) — its orbit and its W disagree.`
+          `Moon ${body.id} turns its face up to ${worst.toFixed(2)} degrees from its planet between AD 1 and 3000 (at most ${ceiling} expected) — its orbit and its W disagree.`
         );
         spins.push(`${body.id} faces ${worst.toFixed(2)}`);
       }

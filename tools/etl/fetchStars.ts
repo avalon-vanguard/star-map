@@ -113,8 +113,12 @@ export async function fetchStars(): Promise<StarRecord[]> {
     const crossMatched = row['hip'] ? gaiaByHip.get(Number(row['hip'])) : undefined;
     const positional = crossMatched === undefined && unplaced ? brightCounterpart(row, magnitude, brightGaia) : undefined;
     // Where HYG's position leads to no bright source, the one SIMBAD names it as: HD 45951, whose
-    // declination HYG has 31.7′ out, and θ¹ Ori A (HD 37020), whose V it has 1.65 brighter than G.
-    const byIdentity = crossMatched === undefined && positional === undefined && unplaced ? brightByDesignation.get(nakedEyeDesignations.get(`HD ${row['hd']}`) ?? '') : undefined;
+    // declination HYG has 31.7′ out. Within a magnitude of HYG's V, as by position: θ¹ Ori A
+    // (HD 37020) has V 4.98 and O7 in HYG, Hipparcos's entry for it and a companion together, and
+    // its own source G 6.63 (SIMBAD: V 6.73, B0V). Placed, it was drawn brighter than θ¹ Ori C and
+    // counted as naked-eye; at 378 pc and its own magnitude the map does not keep it.
+    const named = crossMatched === undefined && positional === undefined && unplaced ? brightByDesignation.get(nakedEyeDesignations.get(`HD ${row['hd']}`) ?? '') : undefined;
+    const byIdentity = named && Math.abs(named.magnitudeG - magnitude) <= BRIGHT_COUNTERPART_MAGNITUDES ? named : undefined;
     const gaia = crossMatched ?? positional ?? byIdentity;
     const gaiaPc = gaia?.distancePc;
     const hipparcosError = hipparcos?.relativeError;

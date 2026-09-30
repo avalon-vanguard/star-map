@@ -74,23 +74,30 @@ const MIN_COLOURS_FROM_TEMPERATURE = 40;
  */
 const MAX_ARCHIVE_IDS_OFF_THEIR_NAME = 5;
 /**
- * Every star the naked eye sees, kept at any distance (c64eea0): measured 8 899 of V 6.5 or
- * brighter, 1 664 of them past 250 pc. With no magnitude handed to placementDistancePc, 7 379 are
+ * Every star the naked eye sees, kept at any distance (c64eea0): measured 8 898 of V 6.5 or
+ * brighter, 1 663 of them past 250 pc. With no magnitude handed to placementDistancePc, 7 379 are
  * left and Rigel, Deneb and Alnilam are gone — and every other check passed, the HYG survivors
  * going down rather than up. HD 197770 and HD 45291 are two of the twelve only Gaia's bright
  * sources place, by position; without that lookup they are gone and the count drops by twelve,
- * which the floor alone would not see. HD 45951 is one of the two only SIMBAD's name for its Gaia
- * source places, HYG's declination for it being 31.7′ out; θ¹ Ori A (HD 37020) is the other.
+ * which the floor alone would not see.
+ *
+ * HD 45951 is the one only SIMBAD's name for its Gaia source places, HYG's declination for it being
+ * 31.7′ out. Placed along HYG's direction instead, every check here passed, with the star drawn
+ * twice: there, and as its bare source 31.7′ away. So it is held to that source by designation.
  *
  * Twenty HYG rows of V 6.5 or brighter are still left out, for want of a distance: neither HYG nor
  * Hipparcos gives one, and Gaia DR3 has no source brighter than G 7.5 with a parallax five times
  * its error within a minute of arc, nor under the name SIMBAD gives. They are β Phe, φ Cas, χ Aur,
  * ο¹ Cen, Polis, 16 Sgr, ρ Cas, η Car, and HD 47240, 50820, 90772, 97534, 100198, 101205, 101947,
- * 129092, 151804, 185936, 202214 and 212466.
+ * 129092, 151804, 185936, 202214 and 212466. A 21st, θ¹ Ori A (HYG 26155), is left out on purpose:
+ * its V 4.98 and O7 are Hipparcos's for it and a companion together, and SIMBAD names it a source
+ * of G 6.63 at 378 pc, which the map does not keep; placed, it was drawn brighter than θ¹ Ori C.
  */
 const MIN_NAKED_EYE_STARS = 8_800;
 const NAKED_EYE_MAGNITUDE_V = 6.5;
 const REQUIRED_NAKED_EYE_STARS = ['Rigel', 'Deneb', 'Alnilam', 'HD 197770', 'HD 45291', 'HD 45951'];
+const IDENTIFIED_NAKED_EYE_STARS = [{ name: 'HD 45951', gaiaDesignation: 'Gaia DR3 3369454521490604416' }];
+const BLENDED_NAKED_EYE_ROWS = [{ id: 26155, name: 'θ¹ Ori A' }];
 
 function validateStars(stars: StarRecord[]): void {
   assertCondition(stars.length > 0, 'No stars were produced.');
@@ -178,6 +185,15 @@ function validateStars(stars: StarRecord[]): void {
   );
   for (const name of REQUIRED_NAKED_EYE_STARS) {
     assertCondition(stars.some((star) => star.name === name), `${name} is missing — naked-eye stars are no longer kept wherever a survey places them.`);
+  }
+  for (const expected of IDENTIFIED_NAKED_EYE_STARS) {
+    assertCondition(
+      stars.some((star) => star.name === expected.name && star.gaiaDesignation === expected.gaiaDesignation),
+      `${expected.name} is not on ${expected.gaiaDesignation}, the source SIMBAD names it as — it is drawn where HYG has it, beside that source.`
+    );
+  }
+  for (const blended of BLENDED_NAKED_EYE_ROWS) {
+    assertCondition(!stars.some((star) => star.id === blended.id), `${blended.name} is drawn in the V and type of Hipparcos's blend of it with a companion.`);
   }
   console.log(`  ${nakedEye} naked-eye stars.`);
 

@@ -28,6 +28,13 @@ export function entrySubtitle(entry: SearchEntry): string {
  * prefix match, and so on, so a better kind of match can never be crowded out by a worse one.
  */
 const MATCH_EXACT = 4;
+/**
+ * A prefix that ends where a word does, "kepler-186 f" for "kepler-186", ahead of one running on into
+ * the same word, "kepler-1860". Level with it, the star outranked the planet on kind, and once the
+ * archive's hosts became stars, searching a host's name listed K2-180 to K2-186 and none of K2-18's
+ * planets: 325 hosts lost some of their own planets from the eight rows shown, and now 50 do.
+ */
+const MATCH_WORD_PREFIX = 3.5;
 const MATCH_PREFIX = 3;
 const MATCH_WORD_START = 2;
 const MATCH_SUBSTRING = 1;
@@ -89,7 +96,7 @@ function scoreIndexed(indexed: IndexedSearchEntry, normalizedQuery: string, comp
     return MATCH_EXACT;
   }
   if (indexed.normalizedName.startsWith(normalizedQuery)) {
-    return MATCH_PREFIX;
+    return WORD_SEPARATORS.test(indexed.normalizedName.charAt(normalizedQuery.length)) ? MATCH_WORD_PREFIX : MATCH_PREFIX;
   }
   if (indexed.words.some((word) => word.startsWith(normalizedQuery))) {
     return MATCH_WORD_START;

@@ -1025,8 +1025,8 @@
     },
     "rates": {
       "meanMotionDegPerDay": 50.3176072,
-      "longitudeOfAscendingNodeDegPerDay": -0.007430053246547835,
-      "argumentOfPeriapsisDegPerDay": 0.015509705634511267
+      "longitudeOfAscendingNodeDegPerDay": -0.00715196269822335,
+      "argumentOfPeriapsisDegPerDay": 0.015231615086186782
     },
     "laplacePole": {
       "raDeg": 268.168,
@@ -1063,8 +1063,8 @@
         },
         {
           "angleDeg": [
-            117.57926275587673,
-            271.38269483015966
+            120.11864659790176,
+            261.22543755260784
           ],
           "ra": 0.431,
           "dec": 0.186,
@@ -1099,14 +1099,14 @@
     },
     "rates": {
       "meanMotionDegPerDay": 21.5710728,
-      "longitudeOfAscendingNodeDegPerDay": -0.002908996763377476,
-      "argumentOfPeriapsisDegPerDay": 0.004790407209562851
+      "longitudeOfAscendingNodeDegPerDay": -0.0017074099257316522,
+      "argumentOfPeriapsisDegPerDay": 0.003588820371917027
     },
     "laplacePole": {
       "raDeg": 268.639,
       "decDeg": 64.749
     },
-    "orbitSource": "JPL SSD satellite mean elements, epoch 1997 Jan 16, within 0.2 degrees of Horizons from 1950 to 2100",
+    "orbitSource": "JPL SSD satellite mean elements, epoch 1997 Jan 16, within 0.1 degrees of Horizons from 1950 to 2100",
     "parentBodyId": "jupiter",
     "rotationPeriodHours": 400.5364072574082,
     "rotationalElements": {
@@ -1137,8 +1137,8 @@
         },
         {
           "angleDeg": [
-            229.8,
-            64.3
+            230.28422637269546,
+            62.363147537348596
           ],
           "ra": 0.59,
           "dec": 0.254,
@@ -1173,8 +1173,8 @@
     },
     "rates": {
       "meanMotionDegPerDay": 381.9944948,
-      "longitudeOfAscendingNodeDegPerDay": -0.9996209770462032,
-      "argumentOfPeriapsisDegPerDay": 1.9992419540924065,
+      "longitudeOfAscendingNodeDegPerDay": -0.9994661190965093,
+      "argumentOfPeriapsisDegPerDay": 1.9990870961427125,
       "meanAnomalyTerms": {
         "b": 0,
         "c": 30.901081394463684,
@@ -1208,8 +1208,8 @@
       "terms": [
         {
           "angleDeg": [
-            178.81408536763,
-            -36511.15618661257
+            177.4,
+            -36505.5
           ],
           "ra": 13.56,
           "dec": -1.53,
@@ -1461,8 +1461,8 @@
     },
     "rates": {
       "meanMotionDegPerDay": 22.5769756,
-      "longitudeOfAscendingNodeDegPerDay": -0.001398845136769169,
-      "argumentOfPeriapsisDegPerDay": 0.002799120423059061
+      "longitudeOfAscendingNodeDegPerDay": -0.0014339093695790572,
+      "argumentOfPeriapsisDegPerDay": 0.002834184655868949
     },
     "laplacePole": {
       "raDeg": 36.214,
@@ -1671,14 +1671,14 @@
     },
     "rates": {
       "meanMotionDegPerDay": 254.6906576,
-      "longitudeOfAscendingNodeDegPerDay": -0.05560028675847895,
-      "argumentOfPeriapsisDegPerDay": 0.11058300049002093
+      "longitudeOfAscendingNodeDegPerDay": -0.05541273308413766,
+      "argumentOfPeriapsisDegPerDay": 0.11039544681567964
     },
     "laplacePole": {
       "raDeg": 77.311,
       "decDeg": 15.175
     },
-    "orbitSource": "JPL SSD satellite mean elements, epoch 1980 Jan 1, within 1.8 degrees of Horizons from 1950 to 2100",
+    "orbitSource": "JPL SSD satellite mean elements, epoch 1980 Jan 1, within 1.7 degrees of Horizons from 1950 to 2100",
     "parentBodyId": "uranus",
     "rotationPeriodHours": 33.9235057988244,
     "rotationalElements": {
@@ -1700,8 +1700,8 @@
       "terms": [
         {
           "angleDeg": [
-            103.87516350424971,
-            -2030.8004738534437
+            102.16251712700222,
+            -2023.950075898128
           ],
           "ra": 4.41,
           "dec": 4.25,
@@ -1718,8 +1718,8 @@
         },
         {
           "angleDeg": [
-            207.75032700849943,
-            -4061.6009477068874
+            204.32503425400444,
+            -4047.900151796256
           ],
           "ra": -0.04,
           "dec": -0.02,

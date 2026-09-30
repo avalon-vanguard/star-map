@@ -920,7 +920,22 @@ describe('locked moons across the clock’s window', () => {
   // As shipped, pole, W and all: the IAU gives each a W fitted near the present, and its rate is
   // not quite its orbit's, nor Iapetus's pole a line for twenty centuries.
   const shipped: BodyRecord[] = JSON.parse(readFileSync(`${process.cwd()}/src/assets/data/bodies.json`, 'utf8'));
-  const renderer = new SystemOrbitsRenderer(shipped.filter((body) => ['saturn', 'uranus', 'neptune', 'mimas', 'iapetus', 'miranda', 'proteus'].includes(body.id)), []);
+  const renderer = new SystemOrbitsRenderer(
+    shipped.filter((body) => ['jupiter', 'saturn', 'uranus', 'neptune', 'europa', 'ganymede', 'callisto', 'mimas', 'rhea', 'iapetus', 'miranda', 'triton', 'proteus'].includes(body.id)),
+    []
+  );
+
+  /** Degrees between two lines, the way a spin axis and an orbit normal are compared: Miranda turns backwards against the IAU's pole. */
+  function linesApartDeg(a: THREE.Vector3, b: THREE.Vector3): number {
+    return (Math.acos(Math.min(1, Math.abs(a.clone().normalize().dot(b.clone().normalize())))) * 180) / Math.PI;
+  }
+
+  /** A moon's drawn spin axis and the normal of its drawn orbit line, in the scene's ICRF frame. */
+  function axisAndOrbitNormal(id: string): { axis: THREE.Vector3; normal: THREE.Vector3 } {
+    const moon = renderer.members.find((member) => member.id === id)!.marker;
+    const line = moon.parent!.children.find((child) => child.name === 'orbit-line')!;
+    return { axis: new THREE.Vector3(0, 1, 0).applyQuaternion(moon.quaternion), normal: new THREE.Vector3(0, 0, 1).applyQuaternion(line.quaternion) };
+  }
 
   /** East longitude, on its map, of the point on a moon's drawn sphere that faces its planet. */
   function facingPlanet(id: string): number {
@@ -944,20 +959,49 @@ describe('locked moons across the clock’s window', () => {
     }
   });
 
-  it('keeps the axes of Miranda, Mimas and Iapetus on their drawn orbits’ normals, as a Cassini state holds them, at AD 1, today and AD 3000', () => {
-    // Measured over AD 1-3000: Miranda 0.42 degrees at most, Mimas 0.47, Iapetus 0.74. With their
-    // poles going round at the IAU's node rates, Miranda was 7.6 off at AD 1 and Mimas 2.6; with
-    // Iapetus's pole on its Laplace pole, 8.3 off at every date.
+  it('keeps the axes of Mimas and Iapetus on their drawn orbits’ normals, as a Cassini state holds them, at AD 1, today and AD 3000', () => {
+    // Measured over AD 1-3000: Mimas 0.44 degrees at most, Iapetus 0.74. With Iapetus's pole on
+    // its Laplace pole, 8.3 off at every date.
     for (const jd of [1721425.5, 2460676.5, 2816787.4]) {
       renderer.update(jd);
-      for (const id of ['miranda', 'mimas', 'iapetus']) {
-        const moon = renderer.members.find((member) => member.id === id)!.marker;
-        const line = moon.parent!.children.find((child) => child.name === 'orbit-line')!;
-        const axis = new THREE.Vector3(0, 1, 0).applyQuaternion(moon.quaternion);
-        const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(line.quaternion);
-        // A line, not a direction: Miranda turns backwards against the IAU's pole.
-        expect((Math.acos(Math.min(1, Math.abs(axis.dot(normal)))) * 180) / Math.PI).toBeLessThan(1);
+      for (const id of ['mimas', 'iapetus']) {
+        const { axis, normal } = axisAndOrbitNormal(id);
+        expect(linesApartDeg(axis, normal)).toBeLessThan(1);
       }
+    }
+  });
+
+  it('turns the poles of Europa, Ganymede, Callisto, Rhea, Miranda and Triton round with their drawn nodes, at AD 1, today and AD 3000', () => {
+    // Each pole goes round on a term of its node's angle, re-rated to the node's drawn rate (see
+    // `lockedToOrbit`), each node at JPL's current rate. Measured at these dates: at most 0.23
+    // degrees (Miranda). On the IAU's rates Rhea is 0.73, Miranda 0.51 and Triton 0.42, and on the
+    // archived table's node periods Callisto 0.48 and Miranda 0.42.
+    for (const jd of [1721425.5, 2460676.5, 2816787.4]) {
+      renderer.update(jd);
+      for (const id of ['europa', 'ganymede', 'callisto', 'rhea', 'miranda', 'triton']) {
+        const { axis, normal } = axisAndOrbitNormal(id);
+        expect(linesApartDeg(axis, normal), id).toBeLessThan(0.25);
+      }
+    }
+  });
+
+  it('draws Miranda’s orbit, and turns its axis, where Horizons has its orbit in 1601 and 2390', () => {
+    // Horizons' osculating orbit normal (ura184, ICRF), averaged over three of Miranda's orbits about
+    // each date; it wobbles 0.01 degrees about that. The drawn node turns at JPL's current 17.787-year
+    // period (see `nodePeriodYears` in the ETL); on the archived table's 17.727, which the IAU's pole
+    // was once turned after too, the drawn orbit was 2.1 degrees from Horizons' at both dates and the
+    // axis 2.4 at 1601. A date this far back is TDB less some two minutes; the node moves 0.004 degrees in that.
+    const HORIZONS_NORMALS: Array<[jd: number, raDeg: number, decDeg: number]> = [
+      [2305813.5, 72.83137, 16.17526],
+      [2594102.5, 81.27691, 17.43782]
+    ];
+    for (const [jd, raDeg, decDeg] of HORIZONS_NORMALS) {
+      renderer.update(jd);
+      const [ra, dec] = [(raDeg * Math.PI) / 180, (decDeg * Math.PI) / 180];
+      const horizons = new THREE.Vector3(Math.cos(dec) * Math.cos(ra), Math.cos(dec) * Math.sin(ra), Math.sin(dec));
+      const { axis, normal } = axisAndOrbitNormal('miranda');
+      expect(linesApartDeg(normal, horizons)).toBeLessThan(0.5);
+      expect(linesApartDeg(axis, horizons)).toBeLessThan(0.5);
     }
   });
 });

@@ -62,9 +62,10 @@ const SUN_LIGHT_POSITION = new THREE.Vector3(4, 3, 5);
           </a>
         </div>
       }
-      <!-- Search and what has been kept: there is no scene readout here, the info panel is
-           the reading, and the panel's own control is what keeps this body. -->
-      <app-hud-dock (bookmarkChosen)="goToBookmark($event)" />
+      <!-- Search, what has been kept and the clock: there is no scene readout here, the info
+           panel is the reading, and the panel's own control is what keeps this body. The body is
+           drawn at the clock's date and turns at its rate, so both are shown and can be set here. -->
+      <app-hud-dock [date]="date()" [clock]="true" (bookmarkChosen)="goToBookmark($event)" />
     </div>
   `
 })
@@ -101,6 +102,10 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
 
   readonly viewModel = signal<BodyDetailViewModel | undefined>(undefined);
   readonly notFound = signal(false);
+  /** The date the body is drawn for, as the dock's strip prints it; empty at the present. */
+  readonly date = signal('');
+  /** Set when a body is shown, until the next frame has put the camera on its Sun's side. */
+  private cameraToSunSide = false;
 
   constructor(
     private readonly engine: EngineService,
@@ -188,6 +193,7 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     this.body = this.bodies.find((body) => body.id === viewModel.id);
     this.planet?.rotation.set(0, 0, 0);
     this.sunLight?.position.copy(SUN_LIGHT_POSITION);
+    this.cameraToSunSide = true;
 
     this.disposeRing();
     this.disposeGlow();
@@ -279,14 +285,23 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
    */
   private tick(deltaSeconds: number): void {
     this.controls?.update();
-    if (!this.planet) {
+    this.date.set(this.time.atNow() ? '' : this.time.date().toISOString().slice(0, 10));
+    if (!this.planet || !this.sunLight) {
       return;
     }
     const sunAzimuth = Math.atan2(SUN_LIGHT_POSITION.x, SUN_LIGHT_POSITION.z);
-    if (this.body && this.sunLight && bodyPageView(this.body, this.bodies, this.time.julianDate(), sunAzimuth, this.planet.quaternion, this.sunLight.position)) {
+    if (this.body && bodyPageView(this.body, this.bodies, this.time.julianDate(), sunAzimuth, this.planet.quaternion, this.sunLight.position)) {
       this.sunLight.position.multiplyScalar(SUN_LIGHT_POSITION.length());
     } else {
       this.planet.rotation.y += deltaSeconds * 0.08;
+    }
+    if (this.cameraToSunSide) {
+      // Above or below the equator, whichever side the Sun is on. Held above it, the page opened
+      // Saturn on the unlit face of its rings from 2025 until 2039, while the Sun is south of
+      // them — the face Earth does not see either.
+      const camera = this.engine.getCamera();
+      camera.position.y = Math.abs(camera.position.y) * (this.sunLight.position.y < 0 ? -1 : 1);
+      this.cameraToSunSide = false;
     }
   }
 

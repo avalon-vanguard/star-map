@@ -77,6 +77,17 @@ describe('HudDockComponent', () => {
     expect(tabNames()).toEqual(['Search', 'Readout', 'Routes', 'Bookmarks', 'Display']);
   });
 
+  it('offers the clock alone, as a Clock tab, to a surface with no layers', () => {
+    fixture.componentRef.setInput('clock', true);
+    fixture.componentRef.setInput('defaultTab', 'display');
+    fixture.detectChanges();
+    expect(tabNames()).toEqual(['Search', 'Bookmarks', 'Clock']);
+    const panel = host().querySelector('#dock-panel-display')!;
+    expect(panel.querySelector('[role="radiogroup"][aria-label="Clock rate"]')).not.toBeNull();
+    expect(panel.querySelector('#clock-date')).not.toBeNull();
+    expect(panel.textContent).not.toContain('Layers');
+  });
+
   it('opens the default tab on mount and renders the readout from its inputs', () => {
     setReadout();
     fixture.componentRef.setInput('defaultTab', 'readout');

@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 import * as THREE from 'three/webgpu';
@@ -34,7 +34,9 @@ const SATURN: BodyRecord = {
   rates: {meanMotionDegPerDay: 0.033459683702669406, longitudeOfAscendingNodeDegPerDay: -0.000006848734291581108, argumentOfPeriapsisDegPerDay: 0.000021682266940451745},
   rotationalElements: {poleRaDeg: [40.589, -0.036, 0], poleDecDeg: [83.537, -0.004, 0], primeMeridianDeg: [38.9, 810.7939024, 0]}
 };
-const BODIES = [EARTH, SATURN];
+// Eris as it is shipped for this page's purposes: no IAU model, so its page keeps its own light.
+const ERIS: BodyRecord = { ...EARTH, id: 'eris', name: 'Eris', kind: 'dwarf', radiusKm: 1163, rotationalElements: undefined };
+const BODIES = [EARTH, SATURN, ERIS];
 
 /** Stands in for the WebGPU engine: a scene, a camera, and the tick hook, driven by hand. */
 class FakeEngineService {
@@ -85,24 +87,29 @@ describe('BodyDetailSceneComponent', () => {
   let engine: FakeEngineService;
   let page: { planet: THREE.Mesh; ring?: THREE.Mesh; sunLight: THREE.DirectionalLight };
   let time: TimeStore;
+  let route: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
 
-  async function open(id: string): Promise<void> {
+  let fixture: ComponentFixture<BodyDetailSceneComponent>;
+
+  /** Opens a body's page at a date; `whole` keeps the page's own template, dock and panel included. */
+  async function open(id: string, date = '2025-06-01T12:00Z', whole = false): Promise<void> {
     engine = new FakeEngineService();
+    route = new BehaviorSubject(convertToParamMap({ id }));
     TestBed.configureTestingModule({
       imports: [BodyDetailSceneComponent],
       providers: [
         { provide: DataLoaderService, useClass: FakeDataLoaderService },
-        { provide: ActivatedRoute, useValue: { paramMap: new BehaviorSubject(convertToParamMap({ id })) } },
+        { provide: ActivatedRoute, useValue: { paramMap: route } },
         { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true) } }
       ]
     }).overrideComponent(BodyDetailSceneComponent, {
-      // The scene alone: the info panel and the dock are tested on their own.
-      set: { providers: [{ provide: EngineService, useValue: engine }], imports: [], template: '<canvas #canvas></canvas>' }
+      // The scene alone, unless asked: the info panel and the dock are tested on their own.
+      set: whole ? { providers: [{ provide: EngineService, useValue: engine }] } : { providers: [{ provide: EngineService, useValue: engine }], imports: [], template: '<canvas #canvas></canvas>' }
     });
     time = TestBed.inject(TimeStore);
     time.setRate(0);
-    time.setDate(new Date('2025-06-01T12:00Z'));
-    const fixture = TestBed.createComponent(BodyDetailSceneComponent);
+    time.setDate(new Date(date));
+    fixture = TestBed.createComponent(BodyDetailSceneComponent);
     fixture.detectChanges();
     await flushAsync();
     page = fixture.componentInstance as unknown as typeof page;
@@ -127,5 +134,51 @@ describe('BodyDetailSceneComponent', () => {
     expect(bodyPageView(EARTH, BODIES, time.julianDate(), Math.atan2(4, 5), planet, sun)).toBe(true);
     expect(page.planet.quaternion.angleTo(planet)).toBeLessThan(1e-9);
     expect(page.sunLight.position.clone().normalize().angleTo(sun)).toBeLessThan(1e-9);
+  });
+
+  it('follows the clock once the page is open, as it runs or is set', async () => {
+    await open('earth');
+    time.setDate(new Date('2025-06-01T18:00Z'));
+    engine.tick(0.016);
+    const planet = new THREE.Quaternion();
+    expect(bodyPageView(EARTH, BODIES, time.julianDate(), Math.atan2(4, 5), planet, new THREE.Vector3())).toBe(true);
+    // Six hours on, a quarter turn of Earth: a page frozen at its first frame is 90 degrees out.
+    expect(page.planet.quaternion.angleTo(planet)).toBeLessThan(1e-9);
+  });
+
+  it('puts the page’s own light back when the next body shown has no IAU model to place its Sun', async () => {
+    await open('earth');
+    expect(page.sunLight.position.distanceTo(new THREE.Vector3(4, 3, 5))).toBeGreaterThan(0.1);
+    route.next(convertToParamMap({ id: 'eris' }));
+    await flushAsync();
+    engine.tick(0.016);
+    expect(page.sunLight.position.distanceTo(new THREE.Vector3(4, 3, 5))).toBeLessThan(1e-9);
+  });
+
+  it('says on its dock the date the body is drawn for, and nothing at the present, and offers the clock', async () => {
+    await open('saturn', '2032-06-01T12:00Z', true);
+    fixture.detectChanges();
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('[data-testid="hud-date"]')?.textContent).toContain('2032-06-01');
+    expect([...host.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent?.trim())).toContain('Clock');
+    time.reset();
+    engine.tick(0.016);
+    fixture.detectChanges();
+    expect(host.querySelector('[data-testid="hud-date"]')).toBeNull();
+  });
+
+  it('opens Saturn on the face of its rings the Sun lights: the south, from 2025 to 2039', async () => {
+    await open('saturn', '2032-06-01T12:00Z');
+    const camera = engine.getCamera();
+    // The Sun 26.7 degrees south of the rings, and the camera with it rather than 11 degrees north.
+    expect(page.sunLight.position.y).toBeLessThan(0);
+    expect(camera.position.y).toBeLessThan(0);
+
+    route.next(convertToParamMap({ id: 'earth' }));
+    await flushAsync();
+    engine.tick(0.016);
+    // June: Earth's Sun is in the north, and so is the camera again.
+    expect(page.sunLight.position.y).toBeGreaterThan(0);
+    expect(camera.position.y).toBeGreaterThan(0);
   });
 });

@@ -9,6 +9,7 @@ import { BodyRecord, RotationalElements } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
 import { bodyTexturePath, loadCachedTexture } from '../../shared/rendering/texture-catalog';
+import { bodyMarkerRadiusAu } from './system-framing';
 
 /** The clock's UT date that names a TDB one: TT - UT, which moves by under a second a year, earlier. */
 const utOf = (jdTdb: number): number => jdTdb - ttMinusUtSeconds(jdTdb) / 86400;
@@ -512,6 +513,27 @@ describe('photographs', () => {
   });
 });
 
+describe('markers', () => {
+  it('draws every body on the one sphere, scaled to its radius, and leaves that sphere when a system is left', () => {
+    const records: BodyRecord[] = [2500, 60000].map((radiusKm, index) => ({
+      id: `body-${index}`, systemStarId: 0, name: `Body ${index}`, kind: 'planet', radiusKm, orbitSource: 'test',
+      orbit: { semiMajorAxisAu: 1 + index, eccentricity: 0, inclinationDeg: 0, longitudeOfAscendingNodeDeg: 0, argumentOfPeriapsisDeg: 0, meanAnomalyAtEpochDeg: 0, epochJd: DEFAULT_EPOCH_JD },
+      rates: keplerRates(1 + index, GM_SUN_AU3_PER_DAY2)
+    }));
+    const renderer = new SystemOrbitsRenderer(records, [exoplanet({ radiusEarth: 1.1 })], undefined, 1);
+    const meshes = renderer.members.map((member) => member.marker as THREE.Mesh);
+    expect(new Set(meshes.map((mesh) => mesh.geometry)).size).toBe(1);
+    [2500, 60000, 1.1 * 6371].forEach((radiusKm, index) => {
+      const sphere = meshes[index].geometry as THREE.SphereGeometry;
+      expect(meshes[index].scale.x * sphere.parameters.radius).toBeCloseTo(bodyMarkerRadiusAu(radiusKm), 12);
+    });
+    const disposed = vi.fn();
+    meshes[0].geometry.addEventListener('dispose', disposed);
+    renderer.dispose();
+    expect(disposed).not.toHaveBeenCalled();
+  });
+});
+
 describe('derived surfaces', () => {
   const maps = (renderer: SystemOrbitsRenderer): Array<THREE.Texture | null> =>
     renderer.members.map((member) => ((member.marker as THREE.Mesh).material as THREE.MeshStandardMaterial).map);
@@ -553,7 +575,7 @@ describe('derived surfaces', () => {
 describe('exoplanet size without a measured radius', () => {
   const radiusOf = (overrides: Partial<ExoplanetRecord>): number => {
     const renderer = new SystemOrbitsRenderer([], [exoplanet(overrides)], undefined, 1);
-    return ((renderer.members[0].marker as THREE.Mesh).geometry as THREE.SphereGeometry).parameters.radius;
+    return renderer.members[0].marker.userData['radiusAu'];
   };
   const EARTH_AU = 6371 / 149597870.7;
 
@@ -769,7 +791,7 @@ describe('solar-system bodies against Horizons', () => {
     const marker = renderer.members.find((member) => member.id === id)!.marker as THREE.Mesh;
     const centre = worldPosition(id);
     const towards = point.clone().sub(centre).normalize();
-    const radius = (marker.geometry as THREE.SphereGeometry).parameters.radius;
+    const radius = marker.userData['radiusAu'];
     const hit = new THREE.Raycaster(centre.clone().addScaledVector(towards, radius * 4), towards.clone().negate()).intersectObject(marker)[0];
     return { eastDeg: (hit.uv!.x - 0.5) * 360, latDeg: (hit.uv!.y - 0.5) * 180 };
   }

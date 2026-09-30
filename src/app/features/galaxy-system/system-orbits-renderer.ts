@@ -205,6 +205,11 @@ function reshapeOrbitLine(line: THREE.Line, elements: OrbitalElements): void {
  * frame: a texture is copied to the GPU in the first frame that draws it, and the 28 maps, which
  * arrive within 40 ms of each other, made that one frame a 160-210 ms task on entering the Sun's
  * system (copyExternalImageToTexture, about 20 megapixels of JPEG).
+ *
+ * Every marker is the one unit sphere, {@link MARKER_SPHERE}, scaled to the body's radius, which
+ * it also keeps as `userData.radiusAu`: built one a body, the 38 spheres of the Sun's system took
+ * 12 ms of the 15 ms the renderer took to build and, with their upload, made a return to the
+ * system a long task of 52 to 70 ms, where the 18 bodies before had made none.
  */
 function buildMarker(
   id: string | undefined,
@@ -214,7 +219,6 @@ function buildMarker(
   deferSurface: (paint: () => void) => void,
   deferPhotograph: (material: THREE.MeshStandardMaterial, texture: THREE.Texture) => void
 ): THREE.Mesh {
-  const geometry = new THREE.SphereGeometry(bodyMarkerRadiusAu(radiusKm), MARKER_WIDTH_SEGMENTS, MARKER_HEIGHT_SEGMENTS);
   const photograph = id ? bodyTexturePath(id) : undefined;
   // null, not undefined, until there is one: three warns "parameter 'map' has value of
   // undefined" for every body built so, eleven of them on entering the Sun's system.
@@ -235,7 +239,11 @@ function buildMarker(
       material.needsUpdate = true;
     });
   }
-  return new THREE.Mesh(geometry, material);
+  const marker = new THREE.Mesh(MARKER_SPHERE, material);
+  const radiusAu = bodyMarkerRadiusAu(radiusKm);
+  marker.scale.setScalar(radiusAu);
+  marker.userData = { radiusAu };
+  return marker;
 }
 
 /**
@@ -266,6 +274,8 @@ function starLight(): THREE.PointLight {
  */
 const MARKER_WIDTH_SEGMENTS = 64;
 const MARKER_HEIGHT_SEGMENTS = 32;
+/** Shared by every marker of every system, so it is never disposed; see `buildMarker`. */
+const MARKER_SPHERE = new THREE.SphereGeometry(1, MARKER_WIDTH_SEGMENTS, MARKER_HEIGHT_SEGMENTS);
 
 /**
  * A drawn radius, in Earth radii, for an exoplanet that has a mass and no measured radius — 1 076
@@ -434,7 +444,8 @@ export class SystemOrbitsRenderer {
         // A child of the sphere, so it lies in the equator the IAU pole turns the sphere into and
         // is scaled with it where the marker is held to its pixel floor. Jupiter's, Uranus's and
         // Neptune's rings are left out: dark, narrow or dusty, they are too faint to see here.
-        const ring = saturnRing(body.radiusKm, bodyMarkerRadiusAu(body.radiusKm));
+        // In the sphere's own units, its radius being 1.
+        const ring = saturnRing(body.radiusKm, 1);
         tracked.marker.add(ring);
         this.trackDisposable(ring.geometry, ring.material as THREE.Material);
       }
@@ -613,7 +624,9 @@ export class SystemOrbitsRenderer {
     this.grid?.dispose();
     this.tethers?.dispose();
     for (const { geometry, material } of this.disposables) {
-      geometry.dispose();
+      if (geometry !== MARKER_SPHERE) {
+        geometry.dispose();
+      }
       material.dispose();
     }
     // Detach as well as dispose. A star-to-star hop builds a new renderer and drops the old

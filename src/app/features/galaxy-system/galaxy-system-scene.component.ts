@@ -861,8 +861,12 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
     const world = new THREE.Vector3();
     const drawnRadiusAu = new Map<string, number>();
-    const radiusOf = (marker: THREE.Object3D): number | undefined =>
+    // A body's marker is a unit sphere scaled to its radius, kept in `userData.radiusAu`; the
+    // star's is built at its own.
+    const sphereRadius = (marker: THREE.Object3D): number | undefined =>
       ((marker as THREE.Mesh).geometry as THREE.SphereGeometry | undefined)?.parameters?.radius;
+    const radiusOf = (marker: THREE.Object3D): number | undefined =>
+      (marker.userData['radiusAu'] as number | undefined) ?? sphereRadius(marker);
     const floorFor = (marker: THREE.Object3D): number => {
       marker.getWorldPosition(world);
       return (
@@ -891,7 +895,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
           : Number.POSITIVE_INFINITY;
       const drawn = Math.min(Math.max(radiusAu, floorFor(marker)), Math.max(radiusAu, ceiling));
       drawnRadiusAu.set(id, drawn);
-      marker.scale.setScalar(drawn / radiusAu);
+      marker.scale.setScalar(drawn / sphereRadius(marker)!);
     }
   }
 

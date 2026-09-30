@@ -174,24 +174,37 @@ describe('effectiveTemperatureK', () => {
   });
 
   it('reads a colour in its own system, and a spectral type where there is no colour', () => {
-    // An M5 dwarf is 3 060 K at B−V 1.83 or BP−RP 3.35. Its type alone goes through the colour
-    // `spectralTypeToColorIndex` gives it, B−V 1.70, and comes out a little warmer.
+    // An M5 dwarf is 3 060 K at B−V 1.83 or BP−RP 3.35, and at its type alone.
     expect(effectiveTemperatureK({ magnitude: 11, distancePc: 5, colorIndex: 3.35, colorSystem: 'BP-RP' })).toBeCloseTo(3060, 0);
     expect(effectiveTemperatureK({ magnitude: 11, distancePc: 5, colorIndex: 1.83, colorSystem: 'B-V' })).toBeCloseTo(3060, 0);
-    expect(effectiveTemperatureK({ magnitude: 11, distancePc: 5, spectralType: 'M5Ve', colorIndex: null })).toBeCloseTo(3106, 0);
+    expect(effectiveTemperatureK({ magnitude: 11, distancePc: 5, spectralType: 'M5Ve', colorIndex: null })).toBeCloseTo(3060, 0);
     expect(effectiveTemperatureK({ magnitude: 11, distancePc: 5, spectralType: 'Unknown', colorIndex: null })).toBeNull();
   });
 
   it('reads a colour past the table at its end where there is no type, and the type where there is', () => {
     // An ultracool dwarf redder than M8.5, a white dwarf bluer than B9 at the 19 012 K Gentile
-    // Fusillo et al. (2021) measure at its colour, not B9's 10 700, and an O star B−V puts at B0.
+    // Fusillo et al. (2021) measure at its colour, not B9's 10 700, and an O star at its type's
+    // 35 100 K, where B−V puts every O star at B0's 31 400.
     expect(effectiveTemperatureK({ magnitude: 14.005, distancePc: 4.005, spectralType: 'Unknown', magnitudeBand: 'G', colorIndex: 5.113, colorSystem: 'BP-RP' })).toBe(2420);
     expect(effectiveTemperatureK({ magnitude: 14, distancePc: 25, spectralType: 'Unknown', magnitudeBand: 'G', colorIndex: -0.25, colorSystem: 'BP-RP' })).toBeCloseTo(19012, 6);
-    expect(effectiveTemperatureK({ magnitude: 7, distancePc: 121, spectralType: 'O8', colorIndex: -0.31, colorSystem: 'B-V' })).toBe(31400);
+    expect(effectiveTemperatureK({ magnitude: 7, distancePc: 121, spectralType: 'O8', colorIndex: -0.31, colorSystem: 'B-V' })).toBe(35100);
     // HD 49748, G5 V at B−V −0.32: the colour is the one that is wrong.
     const g5 = effectiveTemperatureK({ magnitude: 9, distancePc: 184, spectralType: 'G5V', colorIndex: null })!;
     expect(effectiveTemperatureK({ magnitude: 9, distancePc: 184, spectralType: 'G5V', colorIndex: -0.319, colorSystem: 'B-V' })).toBe(g5);
     expect(g5).toBeGreaterThan(5500);
+  });
+});
+
+describe('a dwarf with a type and no colour', () => {
+  it("is drawn at its type's row of the dwarf sequence, not at the textbook colour of its type", () => {
+    // GJ 3655, M8 at V 19.57 and 14.35 pc: M8 V is 2 570 K and 0.114 R☉ (Mamajek's table, 2022.04.16).
+    // Through the textbook colour, B−V 1.88, the table's M5, and the textbook correction, −3.92
+    // where M8's is −5.65, it was 3 001 K and 0.035 R☉, a third of Jupiter.
+    const gj3655 = { magnitude: 19.57, distancePc: 14.35, spectralType: 'M8', magnitudeBand: 'V', colorIndex: null } as const;
+    expect(effectiveTemperatureK(gj3655)).toBeCloseTo(2570, 6);
+    const radius = radiusFromLuminositySolar(luminositySolar(gj3655)!, effectiveTemperatureK(gj3655)!);
+    expect(radius / 0.114).toBeGreaterThan(1 / 1.2);
+    expect(radius / 0.114).toBeLessThan(1.2);
   });
 });
 

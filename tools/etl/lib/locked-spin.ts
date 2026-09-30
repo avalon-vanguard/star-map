@@ -21,6 +21,16 @@ const MAX_LOCKED_RATE_OFFSET = 1e-5;
 /** Harmonics of the node's angle that carry a pole round its orbit's; see {@link lockedToOrbit}. */
 const POLE_HARMONICS = 5;
 
+/**
+ * How far a periodic term's angle may turn from a multiple of the node's rate, as a fraction of it,
+ * and still be taken for the node's angle as the IAU's source had it. Measured: at most 3.4e-2
+ * (Ganymede's J5), then Rhea's R4 1.2e-2 and Miranda's U11 3.2e-3; the nearest that is not a node is
+ * a term of Miranda's W alone, 6.0e-2 from three times it. Multiples go up to the ninth, the most the
+ * report takes (Triton's N7); past that, Umbriel's W has a term 1.0e-2 from ten times its node's.
+ */
+const MAX_NODE_RATE_OFFSET = 0.05;
+const MAX_NODE_HARMONIC = 9;
+
 /** The planet's east longitude on a moon's IAU body-fixed frame, from the moon's mean place, at a TDB date. */
 export function subPlanetLongitudeDeg(body: Pick<BodyRecord, 'orbit' | 'rates' | 'laplacePole'>, elements: RotationalElements, jd: number): number {
   const own = positionAtEpoch(meanElementsAt(body.orbit, body.rates, jd));
@@ -41,15 +51,25 @@ export function subPlanetLongitudeDeg(body: Pick<BodyRecord, 'orbit' | 'rates' |
  * The report gives a locked moon's W the mean motion of whichever orbit its authors had, and JPL's
  * table has another: Proteus's W turns 6.3e-7 of its rate slower than its row, which turned its far
  * side to Neptune at AD 1 (146 degrees), Mimas's 1.6e-7 faster (52 at AD 1) and Miranda's (23).
- * W's rate is set to the orbit's here, its constant moved so W is unchanged at {@link PRESENT_JD},
- * and the pole and every periodic term are the IAU's. Measured over AD 1-3000: Proteus 2.7 degrees,
- * Mimas 8.9, Miranda 2.8, Ariel 1.0. A W with a quadratic is left: Phobos's orbit already takes the
- * quadratic from W (see `orbitalTermsOfPrimeMeridian`), and the Moon's, its tidal slowing, is 0.75
- * degrees at AD 1.
+ * W's rate is set to the orbit's here, its constant moved so W is unchanged at {@link PRESENT_JD}.
+ * Measured over AD 1-3000: Proteus 2.7 degrees, Mimas 8.9, Miranda 2.4, Ariel 1.0. A W with a
+ * quadratic is left: Phobos's orbit already takes the quadratic from W (see
+ * `orbitalTermsOfPrimeMeridian`), and the Moon's, its tidal slowing, is 0.75 degrees at AD 1.
+ *
+ * The node's angle goes the same way. A moon in a Cassini state keeps its axis on its orbit normal,
+ * which goes round the Laplace pole with the node, and the IAU's pole goes round with it on a term
+ * of the node's angle, at the node's rate as its source had it: Miranda's U11 at -2024.22 degrees a
+ * century, where the table the orbit is drawn from has -2030.80. On a 4.3-degree circle that parted
+ * the axis from the drawn orbit by 7.9 degrees at AD 1, and Mimas's by 2.6. Every term whose angle
+ * turns within {@link MAX_NODE_RATE_OFFSET} of a multiple of the node's rate is set to that multiple,
+ * its constant moved so the angle is unchanged at the present, and the pole with it: over AD 1-3000
+ * Miranda's axis stays within 0.42 degrees of its orbit normal and Mimas's within 0.47, and the
+ * Io's, Europa's, Ganymede's, Rhea's and Triton's within 0.17. The rest of the pole and its terms
+ * are the IAU's: Callisto's J6 turns 40 per cent slower than its node, and is left.
  *
  * `poleFollowsOrbit` is for Iapetus, whose IAU pole moves 3.9 degrees a century in right ascension
  * and 1.1 in declination: a straight line through its orbit normal's 3 439-year circle round the
- * Laplace pole, 8.3 degrees across, which by AD 1 has run past the celestial pole (Dec 97.9) and 11
+ * Laplace pole, 8.3 degrees in radius (16.6 across), which by AD 1 has run past the celestial pole (Dec 97.9) and 11
  * degrees off the orbit, and turned its face 87 degrees from Saturn. Its axis sits on its orbit normal
  * (0.04 degrees apart today), as a moon in a Cassini state keeps it, so its pole is given the circle: the
  * normal's right ascension as sines and declination as cosines of the node's angle and its first
@@ -69,7 +89,17 @@ export function lockedToOrbit(elements: RotationalElements, mean: Pick<MeanOrbit
   if (Math.abs(w1 / n - 1) > MAX_LOCKED_RATE_OFFSET) {
     throw new Error(`${name}'s IAU W turns at ${w1} degrees a day, ${Math.abs(w1 / n - 1).toExponential(2)} of its orbit's ${n}: not the rate of the orbit it keeps its face to.`);
   }
-  const locked: RotationalElements = { ...elements, primeMeridianDeg: [w0 + (w1 - n) * (PRESENT_JD - J2000_JD), n, 0] };
+  const nodeRate = mean.rates.longitudeOfAscendingNodeDegPerDay * DAYS_PER_JULIAN_CENTURY;
+  const present = (PRESENT_JD - J2000_JD) / DAYS_PER_JULIAN_CENTURY;
+  const terms = elements.terms?.map((term) => {
+    const [constant, rate, quadratic = 0] = term.angleDeg;
+    const k = Math.round(rate / nodeRate);
+    if (quadratic !== 0 || k === 0 || Math.abs(k) > MAX_NODE_HARMONIC || Math.abs(rate / (k * nodeRate) - 1) > MAX_NODE_RATE_OFFSET) {
+      return term;
+    }
+    return { ...term, angleDeg: [constant + (rate - k * nodeRate) * present, k * nodeRate] };
+  });
+  const locked: RotationalElements = { ...elements, primeMeridianDeg: [w0 + (w1 - n) * (PRESENT_JD - J2000_JD), n, 0], ...(terms ? { terms } : {}) };
   return poleFollowsOrbit ? poleRoundOrbit(locked, mean) : locked;
 }
 

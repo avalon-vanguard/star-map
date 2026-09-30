@@ -1,6 +1,6 @@
 import { statSync } from 'node:fs';
 
-import { BodyRecord, OrbitalElements } from '../../src/app/shared/models/body.model';
+import { BodyRecord, OrbitalElements, RotationalElements } from '../../src/app/shared/models/body.model';
 import { eclipticToEquatorial, laplacePlaneToEquatorial, raDecToUnitVector } from '../../src/app/shared/astro/coordinates';
 import { meanElementsAt, positionAtEpoch } from '../../src/app/shared/astro/kepler';
 import { orientationAt } from '../../src/app/shared/astro/rotational-elements';
@@ -257,7 +257,7 @@ const MAX_OBLIQUITY_OFFSET_DEG = 0.1;
  *
  * Measured on this catalogue: at most 5.36 degrees (Titan) but for three. The Moon 7.62, at AD 1:
  * its longitude swings 6.3 either way with its eccentricity, Horizons' too, and W's quadratic, the
- * tidal slowing its orbit here does not carry, adds 0.75 by then. Mimas 8.94: about 6.3 off on
+ * tidal slowing its orbit here does not carry, adds 0.75 by then. Mimas 8.89: about 6.3 off on
  * average because the IAU's W and JPL's mean longitude disagree, and swung 2.3 either way (2e) by
  * its eccentricity. None of that is Mimas: its measured physical libration is 0.84 degrees
  * (Tajeddine et al. 2014, Science 346, 322), and W carries none; Horizons, on the same W against its
@@ -269,6 +269,22 @@ const MAX_OBLIQUITY_OFFSET_DEG = 0.1;
  */
 const MAX_SUB_PLANET_LONGITUDE_DEG = 7;
 const SUB_PLANET_CEILINGS_DEG: Record<string, number> = { moon: 8, mimas: 9.5, iapetus: 16.5 };
+/**
+ * How far a locked moon's spin axis may lean from the normal of the orbit it is drawn going round,
+ * over the same dates. A locked moon sits in a Cassini state, its axis on its orbit normal as the
+ * node carries both round the Laplace pole, and the IAU's pole goes round on a term of the node's
+ * angle; at the rate the IAU's source had for it and not the drawn orbit's, Miranda's axis was 7.89
+ * degrees off at AD 9 and Mimas's 2.63, and an Iapetus pole left on the Laplace pole is 8.30 off at
+ * every date (see `lockedToOrbit`).
+ *
+ * Measured on this catalogue: at most 0.97 degrees (Tethys, whose IAU pole sits 0.69 from its orbit
+ * normal today; Titan 0.94, whose pole the IAU holds still while its node turns in 705 years) but
+ * for four. The Moon 6.98, its real 6.7-degree tilt to its orbit. Phobos 1.81 and Deimos 1.74, and
+ * Proteus 1.09: their IAU poles nod with Mars's and Neptune's precessing poles, the Laplace poles
+ * their orbits are drawn round are fixed.
+ */
+const MAX_AXIS_FROM_ORBIT_DEG = 1;
+const AXIS_FROM_ORBIT_CEILINGS_DEG: Record<string, number> = { moon: 7.1, phobos: 2, deimos: 2, proteus: 1.2 };
 /** The clock's window, AD 1 to 3000 (`CLOCK_WINDOW` in `time.store.ts`), as Julian dates. */
 const CLOCK_START_JD = Date.parse('0001-01-01T00:00Z') / 86400000 + 2440587.5;
 const CLOCK_END_JD = Date.parse('3000-01-01T00:00Z') / 86400000 + 2440587.5;
@@ -277,6 +293,19 @@ const LOCK_DATES_JD = Array.from({ length: Math.floor((CLOCK_END_JD - CLOCK_STAR
 function angleBetweenDeg(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }): number {
   const cosine = (a.x * b.x + a.y * b.y + a.z * b.z) / (Math.hypot(a.x, a.y, a.z) * Math.hypot(b.x, b.y, b.z));
   return (Math.acos(Math.min(1, Math.max(-1, cosine))) * 180) / Math.PI;
+}
+
+/** Degrees between a body's spin axis — its IAU pole, turned over where W runs backwards — and the normal of the orbit it is drawn going round, at a TDB date. */
+function axisFromOrbitDeg(body: BodyRecord, rotation: RotationalElements, jd: number): number {
+  const pole = orientationAt(rotation, jd);
+  const pointing = raDecToUnitVector(pole.poleRaDeg / 15, pole.poleDecDeg);
+  const sense = Math.sign(rotation.primeMeridianDeg[1]);
+  const axis = { x: sense * pointing.x, y: sense * pointing.y, z: sense * pointing.z };
+  const { inclinationDeg, longitudeOfAscendingNodeDeg } = meanElementsAt(body.orbit, body.rates, jd);
+  const tilt = inclinationDeg * DEG_TO_RAD;
+  const node = longitudeOfAscendingNodeDeg * DEG_TO_RAD;
+  const normal = { x: Math.sin(tilt) * Math.sin(node), y: -Math.sin(tilt) * Math.cos(node), z: Math.cos(tilt) };
+  return angleBetweenDeg(axis, body.laplacePole ? laplacePlaneToEquatorial(normal, body.laplacePole) : eclipticToEquatorial(normal));
 }
 
 function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, OrbitalElements>, horizonsTracks: Map<string, TrackPoint[]>): void {
@@ -364,14 +393,7 @@ function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, Orbita
         spins.push(`${body.id} day ${dayOffset.toExponential(1)}`);
       }
       if (body.obliquityDeg !== undefined) {
-        const pole = orientationAt(rotation, horizons!.epochJd);
-        const pointing = raDecToUnitVector(pole.poleRaDeg / 15, pole.poleDecDeg);
-        const axis = { x: Math.sign(rate) * pointing.x, y: Math.sign(rate) * pointing.y, z: Math.sign(rate) * pointing.z };
-        const { inclinationDeg, longitudeOfAscendingNodeDeg } = meanElementsAt(body.orbit, body.rates, horizons!.epochJd);
-        const tilt = inclinationDeg * DEG_TO_RAD;
-        const node = longitudeOfAscendingNodeDeg * DEG_TO_RAD;
-        const normal = { x: Math.sin(tilt) * Math.sin(node), y: -Math.sin(tilt) * Math.cos(node), z: Math.cos(tilt) };
-        const obliquity = angleBetweenDeg(axis, body.laplacePole ? laplacePlaneToEquatorial(normal, body.laplacePole) : eclipticToEquatorial(normal));
+        const obliquity = axisFromOrbitDeg(body, rotation, horizons!.epochJd);
         assertCondition(
           Math.abs(obliquity - body.obliquityDeg) <= MAX_OBLIQUITY_OFFSET_DEG,
           `${body.name}'s IAU spin axis is ${obliquity.toFixed(3)} degrees from its orbit's pole, where ${body.id === 'pluto' ? 'its IAU pole' : 'Horizons'} gives an obliquity of ${body.obliquityDeg} (at most ${MAX_OBLIQUITY_OFFSET_DEG} apart expected) — the pole or the sense of W was read wrongly.`
@@ -406,6 +428,13 @@ function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, Orbita
           `Moon ${body.id} turns its face up to ${worst.toFixed(2)} degrees from its planet between AD 1 and 3000 (at most ${ceiling} expected) — its orbit and its W disagree.`
         );
         spins.push(`${body.id} faces ${worst.toFixed(2)}`);
+        const axisCeiling = AXIS_FROM_ORBIT_CEILINGS_DEG[body.id] ?? MAX_AXIS_FROM_ORBIT_DEG;
+        const worstAxis = Math.max(...LOCK_DATES_JD.map((jd) => axisFromOrbitDeg(body, rotation!, jd)));
+        assertCondition(
+          worstAxis <= axisCeiling,
+          `Moon ${body.id}'s spin axis leans up to ${worstAxis.toFixed(2)} degrees from its orbit's normal between AD 1 and 3000 (at most ${axisCeiling} expected) — its pole does not go round with its node.`
+        );
+        spins.push(`${body.id} axis ${worstAxis.toFixed(2)}`);
       }
       if (body.massRatio !== undefined) {
         // The pair's barycentre, which the planet's elements place, must lie outside the planet —

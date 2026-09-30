@@ -56,7 +56,10 @@ in it is measured and what is not.
 cutting to a new scene. The Sun gets the real solar-system bodies, moving on JPL's mean orbital
 elements — Standish's for the planets, JPL SSD's satellite table for the moons, the Small-Body
 Database for Ceres, Eris, Haumea and Makemake — and turned by the IAU's rotational elements, Earth
-by the IERS Earth Rotation Angle; other
+by the IERS Earth Rotation Angle; a tidally locked moon's prime meridian (but the Moon's and
+Phobos's) turns at its JPL mean motion and its pole's terms on its node at its JPL node rate, both
+re-phased to the IAU's values on 2025-01-01, and Iapetus's pole follows its orbit normal
+(`lockedToOrbit`), so each keeps its face to its planet from AD 1 to 3000; other
 stars get their confirmed exoplanets. Orbits are drawn as ellipses and bodies are propagated
 along them by a Kepler solver to the date on the map's clock. Under them, a dashed grid marks out
 round distances in AU — 5 AU rings for the solar system, 0.01 AU rings for TRAPPIST-1 — with a
@@ -330,7 +333,7 @@ plugin's own files are kept so it can be listed from a marketplace of its own la
 ## Data credits
 
 Star catalogue: [HYG database](https://github.com/astronexus/HYG-Database) (Hipparcos, Yale
-Bright Star, Gliese) — 68 388 stars within 250 pc. Solar-system orbits: JPL approximate planetary mean elements (Standish), JPL SSD satellite mean elements and the JPL Small-Body Database; rotation: the IAU WGCCRE 2015 report via NAIF's pck00011, and for Earth the IERS Conventions 2010; physical data, and the positions the orbits are checked against: NASA/JPL Horizons. Exoplanets: NASA Exoplanet
+Bright Star, Gliese) — 68 388 stars within 250 pc. Solar-system orbits: JPL approximate planetary mean elements (Standish), JPL SSD satellite mean elements and the JPL Small-Body Database; rotation: the IAU WGCCRE 2015 report via NAIF's pck00011, with a locked moon's W and node terms re-rated to its JPL mean elements and Iapetus's pole carried round its orbit normal, and for Earth the IERS Conventions 2010; physical data, and the positions the orbits are checked against: NASA/JPL Horizons. Exoplanets: NASA Exoplanet
 Archive. Deep-sky objects: [OpenNGC](https://github.com/mattiaverga/OpenNGC). Body and skybox
 imagery: NASA/JPL/USGS public domain and Solar System Scope (CC BY 4.0) — per-file provenance
 is recorded in `src/assets/textures/README.md`.

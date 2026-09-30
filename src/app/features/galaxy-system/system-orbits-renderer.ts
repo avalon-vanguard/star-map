@@ -162,7 +162,8 @@ function ellipseInItsPlane(elements: OrbitalElements, positions: Float32Array): 
 
 /**
  * How far, in AU, an orbit's drawn ellipse may be from its current one before it is drawn again:
- * well under the 128 chords' own sag from the true curve, 0.0005 AU for Mars and 0.003 for Saturn.
+ * well under the 128 chords' own sag from the true curve, at most 0.00055 AU for Mars and 0.0032
+ * for Saturn, near aphelion, where points spaced evenly in true anomaly lie furthest apart.
  */
 const ORBIT_RESHAPE_AU = 1e-4;
 

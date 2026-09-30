@@ -718,12 +718,21 @@ describe('solar-system bodies against Horizons', () => {
   }
 
   it('redraws a planet’s orbit as its axis and eccentricity drift, so Saturn and Mars stay on their lines at AD 1', () => {
-    // What is left is the 128 chords' own sag from the true ellipse: measured 0.0017 AU for Saturn and
-    // 0.0005 for Mars at AD 1, and 0.0011 for Saturn at J2000. Drawn at J2000's shape at AD 1, the
-    // lines were 0.054 AU from Saturn and 0.0022 from Mars.
-    for (const [id, days, maxAu] of [['saturn', -730000, 0.002], ['mars', -730000, 0.0006], ['saturn', 0, 0.0015]] as const) {
+    // What is left is the 128 chords' own sag from the true ellipse, which depends on where the
+    // planet falls between two points: at most 0.0032 AU for Saturn, near aphelion, and 0.00055 for
+    // Mars. Measured 0.0017 AU for Saturn and 0.0005 for Mars at AD 1, and 0.0011 for Saturn at
+    // J2000. Drawn at J2000's shape at AD 1, the lines were 0.054 AU from Saturn and 0.0022 from Mars.
+    const saturnLine = renderer.object.children[renderer.object.children.indexOf(renderer.members.find((member) => member.id === 'saturn')!.marker) - 1] as THREE.Line;
+    renderer.update(DEFAULT_EPOCH_JD);
+    const drawnVersion = (saturnLine.geometry.getAttribute('position') as THREE.BufferAttribute).version;
+    for (const [id, days, maxAu] of [['saturn', -730000, 0.0035], ['mars', -730000, 0.0006], ['saturn', 0, 0.0035]] as const) {
       renderer.update(DEFAULT_EPOCH_JD + days);
       expect(offLineAu(id)).toBeLessThan(maxAu);
+      if (days !== 0) {
+        // Handed to the GPU again, which uploads a buffer only when its version rises: the points
+        // rewritten on the CPU alone leave J2000's ellipse on screen.
+        expect((saturnLine.geometry.getAttribute('position') as THREE.BufferAttribute).version).toBeGreaterThan(drawnVersion);
+      }
     }
   });
 

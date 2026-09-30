@@ -9,6 +9,8 @@ import { fetchExoplanets } from './fetchExoplanets';
 import { fetchSolarSystem } from './fetchSolarSystem';
 import { BYTES_PER_STAR_META, BYTES_PER_STAR_POSITION, decodeStarCatalog, encodeStarCatalog, isDesignation } from '../../src/app/shared/models/star-catalog';
 import { fetchStars } from './fetchStars';
+import { ARCHIVE_EPOCH, archiveStarId, CATALOGUE_EPOCH } from '../../src/app/shared/astro/host-star-matching';
+import { propagateProperMotion, raDegDecDistanceToXyz } from '../../src/app/shared/astro/coordinates';
 import { describeSources } from './sources/registry';
 import { dataPath } from './lib/paths';
 
@@ -43,6 +45,42 @@ const MAX_RANGED_DISTANCE_SHARE = 0.01;
  * notices — the other 62 002 carry it from their Gaia row.
  */
 const MIN_HYG_STARS_AT_GAIA_DISTANCE = 6_000;
+/**
+ * The other half of placing a star at its more precise distance (8c3a860): a HYG star folded into
+ * its Gaia entry that keeps its Hipparcos distance, which Gaia saturates on. Measured 384, none
+ * before 8c3a860, and 148 with fetchStars handing combine Gaia's error with the Hipparcos distance,
+ * where the two errors tie and Gaia's distance wins — which the floor above cannot see, since that
+ * raises its count to 8 129. The two stars below are what that looks like: Tarazed went back to
+ * Gaia's 178.9 pc, and Eta Leo kept its 389 pc but read "±17 %, HYG, Gaia DR3 distance".
+ */
+const MIN_GAIA_STARS_AT_HIPPARCOS_DISTANCE = 300;
+const HIPPARCOS_PLACED_STARS = [
+  { id: 96970, name: 'Tarazed', distancePc: 121.07 },
+  { id: 49441, name: 'Eta Leo', distancePc: 389.11 }
+];
+/** Their distances' errors, 2.1 % and 6.3 %, against Gaia's 6.9 % and 17 %. */
+const MAX_HIPPARCOS_PLACED_ERROR = 0.065;
+/**
+ * Archive hosts whose colour is read off their temperature, which the card marks "from its
+ * temperature" (23547de). Measured 54; the flag's write dropped from fetchExoplanets leaves none,
+ * and every other check passes, since the round trip compares the flag with itself.
+ */
+const MIN_COLOURS_FROM_TEMPERATURE = 40;
+/**
+ * Archive stars numbered after their host's name (62f81f2), so a refresh keeps each one's id and a
+ * bookmark its star. Measured: 3 276 of the 3 277 take the id their name hashes to, one having
+ * probed past a taken one. Numbered in arrival order, as before, none do, and nothing else fails.
+ */
+const MAX_ARCHIVE_IDS_OFF_THEIR_NAME = 5;
+/**
+ * Every star the naked eye sees, kept at any distance (c64eea0): measured 8 886 of V 6.5 or
+ * brighter, 1 653 of them past 250 pc. With no magnitude handed to placementDistancePc, 7 379 are
+ * left and Rigel, Deneb and Alnilam are gone — and every other check passed, the HYG survivors
+ * going down rather than up.
+ */
+const MIN_NAKED_EYE_STARS = 8_800;
+const NAKED_EYE_MAGNITUDE_V = 6.5;
+const REQUIRED_DISTANT_STARS = ['Rigel', 'Deneb', 'Alnilam'];
 
 function validateStars(stars: StarRecord[]): void {
   assertCondition(stars.length > 0, 'No stars were produced.');
@@ -122,6 +160,45 @@ function validateStars(stars: StarRecord[]): void {
   console.log(
     `  Gaia distances a median ${(medianGaiaError * 100).toFixed(2)} % uncertain; ${ranged} parallax distances ranged; ${hygAtGaiaDistance} HYG stars at Gaia's distance.`
   );
+
+  const nakedEye = stars.filter((star) => star.magnitudeBand === 'V' && star.magnitude <= NAKED_EYE_MAGNITUDE_V && star.id !== SUN_STAR_ID).length;
+  assertCondition(
+    nakedEye >= MIN_NAKED_EYE_STARS,
+    `Only ${nakedEye} stars of V ${NAKED_EYE_MAGNITUDE_V} or brighter (at least ${MIN_NAKED_EYE_STARS} expected) — naked-eye stars are no longer kept at any distance.`
+  );
+  for (const name of REQUIRED_DISTANT_STARS) {
+    assertCondition(stars.some((star) => star.name === name), `${name} is missing — a naked-eye star past the survey is no longer kept.`);
+  }
+  console.log(`  ${nakedEye} naked-eye stars.`);
+
+  const gaiaAtHipparcosDistance = stars.filter((star) => star.source === 'gaia' && star.magnitudeBand === 'V' && !star.distanceFromGaia).length;
+  assertCondition(
+    gaiaAtHipparcosDistance >= MIN_GAIA_STARS_AT_HIPPARCOS_DISTANCE,
+    `Only ${gaiaAtHipparcosDistance} HYG stars folded into Gaia keep their Hipparcos distance (at least ${MIN_GAIA_STARS_AT_HIPPARCOS_DISTANCE} expected) — the more precise distance no longer wins.`
+  );
+  for (const expected of HIPPARCOS_PLACED_STARS) {
+    const star = stars.find((candidate) => candidate.id === expected.id);
+    const distancePc = star && Math.hypot(star.x, star.y, star.z);
+    assertCondition(
+      star !== undefined && Math.abs(distancePc! / expected.distancePc - 1) < 0.01 && !star.distanceFromGaia && (star.distanceError ?? 1) < MAX_HIPPARCOS_PLACED_ERROR,
+      `${expected.name} is at ${distancePc?.toFixed(1)} pc, error ${star?.distanceError}, Gaia's: ${star?.distanceFromGaia} — expected its Hipparcos ${expected.distancePc} pc and error.`
+    );
+  }
+  const coloursFromTemperature = stars.filter((star) => star.colorFromTemperature).length;
+  assertCondition(
+    coloursFromTemperature >= MIN_COLOURS_FROM_TEMPERATURE,
+    `Only ${coloursFromTemperature} colours are marked as read off a temperature (at least ${MIN_COLOURS_FROM_TEMPERATURE} expected) — fetchExoplanets no longer says so.`
+  );
+  const archiveStars = stars.filter((star) => star.source === 'exoplanet-archive');
+  const offTheirName = archiveStars.filter((star) => star.id !== archiveStarId(star.name, new Set())).length;
+  assertCondition(
+    offTheirName <= MAX_ARCHIVE_IDS_OFF_THEIR_NAME,
+    `${offTheirName} of the ${archiveStars.length} archive stars have an id other than their name's (at most ${MAX_ARCHIVE_IDS_OFF_THEIR_NAME} expected) — a refresh would renumber them.`
+  );
+  console.log(
+    `  ${gaiaAtHipparcosDistance} Gaia stars at their Hipparcos distance; ${coloursFromTemperature} colours from a temperature; ${offTheirName} archive ids off their name.`
+  );
+
 
   // Hipparcos's mark on a classification it does not print in full reached the card as "Spectral
   // type A0m...", for Sirius and 2 126 other stars, which reads as text the app cut short.
@@ -247,6 +324,12 @@ const MIN_HOSTED_SHARE = 0.995;
  * Proxima 0.105 R☉ instead of 0.141 — and nothing else fails.
  */
 const MIN_HOST_SURFACE_SHARE = 0.9;
+/**
+ * How far, in milliarcseconds, a star placed from the archive may sit from its planets' published
+ * position carried from the archive's epoch to the catalogue's. Measured 0.0001 at most, rounding;
+ * carried from J2016 instead, TOI-2406 moves 203 mas and 2 287 archive stars more than 1.
+ */
+const MAX_ARCHIVE_EPOCH_OFFSET_MAS = 1;
 
 function validateExoplanets(exoplanets: ExoplanetRecord[], stars: StarRecord[]): void {
   assertCondition(exoplanets.length > 0, 'No exoplanets were produced.');
@@ -293,7 +376,35 @@ function validateExoplanets(exoplanets: ExoplanetRecord[], stars: StarRecord[]):
     Math.min(withRadius, withTemperature) >= exoplanets.length * MIN_HOST_SURFACE_SHARE,
     `Only ${withRadius} of ${exoplanets.length} exoplanets carry their host's radius and ${withTemperature} its temperature (at least ${MIN_HOST_SURFACE_SHARE * 100} % expected) — st_rad or st_teff is being lost.`
   );
-  console.log(`  ${withRadius}/${exoplanets.length} carry their host's radius, ${withTemperature} its temperature.`);
+  // Since d94451e st_lum warms the planets of 4 441 hosts and is what their cards print; lost, each
+  // falls back to a derived luminosity, 757 of them more than 1.5 times off it. Measured 6 036.
+  const luminosities = exoplanets.map((exoplanet) => exoplanet.hostStarLuminositySolar).filter((luminosity) => luminosity !== undefined);
+  assertCondition(
+    luminosities.length >= exoplanets.length * MIN_HOST_SURFACE_SHARE,
+    `Only ${luminosities.length} of ${exoplanets.length} exoplanets carry their host's luminosity (at least ${MIN_HOST_SURFACE_SHARE * 100} % expected) — st_lum is being lost.`
+  );
+  // Published as a logarithm, most of them negative: stored unconverted, they would not be.
+  assertCondition(
+    luminosities.every((luminosity) => Number.isFinite(luminosity) && luminosity! > 0),
+    'A host luminosity is not a positive number — st_lum is no longer converted from its logarithm.'
+  );
+  console.log(`  ${withRadius}/${exoplanets.length} carry their host's radius, ${withTemperature} its temperature, ${luminosities.length} its luminosity.`);
+
+  let worstOffsetMas = 0;
+  for (const star of stars.filter((candidate) => candidate.source === 'exoplanet-archive')) {
+    const planet = exoplanets.find((candidate) => candidate.hostStarId === star.id)!;
+    const at = propagateProperMotion(planet.hostRaDeg!, planet.hostDecDeg!, planet.hostPmRaMasPerYear ?? 0, planet.hostPmDecMasPerYear ?? 0, CATALOGUE_EPOCH - ARCHIVE_EPOCH);
+    const expected = raDegDecDistanceToXyz(at.raDeg, at.decDeg, 1);
+    const length = Math.hypot(star.x, star.y, star.z);
+    // The chord between the two directions, which unlike an arccosine resolves a milliarcsecond.
+    const chord = Math.hypot(star.x / length - expected.x, star.y / length - expected.y, star.z / length - expected.z);
+    worstOffsetMas = Math.max(worstOffsetMas, (chord * 180 * 3_600_000) / Math.PI);
+  }
+  assertCondition(
+    worstOffsetMas <= MAX_ARCHIVE_EPOCH_OFFSET_MAS,
+    `A star placed from the archive sits ${worstOffsetMas.toFixed(1)} mas from its published position carried to J2000 (at most ${MAX_ARCHIVE_EPOCH_OFFSET_MAS} expected) — it is carried from another epoch.`
+  );
+  console.log(`  Stars placed from the archive at most ${worstOffsetMas.toExponential(1)} mas from their published position carried to J2000.`);
 
   // How many can be propagated at their real rate rather than as if the host were the Sun.
   const withPeriod = exoplanets.filter((exoplanet) => exoplanet.periodDays !== undefined).length;

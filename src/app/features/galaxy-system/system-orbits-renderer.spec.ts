@@ -690,6 +690,33 @@ describe('solar-system bodies against Horizons', () => {
     }
   });
 
+  /** How far a top-level body is from its own drawn orbit line, in AU: from the nearest of its chords. */
+  function offLineAu(id: string): number {
+    const marker = renderer.members.find((member) => member.id === id)!.marker;
+    const line = renderer.object.children[renderer.object.children.indexOf(marker) - 1] as THREE.Line;
+    expect(line.name).toBe('orbit-line');
+    line.updateMatrixWorld();
+    const position = line.geometry.getAttribute('position');
+    const vertex = (index: number): THREE.Vector3 => new THREE.Vector3().fromBufferAttribute(position, index).applyMatrix4(line.matrixWorld);
+    const chord = new THREE.Line3();
+    const closest = new THREE.Vector3();
+    let nearest = Number.POSITIVE_INFINITY;
+    for (let index = 0; index + 1 < position.count; index++) {
+      nearest = Math.min(nearest, chord.set(vertex(index), vertex(index + 1)).closestPointToPoint(marker.position, true, closest).distanceTo(marker.position));
+    }
+    return nearest;
+  }
+
+  it('redraws a planet’s orbit as its axis and eccentricity drift, so Saturn and Mars stay on their lines at AD 1', () => {
+    // What is left is the 128 chords' own sag from the true ellipse: measured 0.0017 AU for Saturn and
+    // 0.0005 for Mars at AD 1, and 0.0011 for Saturn at J2000. Drawn at J2000's shape at AD 1, the
+    // lines were 0.054 AU from Saturn and 0.0022 from Mars.
+    for (const [id, days, maxAu] of [['saturn', -730000, 0.002], ['mars', -730000, 0.0006], ['saturn', 0, 0.0015]] as const) {
+      renderer.update(DEFAULT_EPOCH_JD + days);
+      expect(offLineAu(id)).toBeLessThan(maxAu);
+    }
+  });
+
   it('turns the Moon’s drawn orbit with its node, so the Moon stays on its own line', () => {
     // Half the node's 18.6-year turn on, the ellipse drawn at the epoch has the Moon 10 degrees off
     // its plane at the worst.

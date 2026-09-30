@@ -137,11 +137,15 @@ const BODY_SPECS: BodySpec[] = [
   // Hyperion's eccentricity is 0.105 in JPL's current table (ssd.jpl.nasa.gov/sats/elem, SAT441).
   { id: 'hyperion', name: 'Hyperion', kind: 'moon', horizonsCommand: '607', center: '500@699', parentBodyId: 'saturn', spinsFreely: true, measuredEccentricity: 0.105, trackStepDays: 1 },
   { id: 'iapetus', name: 'Iapetus', kind: 'moon', horizonsCommand: '608', center: '500@699', parentBodyId: 'saturn', poleFollowsOrbit: true },
-  // Phoebe's row gives a mean motion of 0.6569114 degrees a day, a 548.02-day year, where its
-  // Horizons page and JPL's current table (SAT441) give 550.30: the table's own note warns that
-  // its source misstated the mean motions of retrograde moons. On the row's figure Phoebe was
-  // 25 degrees from Horizons by 2025 and 100 by 2075; on the current period, within 2.6 from 1950
-  // to 2100 (2.58 in 1969).
+  // Phoebe's row gives n = 0.6569114 degrees a day as the table defines it, the rate of its mean
+  // longitude, node plus periapsis plus mean anomaly, and its P, 548.02 days, is 360 over that. Its
+  // sidereal period is 550.30 (its Horizons page and JPL's current table, SAT441): n less twice its
+  // node's rate, 0.6541855, against 360 / 550.30391 = 0.6541840. Triton's row gives its sidereal
+  // rate as n instead, and the propagator reads a retrograde moon's n as that (see
+  // `meanElementsAt`): on the row's n Phoebe ran twice its node's rate too fast, 25 degrees from
+  // Horizons by 2025 and 100 by 2075. On the sidereal period it is within 2.6 from 1950 to 2100
+  // (2.58 in 1969). The table's note on misstated retrograde mean motions is about another source,
+  // Jacobson 2000 on Jupiter's outer moons, and says the table carries the corrected values.
   { id: 'phoebe', name: 'Phoebe', kind: 'moon', horizonsCommand: '609', center: '500@699', parentBodyId: 'saturn', spinsFreely: true, periodDays: 550.30391 },
   { id: 'miranda', name: 'Miranda', horizonsCommand: '705', ...URANUS_MOON },
   { id: 'ariel', name: 'Ariel', horizonsCommand: '701', ...URANUS_MOON },

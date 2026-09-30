@@ -95,10 +95,10 @@ export interface BodyRecord {
    * Horizons gives a negative rate (Venus, Uranus), and the tilt of that axis from its orbital
    * plane — which past 90 degrees already says the turn is retrograde.
    *
-   * For a locked moon the period is its orbit's, from the mean motion that carries it round; for
-   * a body whose source states none, the measured one its ETL spec carries (Eris, Nereid). Absent
-   * only for Hyperion, which tumbles — the view leaves it still rather than spinning it at an
-   * invented rate.
+   * For a locked moon the period is its orbit's, from the mean motion that carries it round. Where
+   * the source states none, or one a later measurement overturns, it is the one the body's ETL spec
+   * carries: Nereid's K2 light curve, Eris's lock to Dysnomia. Absent only for Hyperion, which
+   * tumbles — the view leaves it still rather than spinning it at an invented rate.
    */
   rotationPeriodHours?: number;
   obliquityDeg?: number;

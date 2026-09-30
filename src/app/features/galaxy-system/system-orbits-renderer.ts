@@ -204,7 +204,8 @@ function reshapeOrbitLine(line: THREE.Line, elements: OrbitalElements): void {
  * A photograph is handed to `deferPhotograph`, which puts it on the body once it has loaded, one a
  * frame: a texture is copied to the GPU in the first frame that draws it, and the 28 maps, which
  * arrive within 40 ms of each other, made that one frame a 160-210 ms task on entering the Sun's
- * system (copyExternalImageToTexture, about 20 megapixels of JPEG).
+ * system (copyExternalImageToTexture, about 38 megapixels of JPEG: nine maps at 2048 by 1024, the
+ * Sun's among them, Jupiter's at 3840 by 1920, and eighteen smaller).
  *
  * Every marker is the one unit sphere, {@link MARKER_SPHERE}, scaled to the body's radius, which
  * it also keeps as `userData.radiusAu`: built one a body, the 38 spheres of the Sun's system took

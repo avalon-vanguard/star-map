@@ -58,8 +58,9 @@ export function poleFrame(pole: { raDeg: number; decDeg: number }, target = new 
  * it is turned by the IERS Earth Rotation Angle at the clock's date (IERS Conventions 2010, eq.
  * 5.15), counted from the node its W starts at, 90 degrees past its pole's right ascension. The
  * IAU's W for Earth, fitted to today, runs 6.3e-6 degrees a day slow of that once its pole's drift
- * is counted: taken at UT, it left Earth's lit face 2.3 degrees off Horizons at AD 1000 and 4.5 at
- * AD 1. Taken at TDB, it would have turned ΔT further, 44 degrees at AD 1.
+ * is counted: taken at UT + 69.184 s, as it was, it left Earth's lit face 2.3 degrees off Horizons at
+ * AD 1000 and 4.5 at AD 1 (2.0 and 4.2 at UT itself). Taken at TDB, it would have turned ΔT further,
+ * 44 degrees at AD 1.
  */
 export function bodyOrientation(elements: RotationalElements, jdUtc: number, target = new THREE.Quaternion(), followsUt = false): THREE.Quaternion {
   const { poleRaDeg, poleDecDeg, primeMeridianDeg } = orientationAt(elements, tdbFromUtc(jdUtc));

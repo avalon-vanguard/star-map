@@ -126,6 +126,14 @@ describe('luminositySolar', () => {
     // Antares, M1 Ib at B−V 1.87: 3 660 K (Ohnaka et al. 2013), where its colour's dwarf is 3 019.
     const antares = { magnitude: 1.06, distancePc: 169.78, spectralType: 'M1Ib + B2.5V', magnitudeBand: 'V', colorIndex: 1.865, colorSystem: 'B-V' } as const;
     expect(Math.abs(effectiveTemperatureK(antares)! - 3660)).toBeLessThan(100);
+    // Each piece of van Belle et al.'s (2021) table 8, at G0 = 50, K0 = 60, M0 = 66 on its index:
+    // G8 III 7856 − 52.74 × 58, K2 III 16751 − 199.41 × 62, and flat at 3 134 K from M6 III.
+    const giant = (spectralType: string) => effectiveTemperatureK({ magnitude: 5, distancePc: 100, spectralType, colorIndex: null });
+    expect(giant('G8III')).toBeCloseTo(4797.08, 1);
+    expect(giant('K2III')).toBeCloseTo(4387.58, 1);
+    expect(giant('M5.5III')).toBeCloseTo(3343.43, 1);
+    expect(giant('M6III')).toBe(3134);
+    expect(giant('M7III')).toBe(3134);
     // Aldebaran, K5 III, 44.2 R☉ (Richichi & Roccatagliata 2005), to a tenth; Rigel, B8 Ia, 74.1
     // (Baines et al. 2018), to a fifth. With a correction off the type beside the colour's
     // temperature, Rigel came out 101.6; with K5's own correction at 3 902 K, Aldebaran 52.

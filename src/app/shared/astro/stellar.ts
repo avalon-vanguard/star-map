@@ -188,8 +188,9 @@ export function effectiveTemperatureK(star: StellarPhotometry): number | null {
  * temperature it was drawn at 95 R☉, and Alp Cam, O9.5 Ia, at 338, where 14 and 21 are published.
  *
  * G to M giants take van Belle et al.'s (2021, ApJ 922, 163, table 8) interferometric scale, fitted
- * to 191 giants from G1 to M7.75 III: 4 692 K at K0, 3 816 at M0, 3 472 at M4, held at 3 134 past
- * M7.75. O to F giants take the dwarf of their type, which a supergiant of the same type is within
+ * to 191 giants from G1 to M7.75 III: 4 797 K at G8, 4 388 at K2, 3 816 at M0, 3 472 at M4, and held
+ * at 3 134 K from M6, where its own M6 and M7 giants average 3 112 and 3 114 K. Carried on to M7.9
+ * instead, the M6 giants were 3 300 K and drawn 30 % too small. O to F giants take the dwarf of their type, which a supergiant of the same type is within
  * a few per cent of from B8 on, and a few thousand kelvin cooler than at B0 (Alnilam, B0 Ia, about
  * 27 000 K against B0 V's 31 400). Carbon and S stars take {@link CARBON_STAR}.
  */
@@ -209,7 +210,7 @@ export function giantSurface(spectralType: string | null | undefined): { tempera
   if (spectralClass === 'G' || spectralClass === 'K' || spectralClass === 'M') {
     // van Belle's index: G0 at 50, K0 at 60, K5 at 65 and M0 at 66, so a K later than K5 falls between.
     const index = spectralClass === 'G' ? 50 + subclass : spectralClass === 'K' ? 60 + Math.min(subclass, 5) + Math.max(subclass - 5, 0) / 5 : 66 + subclass;
-    const temperatureK = index <= 61 ? 7856 - 52.74 * index : index <= 64 ? 16751 - 199.41 * index : Math.max(9491 - 85.98 * index, 3134);
+    const temperatureK = index <= 61 ? 7856 - 52.74 * index : index <= 64 ? 16751 - 199.41 * index : index < 72 ? 9491 - 85.98 * index : 3134;
     return { temperatureK, bolometricCorrectionV: dwarfSequenceAtTemperature(temperatureK).bolometricCorrectionV };
   }
   const dwarf = dwarfSequenceAtType(primary)!;

@@ -64,8 +64,8 @@ describe('systemFramingDistanceAu', () => {
   });
 
   it("keeps a giant's disc clear of its neighbours' names on a phone, which hang a fixed 78 px in from their ring", () => {
-    // Betelgeuse at 390x844 and at 1600x1000. Kept to half the half-side, its disc was 98 px on the
-    // phone, where the names come within 66 px of the centre.
+    // Betelgeuse at 390x844 and at 1600x1000. Kept to half the half-side, its disc was 98 px in radius
+    // on the phone, where the names come within 66 px of the centre.
     const betelgeuseAu = 2.72;
     for (const [width, height] of [[390, 844], [1600, 1000]]) {
       const viewport = { fovDegrees: 50, aspect: width / height, shorterSidePx: Math.min(width, height) };

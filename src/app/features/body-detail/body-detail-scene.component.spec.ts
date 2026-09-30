@@ -38,7 +38,14 @@ const SATURN: BodyRecord = {
 // their own light; Eris's day is measured, and Hyperion tumbles and has none.
 const ERIS: BodyRecord = { ...EARTH, id: 'eris', name: 'Eris', kind: 'dwarf', radiusKm: 1163, rotationalElements: undefined, rotationPeriodHours: 378.504 };
 const HYPERION: BodyRecord = { ...ERIS, id: 'hyperion', name: 'Hyperion', kind: 'moon', radiusKm: 135, parentBodyId: 'saturn', rotationPeriodHours: undefined };
-const BODIES = [EARTH, SATURN, ERIS, HYPERION];
+// Mercury as shipped, but its 0.01-degree libration: its Sun is never 0.034 degrees off its equator.
+const MERCURY: BodyRecord = {
+  id: 'mercury', systemStarId: 0, name: 'Mercury', kind: 'planet', radiusKm: 2439.4, orbitSource: 'test',
+  orbit: {semiMajorAxisAu: 0.38709843, eccentricity: 0.20563661, inclinationDeg: 7.00559432, longitudeOfAscendingNodeDeg: 48.33961819, argumentOfPeriapsisDeg: 29.118100759999997, meanAnomalyAtEpochDeg: 174.79394829, epochJd: 2451545},
+  rates: {meanMotionDegPerDay: 4.092338805372484, longitudeOfAscendingNodeDegPerDay: -0.0000033440607802874744, argumentOfPeriapsisDegPerDay: 0.000007708198494182067},
+  rotationalElements: {poleRaDeg: [281.0103, -0.0328, 0], poleDecDeg: [61.4155, -0.0049, 0], primeMeridianDeg: [329.5988, 6.1385108, 0]}
+};
+const BODIES = [EARTH, SATURN, ERIS, HYPERION, MERCURY];
 
 /** Stands in for the WebGPU engine: a scene, a camera, and the tick hook, driven by hand. */
 class FakeEngineService {
@@ -221,6 +228,23 @@ describe('BodyDetailSceneComponent', () => {
     // degrees off the middle of the view.
     const toSaturn = new THREE.Vector3().sub(camera.position);
     expect(camera.getWorldDirection(new THREE.Vector3()).angleTo(toSaturn)).toBeLessThan(1e-9);
+  });
+
+  it('leaves the camera on its side while the Sun only grazes the equator: Mercury through two crossings', async () => {
+    // The Sun is south of Mercury's equator on 2026-10-20, north from about 1 November, and south
+    // again from about 6 December, never more than 0.034 degrees either side.
+    await open('mercury', '2026-10-20T00:00Z');
+    const camera = engine.getCamera();
+    expect(page.sunLight.position.y).toBeLessThan(0);
+    expect(camera.position.y).toBeLessThan(0);
+    const sunSides = new Set<number>();
+    for (let day = 1; day <= 60; day++) {
+      time.setDate(new Date(Date.parse('2026-10-20T00:00Z') + day * 86400000));
+      engine.tick(0.016);
+      sunSides.add(Math.sign(page.sunLight.position.y));
+      expect(camera.position.y).toBeLessThan(0);
+    }
+    expect([...sunSides].sort()).toEqual([-1, 1]);
   });
 
   it('leaves the camera where the reader orbits it while the Sun stays on one side', async () => {

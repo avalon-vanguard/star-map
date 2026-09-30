@@ -21,11 +21,14 @@ export function describingCatalogue(star: StarRecord): string {
 /**
  * What the readout says a star is: the catalogue's classification, or — for the 83 % of stars
  * that have none, every Gaia star among them — the dwarf type its colour matches, marked as an
- * estimate. Empty with neither, rather than the ETL's literal "Unknown".
+ * estimate. Empty with neither, rather than the ETL's literal "Unknown". Where the colour was itself
+ * read off the archive's temperature, the estimate says so: 30 archive hosts measured in no colour
+ * read "~X, from colour", PSR J1719-1438, a pulsar the archive gives 4 500 K, "~K5, from colour".
  */
 export function starSubtitle(star: StarRecord): string {
   const classification = spectralClassification(star);
-  return !classification ? '' : `Spectral type ${classification}${classification.startsWith('~') ? ', from colour' : ''}`;
+  const basis = star.colorFromTemperature ? ', from its temperature' : ', from colour';
+  return !classification ? '' : `Spectral type ${classification}${classification.startsWith('~') ? basis : ''}`;
 }
 
 /**

@@ -34,6 +34,8 @@ interface BodySpec {
   sbdb?: string;
   /** A measured mean radius, in km, for a body neither Horizons nor the SBDB gives one for. */
   radiusKm?: number;
+  /** A triaxial body's semi-axes, in km, largest first, where its card should give its shape; see `BodyRecord.semiAxesKm`. */
+  semiAxesKm?: [number, number, number];
   /** A measured sidereal day, in hours, where a later measurement overturns the one its source gives. */
   rotationPeriodHours?: number;
   /** The eccentricity for the card, where the row the orbit is drawn from gives an outdated one; see `BodyRecord.measuredEccentricity`. */
@@ -116,7 +118,7 @@ const BODY_SPECS: BodySpec[] = [
   // +/- 0.08 hour single peak again with TESS and Gaia, cannot confirm the 22.8, and take 11.4 as
   // their default. Neither overturns the other; the SBDB's 22.83 is kept, and may be twice the day.
   { id: 'eris', name: 'Eris', kind: 'dwarf', horizonsCommand: '136199;', center: '500@10', sbdb: 'Eris', radiusKm: 1163, rotationPeriodHours: 15.771 * 24 },
-  { id: 'haumea', name: 'Haumea', kind: 'dwarf', horizonsCommand: '136108;', center: '500@10', sbdb: 'Haumea', radiusKm: 797.6 },
+  { id: 'haumea', name: 'Haumea', kind: 'dwarf', horizonsCommand: '136108;', center: '500@10', sbdb: 'Haumea', radiusKm: 797.6, semiAxesKm: [1161, 852, 513] },
   { id: 'makemake', name: 'Makemake', kind: 'dwarf', horizonsCommand: '136472;', center: '500@10', sbdb: 'Makemake', radiusKm: 715 },
   { id: 'moon', name: 'Moon', kind: 'moon', horizonsCommand: '301', center: '500@399', parentBodyId: 'earth' },
   { id: 'phobos', name: 'Phobos', kind: 'moon', horizonsCommand: '401', center: '500@499', parentBodyId: 'mars', orbitFromW: {} },
@@ -271,6 +273,7 @@ export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizo
       name: spec.name,
       kind: spec.kind,
       radiusKm: radiusKm ?? 0,
+      ...(spec.semiAxesKm ? { semiAxesKm: spec.semiAxesKm } : {}),
       orbit: mean.orbit,
       rates: mean.rates,
       ...(mean.laplacePole ? { laplacePole: mean.laplacePole } : {}),

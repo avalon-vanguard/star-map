@@ -20,6 +20,8 @@ export interface BodyDetailViewModel {
    */
   hostStarId?: number;
   radiusKm?: number;
+  /** A triaxial body's semi-axes, where `radiusKm` is the mean of them; see `BodyRecord.semiAxesKm`. */
+  semiAxesKm?: readonly [number, number, number];
   massEarth?: number;
   discoveryYear?: number;
   orbit: Partial<OrbitalElements>;

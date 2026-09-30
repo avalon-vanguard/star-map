@@ -548,6 +548,11 @@
     "name": "Haumea",
     "kind": "dwarf",
     "radiusKm": 797.6,
+    "semiAxesKm": [
+      1161,
+      852,
+      513
+    ],
     "orbit": {
       "semiMajorAxisAu": 43.06029023650952,
       "eccentricity": 0.1944430148898797,

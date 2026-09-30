@@ -31,6 +31,9 @@ const POLE_HARMONICS = 5;
 const MAX_NODE_RATE_OFFSET = 0.05;
 const MAX_NODE_HARMONIC = 9;
 
+/** How far, in degrees, re-rating may move a locked moon's pole or W at {@link PRESENT_JD}; see {@link lockedToOrbit}. */
+const MAX_PRESENT_OFFSET_DEG = 1e-6;
+
 /** The planet's east longitude on a moon's IAU body-fixed frame, from the moon's mean place, at a TDB date. */
 export function subPlanetLongitudeDeg(body: Pick<BodyRecord, 'orbit' | 'rates' | 'laplacePole'>, elements: RotationalElements, jd: number): number {
   const own = positionAtEpoch(meanElementsAt(body.orbit, body.rates, jd));
@@ -106,7 +109,15 @@ export function lockedToOrbit(elements: RotationalElements, mean: Pick<MeanOrbit
     return { ...term, angleDeg: [constant + (rate - k * nodeRate) * present, k * nodeRate] };
   });
   const locked: RotationalElements = { ...elements, primeMeridianDeg: [w0 + (w1 - n) * (PRESENT_JD - J2000_JD), n, 0], ...(terms ? { terms } : {}) };
-  return poleFollowsOrbit ? poleRoundOrbit(locked, mean) : locked;
+  const turned = poleFollowsOrbit ? poleRoundOrbit(locked, mean) : locked;
+  // Whatever is re-rated, the pole and W at the present are the kernel's, which is what they were
+  // fitted to. Measured: at most 4.7e-10 degrees (Deimos's W, some 2.6 million degrees round).
+  const [iau, own] = [elements, turned].map((each) => orientationAt(each, PRESENT_JD));
+  const moved = Math.max(...(['poleRaDeg', 'poleDecDeg', 'primeMeridianDeg'] as const).map((key) => Math.abs(own[key] - iau[key])));
+  if (moved > MAX_PRESENT_OFFSET_DEG) {
+    throw new Error(`${name}'s pole or W on ${PRESENT_JD} is ${moved.toExponential(2)} degrees from the IAU's: re-rated, it should be where the kernel has it today.`);
+  }
+  return turned;
 }
 
 function poleRoundOrbit(elements: RotationalElements, mean: Pick<MeanOrbit, 'orbit' | 'rates' | 'laplacePole'>): RotationalElements {

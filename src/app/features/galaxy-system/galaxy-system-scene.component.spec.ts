@@ -19,6 +19,7 @@ import { closestApproachAu, SUN_RADIUS_AU } from './system-framing';
 import { blackbodyColor, SOLAR_EFFECTIVE_TEMPERATURE_K } from '../../shared/astro/stellar';
 import { appearanceForExoplanet } from '../../shared/astro/body-appearance';
 import { planetTexture } from '../../shared/rendering/procedural-planet-texture';
+import { loadCachedTexture, SUN_TEXTURE_PATH } from '../../shared/rendering/texture-catalog';
 import { JumpLinkRenderer } from './jump-link-renderer';
 import { StarFieldRenderer } from './star-field-renderer';
 import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
@@ -1014,6 +1015,27 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expectColour(light.color, blackbodyColor(2900, SOLAR_EFFECTIVE_TEMPERATURE_K));
       expect(scene.hudReadouts().find((readout) => readout.label === 'Luminosity')).toEqual({ label: 'Luminosity', value: '0.0015 L☉' });
       expect(scene.hudReadouts().find((readout) => readout.label === 'Radius')?.value).toBe('0.141 solar radii');
+    });
+
+    it("draws the disc as the Sun's photograph in the star's colour, darkened towards the limb", async () => {
+      // The disc's three parts, read off the material's node graph: the tint the star's temperature
+      // sets, the photograph, and the limb-darkening coefficient, 0.6 as the Sun's. Before, only the
+      // tint uniform was read, which the scene sets whether or not the material uses it.
+      const scene = await enter(PROXIMA);
+      const nodes = new Set<THREE.Node>();
+      const walk = (node: THREE.Node): void => {
+        if (!nodes.has(node)) {
+          nodes.add(node);
+          for (const child of node.getChildren()) {
+            walk(child);
+          }
+        }
+      };
+      walk((scene as unknown as { starMarkerMaterial: THREE.MeshBasicNodeMaterial }).starMarkerMaterial.colorNode!);
+      const values = [...nodes].map((node) => (node as { value?: unknown }).value);
+      expect(values).toContain(scene.starTint.value);
+      expect(values).toContain(loadCachedTexture(SUN_TEXTURE_PATH));
+      expect(values).toContain(0.6);
     });
 
     it('tints a host in the star field the colour its disc is drawn in, at the temperature the archive gives it', async () => {

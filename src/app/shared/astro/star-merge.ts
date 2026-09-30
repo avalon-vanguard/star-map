@@ -262,14 +262,21 @@ export function isSameStar(kept: StarRecord, entry: StarRecord): boolean {
  * unless the other entry's distance is the more precise, as the Hipparcos one of a bright star
  * `placementDistancePc` keeps at it is, which then sets the distance along Gaia's direction.
  * `described` overrides that choice where an identity settles it (see {@link foldByIdentity}).
+ *
+ * A colour the description lacks comes from the other entry, in its own system: HYG has none for
+ * HD 45951, HD 45291 and HD 124953, three naked-eye giants Gaia measures at BP−RP 1.25, 1.19 and
+ * 0.37, and each card showed no colour at all.
  */
 function combine(kept: StarRecord, other: StarRecord, described = isDesignation(kept) && !isDesignation(other) ? other : kept): StarRecord {
   const otherBetter = other.distanceError !== undefined && kept.distanceError !== undefined && other.distanceError < kept.distanceError;
   const placed = otherBetter ? other : kept;
   const scale = otherBetter ? distanceOf(other) / distanceOf(kept) : 1;
   const gaiaDesignation = kept.gaiaDesignation ?? other.gaiaDesignation;
+  const coloured = described.colorIndex !== null ? described : described === kept ? other : kept;
   return {
     ...described,
+    colorIndex: coloured.colorIndex,
+    colorSystem: coloured.colorSystem,
     x: kept.x * scale,
     y: kept.y * scale,
     z: kept.z * scale,
@@ -339,9 +346,10 @@ export function foldByIdentity(stars: readonly StarRecord[], gaiaDesignationById
     }
     const describer = gaiaDesignationById.get(result[target].id);
     const { magnitude, magnitudeBand, colorIndex, colorSystem } = result[target];
+    // Where the Gliese row is the star, its colour too, or none: not the one of the star SIMBAD puts elsewhere.
     result[target] =
       describer !== undefined && describer !== designation
-        ? combine(result[target], star, star)
+        ? { ...combine(result[target], star, star), colorIndex: star.colorIndex, colorSystem: star.colorSystem }
         : { ...combine(result[target], star), magnitude, magnitudeBand, colorIndex, colorSystem };
     // One star each: a second Gliese row naming the same source is another star SIMBAD has not split.
     byDesignation.delete(designation!);

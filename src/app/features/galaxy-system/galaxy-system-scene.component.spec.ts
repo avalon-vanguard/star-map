@@ -60,6 +60,9 @@ const PROXIMA_B: ExoplanetRecord = {
   orbit: { semiMajorAxisAu: 0.0485, eccentricity: 0.02 }
 };
 
+// A microlensing planet, whose host the archive places 6.7 kpc out.
+const LENS_B: ExoplanetRecord = { id: 'KMT-2016-BLG-1107L b', hostStarId: LENS.id, hostStarName: 'KMT-2016-BLG-1107L', name: 'KMT-2016-BLG-1107L b', orbit: {} };
+
 const DEEP_SKY_OBJECT: DeepSkyRecord = {
   id: 'NGC0224',
   name: 'Andromeda Galaxy',
@@ -186,7 +189,7 @@ class FakeDataLoaderService {
   }
 
   loadExoplanets(): Promise<ExoplanetRecord[]> {
-    return Promise.resolve([PROXIMA_B]);
+    return Promise.resolve([PROXIMA_B, LENS_B]);
   }
 
   loadDeepSky(): Promise<DeepSkyRecord[]> {
@@ -235,6 +238,12 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     fixture = TestBed.createComponent(GalaxySystemSceneComponent);
     fixture.detectChanges(); // triggers ngAfterViewInit -> bootstrap()
     await flushAsync();
+  });
+
+  it('rings the systems inside the survey edge, and puts them first in the draw budget, not a host kiloparsecs out', () => {
+    const scene = fixture.componentInstance as unknown as { hostRings: { count: number }; hostStars: Uint8Array };
+    expect(scene.hostRings.count).toBe(2);
+    expect([...scene.hostStars]).toEqual(STARS.map((star) => (star === SUN || star === PROXIMA ? 1 : 0)));
   });
 
   it('starts in the galaxy view with the system group hidden', () => {
@@ -296,7 +305,8 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(refocus).toHaveBeenCalledTimes(1);
       const [focus] = refocus.mock.calls[0];
       expect(focus.view).toBeDefined();
-      // The Sun has Earth and Proxima its b, so both are hosts; the others have nothing catalogued.
+      // The Sun has Earth and Proxima its b, so both are hosts; the lens has a planet too, but 6.7 kpc
+      // out, past the survey edge; the others have nothing catalogued.
       expect(Array.from(focus.hosts ?? [])).toEqual([1, 0, 1, 0, 0, 0]);
     });
 

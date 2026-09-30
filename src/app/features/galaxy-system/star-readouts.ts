@@ -1,4 +1,5 @@
 import { spectralClassification } from '../../shared/astro/spectral';
+import { temperatureFromColour } from '../../shared/astro/stellar';
 import { formatDistance, formatLuminosity } from '../../shared/format/quantity';
 import { StarRecord, SUN_STAR_ID } from '../../shared/models/star.model';
 import { StarSurface } from '../body-detail/body-view-model';
@@ -58,17 +59,30 @@ export function starReadouts(star: StarRecord, surface?: StarSurface): HudReadou
     ...(surface?.luminositySolar
       ? [{ label: 'Luminosity', value: formatLuminosity(surface.luminositySolar), ...(surface.luminosityDerived ? { derived: true } : {}) }]
       : []),
-    ...(surface?.radiusSolar ? [radiusReadout(surface.radiusSolar, surface.radiusDerived)] : []),
+    ...(surface?.radiusSolar ? [radiusReadout(surface.radiusSolar, surface.radiusDerived, radiusBasis(star))] : []),
     { label: 'Source', value: catalogue === 'HYG' && star.distanceFromGaia ? 'HYG, Gaia DR3 distance' : catalogue }
   ];
 }
 
+/**
+ * What a derived radius is worked out from besides the brightness: the temperature the star's
+ * colour gives, or its type's — a giant's always, and a dwarf's with no colour the table reads.
+ * 11 546 radii read "from colour" whose temperature no colour went into: 10 702 giants with one, and
+ * 844 stars with none, GJ 3655 (M8) among them.
+ */
+function radiusBasis(star: StarRecord): string {
+  if (star.colorFromTemperature) {
+    return 'its temperature';
+  }
+  return temperatureFromColour(star) ? 'colour' : 'its type';
+}
+
 /** Two figures for a derived radius, three for a published one: 0.105 is not what colour gives. */
-function radiusReadout(radiusSolar: number, derived: boolean): HudReadout {
+function radiusReadout(radiusSolar: number, derived: boolean, basis: string): HudReadout {
   const digits = derived ? 2 : 3;
   const figure = radiusSolar.toLocaleString('en-GB', { minimumSignificantDigits: digits, maximumSignificantDigits: digits });
   return derived
-    ? { label: 'Radius', value: `~${figure} solar radii, from colour and brightness`, derived: true }
+    ? { label: 'Radius', value: `~${figure} solar radii, from ${basis} and brightness`, derived: true }
     : { label: 'Radius', value: `${figure} solar radii` };
 }
 

@@ -415,7 +415,9 @@ function isWideViewport(): boolean {
       }
 
       <div class="hud-brackets hud-surface pointer-events-auto flex w-full items-stretch">
-        <div role="tablist" aria-label="Dock" class="flex items-stretch divide-x divide-border/40">
+        <!-- The tabs give way to the date and the range, and scroll: the five of the system view
+             take 397 px, and on a portrait phone they pushed the date off the right edge. -->
+        <div role="tablist" aria-label="Dock" class="flex min-w-0 items-stretch divide-x divide-border/40 overflow-x-auto">
           @for (tab of tabs(); track tab) {
             <button
               type="button"
@@ -439,7 +441,7 @@ function isWideViewport(): boolean {
              today's, which the reader's own machine already says. -->
         @if (date()) {
           <p
-            class="ml-auto flex items-baseline gap-2 border-l border-border/40 px-3 py-2 sm:px-4"
+            class="ml-auto flex shrink-0 items-baseline gap-2 border-l border-border/40 px-3 py-2 sm:px-4"
             data-testid="hud-date"
           >
             <span class="type-label text-muted">Date</span>
@@ -448,7 +450,7 @@ function isWideViewport(): boolean {
         }
         @if (range()) {
           <p
-            class="flex items-baseline gap-2 border-l border-border/40 px-3 py-2 sm:px-4"
+            class="flex shrink-0 items-baseline gap-2 border-l border-border/40 px-3 py-2 sm:px-4"
             [class.ml-auto]="!date()"
           >
             <span class="type-label text-muted">Range</span>
@@ -553,8 +555,11 @@ export class HudDockComponent implements OnInit {
       this.dateField.set(field.value);
       // On a phone the sheet covers the system it has just set the date of: at 360 by 640 every
       // orbit lies behind it. The thing to look at is now the scene, as after a search.
+      // Focus goes back to the tab that folded, not to the page: the form it was in is gone.
       if (!isWideViewport()) {
+        const tab = this.activeTab();
         this.activeTab.set(null);
+        this.host.nativeElement.querySelector<HTMLElement>(`#dock-tab-${tab}`)?.focus();
       }
     }
   }

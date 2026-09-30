@@ -467,6 +467,30 @@ describe('HudDockComponent', () => {
       }
     });
 
+    it('hands focus to the tab that folded, not to the page, so Enter opens the panel again', () => {
+      viewport.wide = false;
+      try {
+        const field = host().querySelector<HTMLInputElement>('#clock-date')!;
+        field.focus();
+        field.value = '2020-12-21T18:00';
+        button('Go').click();
+        fixture.detectChanges();
+        expect(document.activeElement?.id).toBe('dock-tab-display');
+      } finally {
+        viewport.wide = true;
+      }
+    });
+
+    it('keeps the date strip on screen on a phone: the tabs give way to it, and scroll', () => {
+      // At 360 px the system view's five tabs take 397 px, and pushed the strip past the right
+      // edge, where nothing scrolls: after Go on a phone the date was nowhere on screen.
+      fixture.componentRef.setInput('date', '2020-12-21');
+      fixture.detectChanges();
+      const tabs = host().querySelector('[role="tablist"]')!.classList;
+      expect(tabs.contains('min-w-0') && tabs.contains('overflow-x-auto')).toBe(true);
+      expect(host().querySelector('[data-testid="hud-date"]')!.classList.contains('shrink-0')).toBe(true);
+    });
+
     it('keeps the panel open on a wide screen, where it covers little of the scene', () => {
       host().querySelector<HTMLInputElement>('#clock-date')!.value = '2020-12-21T18:00';
       button('Go').click();

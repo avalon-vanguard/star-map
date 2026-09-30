@@ -104,8 +104,8 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
   readonly notFound = signal(false);
   /** The date the body is drawn for, as the dock's strip prints it; empty at the present. */
   readonly date = signal('');
-  /** Set when a body is shown, until the next frame has put the camera on its Sun's side. */
-  private cameraToSunSide = false;
+  /** The side of the equator the Sun stood on at the last frame, 1 north or -1 south; 0 once a body is shown. */
+  private sunSide = 0;
 
   constructor(
     private readonly engine: EngineService,
@@ -193,7 +193,7 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     this.body = this.bodies.find((body) => body.id === viewModel.id);
     this.planet?.rotation.set(0, 0, 0);
     this.sunLight?.position.copy(SUN_LIGHT_POSITION);
-    this.cameraToSunSide = true;
+    this.sunSide = 0;
 
     this.disposeRing();
     this.disposeGlow();
@@ -295,13 +295,21 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     } else {
       this.planet.rotation.y += deltaSeconds * 0.08;
     }
-    if (this.cameraToSunSide) {
-      // Above or below the equator, whichever side the Sun is on. Held above it, the page opened
-      // Saturn on the unlit face of its rings from 2025 until 2039, while the Sun is south of
-      // them — the face Earth does not see either.
+    const sunSide = this.sunLight.position.y < 0 ? -1 : 1;
+    if (sunSide !== this.sunSide) {
+      // Above or below the equator, whichever side the Sun is on, when a body is shown and again
+      // whenever the Sun crosses it, as the clock runs or is set: held above it, the page opened
+      // Saturn on the unlit face of its rings from 2025 until 2039, while the Sun is south of them —
+      // the face Earth does not see either — and the Clock set to 2045 left it on the other one.
+      // Between crossings the camera is the reader's to orbit where they like.
+      this.sunSide = sunSide;
       const camera = this.engine.getCamera();
-      camera.position.y = Math.abs(camera.position.y) * (this.sunLight.position.y < 0 ? -1 : 1);
-      this.cameraToSunSide = false;
+      camera.position.y = Math.abs(camera.position.y) * sunSide;
+      // Aimed again before this frame is drawn: the controls aimed it from where it was, and the
+      // frame drawn from here otherwise had the body 22.6 degrees off the middle of the view.
+      if (this.controls) {
+        camera.lookAt(this.controls.target);
+      }
     }
   }
 

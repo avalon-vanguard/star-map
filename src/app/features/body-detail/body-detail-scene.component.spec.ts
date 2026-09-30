@@ -181,4 +181,28 @@ describe('BodyDetailSceneComponent', () => {
     expect(page.sunLight.position.y).toBeGreaterThan(0);
     expect(camera.position.y).toBeGreaterThan(0);
   });
+
+  it('follows the Sun across Saturn’s equator when the clock is set past the 2039 equinox, and aims at Saturn in that same frame', async () => {
+    await open('saturn', '2032-06-01T12:00Z');
+    const camera = engine.getCamera();
+    expect(camera.position.y).toBeLessThan(0);
+    // What the page's own Clock tab does: 2045, the Sun 25.7 degrees north of the rings.
+    time.setDate(new Date('2045-06-01T12:00Z'));
+    engine.tick(0.016);
+    expect(page.sunLight.position.y).toBeGreaterThan(0);
+    expect(camera.position.y).toBeGreaterThan(0);
+    // The frame drawn straight after the move: aimed from where the camera was, it had Saturn 22.6
+    // degrees off the middle of the view.
+    const toSaturn = new THREE.Vector3().sub(camera.position);
+    expect(camera.getWorldDirection(new THREE.Vector3()).angleTo(toSaturn)).toBeLessThan(1e-9);
+  });
+
+  it('leaves the camera where the reader orbits it while the Sun stays on one side', async () => {
+    await open('saturn', '2032-06-01T12:00Z');
+    const camera = engine.getCamera();
+    // Taken over the rings, to their unlit face, on purpose.
+    camera.position.y = 0.6;
+    engine.tick(0.016);
+    expect(camera.position.y).toBeGreaterThan(0);
+  });
 });

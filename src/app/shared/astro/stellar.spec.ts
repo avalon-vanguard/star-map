@@ -5,6 +5,7 @@ import {
   blackbodyColor,
   bolometricCorrection,
   effectiveTemperatureK,
+  giantSurface,
   luminositySolar,
   radiusFromLuminositySolar,
   SOLAR_ABSOLUTE_MAGNITUDE_V,
@@ -159,6 +160,25 @@ describe('luminositySolar', () => {
       expect(radius / measured).toBeGreaterThan(1 / 1.2);
       expect(radius / measured).toBeLessThan(1.2);
     }
+  });
+
+  it("draws van Belle's own M4, M5 and M7 giants at their measured radii, and holds the correction past M7.5", () => {
+    // Median Johnson V, parallax and radius from van Belle et al. (2021) tables 6 and 4, none behind
+    // more than 0.02 mag of dust: 103.1, 103.2 and 173.3 R☉, drawn at 1.00, 1.00 and 0.91 of that.
+    // A dwarf's correction draws M4 18 % smaller and M5 26 %, and M6's −3.94 draws M7 25 % smaller;
+    // hence 15 %, not the M6 case's 20 %.
+    const giants = [
+      [{ magnitude: 7.72, distancePc: 1000 / 1.87, spectralType: 'M4III', magnitudeBand: 'V' }, 103.11], // HD 118669
+      [{ magnitude: 6.97, distancePc: 1000 / 3.45, spectralType: 'M5III', magnitudeBand: 'V' }, 103.15], // HD 104207
+      [{ magnitude: 9.29, distancePc: 1000 / 2.17, spectralType: 'M7III', magnitudeBand: 'V' }, 173.31] // HIP 68357
+    ] as const;
+    for (const [star, measured] of giants) {
+      const radius = radiusFromLuminositySolar(luminositySolar(star)!, effectiveTemperatureK(star)!);
+      expect(radius / measured).toBeGreaterThan(1 / 1.15);
+      expect(radius / measured).toBeLessThan(1.15);
+    }
+    // Six M8 III stars in the catalogue, past the table's last type, take its −4.86, not its first.
+    expect(giantSurface('M8III')!.bolometricCorrectionV).toBe(giantSurface('M7.5III')!.bolometricCorrectionV);
   });
 
   it('reads a hot giant reddened by dust at its type, not at the cool star its colour reads as', () => {

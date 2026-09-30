@@ -1132,6 +1132,18 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(engine.getCamera().position.length()).toBeCloseTo(onPhone, 6);
     });
 
+    it('frames it by the shorter side on a phone held sideways too', async () => {
+      // 844x390: framed by the width, the disc took the desktop's half again, 8.49 AU out, not 14.97.
+      const canvas = (fixture.nativeElement as HTMLElement).querySelector('canvas')!;
+      Object.defineProperty(canvas, 'clientWidth', { value: 844 });
+      Object.defineProperty(canvas, 'clientHeight', { value: 390 });
+      const scene = await enter(ANTARES);
+      const camera = engine.getPerspectiveCamera();
+      const gridOuterRadiusAu = (scene.systemRenderer as unknown as { gridOuterRadiusAu: number }).gridOuterRadiusAu;
+      const radius = scene.starMarkerGeometry.parameters.radius;
+      expect(engine.getCamera().position.length()).toBeCloseTo(systemFramingDistanceAu(gridOuterRadiusAu, { fovDegrees: camera.fov, aspect: camera.aspect, shorterSidePx: 390 }, radius), 6);
+    });
+
     it('draws a star nothing gives a size or temperature for as a grey point, not as the Sun', async () => {
       const scene = await enter(PROCYON_B);
       expect(scene.starMarkerGeometry.parameters.radius).toBeLessThan(SUN_RADIUS_AU / 1000);

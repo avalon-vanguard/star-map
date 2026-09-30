@@ -1,4 +1,4 @@
-import { DwarfSequencePoint, dwarfSequenceAtColor, dwarfSequenceAtTemperature, dwarfSequenceAtType, isGiant, parseSpectralClass, SpectralClass, spectralTypeToColorIndex } from './spectral';
+import { DwarfSequencePoint, dwarfSequenceAtColor, dwarfSequenceAtTemperature, dwarfSequenceAtType, isGiant, parseSpectralClass, SpectralClass } from './spectral';
 
 /**
  * Stellar luminosity, derived from the two things the star catalogue actually measures.
@@ -123,15 +123,17 @@ export function luminositySolar(star: StellarPhotometry): number | null {
   }
 
   // Where the star has a colour the dwarf sequence covers, its correction is read off that colour,
-  // and a G magnitude is carried to V first; only otherwise is the spectral type used, and a G
-  // magnitude taken as V. Gaia classifies none of its stars, so every one of them used to be
-  // given the Sun's correction, and TRAPPIST-1 came out at a seventh of its luminosity. Against
-  // the archive's own figure for 1 449 hosts, the worst tenth was off by 0.29 dex or more, and is
-  // now off by 0.12.
+  // and a G magnitude is carried to V first; otherwise both are read off the same table at its
+  // spectral type, and only with neither is a G magnitude taken as V. Gaia classifies none of its
+  // stars, so every one of them used to be given the Sun's correction, and TRAPPIST-1 came out at
+  // a seventh of its luminosity. Against the archive's own figure for 1 449 hosts, the worst tenth
+  // was off by 0.29 dex or more, and is now off by 0.12. A type with no colour took the textbook
+  // anchors below instead, M8 −3.92 where the table has −5.65: GJ 3655, M8, came out 8.9×10⁻⁵ L☉
+  // at 3 001 K and 0.035 R☉, where its type's row gives 2 570 K and 0.106.
   //
   // Not for a star its type says is a giant, though, whose correction is read off its type along
   // with its temperature: see giantSurface.
-  const sequence = sequenceAtColour(star);
+  const sequence = sequenceAtColour(star) ?? dwarfSequenceAtType(star.spectralType);
   const absoluteV = absolute - (star.magnitudeBand === 'G' ? (sequence?.gMinusV ?? 0) : 0);
   const correction = giantSurface(star.spectralType)?.bolometricCorrectionV ?? sequence?.bolometricCorrectionV ?? bolometricCorrection(star.spectralType);
   const bolometric = absoluteV + correction;
@@ -160,20 +162,17 @@ function sequenceAtColour(star: StellarPhotometry): DwarfSequencePoint | null {
 export const SOLAR_EFFECTIVE_TEMPERATURE_K = 5772;
 
 /**
- * Effective temperature, off the dwarf sequence at the star's colour, or at the colour its
- * spectral type implies where it has none; a giant's off its type (giantSurface). Exactly the
- * Sun's for the Sun, which is at zero distance here.
+ * Effective temperature, off the dwarf sequence at the star's colour, or at its spectral type where
+ * it has none; a giant's off its type (giantSurface). Exactly the Sun's for the Sun, which is at
+ * zero distance here. The type was read through the textbook colour `spectralTypeToColorIndex`
+ * gives it, which the table puts elsewhere: M8's 1.88 is M5's, 3 001 K where M8 is 2 570, and every
+ * O type came out B0's 31 400.
  */
 export function effectiveTemperatureK(star: StellarPhotometry): number | null {
   if (star.distancePc === 0) {
     return SOLAR_EFFECTIVE_TEMPERATURE_K;
   }
-  // A type's colour past the table is an O star's, which B−V no longer tells apart from B0.
-  return (
-    giantSurface(star.spectralType)?.temperatureK ??
-    (sequenceAtColour(star) ?? dwarfSequenceAtColor(spectralTypeToColorIndex(star.spectralType), 'B-V', true))?.temperatureK ??
-    null
-  );
+  return giantSurface(star.spectralType)?.temperatureK ?? (sequenceAtColour(star) ?? dwarfSequenceAtType(star.spectralType))?.temperatureK ?? null;
 }
 
 /**

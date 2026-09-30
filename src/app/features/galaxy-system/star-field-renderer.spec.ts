@@ -64,9 +64,9 @@ describe('colorIndexToRgb', () => {
     });
 
     it('matches the colour the same spectral type would give explicitly', () => {
-      // K5 sits halfway between the K anchor (0.81) and the M anchor (1.40).
+      // K5's row of the dwarf sequence is at B−V 1.15.
       const derived = colorIndexToRgb(null, 'K5');
-      const explicit = colorIndexToRgb(1.105);
+      const explicit = colorIndexToRgb(1.15);
 
       expect(derived.r).toBeCloseTo(explicit.r, 6);
       expect(derived.g).toBeCloseTo(explicit.g, 6);

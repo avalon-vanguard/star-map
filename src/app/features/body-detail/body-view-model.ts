@@ -51,6 +51,21 @@ export interface StarSurface {
 }
 
 /**
+ * The temperature each host's disc is drawn at where the archive gives one, by star id: the first
+ * among its planets, in their order, as {@link starSurfaceOf} takes it — for the star field, which
+ * tints every star the colour of its own disc.
+ */
+export function publishedTemperaturesK(exoplanets: readonly ExoplanetRecord[]): Map<number, number> {
+  const temperatures = new Map<number, number>();
+  for (const { hostStarId, hostStarTemperatureK } of exoplanets) {
+    if (hostStarId !== null && hostStarTemperatureK && !temperatures.has(hostStarId)) {
+      temperatures.set(hostStarId, hostStarTemperatureK);
+    }
+  }
+  return temperatures;
+}
+
+/**
  * A star's radius, effective temperature and luminosity: the archive's `st_rad`, `st_teff` and
  * `st_lum` for a planet host, from any of its planets' rows, and otherwise derived — the
  * temperature off the dwarf sequence at the star's colour, the luminosity from its magnitude

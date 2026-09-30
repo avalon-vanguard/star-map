@@ -101,9 +101,11 @@ const NEUTRAL_STAR_COLOR = new THREE.Color(1.0, 1.0, 1.0);
 
 /**
  * A star's tint in the field: the colour of a blackbody at its effective temperature against the
- * display's white — the tint its own disc is drawn in, in its system. The temperature is the one
- * the disc is drawn at (`effectiveTemperatureK`): off the dwarf sequence at the star's colour, in
- * B−V or Gaia's BP−RP, off the type where there is no colour, and off the type for a giant.
+ * display's white — the tint its own disc is drawn in, in its system. For a star with no planets
+ * the temperature is the one the disc is drawn at (`effectiveTemperatureK`): off the dwarf sequence
+ * at the star's colour, in B−V or Gaia's BP−RP, off the type where there is no colour, and off the
+ * type for a giant. A host's disc is drawn at the archive's temperature instead, which the renderer
+ * is given apart and tints it at ({@link temperatureTint}).
  *
  * `colorIndex` is `null` for the ~10% of stars HYG never photometered. Those fall back to their
  * `spectralType`, and to neutral white only when the catalog records no classification at all —
@@ -117,7 +119,11 @@ const NEUTRAL_STAR_COLOR = new THREE.Color(1.0, 1.0, 1.0);
  */
 export function colorIndexToRgb(colorIndex: number | null, spectralType?: string, colorSystem?: 'B-V' | 'BP-RP'): THREE.Color {
   // The distance is only there to say the star is not the Sun; the temperature reads none of the rest.
-  const temperatureK = effectiveTemperatureK({ magnitude: 0, distancePc: 1, spectralType, colorIndex, colorSystem });
+  return temperatureTint(effectiveTemperatureK({ magnitude: 0, distancePc: 1, spectralType, colorIndex, colorSystem }));
+}
+
+/** The field's tint at a temperature: a blackbody against the display's white, neutral with none. */
+export function temperatureTint(temperatureK: number | null): THREE.Color {
   if (temperatureK === null) {
     return new THREE.Color().copy(NEUTRAL_STAR_COLOR);
   }
@@ -291,7 +297,14 @@ export class StarFieldRenderer {
     private readonly catalogue: readonly StarRecord[],
     private readonly cataloguePositions: Float32Array,
     budget = STAR_RENDER_BUDGET,
-    brightness?: BrightnessIndex
+    brightness?: BrightnessIndex,
+    /**
+     * The temperature the archive gives each planet host, by star id, which its disc is drawn at
+     * (`publishedTemperaturesK`). Tinted off its colour instead, 1 755 of the 4 485 hosts differed
+     * from their own disc by more than 0.1 in RGB: Kepler-186 at 3 096 K in the field and 3 788 on
+     * its disc, HD 97048 at 6 825 and 10 000.
+     */
+    publishedTemperaturesK?: ReadonlyMap<number, number>
   ) {
     this.budget = budget;
     this.brightness = brightness ?? brightnessIndex(catalogue);
@@ -305,7 +318,8 @@ export class StarFieldRenderer {
     this.catalogueColors = new Float32Array(catalogue.length * 3);
     this.catalogueSizes = new Float32Array(catalogue.length);
     catalogue.forEach((star, index) => {
-      const color = colorIndexToRgb(star.colorIndex, star.spectralType, star.colorSystem);
+      const published = publishedTemperaturesK?.get(star.id);
+      const color = published === undefined ? colorIndexToRgb(star.colorIndex, star.spectralType, star.colorSystem) : temperatureTint(published);
       this.catalogueColors[index * 3] = color.r;
       this.catalogueColors[index * 3 + 1] = color.g;
       this.catalogueColors[index * 3 + 2] = color.b;

@@ -13,9 +13,10 @@ import { NavigationStore } from '../../shared/state/navigation.store';
 import { LinkBudget } from '../../shared/astro/jump-links';
 import { HudDisplay } from '../hud/hud-dock.component';
 import { GalaxySystemSceneComponent } from './galaxy-system-scene.component';
+import { normalView, positionViewDirection } from 'three/tsl';
 import { galacticNormal } from './grid-plane';
 import { catalogueCensus, positionsNote } from './star-readouts';
-import { closestApproachAu, SUN_RADIUS_AU } from './system-framing';
+import { closestApproachAu, SUN_RADIUS_AU, systemFramingDistanceAu } from './system-framing';
 import { blackbodyColor, SOLAR_EFFECTIVE_TEMPERATURE_K } from '../../shared/astro/stellar';
 import { appearanceForExoplanet } from '../../shared/astro/body-appearance';
 import { planetTexture } from '../../shared/rendering/procedural-planet-texture';
@@ -1028,10 +1029,11 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     });
 
     it("draws the disc as the Sun's photograph in the star's colour, darkened towards the limb", async () => {
-      // The disc's three parts, read off the material's node graph: the tint the star's temperature
-      // sets, the photograph, and the limb-darkening coefficient, 0.6 as the Sun's. Before, only the
-      // tint uniform was read, which the scene sets whether or not the material uses it.
+      // The disc's parts, read off the material's node graph: the tint the star's temperature sets
+      // and the photograph, times the limb factor, which is worked out below at a few angles.
+      // Checking only that 0.6 was somewhere in the graph passed a limb brighter than the centre.
       const scene = await enter(PROXIMA);
+      const colorNode = (scene as unknown as { starMarkerMaterial: THREE.MeshBasicNodeMaterial }).starMarkerMaterial.colorNode!;
       const nodes = new Set<THREE.Node>();
       const walk = (node: THREE.Node): void => {
         if (!nodes.has(node)) {
@@ -1041,11 +1043,45 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
           }
         }
       };
-      walk((scene as unknown as { starMarkerMaterial: THREE.MeshBasicNodeMaterial }).starMarkerMaterial.colorNode!);
+      walk(colorNode);
       const values = [...nodes].map((node) => (node as { value?: unknown }).value);
       expect(values).toContain(scene.starTint.value);
       expect(values).toContain(loadCachedTexture(SUN_TEXTURE_PATH));
-      expect(values).toContain(0.6);
+
+      // The factor the photograph is multiplied by, as the shader computes it where the cosine
+      // between the surface normal and the line of sight is `cosine`. Only the operations a limb
+      // law is written with are known; anything else fails rather than being guessed at.
+      type Graph = { isConstNode?: boolean; isVarNode?: boolean; value?: number; op?: string; method?: string; node: Graph; aNode: Graph; bNode: Graph; cNode: Graph };
+      const factorAt = (node: Graph, cosine: number): number => {
+        const at = (child: Graph): number => factorAt(child, cosine);
+        if (node.isVarNode) {
+          return at(node.node);
+        }
+        if (node.isConstNode) {
+          return node.value!;
+        }
+        switch (node.op ?? node.method) {
+          case '+': return at(node.aNode) + at(node.bNode);
+          case '-': return at(node.aNode) - at(node.bNode);
+          case '*': return at(node.aNode) * at(node.bNode);
+          case 'oneMinus': return 1 - at(node.aNode);
+          case 'negate': return -at(node.aNode);
+          case 'clamp': return Math.min(at(node.cNode), Math.max(at(node.bNode), at(node.aNode)));
+          case 'dot':
+            expect(node.aNode).toBe(normalView);
+            expect(node.bNode).toBe(positionViewDirection);
+            return cosine;
+          default: throw new Error(`the limb factor has an operation the test cannot work out: ${node.op ?? node.method}`);
+        }
+      };
+      // The graph is (photograph × tint) × factor, each step held in a variable.
+      const factor = (colorNode as unknown as Graph).node.bNode;
+      // The Sun's linear law, 1 − 0.6 (1 − μ): the centre at full brightness, the limb at 40 %, and
+      // past the silhouette, where the normal turns away, no darker than the limb.
+      expect(factorAt(factor, 1)).toBeCloseTo(1, 12);
+      expect(factorAt(factor, 0.5)).toBeCloseTo(0.7, 12);
+      expect(factorAt(factor, 0)).toBeCloseTo(0.4, 12);
+      expect(factorAt(factor, -0.3)).toBeCloseTo(0.4, 12);
     });
 
     it('tints a host in the star field the colour its disc is drawn in, at the temperature the archive gives it', async () => {
@@ -1079,6 +1115,21 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(scene.controls.minDistance).toBeGreaterThan(5);
       // Settled where its disc stays inside the ring of its neighbours' names, not pressed up to it.
       expect(engine.getCamera().position.length()).toBeGreaterThan(1.2 * scene.controls.minDistance);
+    });
+
+    it("frames a supergiant on a phone by the canvas's own size, so its neighbours' names stay off its disc", async () => {
+      // A 390x844 canvas: framed as on a desktop, at half the half-side, the disc reached 98 px
+      // from the centre and the names hung in from their ring came to 70.
+      const canvas = (fixture.nativeElement as HTMLElement).querySelector('canvas')!;
+      Object.defineProperty(canvas, 'clientWidth', { value: 390 });
+      Object.defineProperty(canvas, 'clientHeight', { value: 844 });
+      const scene = await enter(ANTARES);
+      const camera = engine.getPerspectiveCamera();
+      const gridOuterRadiusAu = (scene.systemRenderer as unknown as { gridOuterRadiusAu: number }).gridOuterRadiusAu;
+      const radius = scene.starMarkerGeometry.parameters.radius;
+      const onPhone = systemFramingDistanceAu(gridOuterRadiusAu, { fovDegrees: camera.fov, aspect: camera.aspect, shorterSidePx: 390 }, radius);
+      expect(onPhone).toBeGreaterThan(1.5 * systemFramingDistanceAu(gridOuterRadiusAu, { fovDegrees: camera.fov, aspect: camera.aspect }, radius));
+      expect(engine.getCamera().position.length()).toBeCloseTo(onPhone, 6);
     });
 
     it('draws a star nothing gives a size or temperature for as a grey point, not as the Sun', async () => {

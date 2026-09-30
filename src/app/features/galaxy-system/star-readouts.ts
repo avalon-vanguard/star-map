@@ -7,7 +7,7 @@ import { HudReadout } from '../hud/hud-dock.component';
 /**
  * The catalogue that describes a star — its name, type and photometry — as the readout names it.
  *
- * Not the same as `source`, which records whose *position* the star has: 62 002 stars HYG
+ * Not the same as `source`, which records whose *position* the star has: 62 097 stars HYG
  * describes sit where Gaia places them, and carry `gaia`. What gives them away is their V
  * magnitude, which only HYG and the archive measure and the archive's stars have their own source.
  */
@@ -77,8 +77,9 @@ function radiusReadout(radiusSolar: number, derived: boolean): HudReadout {
  * Exoplanet Archive places, which sit at its own distances — a lensing model's for the
  * microlensing hosts among them, OGLE-2005-BLG-390L's 6.6 kpc for one, with no parallax behind it —
  * and the HYG stars neither Hipparcos nor Gaia measured, which sit at the Gliese catalogue's. Those
- * have no published error, and of the 313 on the map about 154 have a photometric or spectroscopic
- * parallax in CNS3 (Gliese & Jahreiss 1991), none measured: GJ 3522 at 4.46 pc is 1000/224 mas.
+ * have no published error, and of the 313 on the map before 49 were folded into the Gaia source SIMBAD names
+ * them as (264 now), about 154 had a photometric or spectroscopic parallax in CNS3 (Gliese &
+ * Jahreiss 1991), none measured: GJ 3522 at 4.46 pc is 1000/224 mas.
  */
 export function positionsNote(stars: readonly StarRecord[]): string {
   const archive = stars.filter((star) => star.source === 'exoplanet-archive').length;

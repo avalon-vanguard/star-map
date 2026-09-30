@@ -42,7 +42,7 @@ export const BYTES_PER_STAR_META =
 
 /**
  * Bits of the photometry column. The band takes two: none (a stand-in magnitude), V or G. None
- * of it follows from the source, which records where the *position* came from: 62 002 stars
+ * of it follows from the source, which records where the *position* came from: 62 097 stars
  * Gaia places keep HYG's V and B−V, and the archive's stars in G have a B−V from their
  * temperature. The next bit says whose parallax the distance is, which for a HYG star Gaia did
  * not place can still be Gaia's, and the last whether the colour was read off a temperature.

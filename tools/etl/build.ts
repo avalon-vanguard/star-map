@@ -212,12 +212,24 @@ const WITHOUT_ROTATIONAL_ELEMENTS = new Set(['hyperion', 'nereid', 'eris', 'haum
 const TUMBLING = new Set(['hyperion']);
 
 /**
- * How far the IAU's day, 360 degrees over W's rate, may be from the one Horizons states, as a
- * fraction of it. Measured on this catalogue: at most 1.8e-5 (Jupiter's System III, 9.92492 hours
- * against 9.92510). Neptune is 0.89 per cent out, because the report takes 15.9663 hours from the
- * cloud features Karkoschka (2011) tracked, where Horizons keeps Voyager's radio period, 16.11. What
- * this catches is a rate read in the wrong unit or for the wrong body: Oberon's day for Titania's is
- * 55 per cent out.
+ * How far the IAU's day, 360 degrees over W's rate, may be from the period the body's record
+ * carries, as a fraction of it. That period is not always a second source:
+ *
+ * - The eight planets and Phoebe: the one Horizons states. Measured on this catalogue: at most
+ *   1.8e-5 (Jupiter's System III, 9.92492 hours against 9.92510). Neptune is 0.89 per cent out,
+ *   because the report takes 15.9663 hours from the cloud features Karkoschka (2011) tracked, where
+ *   Horizons keeps Voyager's radio period, 16.11.
+ * - Pluto and Ceres: the IAU's own rate restated. Horizons' 153.29335198 hours for Pluto is 360 over
+ *   its W (8.5e-12), and the SBDB's 9.074170 for Ceres, which Horizons prints too, is noted as
+ *   derived from the report's 952.1532 degrees a day (3.3e-10).
+ * - The 22 locked moons: their orbit's period, from JPL's satellite table, not a figure from their
+ *   Horizons pages ("Synchronous" on eighteen of them, nothing on Titan's or Proteus's). Their W is
+ *   turned at that rate (see `lockedToOrbit`, which first holds the kernel's own rate to it within
+ *   1e-5), so here they are 0, but for the Moon and Phobos, whose W keeps its own rate and its
+ *   quadratic (1.1e-8 and 3.1e-7).
+ *
+ * What this catches is a rate read in the wrong unit or for the wrong body: Oberon's day for
+ * Titania's is 55 per cent out.
  */
 const MAX_DAY_OFFSET = 1e-4;
 const DAY_OFFSET_CEILINGS: Record<string, number> = { neptune: 0.01 };
@@ -347,7 +359,7 @@ function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, Orbita
         const dayCeiling = DAY_OFFSET_CEILINGS[body.id] ?? MAX_DAY_OFFSET;
         assertCondition(
           dayOffset <= dayCeiling,
-          `${body.name}'s IAU day, ${((360 / Math.abs(rate)) * 24).toFixed(5)} hours, is ${dayOffset.toExponential(2)} of its length from Horizons' ${Math.abs(body.rotationPeriodHours).toFixed(5)} (at most ${dayCeiling} expected).`
+          `${body.name}'s IAU day, ${((360 / Math.abs(rate)) * 24).toFixed(5)} hours, is ${dayOffset.toExponential(2)} of its length from the ${Math.abs(body.rotationPeriodHours).toFixed(5)} its record carries (at most ${dayCeiling} expected).`
         );
         spins.push(`${body.id} day ${dayOffset.toExponential(1)}`);
       }
@@ -419,7 +431,7 @@ function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, Orbita
     `Eris turns once in ${erisDays.toFixed(3)} days; it is locked to Dysnomia's 15.786-day orbit — the SBDB's 25.9-hour period, which it flags as possibly 30 per cent wrong, was taken.`
   );
   console.log(`  mean elements against Horizons, degrees: ${offsets.join(', ')}.`);
-  console.log(`  IAU rotation against Horizons (day as a fraction of it, tilt in degrees): ${spins.join(', ')}.`);
+  console.log(`  IAU rotation against each record's day and tilt (see MAX_DAY_OFFSET for where each comes from; day as a fraction of it, tilt and a locked moon's face in degrees): ${spins.join(', ')}.`);
 }
 
 function validateExoplanets(exoplanets: ExoplanetRecord[], starIds: Set<number>): void {

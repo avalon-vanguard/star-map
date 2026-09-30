@@ -32,7 +32,11 @@ Each was downloaded from the URL below and processed the same way (script:
 `build_maps.py`, kept with the measurements outside the repository):
 
 1. Pixels the source leaves unmapped (value 0 in every band, its no-data value) are set to one
-   flat grey: the mean of the mapped surface. They are never filled with invented terrain.
+   flat grey: the mean of the mapped surface. They are never filled with invented terrain. Titan's
+   source marks its largest gap another way, with a flat grey of its own (147 and 148, its two
+   commonest values; "the uniform gray area in the northern hemisphere indicates a gap in the
+   imaging coverage", PIA19658), which the table counts as unmapped too: 1.09% of `titan.jpg`'s
+   pixels, 0.87% of the sphere, where its zeros alone were 0.02%.
 2. Downsampled by area averaging (PIL `BOX`) to 2 048 by 1 024 for bodies over 1 000 km in radius
    and 1 024 by 512 for the rest.
 3. Rolled half a turn where the source is centred on longitude 180, so longitude 0 is in the
@@ -66,7 +70,7 @@ photometry.
 | `tethys.jpg` | [USGS](https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Tethys_Cassini_mosaic_global_293m.tif) Tethys Cassini Global Mosaic 293 m | Cassini ISS; NASA/JPL/Space Science Institute | Odysseus, Penelope | 0.04% | 0.009% | 1024x512, 182 KB |
 | `dione.jpg` | [USGS](https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Dione_Cassini_Voyager_mosaic_global_154m.tif) Dione Cassini-Voyager Global Mosaic 154 m | Cassini ISS and Voyager; NASA/JPL/Space Science Institute | Creusa, Evander | 0.18% | 0.011% | 1024x512, 195 KB |
 | `rhea.jpg` | [USGS](https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Rhea_Cassini_Voyager_mosaic_global_417m.tif) Rhea Cassini-Voyager Global Mosaic 417 m | Cassini ISS and Voyager; NASA/JPL/Space Science Institute | Inktomi, Tirawa | 0% | 0.003% | 1024x512, 128 KB |
-| `titan.jpg` | [USGS](https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Titan_ISS_P19658_Mosaic_Global_4km.tif) Titan Cassini ISS Global Mosaic 4 km (938 nm, through the haze) | Cassini ISS; NASA/JPL-Caltech/SSI | Xanadu, Shangri-La, Belet | 0.02% | 0.078% | 2048x1024, 294 KB |
+| `titan.jpg` | [USGS](https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Titan_ISS_P19658_Mosaic_Global_4km.tif) Titan Cassini ISS Global Mosaic 4 km (938 nm, through the haze) | Cassini ISS; NASA/JPL-Caltech/SSI | Xanadu, Shangri-La, Belet | 1.1% (48-68 N, 37 W to 25 E: the source's own flat grey, see step 1) | 0.078% | 2048x1024, 294 KB |
 | `iapetus.jpg` | [USGS](https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Iapetus_Cassini_Voyager_mosaic_global_783m.tif) Iapetus Cassini-Voyager Global Mosaic 783 m | Cassini ISS and Voyager; NASA/JPL/Space Science Institute | Cassini Regio (leading side, 90 W), Engelier | 0% | 0.019% | 1024x512, 159 KB |
 | `phoebe.jpg` | [PDS](https://planetarydata.jpl.nasa.gov/img/data/carto/coiss_3001/extras/full/images/SP_1M_0_0_SIMP.IMG.png) COISS_3001, Cassini ISS cartographic map of Phoebe | Cassini ISS; DLR and FU Berlin (Roatsch et al.), NASA PDS | Jason (16 N, 318 W) | 20.41% (the north) | 0.344% (shadows) | 1024x512, 78 KB |
 | `triton.jpg` | [USGS](https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Triton_Voyager2_ClrMosaic_GlobalFill_600m.tif) Triton Voyager 2 Global Colour Mosaic 600 m (PIA18668) | Voyager 2; P. Schenk, NASA/JPL/LPI | Leviathan Patera; southern cap | 38.59% (the north Voyager 2 never saw) | 0% | 2048x1024, 205 KB |

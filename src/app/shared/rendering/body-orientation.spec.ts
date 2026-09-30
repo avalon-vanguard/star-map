@@ -50,7 +50,7 @@ describe('bodyPageView', () => {
   it('lights Earth’s face where Horizons does at the far end of the clock too: AD 1000 and AD 1', () => {
     // Horizons' sub-solar longitude from the Sun (observer quantity 14, TIME_TYPE=UT), Earth taken
     // one light-time back: 1.0510 E on JD 2086455 and 1.5606 E on JD 1721600. The IAU's W, taken at
-    // UT, drew them 2.3 and 4.5 degrees west of that.
+    // UT + 69.184 s as it was, drew them 2.3 and 4.5 degrees west of that (2.0 and 4.2 at UT itself).
     for (const [jdUt, lightMinutes, eastDeg] of [[2086455, 8.45437443, 1.05101], [1721600, 8.45020842, 1.560644]]) {
       expect(Math.abs(subSolarPoint(EARTH, jdUt - lightMinutes / 1440).eastDeg - eastDeg)).toBeLessThan(0.15);
     }

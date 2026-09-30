@@ -760,14 +760,15 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       this.starsByBrightness,
       publishedTemperaturesK(exoplanets),
     );
-    this.hostStars = Uint8Array.from(stars, (star) =>
-      this.starIdsWithBodies.has(star.id) ? 1 : 0,
-    );
+    // Ringed, and drawn ahead of the brightness tier, only inside the survey edge. The 2 883 hosts
+    // the archive places past it, 916 of them beyond a kiloparsec, mostly the Kepler field's, were
+    // a band of 1 687 fixed-size rings over the opening view's lower right, on the 250-350 pc grid
+    // labels, and read as neighbours; they still compete for the budget by brightness, and search
+    // still enters them.
+    const ringed = (star: StarRecord): boolean => this.starIdsWithBodies.has(star.id) && Math.hypot(star.x, star.y, star.z) <= SURVEY_EDGE_PC;
+    this.hostStars = Uint8Array.from(stars, (star) => (ringed(star) ? 1 : 0));
     this.galaxyGroup.add(this.starField.object);
-    this.hostRings = new HostStarRings(
-      stars.filter((star) => this.starIdsWithBodies.has(star.id)),
-      HUD_ACCENT,
-    );
+    this.hostRings = new HostStarRings(stars.filter(ringed), HUD_ACCENT);
     this.galaxyGroup.add(this.hostRings.object);
     this.jumpLinks = new JumpLinkRenderer(HUD_ACCENT);
     this.galaxyGroup.add(this.jumpLinks.object);

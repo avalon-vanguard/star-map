@@ -58,7 +58,7 @@ import {
   type ScaleBar,
 } from '../../shared/format/scale-bar';
 import { BodyDetailViewModel } from '../body-detail/body-detail.model';
-import { buildBodyViewModel, starSurfaceOf, StarSurface } from '../body-detail/body-view-model';
+import { buildBodyViewModel, publishedTemperaturesK, starSurfaceOf, StarSurface } from '../body-detail/body-view-model';
 import {
   DEFAULT_HUD_DISPLAY,
   HudDisplay,
@@ -762,6 +762,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       positions,
       starRenderBudgetFromUrl(window.location.search),
       this.starsByBrightness,
+      publishedTemperaturesK(exoplanets),
     );
     this.hostStars = Uint8Array.from(stars, (star) =>
       this.starIdsWithBodies.has(star.id) ? 1 : 0,

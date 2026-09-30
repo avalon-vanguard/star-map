@@ -1016,6 +1016,15 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(scene.hudReadouts().find((readout) => readout.label === 'Radius')?.value).toBe('0.141 solar radii');
     });
 
+    it('tints a host in the star field the colour its disc is drawn in, at the temperature the archive gives it', async () => {
+      // Proxima's B−V 1.8 reads 3 070 K; its disc is drawn at the archive's 2 900.
+      const scene = await enter(PROXIMA);
+      const field = (scene as unknown as { starField: { catalogueColors: Float32Array } }).starField.catalogueColors;
+      const at = STARS.indexOf(PROXIMA) * 3;
+      const disc = scene.starTint.value;
+      expect([field[at], field[at + 1], field[at + 2]].map((channel) => channel.toFixed(4))).toEqual([disc.r, disc.g, disc.b].map((channel) => channel.toFixed(4)));
+    });
+
     it("warms a host's planets by the luminosity the archive gives it, in the system as on their own page", async () => {
       const scene = await enter(PROXIMA);
       const planet = (scene.systemRenderer as unknown as { members: { id: string; marker: THREE.Mesh }[] }).members.find((member) => member.id === PROXIMA_B.id)!;

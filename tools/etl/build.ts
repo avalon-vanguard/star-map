@@ -180,12 +180,12 @@ const MOON_OFFSET_CEILINGS_DEG: Record<string, number> = { hyperion: 10, iapetus
  * - Iapetus, 10.34: the row sits 9.4 degrees behind Horizons at its own epoch, 2000 Jan 1.5, and
  *   keeps that offset; its plane agrees with Horizons' to 0.07 degrees and its period to 0.001 per
  *   cent, so the fault is in the row's longitude, which this has no second source to correct.
- * - Mimas, 7.43: its orbit carries the 44-degree libration of its resonance with Tethys (see
+ * - Mimas, 7.42: its orbit carries the 44-degree libration of its resonance with Tethys (see
  *   `orbitFromW` in `fetchSolarSystem.ts`), but not the rest of what Horizons integrates.
  * - Ceres, 7.12 (1953): the SBDB's elements are osculating, exact at 2026 Jun 9 and drifting
  *   either side; 1.9 by 2050, 5.3 by 2100, and 39 at 1600 on Horizons' own figures.
  *
- * And three are held tighter than the rest, each where one reading of its row is all that keeps it
+ * And four are held tighter than the rest, each where one reading of its row is all that keeps it
  * close, and without it the card would quietly restate itself under the general ceiling:
  *
  * - Tethys, 0.28, which takes the other half of that libration, 2.23 degrees, from its W. Without
@@ -193,9 +193,12 @@ const MOON_OFFSET_CEILINGS_DEG: Record<string, number> = { hyperion: 10, iapetus
  * - Io, 0.07, and Europa, 0.23, whose periapses turn backwards, held by the Laplace resonance at
  *   2n(Europa) - n(Io), -0.7395 degrees a day (`apsidesRegress`). Read as advancing, Io strays 0.96
  *   and Europa 2.24, and their cards said "within 1.0" and "within 2.3".
+ * - Callisto, 0.08, whose node turns at JPL's current rate and its periapsis's longitude at the
+ *   row's (`nodePeriodYears`). On the row's argument its periapsis moves 44 degrees by 2100 and it
+ *   strays 0.71; on the row's node, 0.19.
  */
 const MAX_TRACK_OFFSET_DEG = 3;
-const TRACK_OFFSET_CEILINGS_DEG: Record<string, number> = { hyperion: 23, nereid: 12, iapetus: 11, mimas: 8, ceres: 8, tethys: 0.5, io: 0.2, europa: 0.5 };
+const TRACK_OFFSET_CEILINGS_DEG: Record<string, number> = { hyperion: 23, nereid: 12, iapetus: 11, mimas: 8, ceres: 8, tethys: 0.5, io: 0.2, europa: 0.5, callisto: 0.15 };
 
 /**
  * The bodies the IAU WGCCRE 2015 report gives no rotational elements for: Hyperion tumbles, and
@@ -273,18 +276,36 @@ const SUB_PLANET_CEILINGS_DEG: Record<string, number> = { moon: 8, mimas: 9.5, i
  * How far a locked moon's spin axis may lean from the normal of the orbit it is drawn going round,
  * over the same dates. A locked moon sits in a Cassini state, its axis on its orbit normal as the
  * node carries both round the Laplace pole, and the IAU's pole goes round on a term of the node's
- * angle; at the rate the IAU's source had for it and not the drawn orbit's, Miranda's axis was 7.89
- * degrees off at AD 9 and Mimas's 2.63, and an Iapetus pole left on the Laplace pole is 8.30 off at
- * every date (see `lockedToOrbit`).
+ * angle; at the rate the IAU's source had for it and not the drawn orbit's, Rhea's axis is 0.77
+ * degrees off by AD 1 and Triton's 0.51, and an Iapetus pole left on the Laplace pole is 8.30 off
+ * at every date (see `lockedToOrbit`).
  *
  * Measured on this catalogue: at most 0.97 degrees (Tethys, whose IAU pole sits 0.69 from its orbit
- * normal today; Titan 0.94, whose pole the IAU holds still while its node turns in 705 years) but
+ * normal today; Titan 0.94, whose pole the IAU holds still while its node turns in 687 years) but
  * for four. The Moon 6.98, its real 6.7-degree tilt to its orbit. Phobos 1.81 and Deimos 1.74, and
  * Proteus 1.09: their IAU poles nod with Mars's and Neptune's precessing poles, the Laplace poles
  * their orbits are drawn round are fixed.
+ *
+ * And six are held tighter, each where its node terms turned at the node's rate, or its node at
+ * JPL's current rate, are what keep it close: Europa 0.13, Ganymede 0.16, Callisto 0.22, Rhea 0.17,
+ * Miranda 0.23 and Triton 0.15. On the IAU's rates they are 0.33, 0.21, 0.33, 0.77, 0.59 and 0.51,
+ * on a tolerance of 1 per cent Callisto and Rhea are left there, on the node's angle alone and not
+ * its harmonics Triton is 0.29, and on the archived table's node periods Callisto is 0.56 and
+ * Miranda 0.42: all under the general ceiling.
  */
 const MAX_AXIS_FROM_ORBIT_DEG = 1;
-const AXIS_FROM_ORBIT_CEILINGS_DEG: Record<string, number> = { moon: 7.1, phobos: 2, deimos: 2, proteus: 1.2 };
+const AXIS_FROM_ORBIT_CEILINGS_DEG: Record<string, number> = {
+  moon: 7.1,
+  phobos: 2,
+  deimos: 2,
+  proteus: 1.2,
+  europa: 0.25,
+  ganymede: 0.25,
+  callisto: 0.25,
+  rhea: 0.25,
+  miranda: 0.25,
+  triton: 0.25
+};
 /** The clock's window, AD 1 to 3000 (`CLOCK_WINDOW` in `time.store.ts`), as Julian dates. */
 const CLOCK_START_JD = Date.parse('0001-01-01T00:00Z') / 86400000 + 2440587.5;
 const CLOCK_END_JD = Date.parse('3000-01-01T00:00Z') / 86400000 + 2440587.5;

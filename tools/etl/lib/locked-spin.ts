@@ -23,8 +23,8 @@ const POLE_HARMONICS = 5;
 
 /**
  * How far a periodic term's angle may turn from a multiple of the node's rate, as a fraction of it,
- * and still be taken for the node's angle as the IAU's source had it. Measured: at most 3.4e-2
- * (Ganymede's J5), then Rhea's R4 1.2e-2 and Miranda's U11 3.2e-3; the nearest that is not a node is
+ * and still be taken for the node's angle as the IAU's source had it. Measured: at most 3.1e-2
+ * (Callisto's J6), then Rhea's R4 1.2e-2 and Ganymede's J5 3.3e-3; the nearest that is not a node is
  * a term of Miranda's W alone, 6.0e-2 from three times it. Multiples go up to the ninth, the most the
  * report takes (Triton's N7); past that, Umbriel's W has a term 1.0e-2 from ten times its node's.
  */
@@ -58,14 +58,20 @@ export function subPlanetLongitudeDeg(body: Pick<BodyRecord, 'orbit' | 'rates' |
  *
  * The node's angle goes the same way. A moon in a Cassini state keeps its axis on its orbit normal,
  * which goes round the Laplace pole with the node, and the IAU's pole goes round with it on a term
- * of the node's angle, at the node's rate as its source had it: Miranda's U11 at -2024.22 degrees a
- * century, where the table the orbit is drawn from has -2030.80. On a 4.3-degree circle that parted
- * the axis from the drawn orbit by 7.9 degrees at AD 1, and Mimas's by 2.6. Every term whose angle
- * turns within {@link MAX_NODE_RATE_OFFSET} of a multiple of the node's rate is set to that multiple,
- * its constant moved so the angle is unchanged at the present, and the pole with it: over AD 1-3000
- * Miranda's axis stays within 0.42 degrees of its orbit normal and Mimas's within 0.47, and the
- * Io's, Europa's, Ganymede's, Rhea's and Triton's within 0.17. The rest of the pole and its terms
- * are the IAU's: Callisto's J6 turns 40 per cent slower than its node, and is left.
+ * of the node's angle, at the node's rate as its source had it, not quite JPL's current one the
+ * orbit is drawn at (see `nodePeriodYears` in `fetchSolarSystem.ts`): Rhea's R4 turns 1.2 per cent
+ * faster than its node, Callisto's J6 3.1 per cent, and Miranda's U11 0.013 per cent, which on a
+ * 4.4-degree circle over twenty centuries still adds up. On the IAU's rates the axes part from the
+ * drawn orbits by AD 1 or 3000: Rhea's by 0.77 degrees, Miranda's 0.59, Triton's 0.51, Europa's and
+ * Callisto's 0.33. Every term whose angle turns within {@link MAX_NODE_RATE_OFFSET} of a multiple of
+ * the node's rate is set to that multiple, its constant moved so the angle is unchanged at the
+ * present, and the pole with it: over AD 1-3000 the axes of Io, Europa, Ganymede, Callisto, Rhea,
+ * Miranda and Triton stay within 0.23 degrees of their orbit normals, and Mimas's, whose drawn node
+ * takes the IAU's S3 itself, within 0.44. The rest of the pole and its terms are the IAU's, and so
+ * are all of the Moon's and Phobos's, left whole with their W: Ariel's, Umbriel's, Titania's and
+ * Oberon's poles go round on angles of their own at none of their nodes' multiples (Oberon's, the
+ * nearest, 8.7 per cent from three times its node's rate), and their axes stay within 0.50 degrees
+ * of their orbit normals without.
  *
  * `poleFollowsOrbit` is for Iapetus, whose IAU pole moves 3.9 degrees a century in right ascension
  * and 1.1 in declination: a straight line through its orbit normal's 3 439-year circle round the

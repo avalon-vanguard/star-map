@@ -13,6 +13,7 @@ import { lockedToOrbit } from './lib/locked-spin';
 import { dataPath, ensureDataDir } from './lib/paths';
 
 const HOURS_PER_DAY = 24;
+const DAYS_PER_JULIAN_YEAR = 365.25;
 
 interface BodySpec {
   id: string;
@@ -52,6 +53,25 @@ interface BodySpec {
   epochJd?: number;
   periodDays?: number;
   /**
+   * The node's period, in Julian years, where the row's is out of date. The archived table the rows
+   * are read from (see `fetchSatelliteMeanElementsHtml`) has older node periods for four moons than
+   * JPL's current one (ssd.jpl.nasa.gov/sats/elem), and Horizons and the IAU agree with the current
+   * ones: Miranda 17.787 years there (URA182) against the row's 17.727, Ganymede 137.812 (JUP365)
+   * against 132.654, Callisto 577.264 against 338.82, Titan 687.370 (SAT441) against 704.60. Fitted
+   * to Horizons' osculating elements on Uranus's equator over 1601-2399, Miranda's node turns
+   * 2023.97 degrees a century (rms 0.04): the current table's 2023.95, the IAU's U11 2024.22, the
+   * row's 2030.80. On the row's rate Miranda's drawn orbit was 2.0 degrees from Horizons' at 1601
+   * and 2.1 at 2399, and the axis `lockedToOrbit` turned after it 2.4 at 1601; on this one, at most 0.12 and 0.34 over 1601-2399.
+   *
+   * The row's periapsis turns at its argument's rate from that node, and it is the longitude, node
+   * plus argument, the row gives the rate of: Callisto's turns 68.7 degrees a century in the row and
+   * 67.2 in the current table, where their arguments turn at 175.0 and 129.5. So the argument takes
+   * up what the node's rate gives: on the new node and the row's argument, Callisto's periapsis
+   * moved 44 degrees by 2100 and Callisto strayed 0.71 degrees from Horizons over 1950-2100 (0.19
+   * before); keeping the row's longitude, 0.08.
+   */
+  nodePeriodYears?: number;
+  /**
    * The terms of the IAU's W that are this locked moon's motion along its orbit, which its row has
    * no column for: W's quadratic, and the term whose angle turns at `angleRateDegPerCentury`, if
    * given. See `orbitalTermsOfPrimeMeridian`.
@@ -71,6 +91,14 @@ interface BodySpec {
 
 /** S5 in pck00011.tpc, 316.45 + 506.2 T: the libration of Mimas and Tethys in their 4:2 resonance. */
 const MIMAS_TETHYS_LIBRATION = { angleRateDegPerCentury: 506.2 };
+
+/**
+ * Mimas's node period, 0.986 years in both JPL's tables, is given to three figures: anywhere from
+ * 36 493 to 36 530 degrees a century. It takes the IAU's S3, 36 505.5, which a fit to Horizons'
+ * osculating elements on Saturn's equator over 1750-2249, 36 506.7, is 1.2 from; the row's figure,
+ * 36 511.2, is 4.5.
+ */
+const MIMAS_NODE_PERIOD_YEARS = 36000 / 36505.5;
 
 /**
  * The poles of the equators JPL refers Uranus's and Pluto's moons to, from the IAU WGCCRE 2015
@@ -125,14 +153,14 @@ const BODY_SPECS: BodySpec[] = [
   { id: 'deimos', name: 'Deimos', kind: 'moon', horizonsCommand: '402', center: '500@499', parentBodyId: 'mars' },
   { id: 'io', name: 'Io', kind: 'moon', horizonsCommand: '501', center: '500@599', parentBodyId: 'jupiter', apsidesRegress: true },
   { id: 'europa', name: 'Europa', kind: 'moon', horizonsCommand: '502', center: '500@599', parentBodyId: 'jupiter', apsidesRegress: true },
-  { id: 'ganymede', name: 'Ganymede', kind: 'moon', horizonsCommand: '503', center: '500@599', parentBodyId: 'jupiter' },
-  { id: 'callisto', name: 'Callisto', kind: 'moon', horizonsCommand: '504', center: '500@599', parentBodyId: 'jupiter' },
-  { id: 'mimas', name: 'Mimas', kind: 'moon', horizonsCommand: '601', center: '500@699', parentBodyId: 'saturn', orbitFromW: MIMAS_TETHYS_LIBRATION },
+  { id: 'ganymede', name: 'Ganymede', kind: 'moon', horizonsCommand: '503', center: '500@599', parentBodyId: 'jupiter', nodePeriodYears: 137.812 },
+  { id: 'callisto', name: 'Callisto', kind: 'moon', horizonsCommand: '504', center: '500@599', parentBodyId: 'jupiter', nodePeriodYears: 577.264 },
+  { id: 'mimas', name: 'Mimas', kind: 'moon', horizonsCommand: '601', center: '500@699', parentBodyId: 'saturn', orbitFromW: MIMAS_TETHYS_LIBRATION, nodePeriodYears: MIMAS_NODE_PERIOD_YEARS },
   { id: 'enceladus', name: 'Enceladus', kind: 'moon', horizonsCommand: '602', center: '500@699', parentBodyId: 'saturn' },
   { id: 'tethys', name: 'Tethys', kind: 'moon', horizonsCommand: '603', center: '500@699', parentBodyId: 'saturn', orbitFromW: MIMAS_TETHYS_LIBRATION },
   { id: 'dione', name: 'Dione', kind: 'moon', horizonsCommand: '604', center: '500@699', parentBodyId: 'saturn' },
   { id: 'rhea', name: 'Rhea', kind: 'moon', horizonsCommand: '605', center: '500@699', parentBodyId: 'saturn' },
-  { id: 'titan', name: 'Titan', kind: 'moon', horizonsCommand: '606', center: '500@699', parentBodyId: 'saturn' },
+  { id: 'titan', name: 'Titan', kind: 'moon', horizonsCommand: '606', center: '500@699', parentBodyId: 'saturn', nodePeriodYears: 687.37 },
   // Hyperion tumbles ("Rotational period = Chaotic") and Phoebe, captured, turns in 9.27 hours.
   // Hyperion's eccentricity is 0.105 in JPL's current table (ssd.jpl.nasa.gov/sats/elem, SAT441).
   { id: 'hyperion', name: 'Hyperion', kind: 'moon', horizonsCommand: '607', center: '500@699', parentBodyId: 'saturn', spinsFreely: true, measuredEccentricity: 0.105, trackStepDays: 1 },
@@ -147,7 +175,7 @@ const BODY_SPECS: BodySpec[] = [
   // (2.58 in 1969). The table's note on misstated retrograde mean motions is about another source,
   // Jacobson 2000 on Jupiter's outer moons, and says the table carries the corrected values.
   { id: 'phoebe', name: 'Phoebe', kind: 'moon', horizonsCommand: '609', center: '500@699', parentBodyId: 'saturn', spinsFreely: true, periodDays: 550.30391 },
-  { id: 'miranda', name: 'Miranda', horizonsCommand: '705', ...URANUS_MOON },
+  { id: 'miranda', name: 'Miranda', horizonsCommand: '705', ...URANUS_MOON, nodePeriodYears: 17.787 },
   { id: 'ariel', name: 'Ariel', horizonsCommand: '701', ...URANUS_MOON },
   { id: 'umbriel', name: 'Umbriel', horizonsCommand: '702', ...URANUS_MOON },
   { id: 'titania', name: 'Titania', horizonsCommand: '703', ...URANUS_MOON },
@@ -215,6 +243,9 @@ export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizo
       (parentName
         ? parseSatelliteMeanElements(satelliteElements, parentName, spec.name, spec.apsidesRegress ?? false, spec.equatorPole)
         : parsePlanetMeanElements(planetElements, spec.id));
+    const nodeRate = spec.nodePeriodYears
+      ? Math.sign(read.rates.longitudeOfAscendingNodeDegPerDay) * (360 / (spec.nodePeriodYears * DAYS_PER_JULIAN_YEAR))
+      : read.rates.longitudeOfAscendingNodeDegPerDay;
     const corrected: MeanOrbit = {
       ...read,
       orbit: {
@@ -222,7 +253,13 @@ export async function fetchSolarSystem(): Promise<{ bodies: BodyRecord[]; horizo
         longitudeOfAscendingNodeDeg: read.orbit.longitudeOfAscendingNodeDeg + (spec.nodeOffsetDeg ?? 0),
         epochJd: spec.epochJd ?? read.orbit.epochJd
       },
-      rates: spec.periodDays ? { ...read.rates, meanMotionDegPerDay: 360 / spec.periodDays } : read.rates
+      rates: {
+        ...read.rates,
+        ...(spec.periodDays ? { meanMotionDegPerDay: 360 / spec.periodDays } : {}),
+        longitudeOfAscendingNodeDegPerDay: nodeRate,
+        // The periapsis's longitude keeps the row's rate; see `nodePeriodYears`.
+        argumentOfPeriapsisDegPerDay: read.rates.argumentOfPeriapsisDegPerDay + (read.rates.longitudeOfAscendingNodeDegPerDay - nodeRate)
+      }
     };
     if (spec.orbitFromW && !rotation) {
       throw new Error(`${spec.name}'s orbit takes terms from a W the kernel does not give.`);

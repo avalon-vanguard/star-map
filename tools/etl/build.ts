@@ -249,8 +249,8 @@ function validateStars(stars: StarRecord[]): void {
  * The other failure leaves no close pair at all, because proper motion had already carried the
  * two entries tens of arcseconds apart — the 2026-08-24 refresh, where HYG sat at epoch 2000.0
  * and Gaia at J2016.0. What it does leave is HYG rows that found no counterpart: 36 056 of them
- * against the 11 465 today, and no counterpart was possible for most of those. 8 308 of them are
- * every star beyond 250 pc but the archive's planet hosts, which the main query never downloads: 1 661
+ * against the 11 464 today, and no counterpart was possible for most of those. 8 307 of them are
+ * every star beyond 250 pc but the archive's planet hosts, which the main query never downloads: 1 660
  * naked-eye stars kept at any distance, and 6 647 fainter ones that Hipparcos put inside
  * `ETL_STAR_DISTANCE_PC` while Gaia's parallax puts them past `ETL_GAIA_DISTANCE_PC`. The other
  * 3 156 are what Gaia genuinely lacks: 1 202 brighter than V 8, which it saturates on or measures
@@ -261,7 +261,7 @@ function validateStars(stars: StarRecord[]): void {
  * This bounds a merge that went wrong, and — loosely — a Gaia download that came back short: a
  * truncated answer leaves the HYG rows whose counterpart it dropped without one, so survivors go
  * *up*, not down. Measured on the main query when it was the only one, with 10 886 survivors
- * against today's 11 465: 11 004 at nine tenths of its rows, 12 711 at half, 16 258 at a third. So
+ * against today's 11 464: 11 004 at nine tenths of its rows, 12 711 at half, 16 258 at a third. So
  * this ceiling only catches a deep truncation, and `fetchGaiaStars` catches the shallower ones
  * with a row floor on each query.
  */

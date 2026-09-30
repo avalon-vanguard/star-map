@@ -64,8 +64,11 @@ with room around it at any system scale and any window shape.
 
 The star at the centre is drawn at its own radius, to the same scale as its orbits: the
 archive's measured radius for a planet host, and otherwise one derived from its luminosity and
-temperature (Stefan-Boltzmann), which the card marks "from colour and brightness". Its surface
-is a limb-darkened disc in the colour of a blackbody at its temperature, and its planets are lit
+temperature (Stefan-Boltzmann), which the card marks with what the temperature came from: "from
+colour and brightness", "from its type and brightness" for a giant or a star whose colour the
+dwarf table does not read, or "from its temperature and brightness" for an archive host whose
+colour was read off its temperature. Its surface is a limb-darkened disc in the colour of a
+blackbody at its temperature, and its planets are lit
 in that colour, relative to the Sun's, so the solar system's photographs stay as they were
 taken. A star nothing gives a size or a temperature for is a grey point. Like every marker, the
 disc is never drawn smaller than three pixels, so a red dwarf framed with its outermost orbit

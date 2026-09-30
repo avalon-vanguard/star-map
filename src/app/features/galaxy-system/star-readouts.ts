@@ -67,8 +67,8 @@ export function starReadouts(star: StarRecord, surface?: StarSurface): HudReadou
 /**
  * What a derived radius is worked out from besides the brightness: the temperature the star's
  * colour gives, or its type's — a giant's always, and a dwarf's with no colour the table reads.
- * 11 546 radii read "from colour" whose temperature no colour went into: 10 702 giants with one, and
- * 844 stars with none, GJ 3655 (M8) among them.
+ * 10 953 radii read "from colour" whose temperature no colour went into: 10 713 giants with one,
+ * 214 stars with none, GJ 3655 (M8) among them, and 26 dwarfs whose colour is off the table.
  */
 function radiusBasis(star: StarRecord): string {
   if (star.colorFromTemperature) {

@@ -177,8 +177,9 @@ export function effectiveTemperatureK(star: StellarPhotometry): number | null {
 
 /**
  * Whether {@link effectiveTemperatureK} reads the star off its colour rather than off its type: not
- * for a giant, nor for a star with no colour the table reads, which since 206e88a is 821 dwarfs
- * placed at their type's row. The card said their radii came "from colour and brightness".
+ * for a giant, nor for a star with no colour the table reads, which since 206e88a is placed at its
+ * type's row: 224 stars that are not giants with no colour, and 36 whose colour is off the table
+ * (HD 49748, G5 V at B−V −0.32). The card said their radii came "from colour and brightness".
  */
 export function temperatureFromColour(star: Pick<StellarPhotometry, 'spectralType' | 'colorIndex' | 'colorSystem'>): boolean {
   return giantSurface(star.spectralType) === null && sequenceAtColour(star) !== null;

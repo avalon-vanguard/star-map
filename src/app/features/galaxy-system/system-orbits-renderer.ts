@@ -129,20 +129,11 @@ const ORBIT_LINE_NAME = 'orbit-line';
  * ellipse fixed at one date has the Moon up to 2 sin 5.16° of its distance, 69 000 km, off its own
  * line nine years on.
  *
- * The shape is the epoch's. The planets' axes and eccentricities do drift, but Pluto's axis, the
- * fastest, moves 0.0045 AU a century against 39.5, which no drawn line shows.
+ * The shape is redrawn by {@link reshapeOrbitLine} as the planets' axes and eccentricities drift.
  */
 function buildOrbitLine(elements: OrbitalElements, kind: SystemMemberKind, frame: THREE.Quaternion): THREE.Line {
-  const points = orbitEllipsePoints({ ...elements, inclinationDeg: 0, longitudeOfAscendingNodeDeg: 0, argumentOfPeriapsisDeg: 0 });
-  const positions = new Float32Array(points.length * 3);
-  points.forEach((point, index) => {
-    positions[index * 3] = point.x;
-    positions[index * 3 + 1] = point.y;
-    positions[index * 3 + 2] = point.z;
-  });
-
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('position', new THREE.BufferAttribute(ellipseInItsPlane(elements, new Float32Array((ORBIT_LINE_SEGMENTS + 1) * 3)), 3));
 
   const material = new THREE.LineBasicMaterial({
     color: colorForKind(kind),
@@ -152,8 +143,47 @@ function buildOrbitLine(elements: OrbitalElements, kind: SystemMemberKind, frame
 
   const line = new THREE.Line(geometry, material);
   line.name = ORBIT_LINE_NAME;
+  line.userData = { semiMajorAxisAu: elements.semiMajorAxisAu, eccentricity: elements.eccentricity };
   orientOrbit(line.quaternion, elements, frame);
   return line;
+}
+
+const ORBIT_LINE_SEGMENTS = 128;
+
+/** The orbit's ellipse in its own plane, periapsis along +X, written into `positions`. */
+function ellipseInItsPlane(elements: OrbitalElements, positions: Float32Array): Float32Array {
+  orbitEllipsePoints({ ...elements, inclinationDeg: 0, longitudeOfAscendingNodeDeg: 0, argumentOfPeriapsisDeg: 0 }, ORBIT_LINE_SEGMENTS).forEach((point, index) => {
+    positions[index * 3] = point.x;
+    positions[index * 3 + 1] = point.y;
+    positions[index * 3 + 2] = point.z;
+  });
+  return positions;
+}
+
+/**
+ * How far, in AU, an orbit's drawn ellipse may be from its current one before it is drawn again:
+ * well under the 128 chords' own sag from the true curve, 0.0005 AU for Mars and 0.003 for Saturn.
+ */
+const ORBIT_RESHAPE_AU = 1e-4;
+
+/**
+ * Draws an orbit line's ellipse again once the axis and eccentricity it was drawn with have drifted
+ * from `elements`' by more than {@link ORBIT_RESHAPE_AU}. Standish's rates move Saturn's
+ * eccentricity 0.0064 in twenty centuries, and left at J2000's, the line passed 0.056 AU, 8.4
+ * million km, from Saturn at AD 1; Jupiter 0.016 AU there, Pluto 0.021 at AD 3000. The moons' and
+ * the exoplanets' elements carry no such rates, so their lines are drawn once.
+ */
+function reshapeOrbitLine(line: THREE.Line, elements: OrbitalElements): void {
+  const drawn = line.userData as { semiMajorAxisAu: number; eccentricity: number };
+  const driftAu = Math.abs(elements.semiMajorAxisAu - drawn.semiMajorAxisAu) + elements.semiMajorAxisAu * Math.abs(elements.eccentricity - drawn.eccentricity);
+  if (driftAu <= ORBIT_RESHAPE_AU) {
+    return;
+  }
+  const position = line.geometry.getAttribute('position') as THREE.BufferAttribute;
+  ellipseInItsPlane(elements, position.array as Float32Array);
+  position.needsUpdate = true;
+  line.geometry.computeBoundingSphere();
+  line.userData = { semiMajorAxisAu: elements.semiMajorAxisAu, eccentricity: elements.eccentricity };
 }
 
 /**
@@ -498,6 +528,7 @@ export class SystemOrbitsRenderer {
       body.position.set(orbital.x, orbital.y, orbital.z).applyQuaternion(body.frame);
       body.marker.position.copy(body.position);
       orientOrbit(body.orbitLine.quaternion, current, body.frame);
+      reshapeOrbitLine(body.orbitLine, current);
       if (body.rotationalElements) {
         bodyOrientation(body.rotationalElements, epochJd, body.marker.quaternion, body.id === 'earth');
       } else if (body.rotationPeriodHours) {

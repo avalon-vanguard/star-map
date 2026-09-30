@@ -1,3 +1,6 @@
+/// <reference types="node" />
+
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { BodyRecord, OrbitalElements } from '../../shared/models/body.model';
@@ -78,6 +81,18 @@ describe('buildBodyViewModel', () => {
     const hyperion: BodyRecord = { ...luna, id: 'hyperion', orbit: orbit({ eccentricity: 0.0232 }), measuredEccentricity: 0.105 };
     const model = buildBodyViewModel('hyperion', { ...catalogues, bodies: [earth, hyperion] })!;
     expect(bodyReadouts(model).measured.find((row) => row.label === 'Eccentricity')?.value).toBe('0.105');
+  });
+
+  it('gives a triaxial body its semi-axes beside its mean radius, not a radius alone', () => {
+    // As shipped: Haumea's shape (Ortiz et al. 2017) travels from the ETL's spec to its card.
+    const shipped: BodyRecord[] = JSON.parse(readFileSync(`${process.cwd()}/src/assets/data/bodies.json`, 'utf8'));
+    const haumea = shipped.find((body) => body.id === 'haumea')!;
+    const measured = bodyReadouts(buildBodyViewModel('haumea', { ...catalogues, bodies: [earth, haumea] })!).measured;
+    expect(measured.find((row) => row.label === 'Mean radius')?.value).toBe('798 km');
+    expect(measured.find((row) => row.label === 'Semi-axes')?.value).toBe('1,161 × 852 × 513 km');
+    expect(measured.find((row) => row.label === 'Radius')).toBeUndefined();
+    // Every other body keeps its one radius.
+    expect(bodyReadouts(buildBodyViewModel('earth', catalogues)!).measured.find((row) => row.label === 'Radius')?.value).toBe('6,371 km');
   });
 
   it('says where the orbit comes from, in the card’s provenance', () => {

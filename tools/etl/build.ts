@@ -325,6 +325,15 @@ function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, Orbita
 
     // A radius of 0 is what a page whose radius no pattern reads comes out as — Charon's did.
     assertCondition(body.radiusKm > 0, `Body ${body.id} has no radius; its page states it in a form the ETL does not read.`);
+    // A triaxial body's card gives its mean radius beside its semi-axes, so the two must agree: the
+    // radius of the sphere of the same volume. Measured: Haumea's 797.6 against 797.62.
+    if (body.semiAxesKm) {
+      const volumeRadius = Math.cbrt(body.semiAxesKm[0] * body.semiAxesKm[1] * body.semiAxesKm[2]);
+      assertCondition(
+        Math.abs(volumeRadius / body.radiusKm - 1) < 0.001,
+        `${body.name}'s radius, ${body.radiusKm} km, is not the mean of its semi-axes ${body.semiAxesKm.join(' x ')}, ${volumeRadius.toFixed(1)} km.`
+      );
+    }
 
     const rotation = body.rotationalElements;
     assertCondition(

@@ -50,7 +50,14 @@ export interface BodyRecord {
   systemStarId: number;
   name: string;
   kind: 'planet' | 'moon' | 'dwarf';
+  /** Mean radius: for a triaxial body, the radius of the sphere of its volume, which is how it is drawn. */
   radiusKm: number;
+  /**
+   * A triaxial body's three semi-axes, in km, largest first, where its shape is too far from a
+   * sphere for one radius to say it: Haumea's 1161 x 852 x 513 (Ortiz et al. 2017), whose mean
+   * radius is 798.
+   */
+  semiAxesKm?: readonly [number, number, number];
   /** Mean elements at `orbit.epochJd`, moving at `rates`. */
   orbit: OrbitalElements;
   rates: MeanElementRates;

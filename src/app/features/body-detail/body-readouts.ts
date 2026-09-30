@@ -31,7 +31,11 @@ export interface BodyReadouts {
 export function bodyReadouts(body: BodyDetailViewModel): BodyReadouts {
   const measured: Readout[] = [];
   if (body.radiusKm !== undefined) {
-    measured.push({ label: 'Radius', value: formatRadiusKm(body.radiusKm) });
+    // A triaxial body is drawn as the sphere of its volume; a radius alone would hide its shape.
+    measured.push({ label: body.semiAxesKm ? 'Mean radius' : 'Radius', value: formatRadiusKm(body.radiusKm) });
+  }
+  if (body.semiAxesKm) {
+    measured.push({ label: 'Semi-axes', value: `${body.semiAxesKm.map((axis) => axis.toLocaleString('en-GB')).join(' × ')} km` });
   }
   if (body.massEarth !== undefined) {
     measured.push({ label: 'Mass', value: formatMassEarth(body.massEarth) });

@@ -52,6 +52,7 @@ export function buildBodyViewModel(id: string, catalogues: BodyCatalogues): Body
       hostStarName: hostStar?.name ?? 'Unknown star',
       hostStarId: body.systemStarId,
       radiusKm: body.radiusKm,
+      semiAxesKm: body.semiAxesKm,
       orbit: body.measuredEccentricity === undefined ? body.orbit : { ...body.orbit, eccentricity: body.measuredEccentricity },
       appearance: appearanceForBody(body, catalogues.bodies, luminosityOf(hostStar)),
       hasPhotography: bodyTexturePath(body.id) !== undefined,

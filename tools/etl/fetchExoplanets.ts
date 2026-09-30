@@ -53,7 +53,7 @@ const CACHE_FILE = `exoplanet-archive-ps-${createHash('sha1').update(TAP_URL).di
  * each column from wherever it is best measured, so an orbit read from it could pair one paper's
  * eccentricity with another's argument of periastron; none of its orbital columns are asked for.
  * Its system columns equal the default rows' wherever both are given (6 225 distances, 6 352
- * positions, none different). What it adds is the 100 distances the default rows leave blank,
+ * positions, none different). What it adds is 100 of the 127 distances the default rows leave blank,
  * TRAPPIST-1's seven among them, 870 host masses, and the parallax, photometry and stellar
  * parameters below — each of which may come from a different reference.
  */

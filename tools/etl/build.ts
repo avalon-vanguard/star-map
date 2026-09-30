@@ -205,6 +205,13 @@ const TRACK_OFFSET_CEILINGS_DEG: Record<string, number> = { hyperion: 23, nereid
 const WITHOUT_ROTATIONAL_ELEMENTS = new Set(['hyperion', 'nereid', 'eris', 'haumea', 'makemake']);
 
 /**
+ * The one moon drawn still: Hyperion, whose page says "Rotational period = Chaotic". Every other
+ * moon without a lock has a measured day; Nereid's page states none, and it was drawn still until
+ * its K2 light curve's 11.594 hours was taken (see its spec).
+ */
+const TUMBLING = new Set(['hyperion']);
+
+/**
  * How far the IAU's day, 360 degrees over W's rate, may be from the one Horizons states, as a
  * fraction of it. Measured on this catalogue: at most 1.8e-5 (Jupiter's System III, 9.92492 hours
  * against 9.92510). Neptune is 0.89 per cent out, because the report takes 15.9663 hours from the
@@ -357,8 +364,12 @@ function validateBodies(bodies: BodyRecord[], horizonsOrbits: Map<string, Orbita
       assertCondition(parent !== undefined, `Moon ${body.id} has no valid parentBodyId.`);
       const orbitHours = (360 / body.rates.meanMotionDegPerDay) * 24;
       if (FREELY_SPINNING_MOONS.has(body.id)) {
-        // Hyperion tumbles and Nereid's page gives no spin, so they have none; Phoebe turns in
-        // 9.27 hours against a 550-day orbit. A lock here would be the rule below misapplied.
+        // Hyperion tumbles, and has no period; Nereid turns in 11.594 hours against a 360-day orbit,
+        // and Phoebe in 9.27 against 550 days. A lock here would be the rule below misapplied.
+        assertCondition(
+          body.rotationPeriodHours !== undefined || TUMBLING.has(body.id),
+          `Moon ${body.id} is drawn not turning, and is not known to tumble: its day was measured somewhere, find it.`
+        );
         assertCondition(
           body.rotationPeriodHours === undefined || Math.abs(body.rotationPeriodHours - orbitHours) > orbitHours * 0.1,
           `Moon ${body.id} does not keep one face to its planet, yet turns once in ${body.rotationPeriodHours} hours against an orbit of ${orbitHours}.`

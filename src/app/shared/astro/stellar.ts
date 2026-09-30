@@ -185,10 +185,10 @@ export function temperatureFromColour(star: Pick<StellarPhotometry, 'spectralTyp
 }
 
 /**
- * What a giant's type says of its surface: its effective temperature, and the bolometric
- * correction the dwarf sequence has at that temperature — both off the type, so that the two a
- * radius is drawn from come from the same place. `null` for a star that is not a giant, or whose
- * class the parser cannot read.
+ * What a giant's type says of its surface: its effective temperature, and its bolometric
+ * correction — the dwarf sequence's at that temperature, or from M0 an M giant's own
+ * ({@link M_GIANT_CORRECTIONS}) — both off the type, so that the two a radius is drawn from come
+ * from the same place. `null` for a star that is not a giant, or whose class the parser cannot read.
  *
  * Read off the colour, a giant is the dwarf of its colour, too cool: Antares, M1 Ib at B−V 1.87,
  * came out 3 019 K against the 3 660 Ohnaka et al. (2013) measure, and the 610 M giants a median
@@ -198,10 +198,10 @@ export function temperatureFromColour(star: Pick<StellarPhotometry, 'spectralTyp
  *
  * G to M giants take van Belle et al.'s (2021, ApJ 922, 163, table 8) interferometric scale, fitted
  * to 191 giants from G1 to M7.75 III: 4 797 K at G8, 4 388 at K2, 3 816 at M0, 3 472 at M4, and held
- * at 3 134 K from M6, where its own M6 and M7 giants average 3 112 and 3 114 K. Carried on to M7.9
- * instead, the M6 giants were 3 300 K and drawn 30 % too small. O to F giants take the dwarf of their type, which a supergiant of the same type is within
- * a few per cent of from B8 on, and a few thousand kelvin cooler than at B0 (Alnilam, B0 Ia, about
- * 27 000 K against B0 V's 31 400). Carbon and S stars take {@link CARBON_STAR}.
+ * at 3 134 K from M6, where its own M6 and M7 giants average 3 112 and 3 114 K; carried on to M7.9
+ * instead, the M6 giants were 3 300 K. O to F giants take the dwarf of their type, which a
+ * supergiant of the same type is within a few per cent of from B8 on, and a few thousand kelvin
+ * cooler than at B0 (Alnilam, B0 Ia, about 27 000 K against B0 V's 31 400). Carbon and S stars take {@link CARBON_STAR}.
  */
 export function giantSurface(spectralType: string | null | undefined): GiantSurface | null {
   // ponytail: kept per type string, unbounded; the catalogue has 2 888 of them. The star field asks
@@ -232,10 +232,39 @@ function giantSurfaceOfType(spectralType: string | null | undefined): GiantSurfa
     // van Belle's index: G0 at 50, K0 at 60, K5 at 65 and M0 at 66, so a K later than K5 falls between.
     const index = spectralClass === 'G' ? 50 + subclass : spectralClass === 'K' ? 60 + Math.min(subclass, 5) + Math.max(subclass - 5, 0) / 5 : 66 + subclass;
     const temperatureK = index <= 61 ? 7856 - 52.74 * index : index <= 64 ? 16751 - 199.41 * index : index < 72 ? 9491 - 85.98 * index : 3134;
-    return { temperatureK, bolometricCorrectionV: dwarfSequenceAtTemperature(temperatureK).bolometricCorrectionV };
+    return { temperatureK, bolometricCorrectionV: index < M_GIANT_CORRECTIONS[0][0] ? dwarfSequenceAtTemperature(temperatureK).bolometricCorrectionV : mGiantCorrection(index) };
   }
   const dwarf = dwarfSequenceAtType(primary)!;
   return { temperatureK: dwarf.temperatureK, bolometricCorrectionV: dwarf.bolometricCorrectionV };
+}
+
+/**
+ * An M giant's bolometric correction to V by van Belle's index: the median over each type of his own
+ * giants, m_bol from their table 4 fluxes (IAU 2015 zero point) less their dereddened Johnson V from
+ * table 6 — 18 at M0, 11 at M2, 11 at M3, 31 at M4, 15 at M5, 7 at M5.5, 3 at M6, and the 4 from M7
+ * to M7.75 at their mean index. Linear between, held past the ends. Down to M3 it is within 0.1 of
+ * the dwarf sequence's at the same temperature; past it TiO takes the V light and the two part, by
+ * 0.4 at M4, 1.2 at M6 and 2.1 at M7. Taken from the dwarfs, RZ Ari (M6 III) came out 81.5 R☉ against
+ * the 119 its 10.3 mas give at its distance, and EU Del 72.6 against 126.
+ */
+const M_GIANT_CORRECTIONS: readonly (readonly [number, number])[] = [
+  [66, -1.22],
+  [68, -1.5],
+  [69, -1.73],
+  [70, -2.2],
+  [71, -2.68],
+  [71.5, -3.34],
+  [72, -3.94],
+  [73.5, -4.86]
+];
+
+function mGiantCorrection(index: number): number {
+  const next = M_GIANT_CORRECTIONS.findIndex(([at]) => at >= index);
+  if (next <= 0) {
+    return M_GIANT_CORRECTIONS[next === 0 ? 0 : M_GIANT_CORRECTIONS.length - 1][1];
+  }
+  const [[fromIndex, from], [toIndex, to]] = [M_GIANT_CORRECTIONS[next - 1], M_GIANT_CORRECTIONS[next]];
+  return from + ((to - from) * (index - fromIndex)) / (toIndex - fromIndex);
 }
 
 /**

@@ -147,6 +147,20 @@ describe('luminositySolar', () => {
     }
   });
 
+  it("draws an M6 giant at the radius its measured diameter gives, with an M giant's correction, not a dwarf's", () => {
+    // RZ Ari (ρ² Ari) and EU Del as the catalogue has them, and their limb-darkened diameters in
+    // CHARM2 (Richichi et al. 2005), 10.30 and 9.90 mas: 119 and 126 R☉ at those distances. With the
+    // dwarf's −2.76 at 3 134 K they came out 81.5 and 72.6; van Belle's own M6 giants give −3.94.
+    const rzAri = { magnitude: 5.76, distancePc: 107.76, spectralType: 'M6IIIvar', magnitudeBand: 'V', colorIndex: 1.452, colorSystem: 'B-V' } as const;
+    const euDel = { magnitude: 6.22, distancePc: 118.6, spectralType: 'M6III', magnitudeBand: 'V', colorIndex: 1.162, colorSystem: 'B-V' } as const;
+    for (const [star, diameterMas] of [[rzAri, 10.3], [euDel, 9.9]] as const) {
+      const measured = 0.10753 * diameterMas * star.distancePc;
+      const radius = radiusFromLuminositySolar(luminositySolar(star)!, effectiveTemperatureK(star)!);
+      expect(radius / measured).toBeGreaterThan(1 / 1.2);
+      expect(radius / measured).toBeLessThan(1.2);
+    }
+  });
+
   it('reads a hot giant reddened by dust at its type, not at the cool star its colour reads as', () => {
     // Menkib, O7.5 Iab at B−V 0.02: 14 R☉ (Krtička & Kubát 2010). At its colour's 9 517 K and its
     // type's correction it was drawn at 95; the dust it is behind still leaves it dimmer than it is.

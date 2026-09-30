@@ -71,8 +71,11 @@ function spectralTypeOf(row: Record<string, string>): string {
 /**
  * Downloads the HYG (Hipparcos/Yale/Gliese) stellar database, places each star along its
  * equatorial direction (epoch J2000.0) at whichever of its Hipparcos and Gaia distances has the
- * smaller error, keeps the ones either survey puts within range, unions the other positional
- * sources, and writes `stars.bin` (packed positions) + `stars-index.json` (everything else).
+ * smaller error, keeps the ones either survey puts within range, and unions the other positional
+ * sources. Writes nothing: fetchExoplanets adds the hosts the catalogue lacks and renames the
+ * ones known only by a designation, then writes the star assets once. Written here as well, they
+ * stood on disk without those 3 277 stars whenever a run stopped between the two — and that
+ * catalogue left 4 237 planets pointing at stars it did not have.
  */
 export async function fetchStars(): Promise<StarRecord[]> {
   console.log(`Fetching HYG star catalog (distance cutoff: ${DISTANCE_CUTOFF_PC} pc)...`);
@@ -162,7 +165,6 @@ export async function fetchStars(): Promise<StarRecord[]> {
 
   const merged = await mergeWithOtherSources(stars);
   merged.sort((a, b) => a.id - b.id);
-  writeStarAssets(merged);
   return merged;
 }
 
@@ -224,8 +226,9 @@ export function writeStarAssets(stars: StarRecord[]): void {
   writeFileSync(dataPath('stars-index.json'), JSON.stringify(index));
 }
 
+// On its own it writes what the ETL would, hosts included; imported late, since fetchExoplanets imports this module.
 if (require.main === module) {
-  fetchStars().catch((error) => {
+  import('./fetchExoplanets').then(({ fetchExoplanets }) => fetchExoplanets()).catch((error) => {
     console.error(error);
     process.exitCode = 1;
   });

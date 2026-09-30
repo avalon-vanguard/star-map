@@ -2130,7 +2130,8 @@
       "decDeg": 69.117
     },
     "orbitSource": "JPL SSD satellite mean elements, epoch 2000 Jan 1, within 11.2 degrees of Horizons from 1950 to 2100",
-    "parentBodyId": "neptune"
+    "parentBodyId": "neptune",
+    "rotationPeriodHours": 11.594
   },
   {
     "id": "proteus",

@@ -147,8 +147,10 @@ const BODY_SPECS: BodySpec[] = [
   { id: 'titania', name: 'Titania', horizonsCommand: '703', ...URANUS_MOON },
   { id: 'oberon', name: 'Oberon', horizonsCommand: '704', ...URANUS_MOON },
   { id: 'triton', name: 'Triton', kind: 'moon', horizonsCommand: '801', center: '500@899', parentBodyId: 'neptune' },
-  // Nereid's eccentric orbit, 0.75, cannot hold a face to Neptune; its page states no spin.
-  { id: 'nereid', name: 'Nereid', kind: 'moon', horizonsCommand: '802', center: '500@899', parentBodyId: 'neptune', spinsFreely: true, trackStepDays: 1 },
+  // Nereid's eccentric orbit, 0.75, cannot hold a face to Neptune. Its page states no spin, but
+  // Kepler's K2 light curve gives 11.594 +/- 0.017 hours, confirming the short periods measured
+  // from the ground (Kiss et al. 2016, MNRAS 457, 2908; arXiv:1601.02395). No pole is known.
+  { id: 'nereid', name: 'Nereid', kind: 'moon', horizonsCommand: '802', center: '500@899', parentBodyId: 'neptune', spinsFreely: true, rotationPeriodHours: 11.594, trackStepDays: 1 },
   { id: 'proteus', name: 'Proteus', kind: 'moon', horizonsCommand: '808', center: '500@899', parentBodyId: 'neptune' },
   // Pluto's section prints its epoch as 2000 Jan 1.0; JPL's current table gives Charon's as
   // 2000-01-01.5, and read at 1.0 Charon sat 27.8 to 28.2 degrees — half a day of its motion is

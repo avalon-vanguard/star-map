@@ -442,8 +442,18 @@ describe('rotation without IAU elements', () => {
     expect(spinSense(spinning({ rotationPeriodHours: 23.934 }))).toBeGreaterThan(0.99);
   });
 
+  it('turns Nereid, as shipped, once in the 11.594 hours Kepler measured: a sixth of a turn in 1.93 hours', () => {
+    const shipped: BodyRecord[] = JSON.parse(readFileSync(`${process.cwd()}/src/assets/data/bodies.json`, 'utf8'));
+    const renderer = new SystemOrbitsRenderer(shipped.filter((body) => body.id === 'neptune' || body.id === 'nereid'), []);
+    const nereid = renderer.members.find((member) => member.id === 'nereid')!.marker;
+    renderer.update(DEFAULT_EPOCH_JD);
+    const start = nereid.quaternion.clone();
+    renderer.update(DEFAULT_EPOCH_JD + 11.594 / 6 / 24);
+    expect((nereid.quaternion.angleTo(start) * 180) / Math.PI).toBeCloseTo(60, 1);
+  });
+
   it('leaves a body with no published rotation still', () => {
-    // Titan: Horizons states no period for it, and an invented one would be a claim.
+    // Hyperion, which tumbles: an invented period would be a claim.
     const renderer = new SystemOrbitsRenderer([spinning({ rotationPeriodHours: undefined })], [], undefined, 1);
     renderer.update(DEFAULT_EPOCH_JD);
     const start = renderer.members[0].marker.quaternion.clone();

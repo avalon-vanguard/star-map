@@ -268,34 +268,36 @@ function isWideViewport(): boolean {
               aria-labelledby="dock-tab-display"
               class="hud-acquire hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-lg px-4 py-3"
             >
-              <p class="type-label text-muted">Layers</p>
-              <div class="mt-2 flex flex-wrap gap-2">
-                @for (layer of layers; track layer.key) {
-                  <button
-                    type="button"
-                    [attr.aria-pressed]="isOn(layer.key)"
-                    (click)="toggleLayer(layer.key)"
-                    class="type-label flex items-center gap-2 border px-3 py-1.5 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
-                    [class]="
-                      isOn(layer.key)
-                        ? 'border-accent/60 bg-accent/12 text-accent hover:bg-accent/18'
-                        : 'border-border/60 text-muted hover:border-border hover:text-text'
-                    "
-                  >
-                    <!-- The state mark: a filled tick when the layer is drawn, hollow when it is not. -->
-                    <span
-                      aria-hidden="true"
-                      class="h-1.5 w-1.5 border border-current"
-                      [class.bg-current]="isOn(layer.key)"
-                    ></span>
-                    {{ layer.label }}
-                  </button>
-                }
-              </div>
+              @if (display()) {
+                <p class="type-label text-muted">Layers</p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  @for (layer of layers; track layer.key) {
+                    <button
+                      type="button"
+                      [attr.aria-pressed]="isOn(layer.key)"
+                      (click)="toggleLayer(layer.key)"
+                      class="type-label flex items-center gap-2 border px-3 py-1.5 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+                      [class]="
+                        isOn(layer.key)
+                          ? 'border-accent/60 bg-accent/12 text-accent hover:bg-accent/18'
+                          : 'border-border/60 text-muted hover:border-border hover:text-text'
+                      "
+                    >
+                      <!-- The state mark: a filled tick when the layer is drawn, hollow when it is not. -->
+                      <span
+                        aria-hidden="true"
+                        class="h-1.5 w-1.5 border border-current"
+                        [class.bg-current]="isOn(layer.key)"
+                      ></span>
+                      {{ layer.label }}
+                    </button>
+                  }
+                </div>
+              }
 
               <!-- The clock. Orbits and rotations are both functions of a date, so this is the
                    difference between a still picture and an orrery. -->
-              <p class="type-label mt-4 text-muted">Clock</p>
+              <p class="type-label text-muted" [class.mt-4]="display()">Clock</p>
               <!-- Radios rather than buttons: the rates are one-of-four, and the native control
                    carries that to a screen reader and to the arrow keys without any script. -->
               <div
@@ -467,8 +469,13 @@ export class HudDockComponent implements OnInit {
   readonly range = input('');
   /** The date the sky is drawn for; empty while the map is drawn for the present. */
   readonly date = input('');
-  /** Layer state; `null` means the surface has no layers to toggle and no Display tab. */
+  /**
+   * Layer state; `null` means the surface has no layers to toggle, and no Display tab unless it
+   * has the clock.
+   */
   readonly display = input<HudDisplay | null>(null);
+  /** The clock without the layers, for a surface that is drawn at its date: the tab is then "Clock". */
+  readonly clock = input(false);
   /** Which panel is open on a wide viewport when the dock mounts. */
   readonly defaultTab = input<DockTab | null>(null);
   /** Routing: what the scene found, what it offers for the fields, and where the view is. */
@@ -497,7 +504,7 @@ export class HudDockComponent implements OnInit {
     // Always offered, even with nothing in it: it is the only place that says the map can keep
     // anything at all, and a tab that appears once you already know is a tab that never taught.
     'bookmarks',
-    ...(this.display() ? (['display'] as const) : []),
+    ...(this.display() || this.clock() ? (['display'] as const) : []),
   ]);
 
   readonly activeTab = signal<DockTab | null>(null);
@@ -522,7 +529,7 @@ export class HudDockComponent implements OnInit {
   }
 
   tabLabel(tab: DockTab): string {
-    return TAB_LABELS[tab];
+    return tab === 'display' && !this.display() ? 'Clock' : TAB_LABELS[tab];
   }
 
   isOn(key: keyof HudDisplay): boolean {

@@ -267,6 +267,7 @@ function combine(kept: StarRecord, other: StarRecord): StarRecord {
   const otherBetter = other.distanceError !== undefined && kept.distanceError !== undefined && other.distanceError < kept.distanceError;
   const placed = otherBetter ? other : kept;
   const scale = otherBetter ? distanceOf(other) / distanceOf(kept) : 1;
+  const gaiaDesignation = kept.gaiaDesignation ?? other.gaiaDesignation;
   return {
     ...described,
     x: kept.x * scale,
@@ -274,38 +275,62 @@ function combine(kept: StarRecord, other: StarRecord): StarRecord {
     z: kept.z * scale,
     source: kept.source,
     distanceError: placed.distanceError,
-    distanceFromGaia: placed.distanceFromGaia
+    distanceFromGaia: placed.distanceFromGaia,
+    ...(gaiaDesignation === undefined ? {} : { gaiaDesignation })
   };
+}
+
+/**
+ * How far apart in V a Gliese-only entry and the HYG star already on its Gaia entry may be and still
+ * be one star. The ten such pairs agree within 0.12 (Gl 251 and HD 265866, 10.01 and 9.89); a
+ * companion SIMBAD gives its primary's source differs by magnitudes.
+ */
+export const IDENTITY_FOLD_MAGNITUDE_TOLERANCE = 0.5;
+
+/**
+ * Whether a Gliese-only entry folds into `target`, the Gaia entry of the source SIMBAD names it as:
+ * always where that entry is still bare, a Gaia designation with Gaia's G, which SIMBAD's identity
+ * settles whatever HYG's V says; where a HYG star already describes it, only if the two V agree.
+ */
+export function foldsInto(target: StarRecord, entry: StarRecord): boolean {
+  return isDesignation(target) || Math.abs(target.magnitude - entry.magnitude) <= IDENTITY_FOLD_MAGNITUDE_TOLERANCE;
 }
 
 /**
  * Folds each Gliese-only entry — HYG's, with no Hipparcos astrometry and so no published error on
  * its distance — into the Gaia entry of the source SIMBAD names it as, `gaiaDesignationById` by
- * HYG id, where that entry is still bare. {@link isSameStar} cannot see these: 42 of them within
- * 25 pc stayed beside their own Gaia entry, too far for their positions (GJ 3478, 16″), moving
- * differently by HYG's motions (GJ 2097, 39 %), or brighter in HYG's V than Gaia's G by more than a
- * primary may be (GJ 4285, 1.6 magnitudes). Two of those were stars that do not exist inside 10 pc:
- * GJ 2097 at 6.41 pc and GJ 4285 at 6.80, which Gaia measures at 24.47 and 28.25. The fold keeps
- * HYG's description and Gaia's position and distance, as {@link combine} does for any other pair.
+ * HYG id (see {@link foldsInto}). {@link isSameStar} cannot see these: 43 of them within 25 pc stayed
+ * beside their own bare Gaia entry, too far for their positions (GJ 3478, 16″), moving differently
+ * by HYG's motions (GJ 2097, 39 %), or brighter in HYG's V than Gaia's G by more than a primary may
+ * be (GJ 4285, 1.6 magnitudes). Two of those were stars that do not exist inside 10 pc: GJ 2097 at
+ * 6.41 pc and GJ 4285 at 6.80, which Gaia measures at 24.47 and 28.25. Others sat beside a Gaia entry
+ * a Hipparcos row of HYG's had already taken, HYG listing the star twice: Gl 251 at 5.76 pc beside
+ * HD 265866, the host of GJ 251 b and c, at 5.58.
+ *
+ * The fold keeps the entry already there's photometry along with Gaia's position and distance, and
+ * HYG's name and type. Taking the Gliese row's, as {@link combine} would, put CNS3's V at Gaia's
+ * distance: GJ 4285 at V 11.45, where its G 13.05 and BP−RP 2.74 give 14.4, drawn five times too
+ * luminous, and six stars with no colour lost their temperature and radius, Gl 700.1C among them.
  */
 export function foldByIdentity(stars: readonly StarRecord[], gaiaDesignationById: ReadonlyMap<number, string>): { stars: StarRecord[]; folded: number } {
-  // A Gaia entry already folded into carries the other catalogue's name, not its designation.
-  const bare = new Map<string, number>();
+  const byDesignation = new Map<string, number>();
   stars.forEach((star, index) => {
-    if (star.source === 'gaia') {
-      bare.set(star.name, index);
+    if (star.gaiaDesignation !== undefined) {
+      byDesignation.set(star.gaiaDesignation, index);
     }
   });
   const result = [...stars];
   const folded = new Set<number>();
   stars.forEach((star, index) => {
     const designation = star.source === 'hyg' && star.distanceError === undefined ? gaiaDesignationById.get(star.id) : undefined;
-    const target = designation === undefined ? undefined : bare.get(designation);
-    if (target === undefined) {
+    const target = designation === undefined ? undefined : byDesignation.get(designation);
+    if (target === undefined || !foldsInto(result[target], star)) {
       return;
     }
-    result[target] = combine(result[target], star);
-    bare.delete(designation!);
+    const { magnitude, magnitudeBand, colorIndex, colorSystem } = result[target];
+    result[target] = { ...combine(result[target], star), magnitude, magnitudeBand, colorIndex, colorSystem };
+    // One star each: a second Gliese row naming the same source is another star SIMBAD has not split.
+    byDesignation.delete(designation!);
     folded.add(index);
   });
   return { stars: result.filter((_, index) => !folded.has(index)), folded: folded.size };

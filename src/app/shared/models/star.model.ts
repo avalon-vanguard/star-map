@@ -61,6 +61,11 @@ export interface StarRecord {
    */
   pmRaMasYr?: number;
   pmDecMasYr?: number;
+  /**
+   * The Gaia DR3 source a Gaia entry is, kept once a HYG row has named it: what `foldByIdentity`
+   * looks up a star SIMBAD identifies by. Only the ETL sets it; the assets do not carry it.
+   */
+  gaiaDesignation?: string;
 }
 
 /** HYG id used for the Sun itself, so solar-system bodies can reference their host star. */

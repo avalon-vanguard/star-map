@@ -219,6 +219,7 @@ function rowsToStars(rows: readonly Record<string, string>[], idBase: number): S
     stars.push({
       id: idBase + index,
       name: `Gaia DR3 ${row['source_id']}`,
+      gaiaDesignation: `Gaia DR3 ${row['source_id']}`,
       x,
       y,
       z,
@@ -298,8 +299,9 @@ export async function fetchGaiaDistancesByHip(): Promise<Map<number, { distanceP
 const BRIGHT_MAGNITUDE_LIMIT = 7.5;
 const BRIGHT_QUERY_ROWS = 35_910;
 
-/** A bright Gaia source's J2000 direction, G magnitude and distance. */
+/** A bright Gaia source's designation, J2000 direction, G magnitude and distance. */
 export interface BrightGaiaSource {
+  designation: string;
   direction: { x: number; y: number; z: number };
   magnitudeG: number;
   distancePc: number;
@@ -330,7 +332,7 @@ export async function fetchBrightGaiaSources(): Promise<BrightGaiaSource[]> {
       continue;
     }
     const j2000 = propagateProperMotion(raDeg, decDeg, parseOptionalNumber(row['pmra']) ?? 0, parseOptionalNumber(row['pmdec']) ?? 0, CATALOGUE_EPOCH - GAIA_DR3_EPOCH);
-    sources.push({ direction: raDegDecDistanceToXyz(j2000.raDeg, j2000.decDeg, 1), magnitudeG, distancePc: 1000 / parallaxMas, relativeError: 1 / overError });
+    sources.push({ designation: `Gaia DR3 ${row['source_id']}`, direction: raDegDecDistanceToXyz(j2000.raDeg, j2000.decDeg, 1), magnitudeG, distancePc: 1000 / parallaxMas, relativeError: 1 / overError });
   }
   return sources;
 }

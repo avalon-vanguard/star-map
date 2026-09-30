@@ -310,25 +310,51 @@ describe('mergeStarCatalogues', () => {
 });
 
 describe('foldByIdentity', () => {
-  // GJ 4285 as HYG has it, at its Gliese photometric distance and a magnitude and a half brighter
-  // in V than Gaia's G, and the Gaia source SIMBAD names as the same star, L 119-44, 50.6″ away.
-  const gliese = at(119513, 339.5, -65.84, 6.8, { name: 'GJ 4285', source: 'hyg', magnitude: 11.45, magnitudeBand: 'V', spectralType: 'M4' });
-  const gaia = at(1050005263, 339.5 + arcsecOfRa(50.6, -65.84), -65.84, 28.25, { name: 'Gaia DR3 6392188629658709888', source: 'gaia', magnitude: 13.05, magnitudeBand: 'G', distanceError: 0.0004, distanceFromGaia: true });
-  const identities = new Map([[gliese.id, gaia.name]]);
+  // GJ 4285 as HYG has it, at its Gliese photometric distance and V, with no colour, and the Gaia
+  // source SIMBAD names as the same star, L 119-44, 50.6″ away: G 13.05 and BP−RP 2.74, which give V 14.4.
+  const gliese = at(119513, 339.5, -65.84, 6.8, { name: 'GJ 4285', source: 'hyg', magnitude: 11.45, magnitudeBand: 'V', spectralType: 'm', colorIndex: null });
+  const gaia = at(1050005263, 339.5 + arcsecOfRa(50.6, -65.84), -65.84, 28.25, {
+    name: 'Gaia DR3 6392188629658709888',
+    gaiaDesignation: 'Gaia DR3 6392188629658709888',
+    source: 'gaia',
+    magnitude: 13.05,
+    magnitudeBand: 'G',
+    colorIndex: 2.74,
+    colorSystem: 'BP-RP',
+    distanceError: 0.0004,
+    distanceFromGaia: true
+  });
+  const identities = new Map([[gliese.id, gaia.gaiaDesignation!]]);
 
-  it("folds a Gliese entry into the Gaia entry SIMBAD names it as, at Gaia's position and distance", () => {
+  it("folds a Gliese entry into the Gaia entry SIMBAD names it as, at Gaia's position and distance and in Gaia's photometry", () => {
     expect(isSameStar(gaia, gliese)).toBe(false);
     const { stars, folded } = foldByIdentity([gliese, gaia], identities);
     expect(folded).toBe(1);
     expect(stars).toHaveLength(1);
-    expect(stars[0]).toMatchObject({ id: gliese.id, name: 'GJ 4285', spectralType: 'M4', source: 'gaia', distanceError: 0.0004, distanceFromGaia: true });
+    expect(stars[0]).toMatchObject({ id: gliese.id, name: 'GJ 4285', spectralType: 'm', source: 'gaia', distanceError: 0.0004, distanceFromGaia: true });
+    expect(stars[0]).toMatchObject({ magnitude: 13.05, magnitudeBand: 'G', colorIndex: 2.74, colorSystem: 'BP-RP' });
     expect(Math.hypot(stars[0].x, stars[0].y, stars[0].z)).toBeCloseTo(28.25, 9);
     expect(directionCosine(stars[0], gaia)).toBeCloseTo(1, 12);
   });
 
-  it('leaves a star with a Hipparcos error, and a Gaia entry already folded into, alone', () => {
+  it('folds one into a Gaia entry a HYG star of the same brightness already describes, and keeps that star', () => {
+    // HYG lists GJ 251 twice: HD 265866, a Hipparcos row merged with its Gaia source, and Gl 251,
+    // 10.9″ away at a Gliese distance of 5.76 pc, which SIMBAD names as the same source.
+    const hd265866 = at(33139, 103.7, 33.27, 5.58, { name: 'HD 265866', source: 'hyg', magnitude: 9.89, magnitudeBand: 'V', spectralType: 'M3', colorIndex: 1.6, colorSystem: 'B-V', distanceError: 0.004 });
+    const source = at(1000033139, 103.7, 33.27, 5.585, { name: 'Gaia DR3 939072613334579328', gaiaDesignation: 'Gaia DR3 939072613334579328', source: 'gaia', magnitude: 8.9, magnitudeBand: 'G', distanceError: 0.0002 });
+    const gl251 = at(118447, 103.7 + arcsecOfRa(10.9, 33.27), 33.27, 5.76, { name: 'Gl 251', source: 'hyg', magnitude: 10.01, magnitudeBand: 'V', spectralType: 'M4', colorIndex: null });
+    const { stars: merged } = mergeStarCatalogues([{ ...HIPPARCOS, stars: [hd265866] }, { ...GAIA, stars: [source] }]);
+    const { stars, folded } = foldByIdentity([...merged, gl251], new Map([[gl251.id, source.gaiaDesignation!]]));
+    expect(folded).toBe(1);
+    expect(stars).toHaveLength(1);
+    expect(stars[0]).toMatchObject({ id: 33139, name: 'HD 265866', magnitude: 9.89, magnitudeBand: 'V', colorIndex: 1.6, source: 'gaia' });
+  });
+
+  it('leaves a star with a Hipparcos error alone, and one of another brightness than the HYG star already there', () => {
     expect(foldByIdentity([{ ...gliese, distanceError: 0.05 }, gaia], identities).folded).toBe(0);
-    expect(foldByIdentity([gliese, { ...gaia, name: 'L 119-44' }], identities).folded).toBe(0);
+    // A companion SIMBAD gives its primary's source: two magnitudes apart.
+    expect(foldByIdentity([gliese, { ...gaia, name: 'L 119-44', magnitude: 13.45 }], identities).folded).toBe(0);
+    expect(foldByIdentity([gliese, { ...gaia, name: 'L 119-44', magnitude: 11.85 }], identities).folded).toBe(1);
     expect(foldByIdentity([gliese, gaia], new Map()).folded).toBe(0);
   });
 });

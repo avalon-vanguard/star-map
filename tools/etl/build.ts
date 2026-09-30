@@ -10,6 +10,7 @@ import { fetchSolarSystem } from './fetchSolarSystem';
 import { BYTES_PER_STAR_META, BYTES_PER_STAR_POSITION, decodeStarCatalog, encodeStarCatalog, isDesignation } from '../../src/app/shared/models/star-catalog';
 import { fetchStars, glieseGaiaDesignations } from './fetchStars';
 import { ARCHIVE_EPOCH, archiveStarId, CATALOGUE_EPOCH } from '../../src/app/shared/astro/host-star-matching';
+import { foldsInto } from '../../src/app/shared/astro/star-merge';
 import { propagateProperMotion, raDegDecDistanceToXyz } from '../../src/app/shared/astro/coordinates';
 import { describeSources } from './sources/registry';
 import { dataPath } from './lib/paths';
@@ -24,7 +25,7 @@ function assertCondition(condition: boolean, message: string): void {
 
 /**
  * Stars whose magnitude is a stand-in, and distances published without an error. Measured 309 and
- * 346: the 44 Gaia sources with no G and the 265 archive hosts with neither V nor G; the 264 Gliese
+ * 332: the 44 Gaia sources with no G and the 265 archive hosts with neither V nor G; the 250 Gliese
  * distances (no Hipparcos parallax behind them) and 82 archive hosts the archive gives no error
  * for. Losing either field loses it for hundreds of thousands of stars.
  */
@@ -73,16 +74,23 @@ const MIN_COLOURS_FROM_TEMPERATURE = 40;
  */
 const MAX_ARCHIVE_IDS_OFF_THEIR_NAME = 5;
 /**
- * Every star the naked eye sees, kept at any distance (c64eea0): measured 8 898 of V 6.5 or
- * brighter, 1 663 of them past 250 pc. With no magnitude handed to placementDistancePc, 7 379 are
+ * Every star the naked eye sees, kept at any distance (c64eea0): measured 8 899 of V 6.5 or
+ * brighter, 1 664 of them past 250 pc. With no magnitude handed to placementDistancePc, 7 379 are
  * left and Rigel, Deneb and Alnilam are gone — and every other check passed, the HYG survivors
  * going down rather than up. HD 197770 and HD 45291 are two of the twelve only Gaia's bright
  * sources place, by position; without that lookup they are gone and the count drops by twelve,
- * which the floor alone would not see.
+ * which the floor alone would not see. HD 45951 is one of the two only SIMBAD's name for its Gaia
+ * source places, HYG's declination for it being 31.7′ out; θ¹ Ori A (HD 37020) is the other.
+ *
+ * Twenty HYG rows of V 6.5 or brighter are still left out, for want of a distance: neither HYG nor
+ * Hipparcos gives one, and Gaia DR3 has no source brighter than G 7.5 with a parallax five times
+ * its error within a minute of arc, nor under the name SIMBAD gives. They are β Phe, φ Cas, χ Aur,
+ * ο¹ Cen, Polis, 16 Sgr, ρ Cas, η Car, and HD 47240, 50820, 90772, 97534, 100198, 101205, 101947,
+ * 129092, 151804, 185936, 202214 and 212466.
  */
 const MIN_NAKED_EYE_STARS = 8_800;
 const NAKED_EYE_MAGNITUDE_V = 6.5;
-const REQUIRED_NAKED_EYE_STARS = ['Rigel', 'Deneb', 'Alnilam', 'HD 197770', 'HD 45291'];
+const REQUIRED_NAKED_EYE_STARS = ['Rigel', 'Deneb', 'Alnilam', 'HD 197770', 'HD 45291', 'HD 45951'];
 
 function validateStars(stars: StarRecord[]): void {
   assertCondition(stars.length > 0, 'No stars were produced.');
@@ -218,37 +226,48 @@ function validateStars(stars: StarRecord[]): void {
  *
  * A star kept twice leaves its two entries near each other on the sky, from *different* sources —
  * one catalogue does not list a star twice. Under an arcsecond that is never two stars at this
- * depth, so every such pair is a miss. Twenty-three survive today; the nineteen first counted were
+ * depth, so every such pair is a miss. Twenty-two survive today; the nineteen first counted were
  * all a second HYG row wanting a Gaia entry that already absorbed one (Gliese lists some doubles
  * twice), and the merge that trusted a Hipparcos parallax over direction left 1 112.
  *
  * The other failure leaves no close pair at all, because proper motion had already carried the
  * two entries tens of arcseconds apart — the 2026-08-24 refresh, where HYG sat at epoch 2000.0
  * and Gaia at J2016.0. What it does leave is HYG rows that found no counterpart: 36 056 of them
- * against the 11 478 today, and no counterpart was possible for most of those. 8 307 of them are
- * every star beyond 250 pc but the archive's planet hosts, which the main query never downloads: 1 660
+ * against the 11 465 today, and no counterpart was possible for most of those. 8 308 of them are
+ * every star beyond 250 pc but the archive's planet hosts, which the main query never downloads: 1 661
  * naked-eye stars kept at any distance, and 6 647 fainter ones that Hipparcos put inside
  * `ETL_STAR_DISTANCE_PC` while Gaia's parallax puts them past `ETL_GAIA_DISTANCE_PC`. The other
- * 3 170 are what Gaia genuinely lacks: 1 204 brighter than V 8, which it saturates on or measures
- * poorly, 1 804 between 8 and 12, and 162 fainter, 112 of them Gliese stars within 50 pc that
+ * 3 156 are what Gaia genuinely lacks: 1 202 brighter than V 8, which it saturates on or measures
+ * poorly, 1 793 between 8 and 12, and 161 fainter, 111 of them Gliese stars within 50 pc that
  * neither of its queries holds. So the headroom left to the ceiling tracks the gap between those two cutoffs as
  * much as Gaia's completeness.
  *
  * This bounds a merge that went wrong, and — loosely — a Gaia download that came back short: a
  * truncated answer leaves the HYG rows whose counterpart it dropped without one, so survivors go
  * *up*, not down. Measured on the main query when it was the only one, with 10 886 survivors
- * against today's 11 478: 11 004 at nine tenths of its rows, 12 711 at half, 16 258 at a third. So
+ * against today's 11 465: 11 004 at nine tenths of its rows, 12 711 at half, 16 258 at a third. So
  * this ceiling only catches a deep truncation, and `fetchGaiaStars` catches the shallower ones
  * with a row floor on each query.
  */
 const MAX_UNMERGED_TWINS = 100;
 /**
  * Gliese-only rows beside the Gaia entry SIMBAD names as the same star, which no geometry saw:
- * 49 before `foldByIdentity`, two of them false stars inside 10 pc (GJ 2097 at 6.41 pc and GJ 4285
- * at 6.80, which Gaia has at 24.47 and 28.25). The twin count above does not see them, being up to
- * minutes of arc apart.
+ * 49 beside a bare one before `foldByIdentity`, two of them false stars inside 10 pc (GJ 2097 at
+ * 6.41 pc and GJ 4285 at 6.80, which Gaia has at 24.47 and 28.25), and 10 beside one a Hipparcos row
+ * already described, Gl 251 at 5.76 pc beside HD 265866. The twin count above does not see them,
+ * being up to minutes of arc apart.
+ *
+ * That count takes SIMBAD's map from the function the fold takes it from, so a slip in the map
+ * turns both off together: with it empty, GJ 2097 and GJ 4285 were back inside 10 pc and the count
+ * read none. These are checked by name and distance instead.
  */
 const MAX_GLIESE_ROWS_BESIDE_THEIR_GAIA_SOURCE = 0;
+const FOLDED_GLIESE_STARS = [
+  { name: 'GJ 2097', beyondPc: 20 },
+  { name: 'GJ 4285', beyondPc: 20 }
+];
+/** Gliese-only rows of stars HYG also lists by their Hipparcos row, HD 265866 and HD 304043. */
+const ABSORBED_GLIESE_ROWS = ['Gl 251', 'Gl 422'];
 const MAX_HYG_SURVIVORS = 15_000;
 const TWIN_TOLERANCE_RAD = (1 / 3600) * (Math.PI / 180);
 
@@ -296,12 +315,26 @@ function validateMerge(stars: StarRecord[], gaiaDesignationById: ReadonlyMap<num
     twins <= MAX_UNMERGED_TWINS,
     `${twins} stars from different catalogues sit within an arcsecond of each other (at most ${MAX_UNMERGED_TWINS} expected), starting with ${example} — the merge is keeping the same star twice.`
   );
-  const bare = new Set(stars.filter((star) => star.source === 'gaia' && isDesignation(star)).map((star) => star.name));
-  const beside = stars.filter((star) => star.source === 'hyg' && star.distanceError === undefined && bare.has(gaiaDesignationById.get(star.id) ?? ''));
+  const byDesignation = new Map(stars.filter((star) => star.gaiaDesignation !== undefined).map((star) => [star.gaiaDesignation!, star]));
+  const beside = stars.filter((star) => {
+    const target = star.source === 'hyg' && star.distanceError === undefined ? byDesignation.get(gaiaDesignationById.get(star.id) ?? '') : undefined;
+    return target !== undefined && foldsInto(target, star);
+  });
   assertCondition(
     beside.length <= MAX_GLIESE_ROWS_BESIDE_THEIR_GAIA_SOURCE,
     `${beside.length} Gliese stars are drawn beside the Gaia source SIMBAD names them as, starting with ${beside[0]?.name} — the identity fold is not being made.`
   );
+  for (const expected of FOLDED_GLIESE_STARS) {
+    const star = stars.find((candidate) => candidate.name === expected.name);
+    const distancePc = star && Math.hypot(star.x, star.y, star.z);
+    assertCondition(
+      distancePc !== undefined && distancePc > expected.beyondPc,
+      `${expected.name} is at ${distancePc?.toFixed(2)} pc, not beyond ${expected.beyondPc} where Gaia measures it — Gliese stars are no longer folded into their Gaia source.`
+    );
+  }
+  for (const name of ABSORBED_GLIESE_ROWS) {
+    assertCondition(!stars.some((star) => star.name === name), `${name} is drawn beside the Hipparcos star it is — Gliese stars are no longer folded into their Gaia source.`);
+  }
   console.log(`  ${survivors} HYG stars have no Gaia counterpart; ${twins} unmerged cross-catalogue pairs within an arcsecond; ${beside.length} Gliese stars beside their own Gaia source.`);
 }
 

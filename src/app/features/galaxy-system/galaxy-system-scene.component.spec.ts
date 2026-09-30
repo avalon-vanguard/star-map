@@ -908,6 +908,14 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       );
     });
 
+    it('holds Earth to its 3-pixel floor at the arrival framing, where its true radius is far under a pixel', async () => {
+      Object.defineProperty((fixture.nativeElement as HTMLElement).querySelector('canvas')!, 'clientHeight', { value: 1000 });
+      const component = await enterTheSun(1.6);
+      const earth = component.systemRenderer.members.find((member) => member.id === 'earth')!.marker as THREE.Mesh;
+      const pixelAu = (2 * engine.visibleHalfHeight(engine.getCamera().position.distanceTo(earth.getWorldPosition(new THREE.Vector3())))) / 1000;
+      expect((earth.scale.x * (earth.geometry as THREE.SphereGeometry).parameters.radius) / pixelAu).toBeCloseTo(3, 3);
+    });
+
     it('leaves the system outwards even from a phone’s framing, which stands past the 400 AU it used to fly to', async () => {
       const component = await enterTheSun(390 / 844);
       const camera = engine.getCamera();

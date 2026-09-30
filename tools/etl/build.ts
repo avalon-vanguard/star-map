@@ -332,6 +332,23 @@ function validateBodies(bodies: BodyRecord[]): void {
  * for a few more of those, not for the matching or the additions to stop working.
  */
 const MIN_HOSTED_SHARE = 0.995;
+/**
+ * Planets whose host only one path places, which the share above has room to lose: mu2 Sco b's
+ * archive rows give a parallax and no distance, and without the parallax it had no star — 6 327
+ * hosted instead of 6 328, and every check passed.
+ */
+const REQUIRED_HOSTED_PLANETS = ['mu2 Sco b'];
+/**
+ * Two hosts' luminosities as the archive gives them, one either side of the Sun's: st_lum −2.821
+ * for Proxima (Ribas et al. 2017 measure 1.51×10⁻³ L☉) and +1.602 for HD 97048. That every
+ * luminosity is positive catches st_lum stored unconverted and nothing else: read as 10^−x or e^x,
+ * Proxima came out 662 or 0.0595 L☉ and every check passed.
+ */
+const LUMINOSITY_ANCHORS = [
+  { planet: 'Proxima Cen b', luminositySolar: 1.51e-3 },
+  { planet: 'HD 97048 b', luminositySolar: 40 }
+];
+const LUMINOSITY_ANCHOR_TOLERANCE = 0.1;
 
 /**
  * The share of planets whose host's radius and temperature the archive gives, which is what
@@ -385,6 +402,10 @@ function validateExoplanets(exoplanets: ExoplanetRecord[], stars: StarRecord[]):
     crossReferenced >= exoplanets.length * MIN_HOSTED_SHARE,
     `Only ${crossReferenced} of ${exoplanets.length} exoplanets have a host star (at least ${MIN_HOSTED_SHARE * 100} % expected) — hosts are no longer being matched or added.`
   );
+  for (const name of REQUIRED_HOSTED_PLANETS) {
+    const planet = exoplanets.find((candidate) => candidate.name === name);
+    assertCondition(planet?.hostStarId != null, `${name} has no host star — a host the archive places by its parallax alone is no longer placed.`);
+  }
 
   const withRadius = exoplanets.filter((exoplanet) => exoplanet.hostStarRadiusSolar !== undefined).length;
   const withTemperature = exoplanets.filter((exoplanet) => exoplanet.hostStarTemperatureK !== undefined).length;
@@ -404,6 +425,13 @@ function validateExoplanets(exoplanets: ExoplanetRecord[], stars: StarRecord[]):
     luminosities.every((luminosity) => Number.isFinite(luminosity) && luminosity! > 0),
     'A host luminosity is not a positive number — st_lum is no longer converted from its logarithm.'
   );
+  for (const anchor of LUMINOSITY_ANCHORS) {
+    const luminosity = exoplanets.find((exoplanet) => exoplanet.name === anchor.planet)?.hostStarLuminositySolar;
+    assertCondition(
+      luminosity !== undefined && Math.abs(luminosity / anchor.luminositySolar - 1) <= LUMINOSITY_ANCHOR_TOLERANCE,
+      `${anchor.planet}'s host is ${luminosity} L☉, not the ${anchor.luminositySolar} its st_lum gives — st_lum is not being read as the base-10 logarithm it is.`
+    );
+  }
   console.log(`  ${withRadius}/${exoplanets.length} carry their host's radius, ${withTemperature} its temperature, ${luminosities.length} its luminosity.`);
 
   let worstOffsetMas = 0;

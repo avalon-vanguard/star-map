@@ -1,9 +1,9 @@
 import { writeFileSync } from 'node:fs';
 
-import { foldByIdentity, hipparcosDistancePc, mergeStarCatalogues, placementDistancePc } from '../../src/app/shared/astro/star-merge';
+import { foldByIdentity, hipparcosDistancePc, mergeStarCatalogues, NAKED_EYE_MAGNITUDE, placementDistancePc } from '../../src/app/shared/astro/star-merge';
 import { encodeStarCatalog } from '../../src/app/shared/models/star-catalog';
 import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model';
-import { fetchGaiaDistancesByHip, fetchHipparcosParallaxErrors, GaiaAnswerError } from './sources/gaia';
+import { BrightGaiaSource, fetchBrightGaiaSources, fetchGaiaDistancesByHip, fetchHipparcosParallaxErrors, GaiaAnswerError } from './sources/gaia';
 import { positionalSources } from './sources/registry';
 import { fetchGaiaDesignationsByGj } from './sources/simbad';
 import { PARALLAX_PRECISION_MAS } from './sources/star-sources';
@@ -85,6 +85,7 @@ export async function fetchStars(): Promise<StarRecord[]> {
   // Not skipped when unreachable, unlike the positional sources below; see its own comment.
   const gaiaByHip = await fetchGaiaDistancesByHip();
   const hipparcosErrors = await fetchHipparcosParallaxErrors();
+  const brightGaia = await fetchBrightGaiaSources();
 
   const stars: StarRecord[] = [];
   let atGaiaDistance = 0;
@@ -101,10 +102,12 @@ export async function fetchStars(): Promise<StarRecord[]> {
     const hygPc = Number(row['dist']);
     const hipparcos = row['hip'] ? hipparcosErrors.get(Number(row['hip'])) : undefined;
     const hipparcosPc = hipparcosDistancePc(hygPc, hipparcos);
-    const gaia = row['hip'] ? gaiaByHip.get(Number(row['hip'])) : undefined;
-    const gaiaPc = gaia?.distancePc;
     const magnitudeV = parseOptionalNumber(row['mag']);
     const magnitude = magnitudeV ?? UNKNOWN_MAGNITUDE;
+    const gaia =
+      (row['hip'] ? gaiaByHip.get(Number(row['hip'])) : undefined) ??
+      (hipparcosPc === undefined && magnitude <= NAKED_EYE_MAGNITUDE ? brightCounterpart(row, magnitude, brightGaia) : undefined);
+    const gaiaPc = gaia?.distancePc;
     const hipparcosError = hipparcos?.relativeError;
     const distancePc = placementDistancePc(hipparcosPc, gaiaPc, magnitude, DISTANCE_CUTOFF_PC, hipparcosError, gaia?.relativeError);
     if (distancePc === null) {
@@ -168,6 +171,31 @@ export async function fetchStars(): Promise<StarRecord[]> {
   console.log(`  ${folded} Gliese entries folded into the Gaia source SIMBAD names them as.`);
   merged.sort((a, b) => a.id - b.id);
   return merged;
+}
+
+/** How far a naked-eye star may be from its Gaia source, and how much brighter or fainter in G. */
+const BRIGHT_COUNTERPART_TOLERANCE_RAD = (5 / 3600) * (Math.PI / 180);
+const BRIGHT_COUNTERPART_MAGNITUDES = 1;
+
+/**
+ * The Gaia source that is a naked-eye HYG star neither survey places otherwise: the nearest within
+ * 5″ of its direction and a magnitude of its V. Found this way, HD 152249 is 4.1″ from where HYG
+ * has it, the rest within 1.1″. At 15″, θ¹ Ori (HIP 26220) took the source of θ¹ Ori C, 12.9″ away
+ * and already on the map.
+ */
+function brightCounterpart(row: Record<string, string>, magnitudeV: number, sources: readonly BrightGaiaSource[]): { distancePc: number; relativeError: number } | undefined {
+  const [x, y, z] = [Number(row['x']), Number(row['y']), Number(row['z'])];
+  const length = Math.hypot(x, y, z);
+  let best: BrightGaiaSource | undefined;
+  let bestCosine = Math.cos(BRIGHT_COUNTERPART_TOLERANCE_RAD);
+  for (const source of sources) {
+    const cosine = (x * source.direction.x + y * source.direction.y + z * source.direction.z) / length;
+    if (cosine >= bestCosine && Math.abs(source.magnitudeG - magnitudeV) <= BRIGHT_COUNTERPART_MAGNITUDES) {
+      best = source;
+      bestCosine = cosine;
+    }
+  }
+  return best;
 }
 
 /** HYG's Gliese designation as SIMBAD writes it: "Gl 734B" is "GJ 734 B". */

@@ -291,6 +291,50 @@ export async function fetchGaiaDistancesByHip(): Promise<Map<number, { distanceP
   return distances;
 }
 
+/**
+ * How bright a Gaia source must be to stand in for a naked-eye HYG star, in G, and how many the
+ * archive holds that bright with a usable parallax: 35 910 on 2026-09-30.
+ */
+const BRIGHT_MAGNITUDE_LIMIT = 7.5;
+const BRIGHT_QUERY_ROWS = 35_910;
+
+/** A bright Gaia source's J2000 direction, G magnitude and distance. */
+export interface BrightGaiaSource {
+  direction: { x: number; y: number; z: number };
+  magnitudeG: number;
+  distancePc: number;
+  relativeError: number;
+}
+
+/**
+ * Every Gaia DR3 source brighter than G 7.5 with a usable parallax, at J2000: for the naked-eye
+ * HYG stars nothing else places, found by position. The Hipparcos cross-match above lacks some of
+ * their HIP numbers, and the HYG rows with no HIP number were never looked up at all. Of the 34
+ * HYG stars of V 6.5 or brighter left off the map for want of a distance, 12 are found here: ten
+ * that were missing, 66 Ori and HD 197770 (1.102 ± 0.029 mas) among them, and HD 45291 and
+ * HD 124953, which were on the map only as bare Gaia entries a second of arc from where HYG has them.
+ */
+export async function fetchBrightGaiaSources(): Promise<BrightGaiaSource[]> {
+  const query = [
+    `select top ${ROW_LIMIT} source_id, ra, dec, pmra, pmdec, parallax, parallax_over_error, phot_g_mean_mag`,
+    'from gaiadr3.gaia_source',
+    `where phot_g_mean_mag < ${BRIGHT_MAGNITUDE_LIMIT} and parallax_over_error > ${(1 / MAX_PARALLAX_ERROR_RATIO).toFixed(1)}`,
+    'order by source_id'
+  ].join(' ');
+  console.log(`Fetching Gaia DR3's sources brighter than G ${BRIGHT_MAGNITUDE_LIMIT}, for the naked-eye stars the cross-match lacks...`);
+  const rows = await fetchQueryRows(query, BRIGHT_QUERY_ROWS);
+  const sources: BrightGaiaSource[] = [];
+  for (const row of rows) {
+    const [raDeg, decDeg, parallaxMas, overError, magnitudeG] = ['ra', 'dec', 'parallax', 'parallax_over_error', 'phot_g_mean_mag'].map((column) => parseOptionalNumber(row[column]));
+    if (raDeg === undefined || decDeg === undefined || !parallaxMas || parallaxMas <= 0 || overError === undefined || magnitudeG === undefined) {
+      continue;
+    }
+    const j2000 = propagateProperMotion(raDeg, decDeg, parseOptionalNumber(row['pmra']) ?? 0, parseOptionalNumber(row['pmdec']) ?? 0, CATALOGUE_EPOCH - GAIA_DR3_EPOCH);
+    sources.push({ direction: raDegDecDistanceToXyz(j2000.raDeg, j2000.decDeg, 1), magnitudeG, distancePc: 1000 / parallaxMas, relativeError: 1 / overError });
+  }
+  return sources;
+}
+
 /** The new Hipparcos reduction holds 117 955 stars, and every one has a parallax error. */
 const MIN_HIPPARCOS_ERRORS = 110_000;
 

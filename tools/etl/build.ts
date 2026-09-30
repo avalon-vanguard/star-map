@@ -73,14 +73,16 @@ const MIN_COLOURS_FROM_TEMPERATURE = 40;
  */
 const MAX_ARCHIVE_IDS_OFF_THEIR_NAME = 5;
 /**
- * Every star the naked eye sees, kept at any distance (c64eea0): measured 8 886 of V 6.5 or
- * brighter, 1 653 of them past 250 pc. With no magnitude handed to placementDistancePc, 7 379 are
+ * Every star the naked eye sees, kept at any distance (c64eea0): measured 8 898 of V 6.5 or
+ * brighter, 1 663 of them past 250 pc. With no magnitude handed to placementDistancePc, 7 379 are
  * left and Rigel, Deneb and Alnilam are gone — and every other check passed, the HYG survivors
- * going down rather than up.
+ * going down rather than up. HD 197770 and HD 45291 are two of the twelve only Gaia's bright
+ * sources place, by position; without that lookup they are gone and the count drops by twelve,
+ * which the floor alone would not see.
  */
 const MIN_NAKED_EYE_STARS = 8_800;
 const NAKED_EYE_MAGNITUDE_V = 6.5;
-const REQUIRED_DISTANT_STARS = ['Rigel', 'Deneb', 'Alnilam'];
+const REQUIRED_NAKED_EYE_STARS = ['Rigel', 'Deneb', 'Alnilam', 'HD 197770', 'HD 45291'];
 
 function validateStars(stars: StarRecord[]): void {
   assertCondition(stars.length > 0, 'No stars were produced.');
@@ -166,8 +168,8 @@ function validateStars(stars: StarRecord[]): void {
     nakedEye >= MIN_NAKED_EYE_STARS,
     `Only ${nakedEye} stars of V ${NAKED_EYE_MAGNITUDE_V} or brighter (at least ${MIN_NAKED_EYE_STARS} expected) — naked-eye stars are no longer kept at any distance.`
   );
-  for (const name of REQUIRED_DISTANT_STARS) {
-    assertCondition(stars.some((star) => star.name === name), `${name} is missing — a naked-eye star past the survey is no longer kept.`);
+  for (const name of REQUIRED_NAKED_EYE_STARS) {
+    assertCondition(stars.some((star) => star.name === name), `${name} is missing — naked-eye stars are no longer kept wherever a survey places them.`);
   }
   console.log(`  ${nakedEye} naked-eye stars.`);
 

@@ -62,15 +62,16 @@ instead of having to be inferred from a shape in space. The camera frames that g
 the orbits, from the field of view it actually has, so the outermost ring sits inside the frame
 with room around it at any system scale and any window shape.
 
-The star at the centre is sized against the system's *innermost* orbit, so it can never swallow
-its closest planet, while the camera is placed to frame the *outermost* ring — and in the solar
-system those differ by a factor of a hundred. At the distance that fits Pluto in view, a disc
-that stays clear of Mercury is about a pixel across, and no radius satisfies both. So the disc
-stays honest to the orbits and the star's halo carries its visibility, floored against the framed
-radius: light is not a surface, and a glow reaching past the innermost orbit says the star is
-bright rather than that it is large. That floor is bounded from both sides — large enough that
-the star reads at a glance, small enough that Venus's and Earth's orbits stay legible as rings
-around it. Mercury's, three pixels wide at that range, does not survive either way.
+The star at the centre is drawn at its own radius, to the same scale as its orbits: the
+archive's measured radius for a planet host, and otherwise one derived from its luminosity and
+temperature (Stefan-Boltzmann), which the card marks "from colour and brightness". Its surface
+is a limb-darkened disc in the colour of a blackbody at its temperature, and its planets are lit
+in that colour, relative to the Sun's, so the solar system's photographs stay as they were
+taken. A star nothing gives a size or a temperature for is a grey point. Like every marker, the
+disc is never drawn smaller than three pixels, so a red dwarf framed with its outermost orbit
+still shows; there is no halo. The camera comes no closer to its centre than 0.05 AU or three of
+its radii, whichever is further, and a giant is framed far enough back that its disc stays
+inside the ring its neighbours' names are drawn on.
 
 ![51 Pegasi b: a surface derived from its measured mass, orbit and host-star luminosity, beside the figures it was derived from](docs/screenshots/body-detail.jpg)
 

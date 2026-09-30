@@ -192,6 +192,15 @@ describe('mergeStarCatalogues', () => {
     expect(merged).toMatchObject({ magnitude: 11.01, magnitudeBand: 'V', colorIndex: 1.807, colorSystem: 'B-V', distanceError: 0.000065, distanceFromGaia: true });
   });
 
+  it("keeps Gaia's colour where the description has none", () => {
+    // HD 45951: HYG gives V 6.20 and K2III but no B−V; Gaia DR3 3369454521490604416 has BP−RP 1.248.
+    const hyg = at(119622, 97.79164, 16.93863, 112, { name: 'HD 45951', magnitude: 6.2, magnitudeBand: 'V', spectralType: 'K2III', colorIndex: null });
+    const gaia = at(1000004369, 97.79164, 16.93863, 112, { name: 'Gaia DR3 3369454521490604416', magnitude: 5.898, magnitudeBand: 'G', colorIndex: 1.248, colorSystem: 'BP-RP', source: 'gaia' });
+    const [merged] = mergeStarCatalogues([{ ...HIPPARCOS, stars: [hyg] }, { ...GAIA, stars: [gaia] }]).stars;
+
+    expect(merged).toMatchObject({ name: 'HD 45951', magnitude: 6.2, magnitudeBand: 'V', colorIndex: 1.248, colorSystem: 'BP-RP' });
+  });
+
   it("takes a Hipparcos distance more precise than the Gaia entry it folds into, along Gaia's direction", () => {
     // Schedar: 71.0 pc ±3.5 % in Gaia, which saturates on it, and 70.0 pc ±1.0 % in Hipparcos.
     const hyg = at(3179, 10.1268, 56.5373, 70.0, { name: 'Schedar', magnitude: 2.24, distanceError: 0.0105, distanceFromGaia: false });
@@ -366,6 +375,8 @@ describe('foldByIdentity', () => {
     expect(stars).toHaveLength(1);
     expect(stars[0]).toMatchObject({ id: 119589, name: 'Gl 905.2B', spectralType: 'DA4', magnitude: 12.9, colorIndex: 0.15, source: 'gaia' });
     expect(Math.hypot(stars[0].x, stars[0].y, stars[0].z)).toBeCloseTo(18.6, 9);
+    // Nor the M5's B−V where the row has no colour of its own (Gl 225.2C, beside HD 40887's).
+    expect(foldByIdentity([...merged, { ...gl905b, colorIndex: null }], identities).stars[0].colorIndex).toBeNull();
   });
 
   it('leaves a star with a Hipparcos error alone, and one of another brightness than the HYG star already there', () => {

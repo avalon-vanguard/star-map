@@ -65,8 +65,8 @@ const MAX_FRAMING_DISTANCE_AU = 200;
  * How much of the view's tighter half-extent a giant's disc may take on arrival: inside the ring
  * the system view names the star's neighbours on, and clear of the names hung inward from it,
  * whose nearest corners come within 292 px of the centre on a 1 000 px view. Framed to fill the
- * frame instead, Betelgeuse settled at the three-radius closest approach with a disc of 379 px,
- * past the 370 px ring, and its neighbours' names on it.
+ * frame instead, Betelgeuse settled at the three-radius closest approach with a disc 379 px in
+ * radius, past the ring 370 px out, and its neighbours' names on it.
  */
 const STAR_FRAME_FRACTION = 0.5;
 /**
@@ -78,7 +78,7 @@ export const NEIGHBOUR_RING_FRACTION = 0.74;
  * How far a neighbour's name reaches in from that ring, in pixels whatever the window: its nearest
  * corner measured 74 px in on a 390 px phone and 78 px on a 1 000 px view, and a margin on that.
  * The fraction above left the names 0.24 of the half-side, 47 px on a phone, and at 390x844
- * Betelgeuse's 98 px disc had HD 39374's name 70 px from its centre.
+ * Betelgeuse's disc, 98 px in radius, had HD 39374's name 70 px from its centre.
  */
 const NAME_REACH_PX = 90;
 /** However small the window, the disc still takes this much of it. */

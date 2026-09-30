@@ -27,8 +27,8 @@ export const BYTES_PER_STAR_POSITION = STAR_POSITION_COMPONENTS * Float32Array.B
 
 /**
  * Columns in `stars-meta.bin`, in order: catalogue id, apparent magnitude, colour index, an
- * index into the spectral-type dictionary, what those were measured in (see {@link PHOTOMETRY}),
- * and the distance's relative error (see {@link DISTANCE_ERROR_STEPS}). Stored column by column
+ * index into the spectral-type dictionary, the distance's relative error (see
+ * {@link DISTANCE_ERROR_STEPS}), and what those were measured in (see {@link PHOTOMETRY}). Stored column by column
  * rather than record by record so each one is a single typed-array view over the buffer, with no
  * per-record stride or alignment padding.
  */

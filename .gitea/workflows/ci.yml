@@ -1,0 +1,26 @@
+name: CI
+
+# Gitea port of .github/workflows/ci.yml, through the organisation's shared workflow
+# (avalon-vanguard/ci, node.yml): lint, typecheck, unit tests, production build, then the
+# Playwright suite. Same triggers: pull requests and the branches they merge into, plus manual
+# dispatch.
+#
+# A .gitea/workflows directory makes Gitea ignore .github/workflows, so pages.yml,
+# data-refresh.yml and junie-review.yml now run on GitHub only, until they are ported.
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+# A second push to the same branch makes the first run's answer irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: avalon-vanguard/ci/.gitea/workflows/node.yml@v1
+    with:
+      e2e: true
+    secrets: inherit

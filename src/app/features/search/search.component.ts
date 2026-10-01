@@ -1,4 +1,4 @@
-import { Component, computed, ElementRef, output, signal, viewChild } from '@angular/core';
+import { Component, computed, ElementRef, inject, output, signal, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { DataLoaderService } from '../../core/data/data-loader.service';
@@ -80,6 +80,10 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
   `
 })
 export class SearchComponent {
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly navigationStore = inject(NavigationStore);
+  private readonly router = inject(Router);
+
   readonly query = signal('');
   /** Fires once a result has been chosen and navigation kicked off — the dock uses it to hand
    *  the view back to the readout, since the thing to look at is now the scene, not the box. */
@@ -109,11 +113,7 @@ export class SearchComponent {
   readonly matchTotal = computed(() => this.matches().length);
   readonly results = computed(() => this.matches().slice(0, MAX_RESULTS));
 
-  constructor(
-    private readonly dataLoader: DataLoaderService,
-    private readonly navigationStore: NavigationStore,
-    private readonly router: Router
-  ) {
+  constructor() {
     void this.buildIndex();
   }
 

@@ -98,6 +98,8 @@ import { ReadoutSectionsComponent } from './readout-sections.component';
 export class InfoPanelComponent {
   readonly body = input.required<BodyDetailViewModel>();
 
+  private readonly router = inject(Router);
+
   readonly bookmarks = inject(BookmarksStore);
 
   private readonly articles = inject(ArticleService);
@@ -105,7 +107,7 @@ export class InfoPanelComponent {
   readonly article = signal<Article | null>(null);
   readonly aboutState = signal<'idle' | 'loading' | 'none' | 'unavailable'>('idle');
 
-  constructor(private readonly router: Router) {
+  constructor() {
     // The panel is reused as the route's parameter changes, so what was asked about one body
     // must not still be showing under the next one's name.
     effect(() => {

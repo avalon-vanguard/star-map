@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, signal, viewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, inject, OnDestroy, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import * as THREE from 'three/webgpu';
@@ -65,6 +65,12 @@ const GLOW_SCALE = 2.6;
   `
 })
 export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
+  private readonly engine = inject(EngineService);
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly navigationStore = inject(NavigationStore);
+
   /** A kept place, revisited from this page: a star means leaving it for the map. */
   goToBookmark(bookmark: Bookmark): void {
     if (bookmark.kind === 'star') {
@@ -94,14 +100,6 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
 
   readonly viewModel = signal<BodyDetailViewModel | undefined>(undefined);
   readonly notFound = signal(false);
-
-  constructor(
-    private readonly engine: EngineService,
-    private readonly dataLoader: DataLoaderService,
-    private readonly route: ActivatedRoute,
-    private readonly router: Router,
-    private readonly navigationStore: NavigationStore
-  ) {}
 
   ngAfterViewInit(): void {
     void this.bootstrap();

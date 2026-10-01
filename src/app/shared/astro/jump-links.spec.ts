@@ -168,7 +168,8 @@ describe('minimumRangeBetween', () => {
     expect(minimumRangeBetween(knotAndChain(), 0, CHAIN_END, 8).rangePc).toBeCloseTo(1, 1);
   });
 
-  it('stops bisecting where a search gave up, and hands back a range that does work', { timeout: 30_000 }, () => {
+  // 7,5 s sur un poste récent, autour de 30 s sur le runner Gitea du VPS : 90 s de marge.
+  it('stops bisecting where a search gave up, and hands back a range that does work', { timeout: 90_000 }, () => {
     // Below the chain's own hop of a parsec, the crowd is still one connected piece and larger than
     // the budget, so those probes give up. Reading a give-up as "no chain at this range" is what
     // used to report ranges up to 29% wider than needed, and went on paying for probes whose

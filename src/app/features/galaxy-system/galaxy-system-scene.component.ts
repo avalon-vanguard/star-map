@@ -484,7 +484,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // Reads both signals, so flipping the layer on and dragging the range each land here.
     effect(() => {
       this.jumpRangePc();
-      this.display().jumpLinks;
+      void this.display().jumpLinks;
       this.scheduleJumpLinks();
     });
   }
@@ -1804,8 +1804,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   }
 
   private swapToSystemSpace(star: StarRecord, direction: THREE.Vector3, onComplete: () => void): void {
-    const camera = this.engine.getCamera();
-
     this.systemRenderer?.dispose();
     if (this.starMarker) {
       this.systemGroup.remove(this.starMarker);
@@ -1912,7 +1910,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   }
 
   private swapToGalaxySpace(exitingStarId: number, direction: THREE.Vector3, isSwitchingSystems: boolean, onComplete: () => void): void {
-    const camera = this.engine.getCamera();
     const star = this.starsById.get(exitingStarId);
     const starPc = star ? new THREE.Vector3(star.x, star.y, star.z) : GALAXY_OVERVIEW_TARGET.clone();
 

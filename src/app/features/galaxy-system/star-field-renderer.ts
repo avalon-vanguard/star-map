@@ -5,7 +5,7 @@ import { BrightnessIndex, brightnessIndex, Positioned } from '../../shared/astro
 import { spectralTypeToColorIndex } from '../../shared/astro/spectral';
 import { SceneCamera } from '../../core/engine/engine.service';
 import { StarRecord } from '../../shared/models/star.model';
-import { PIXELS_TO_ANGULAR_SIZE, REFERENCE_FOV_DEGREES, REFERENCE_VIEWPORT_HEIGHT_PX } from './angular-size';
+import { PIXELS_TO_ANGULAR_SIZE, REFERENCE_FOV_DEGREES } from './angular-size';
 
 /** Apparent star diameters, in pixels at {@link REFERENCE_VIEWPORT_HEIGHT_PX}. */
 const MIN_POINT_SIZE = 1.5;

@@ -604,7 +604,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     }
 
     it('links the stars being drawn, and asks again once a new set of them holds still', async () => {
-      const links = vi.fn((_rangePc: number, _drawn: Uint32Array) => Promise.resolve(new Float32Array(0)));
+      const links = vi.fn<LinkScene['routing']['links']>(() => Promise.resolve(new Float32Array(0)));
       const component = linkScene(links);
       await settle();
       expect(links).toHaveBeenCalledTimes(1);
@@ -625,7 +625,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     });
 
     it('asks for as much of the graph as a million pixels of line make, around where the view is centred', async () => {
-      const links = vi.fn((_rangePc: number, _drawn: Uint32Array, _budget?: LinkBudget) => Promise.resolve(new Float32Array(0)));
+      const links = vi.fn<LinkScene['routing']['links']>(() => Promise.resolve(new Float32Array(0)));
       Object.defineProperty((fixture.nativeElement as HTMLElement).querySelector('canvas')!, 'clientHeight', { value: 1080 });
       // A screen scaled to 200%: 1080 CSS pixels are 2160 drawn ones, and the lines are drawn in those.
       engine.pixelRatio = 2;
@@ -641,7 +641,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
     it('asks again once the view has zoomed past the budget it asked with, though the drawn stars are the same', async () => {
       // All three stars fit the star budget, so the drawn set never changes: only the budget can.
-      const links = vi.fn((_rangePc: number, _drawn: Uint32Array, _budget?: LinkBudget) => Promise.resolve(new Float32Array(0)));
+      const links = vi.fn<LinkScene['routing']['links']>(() => Promise.resolve(new Float32Array(0)));
       Object.defineProperty((fixture.nativeElement as HTMLElement).querySelector('canvas')!, 'clientHeight', { value: 1080 });
       const component = linkScene(links);
       await advanceFrames(engine, 0.3);
@@ -658,7 +658,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     });
 
     it('asks for no graph from inside a system, where distances are in astronomical units', async () => {
-      const links = vi.fn((_rangePc: number, _drawn: Uint32Array, _budget?: LinkBudget) => Promise.resolve(new Float32Array(0)));
+      const links = vi.fn<LinkScene['routing']['links']>(() => Promise.resolve(new Float32Array(0)));
       navigationStore.selectStar(SUN.id);
       await flushAsync();
       await advanceFrames(engine, 2.5);
@@ -695,7 +695,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     });
 
     it('gives a view on the move a new graph at least every quarter second, rather than waiting for it to stop', async () => {
-      const links = vi.fn((_rangePc: number, _drawn: Uint32Array) => Promise.resolve(new Float32Array(0)));
+      const links = vi.fn<LinkScene['routing']['links']>(() => Promise.resolve(new Float32Array(0)));
       const component = linkScene(links);
       await settle();
 

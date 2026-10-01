@@ -271,7 +271,6 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     scene.add(sunLight);
 
     const geometry = new THREE.SphereGeometry(1, 64, 48);
-    const viewModel = this.viewModel();
     this.planetMaterial = new THREE.MeshStandardMaterial({
       // White, always: the map that arrives a moment later carries the colour, whether it is a
       // photograph or a surface derived from the body's own measurements.

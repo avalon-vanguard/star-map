@@ -12,7 +12,8 @@
     "etl:typecheck": "tsc -p tools/etl/tsconfig.json --noEmit",
     "e2e": "playwright test",
     "e2e:typecheck": "tsc -p e2e/tsconfig.json --noEmit",
-    "worker:typecheck": "tsc -p tsconfig.worker.json --noEmit"
+    "worker:typecheck": "tsc -p tsconfig.worker.json --noEmit",
+    "typecheck": "npm run etl:typecheck && npm run e2e:typecheck && npm run worker:typecheck"
   },
   "private": true,
   "packageManager": "npm@11.12.1",

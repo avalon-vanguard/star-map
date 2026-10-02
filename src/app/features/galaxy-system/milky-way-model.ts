@@ -87,9 +87,9 @@ export function createRandom(seed: number): () => number {
 
 /** Standard normal sample, by the polar form of Box-Muller. */
 function gaussian(random: () => number): number {
-  let u = 0;
-  let v = 0;
-  let s = 0;
+  let u: number;
+  let v: number;
+  let s: number;
   do {
     u = random() * 2 - 1;
     v = random() * 2 - 1;

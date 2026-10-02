@@ -1,4 +1,4 @@
-import { Injectable, NgZone } from '@angular/core';
+import { inject, Injectable, NgZone } from '@angular/core';
 import * as THREE from 'three/webgpu';
 
 export type EngineTickCallback = (deltaSeconds: number, elapsedSeconds: number) => void;
@@ -20,6 +20,7 @@ export type SceneCamera = THREE.PerspectiveCamera | THREE.OrthographicCamera;
  */
 @Injectable()
 export class EngineService {
+  private readonly ngZone = inject(NgZone);
   private readonly clock = new THREE.Clock(false);
   private readonly tickCallbacks = new Set<EngineTickCallback>();
 
@@ -35,8 +36,6 @@ export class EngineService {
   private orthographic?: THREE.OrthographicCamera;
   private projection: Projection = 'perspective';
   private running = false;
-
-  constructor(private readonly ngZone: NgZone) {}
 
   get isInitialized(): boolean {
     return !!this.renderer;

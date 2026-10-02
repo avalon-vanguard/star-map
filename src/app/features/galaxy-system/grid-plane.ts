@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 
-import { GALACTIC_BASIS_EQUATORIAL, SUN_HEIGHT_ABOVE_MIDPLANE_PC } from '../../shared/astro/galaxy';
+import { GALACTIC_BASIS_EQUATORIAL } from '../../shared/astro/galaxy';
 
 const SEGMENTS_PER_RING = 180;
 

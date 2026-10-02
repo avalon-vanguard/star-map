@@ -115,11 +115,12 @@ describe('renderPlanetTexture', () => {
   it('produces no NaN or out-of-range bytes for any class', () => {
     for (const planetClass of ALL_CLASSES) {
       const pixels = renderPlanetTexture(appearanceOf(planetClass, { polarCapExtentDeg: 30 }), SIZE);
-      for (const value of pixels) {
-        expect(Number.isInteger(value)).toBe(true);
-        expect(value).toBeGreaterThanOrEqual(0);
-        expect(value).toBeLessThanOrEqual(255);
-      }
+      // One assertion per class, not three per byte: 245 760 expect() calls ran past the
+      // default 5 s timeout on a slower CI machine.
+      const firstBad = pixels.findIndex(
+        (value) => !Number.isInteger(value) || value < 0 || value > 255,
+      );
+      expect(firstBad, planetClass).toBe(-1);
     }
   });
 });

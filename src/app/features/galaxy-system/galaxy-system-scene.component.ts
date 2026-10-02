@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, computed, effect, ElementRef, OnDestroy, signal, viewChild } from '@angular/core';
+import { AfterViewInit, Component, computed, effect, ElementRef, inject, OnDestroy, signal, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import * as THREE from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -323,6 +323,11 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
   `
 })
 export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
+  private readonly engine = inject(EngineService);
+  private readonly dataLoader = inject(DataLoaderService);
+  private readonly router = inject(Router);
+  readonly navigationStore = inject(NavigationStore);
+
   private readonly canvasRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
   private readonly labelHostRef = viewChild.required<ElementRef<HTMLDivElement>>('labelHost');
   private readonly leaderRef = viewChild.required<ElementRef<SVGLineElement>>('leader');
@@ -467,12 +472,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private starMarker?: THREE.Mesh;
   private starGlow?: THREE.Sprite;
 
-  constructor(
-    private readonly engine: EngineService,
-    private readonly dataLoader: DataLoaderService,
-    private readonly router: Router,
-    readonly navigationStore: NavigationStore
-  ) {
+  constructor() {
     effect(() => {
       const selectedStarId = this.navigationStore.selectedStarId();
       if (this.ready) {
@@ -484,7 +484,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // Reads both signals, so flipping the layer on and dragging the range each land here.
     effect(() => {
       this.jumpRangePc();
-      this.display().jumpLinks;
+      void this.display().jumpLinks;
       this.scheduleJumpLinks();
     });
   }
@@ -1804,8 +1804,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   }
 
   private swapToSystemSpace(star: StarRecord, direction: THREE.Vector3, onComplete: () => void): void {
-    const camera = this.engine.getCamera();
-
     this.systemRenderer?.dispose();
     if (this.starMarker) {
       this.systemGroup.remove(this.starMarker);
@@ -1912,7 +1910,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   }
 
   private swapToGalaxySpace(exitingStarId: number, direction: THREE.Vector3, isSwitchingSystems: boolean, onComplete: () => void): void {
-    const camera = this.engine.getCamera();
     const star = this.starsById.get(exitingStarId);
     const starPc = star ? new THREE.Vector3(star.x, star.y, star.z) : GALAXY_OVERVIEW_TARGET.clone();
 

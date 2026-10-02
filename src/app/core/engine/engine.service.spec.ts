@@ -1,4 +1,4 @@
-import { NgZone } from '@angular/core';
+import { Injector, NgZone, runInInjectionContext } from '@angular/core';
 import * as THREE from 'three/webgpu';
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -10,7 +10,8 @@ import { EngineService } from './engine.service';
  * arithmetic that keeps them showing the same thing.
  */
 function engineWithCameras(): { engine: EngineService; perspective: THREE.PerspectiveCamera; orthographic: THREE.OrthographicCamera } {
-  const engine = new EngineService({ runOutsideAngular: (fn: () => unknown) => fn() } as unknown as NgZone);
+  const zone = { runOutsideAngular: (fn: () => unknown) => fn() } as unknown as NgZone;
+  const engine = runInInjectionContext(Injector.create({ providers: [{ provide: NgZone, useValue: zone }] }), () => new EngineService());
   const perspective = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 1000);
   const orthographic = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
   // The two cameras are private, because nothing outside should choose between them by hand.

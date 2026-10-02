@@ -1,4 +1,6 @@
 # Editor configuration, see https://editorconfig.org
+# Source: @avalon-vanguard/config. EditorConfig cannot extend a file, so each repo commits a copy:
+#   cp node_modules/@avalon-vanguard/config/.editorconfig .editorconfig
 root = true
 
 [*]

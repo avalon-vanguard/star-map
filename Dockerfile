@@ -4,7 +4,8 @@
 # Build Angular sous /star-map/ (les chemins des ressources sont relatifs à <base>)
 FROM node:22-alpine AS build
 WORKDIR /src
-COPY package.json package-lock.json ./
+# .npmrc : le scope @avalon-vanguard (config partagée) vient du registre Gitea, lisible sans jeton
+COPY package.json package-lock.json .npmrc ./
 RUN npm ci
 COPY . .
 RUN npm run build -- --base-href /star-map/

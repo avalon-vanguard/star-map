@@ -1,7 +1,8 @@
 # Construit l'image de star-map, la pousse dans le registre Gitea et la déploie dans Openship :
 # service interne, sans domaine, que la passerelle projects.avalonvanguard.com sert sous /star-map/.
-# Secret du dépôt : OPENSHIP_API_TOKEN, jeton Openship limité au projet « star-map ». Il passe devant
-# celui de l'organisation, qui ne couvre que « projects » : ne pas le supprimer.
+# Service « star-map » du projet Openship « projects », à côté de la passerelle : image.yml ne déploie
+# que ce service. Secret : OPENSHIP_API_TOKEN de l'organisation, qui couvre « projects » ; pas de
+# secret de dépôt du même nom, il masquerait celui-ci.
 name: Deploy
 
 on:
@@ -13,6 +14,6 @@ jobs:
   deploy:
     uses: avalon-vanguard/ci/.gitea/workflows/image.yml@v1
     with:
-      openship-project: proj_UPRoF2jaxkCMZAlG
-      openship-service: svc_aZAHqXxnUUyzC-_l
+      openship-project: proj_a0A_iEcpcD2hSrn2
+      openship-service: svc_pjdf5iOYhoblT8nd
     secrets: inherit

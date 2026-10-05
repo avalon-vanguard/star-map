@@ -69,7 +69,7 @@ jobs:
       # covers this definition only — the composite pulls its own dependencies by tag and fetches
       # the Junie CLI over the network. Bump by resolving the new release's commit, never by
       # moving a tag name.
-      - uses: JetBrains/junie-github-action@3f6a906f11c6f67c76efaf3d3264bbb615f9ce29 # v1.7.5
+      - uses: JetBrains/junie-github-action@112ad4d86f7c26d658048ae764b01b39d8427819 # v1.7.16
         if: env.HAS_JUNIE_KEY == 'true'
         # An opinion, not a gate. If Junie is down or rate-limited that is worth seeing in the
         # log, but it is not a reason to hold a pull request whose tests pass.

@@ -33,7 +33,6 @@ import { MilkyWayRenderer } from './milky-way-renderer';
 import {
   starMarkerRadiusAu,
   SUN_RADIUS_AU,
-  systemFrameRadiusAu,
   systemFramingDistanceAu,
   systemViewDirection,
 } from './system-framing';

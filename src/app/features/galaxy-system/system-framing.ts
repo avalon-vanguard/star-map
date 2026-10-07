@@ -53,13 +53,17 @@ const MIN_FRAMING_DISTANCE_AU = 0.06;
 /**
  * Ceiling on the framing distance, so a distant companion does not push the star to a dot.
  *
- * Generous enough to frame the solar system out to Pluto in any window shape, which needs 120 AU
- * on a landscape display and 140 on a portrait one once the camera's real field of view is
- * accounted for. Only genuinely pathological systems reach it now — the handful with
- * directly-imaged companions hundreds of AU out — and those still arrive framed on their inner
- * region, with the orbit controls reaching far enough to pull back to the rest.
+ * Generous enough to frame the solar system out to Eris in any window a reader holds: Eris's
+ * aphelion, 97.7 AU, the furthest it draws, needs 235 AU on a landscape display and 508 on a 390
+ * by 844 phone once the camera's real field of view is accounted for, and 600 holds it down to an
+ * aspect of 0.39. At 500, framed on the 80 AU grid ring inside that aphelion, a phone arrived with
+ * Eris's orbit 3.5 px from the edge; at 200, which framed Pluto's 40 AU ring, a portrait window
+ * arrived with Eris off screen, and a phone with Makemake too. Only genuinely pathological systems
+ * reach it now — the handful with directly-imaged companions hundreds of AU out — and those still
+ * arrive framed on their inner region, with the orbit controls reaching far enough to pull back
+ * to the rest.
  */
-const MAX_FRAMING_DISTANCE_AU = 200;
+const MAX_FRAMING_DISTANCE_AU = 600;
 
 /**
  * How much of the view's tighter half-extent a giant's disc may take on arrival: inside the ring
@@ -145,8 +149,9 @@ export function systemFrameRadiusAu(distanceAu: number, viewport: SystemViewport
  * was tuned by eye against a 55-degree field, and the engine's camera is 50 — which left the
  * grid overflowing the frame in 368 of the 371 systems the datasets contain.
  *
- * Callers pass the outermost thing actually drawn, which is the reference grid's outer ring
- * rather than the outermost orbit — the ring is always the wider of the two, by construction.
+ * Callers pass the outermost thing actually drawn: the reference grid's outer ring, which runs past
+ * every semi-major axis by construction, or an eccentric orbit's aphelion where that runs past the
+ * ring, as Eris's does.
  */
 export function systemFramingDistanceAu(framedRadiusAu: number, viewport: SystemViewport = DEFAULT_SYSTEM_VIEWPORT, starRadiusAu = 0): number {
   // A giant drawn at its own radius can be wider than the system around it — Betelgeuse's 584

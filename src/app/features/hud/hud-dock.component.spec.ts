@@ -1,10 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DataLoaderService } from '../../core/data/data-loader.service';
 import { BookmarksStore } from '../../shared/state/bookmarks.store';
+import { TimeStore } from '../../shared/state/time.store';
 import { DEFAULT_HUD_DISPLAY, HudDisplay, HudDockComponent } from './hud-dock.component';
+
+// jsdom has no matchMedia, which the dock reads once, at import: this one answers from `viewport`.
+const viewport = vi.hoisted(() => {
+  const state = { wide: true };
+  window.matchMedia = (() => ({ get matches() { return state.wide; } })) as unknown as typeof window.matchMedia;
+  return state;
+});
 
 class EmptyDataLoaderService {
   loadStars() {
@@ -76,6 +84,17 @@ describe('HudDockComponent', () => {
     expect(tabNames()).toEqual(['Search', 'Readout', 'Routes', 'Bookmarks', 'Display']);
   });
 
+  it('offers the clock alone, as a Clock tab, to a surface with no layers', () => {
+    fixture.componentRef.setInput('clock', true);
+    fixture.componentRef.setInput('defaultTab', 'display');
+    fixture.detectChanges();
+    expect(tabNames()).toEqual(['Search', 'Bookmarks', 'Clock']);
+    const panel = host().querySelector('#dock-panel-display')!;
+    expect(panel.querySelector('[role="radiogroup"][aria-label="Clock rate"]')).not.toBeNull();
+    expect(panel.querySelector('#clock-date')).not.toBeNull();
+    expect(panel.textContent).not.toContain('Layers');
+  });
+
   it('opens the default tab on mount and renders the readout from its inputs', () => {
     setReadout();
     fixture.componentRef.setInput('defaultTab', 'readout');
@@ -141,7 +160,7 @@ describe('HudDockComponent', () => {
     fixture.componentRef.setInput('defaultTab', 'display');
     fixture.detectChanges();
     const pressed = [...host().querySelectorAll('[aria-pressed]')].map((b) => `${b.textContent?.trim()}=${b.getAttribute('aria-pressed')}`);
-    expect(pressed).toEqual(['Labels=true', 'Orbits=true', 'Grid=false', 'Deep sky=true', 'Sky=true', 'Systems=true', 'Jump links=false', 'Plan view=false']);
+    expect(pressed).toEqual(['Labels=true', 'Orbits=true', 'Grid=false', 'Deep sky=true', 'Sky=true', 'Systems=true', 'Jump links=false', 'Plan view=false', 'Backwards=false']);
   });
 
   it('says how to keep a place, rather than showing an empty list', () => {
@@ -365,5 +384,169 @@ describe('HudDockComponent', () => {
     expect(host().querySelector<HTMLElement>('#dock-panel-routes')!.hidden).toBe(false);
     expect(host().querySelector<HTMLInputElement>('#route-to')!.value).toBe('Sirius');
     expect(host().querySelector<HTMLInputElement>('#route-range')!.value).toBe('6');
+  });
+
+  describe('clock', () => {
+    let time: TimeStore;
+
+    beforeEach(() => {
+      time = TestBed.inject(TimeStore);
+      fixture.componentRef.setInput('display', DEFAULT_HUD_DISPLAY);
+      fixture.componentRef.setInput('defaultTab', 'display');
+      fixture.detectChanges();
+    });
+
+    afterEach(() => vi.unstubAllEnvs());
+
+    function button(name: string): HTMLButtonElement {
+      return [...host().querySelectorAll<HTMLButtonElement>('#dock-panel-display button')].find((b) => b.textContent?.trim() === name)!;
+    }
+
+    function radio(name: string): HTMLInputElement {
+      return [...host().querySelectorAll('#dock-panel-display label')].find((l) => l.textContent?.trim() === name)!.querySelector('input')!;
+    }
+
+    it('runs the same rates backwards, and keeps the direction when the rate changes', () => {
+      button('Backwards').click();
+      fixture.detectChanges();
+      expect(time.rate()).toBe(-1);
+      expect(button('Backwards').getAttribute('aria-pressed')).toBe('true');
+      // Still real time: the direction is not a fifth rate.
+      expect(radio('Real time').checked).toBe(true);
+
+      radio('1 d/s').click();
+      fixture.detectChanges();
+      expect(time.rate()).toBe(-86_400);
+      expect(radio('1 d/s').checked).toBe(true);
+
+      button('Backwards').click();
+      fixture.detectChanges();
+      expect(time.rate()).toBe(86_400);
+      expect(button('Backwards').getAttribute('aria-pressed')).toBe('false');
+    });
+
+    it('opens the date field on the clock’s date, named and held to the window the elements hold for', () => {
+      const field = host().querySelector<HTMLInputElement>('#clock-date')!;
+
+      expect(field.type).toBe('datetime-local');
+      expect(field.value).toBe(time.date().toISOString().slice(0, 16));
+      expect(host().querySelector('label[for="clock-date"]')?.textContent?.trim()).toBe('Date (UTC)');
+      expect(field.min).toBe('0001-01-01T00:00');
+      expect(field.max).toBe('3000-01-01T00:00');
+      expect(host().querySelector(`#${field.getAttribute('aria-describedby')}`)?.textContent).toContain('AD 1 to AD 3000');
+    });
+
+    it('jumps the clock to the date submitted, read as UTC', () => {
+      // Five and a half hours from UTC, so a field read as local time lands elsewhere: in UTC itself,
+      // where CI runs, the two readings are the same instant and this could not tell them apart.
+      vi.stubEnv('TZ', 'Asia/Kolkata');
+      const field = host().querySelector<HTMLInputElement>('#clock-date')!;
+      field.value = '2020-12-21T18:00';
+      button('Go').click();
+      fixture.detectChanges();
+
+      expect(time.date().toISOString().slice(0, 16)).toBe('2020-12-21T18:00');
+      expect(time.atNow()).toBe(false);
+
+      // Back to now puts the field back on the present too, not on the date left behind.
+      button('Back to now').click();
+      fixture.detectChanges();
+      expect(time.atNow()).toBe(true);
+      expect(host().querySelector<HTMLInputElement>('#clock-date')!.value).toBe(time.date().toISOString().slice(0, 16));
+    });
+
+    it('folds the sheet away on a phone once a date is set, so the system it covered can be seen', () => {
+      viewport.wide = false;
+      try {
+        host().querySelector<HTMLInputElement>('#clock-date')!.value = '2020-12-21T18:00';
+        button('Go').click();
+        fixture.detectChanges();
+        expect(host().querySelector('#dock-panel-display')).toBeNull();
+      } finally {
+        viewport.wide = true;
+      }
+    });
+
+    it('hands focus to the tab that folded, not to the page, so Enter opens the panel again', () => {
+      viewport.wide = false;
+      try {
+        const field = host().querySelector<HTMLInputElement>('#clock-date')!;
+        field.focus();
+        field.value = '2020-12-21T18:00';
+        button('Go').click();
+        fixture.detectChanges();
+        expect(document.activeElement?.id).toBe('dock-tab-display');
+      } finally {
+        viewport.wide = true;
+      }
+    });
+
+    it('keeps the date strip on screen on a phone: the tabs give way to it, and scroll', () => {
+      // At 360 px the system view's five tabs take 397 px, and pushed the strip past the right
+      // edge, where nothing scrolls: after Go on a phone the date was nowhere on screen.
+      fixture.componentRef.setInput('date', '2020-12-21');
+      fixture.componentRef.setInput('range', '417 AU');
+      fixture.detectChanges();
+      const tabs = host().querySelector('[role="tablist"]')!.classList;
+      expect(tabs.contains('min-w-0') && tabs.contains('overflow-x-auto')).toBe(true);
+      // Its own scrollbar, where the browser draws one, thin and dark: a desktop's default was a
+      // light bar 15 px tall across the dock.
+      expect(tabs.contains('scheme-dark') && tabs.contains('[scrollbar-width:thin]')).toBe(true);
+      expect(host().querySelector('[data-testid="hud-date"]')!.classList.contains('shrink-0')).toBe(true);
+      // The range keeps its width where it is shown, or '417 AU' wraps and the row grows 20 px; on a
+      // phone it is not shown, where at the present it took the Display tab out of sight.
+      const range = [...host().querySelectorAll('p')].find((p) => p.textContent?.includes('Range'))!.classList;
+      expect(range.contains('shrink-0') && range.contains('max-sm:hidden')).toBe(true);
+    });
+
+    it('brings the tab that matters back into view once the date strip has narrowed the tabs', () => {
+      // jsdom lays nothing out; what is checked is which tab is asked to be in view, and when.
+      const scrolled: string[] = [];
+      HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+        scrolled.push(this.id);
+      };
+      try {
+        // On a phone: the tab focus went back to, which after Go sat wholly out of sight.
+        viewport.wide = false;
+        host().querySelector<HTMLInputElement>('#clock-date')!.value = '2020-12-21T18:00';
+        button('Go').click();
+        fixture.detectChanges();
+        scrolled.length = 0;
+        fixture.componentRef.setInput('date', '2020-12-21');
+        fixture.detectChanges();
+        expect(scrolled).toEqual(['dock-tab-display']);
+        // On a wider window, where the panel stays open: its tab, focus being in the panel.
+        viewport.wide = true;
+        fixture.componentRef.setInput('date', '');
+        fixture.detectChanges();
+        tab('Display').click();
+        fixture.detectChanges();
+        host().querySelector<HTMLInputElement>('#clock-date')!.focus();
+        scrolled.length = 0;
+        fixture.componentRef.setInput('date', '2020-12-21');
+        fixture.detectChanges();
+        expect(scrolled).toEqual(['dock-tab-display']);
+      } finally {
+        viewport.wide = true;
+        delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+      }
+    });
+
+    it('keeps the panel open on a wide screen, where it covers little of the scene', () => {
+      host().querySelector<HTMLInputElement>('#clock-date')!.value = '2020-12-21T18:00';
+      button('Go').click();
+      fixture.detectChanges();
+      expect(host().querySelector('#dock-panel-display')).not.toBeNull();
+    });
+
+    it('fills the date field again with the clock’s date when the panel is opened again', () => {
+      time.setDate(new Date('2020-12-21T18:00Z'));
+      fixture.componentInstance.toggleTab('display');
+      fixture.detectChanges();
+      fixture.componentInstance.toggleTab('display');
+      fixture.detectChanges();
+
+      expect(host().querySelector<HTMLInputElement>('#clock-date')!.value).toBe('2020-12-21T18:00');
+    });
   });
 });

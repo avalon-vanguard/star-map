@@ -41,7 +41,7 @@ const MATCH_SUBSTRING = 1;
 const NO_MATCH = 0;
 
 /**
- * Order for results that match equally well. Solar-system bodies are eighteen famous objects
+ * Order for results that match equally well. Solar-system bodies are a few dozen named worlds
  * and win ties outright; a star outranks an exoplanet because searching a name like "Proxima"
  * is usually an attempt to reach the system rather than one particular planet in it.
  */

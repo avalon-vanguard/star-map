@@ -37,7 +37,9 @@ const IO: BodyRecord = {
     argumentOfPeriapsisDeg: 0,
     meanAnomalyAtEpochDeg: 0,
     epochJd: 2451545.0
-  }
+  },
+  rates: { meanMotionDegPerDay: 203.4889583, longitudeOfAscendingNodeDegPerDay: 0, argumentOfPeriapsisDegPerDay: 0 },
+  orbitSource: 'test'
 };
 
 const PROXIMA_B: ExoplanetRecord = {

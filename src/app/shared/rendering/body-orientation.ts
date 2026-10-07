@@ -64,7 +64,7 @@ export function poleFrame(pole: { raDeg: number; decDeg: number }, target = new 
  */
 export function bodyOrientation(elements: RotationalElements, jdUtc: number, target = new THREE.Quaternion(), followsUt = false): THREE.Quaternion {
   const { poleRaDeg, poleDecDeg, primeMeridianDeg } = orientationAt(elements, tdbFromUtc(jdUtc));
-  const turnDeg = followsUt ? 360 * (0.779057273264 + 1.00273781191135448 * (jdUtc - 2451545)) - 90 - poleRaDeg : primeMeridianDeg;
+  const turnDeg = followsUt ? 360 * (0.779057273264 + 1.0027378119113546 * (jdUtc - 2451545)) - 90 - poleRaDeg : primeMeridianDeg;
   return poleFrame({ raDeg: poleRaDeg, decDeg: poleDecDeg }, target)
     .multiply(scratchTurn.setFromAxisAngle(Z_AXIS, turnDeg * DEG_TO_RAD))
     .multiply(MAP_TO_BODY);

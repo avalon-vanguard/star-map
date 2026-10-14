@@ -4,6 +4,7 @@ import {
   distanceBetween,
   eclipticToEquatorial,
   equatorialToEcliptic,
+  laplacePlaneToEquatorial,
   OBLIQUITY_J2000_DEG,
   parallaxMasToParsecs,
   parseSexagesimal,
@@ -203,6 +204,26 @@ describe('eclipticToEquatorial', () => {
   it('leaves a point in the ecliptic plane in that plane, tilted out of the equator', () => {
     const inPlane = eclipticToEquatorial({ x: 0.6, y: 0.8, z: 0 });
     expect(inPlane.z).toBeCloseTo(0.8 * Math.sin(OBLIQUITY_J2000_DEG * RAD), 12);
+  });
+});
+
+describe('laplacePlaneToEquatorial', () => {
+  const RAD = Math.PI / 180;
+  /** Jupiter's moons' Laplace pole, as JPL gives it for Io. */
+  const POLE = { raDeg: 268.057, decDeg: 64.495 };
+
+  it('sends the plane’s own pole to the right ascension and declination it is named by', () => {
+    const pole = laplacePlaneToEquatorial({ x: 0, y: 0, z: 1 }, POLE);
+    expect(Math.asin(pole.z) / RAD).toBeCloseTo(POLE.decDeg, 9);
+    expect(((Math.atan2(pole.y, pole.x) / RAD) + 360) % 360).toBeCloseTo(POLE.raDeg, 9);
+  });
+
+  it('counts the node from where the plane rises through the equator, 90 degrees past the pole', () => {
+    const node = laplacePlaneToEquatorial({ x: 1, y: 0, z: 0 }, POLE);
+    expect(node.z).toBeCloseTo(0, 12);
+    expect(((Math.atan2(node.y, node.x) / RAD) + 360) % 360).toBeCloseTo((POLE.raDeg + 90) % 360, 9);
+    // Rising: a quarter-turn on along the plane is north of the equator.
+    expect(laplacePlaneToEquatorial({ x: 0, y: 1, z: 0 }, POLE).z).toBeGreaterThan(0);
   });
 });
 

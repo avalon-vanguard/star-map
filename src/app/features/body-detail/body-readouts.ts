@@ -31,7 +31,11 @@ export interface BodyReadouts {
 export function bodyReadouts(body: BodyDetailViewModel): BodyReadouts {
   const measured: Readout[] = [];
   if (body.radiusKm !== undefined) {
-    measured.push({ label: 'Radius', value: formatRadiusKm(body.radiusKm) });
+    // A triaxial body is drawn as the sphere of its volume; a radius alone would hide its shape.
+    measured.push({ label: body.semiAxesKm ? 'Mean radius' : 'Radius', value: formatRadiusKm(body.radiusKm) });
+  }
+  if (body.semiAxesKm) {
+    measured.push({ label: 'Semi-axes', value: `${body.semiAxesKm.map((axis) => axis.toLocaleString('en-GB')).join(' × ')} km` });
   }
   if (body.massEarth !== undefined) {
     measured.push({ label: 'Mass', value: formatMassEarth(body.massEarth) });
@@ -43,7 +47,9 @@ export function bodyReadouts(body: BodyDetailViewModel): BodyReadouts {
     measured.push({ label: 'Eccentricity', value: body.orbit.eccentricity.toFixed(3) });
   }
   if (body.orbit.inclinationDeg !== undefined) {
-    measured.push({ label: 'Inclination', value: `${body.orbit.inclinationDeg.toFixed(2)}°` });
+    // Its size: Standish fits Earth's as -0.00054 degrees, which is the same orbit as +0.00054 with
+    // the node half a turn round, and printed as it stands read "-0.00°".
+    measured.push({ label: 'Inclination', value: `${Math.abs(body.orbit.inclinationDeg).toFixed(2)}°` });
   }
   // The period sits under whichever heading its provenance calls for. Same number, same field —
   // a published period is an observation and a computed one is not.
@@ -65,18 +71,33 @@ export function bodyReadouts(body: BodyDetailViewModel): BodyReadouts {
     derived.push({ label: 'Bulk density', value: formatDensity(body.appearance.bulkDensityGramsPerCm3) });
   }
 
-  return { kindLabel: KIND_LABELS[body.kind], measured, derived, provenance: provenanceFor(body) };
+  const provenance = body.orbitSource ? `${provenanceFor(body)} Orbit: ${body.orbitSource}.` : provenanceFor(body);
+  return { kindLabel: KIND_LABELS[body.kind], measured, derived, provenance };
 }
 
 /**
  * The derived surface is a reasoned illustration, and a panel of real measurements sitting next
  * to it is exactly the context in which it could be mistaken for another one.
+ *
+ * A moon or dwarf planet drawn this way has been imaged — Voyager 2 photographed Uranus's five
+ * large moons, Proteus and Nereid, Cassini Hyperion, and Hubble sees Eris, Haumea and Makemake as
+ * points — but has no global map this app can use. So have the hundred or so exoplanets the
+ * archive flags as imaged, HR 8799's four among them, though only as points of light beside their
+ * star — and one of them has a map, not used here: Luhman 16 b, a brown dwarf, mapped by Doppler
+ * imaging (Crossfield et al. 2014, Nature 505, 654). Only the other exoplanets, known from what they
+ * do to starlight, have no image at all.
  */
 function provenanceFor(body: BodyDetailViewModel): string {
   if (body.hasPhotography) {
     return 'Surface: NASA/ESA/USGS photography.';
   }
+  const why =
+    body.kind !== 'exoplanet'
+      ? 'no global map of this world is used here'
+      : body.imaged
+        ? 'it has been imaged only as a point of light beside its star, and no map of it is used here'
+        : 'no image of this world exists';
   return body.appearance.equilibriumTemperatureK === null
-    ? 'Surface illustrated from this body’s measured size and mass. Its host star is not in the catalogue, so no temperature could be derived. Not an observation — no image of this world exists.'
-    : 'Surface illustrated from the measurements above — size, density and the temperature derived from its star’s output and its orbit. Not an observation — no image of this world exists.';
+    ? `Surface illustrated from this body’s measured size and mass. Its host star is not in the catalogue, so no temperature could be derived. Not an observation — ${why}.`
+    : `Surface illustrated from the measurements above — size, density and the temperature derived from its star’s output and its orbit. Not an observation — ${why}.`;
 }

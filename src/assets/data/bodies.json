@@ -6,16 +6,53 @@
     "kind": "planet",
     "radiusKm": 2439.4,
     "orbit": {
-      "semiMajorAxisAu": 0.38709857292289906,
-      "eccentricity": 0.2056388859154261,
-      "inclinationDeg": 7.003502017708398,
-      "longitudeOfAscendingNodeDeg": 48.29980532881731,
-      "argumentOfPeriapsisDeg": 29.19561108948743,
-      "meanAnomalyAtEpochDeg": 103.9465145977117,
-      "epochJd": 2460676.5
+      "semiMajorAxisAu": 0.38709843,
+      "eccentricity": 0.20563661,
+      "inclinationDeg": 7.00559432,
+      "longitudeOfAscendingNodeDeg": 48.33961819,
+      "argumentOfPeriapsisDeg": 29.118100759999997,
+      "meanAnomalyAtEpochDeg": 174.79394829,
+      "epochJd": 2451545
     },
+    "rates": {
+      "meanMotionDegPerDay": 4.092338805372484,
+      "longitudeOfAscendingNodeDegPerDay": -0.0000033440607802874744,
+      "argumentOfPeriapsisDegPerDay": 0.000007708198494182067,
+      "semiMajorAxisAuPerDay": 0,
+      "eccentricityPerDay": 5.812457221081451e-10,
+      "inclinationDegPerDay": -1.6157645448323065e-7
+    },
+    "orbitSource": "JPL approximate mean elements (Standish), fit for 3000 BC to AD 3000",
     "rotationPeriodHours": 1407.512239412851,
-    "obliquityDeg": 2.11
+    "obliquityDeg": 0.035166666666666666,
+    "rotationalElements": {
+      "poleRaDeg": [
+        281.0103,
+        -0.0328,
+        0
+      ],
+      "poleDecDeg": [
+        61.4155,
+        -0.0049,
+        0
+      ],
+      "primeMeridianDeg": [
+        329.5988,
+        6.1385108,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            174.7910857,
+            149472.53587500003
+          ],
+          "ra": 0,
+          "dec": 0,
+          "pm": 0.01067257
+        }
+      ]
+    }
   },
   {
     "id": "venus",
@@ -24,16 +61,42 @@
     "kind": "planet",
     "radiusKm": 6051.84,
     "orbit": {
-      "semiMajorAxisAu": 0.7233281694940689,
-      "eccentricity": 0.006746576710187382,
-      "inclinationDeg": 3.394393253252075,
-      "longitudeOfAscendingNodeDeg": 76.61185393039594,
-      "argumentOfPeriapsisDeg": 55.15075425343929,
-      "meanAnomalyAtEpochDeg": 280.0749102629981,
-      "epochJd": 2460676.5
+      "semiMajorAxisAu": 0.72332102,
+      "eccentricity": 0.00676399,
+      "inclinationDeg": 3.39777545,
+      "longitudeOfAscendingNodeDeg": 76.67261496,
+      "argumentOfPeriapsisDeg": 55.094942169999996,
+      "meanAnomalyAtEpochDeg": 50.21215136999999,
+      "epochJd": 2451545
     },
+    "rates": {
+      "meanMotionDegPerDay": 1.6021304750882956,
+      "longitudeOfAscendingNodeDegPerDay": -0.000007467261875427789,
+      "argumentOfPeriapsisDegPerDay": 0.000009022264750171116,
+      "semiMajorAxisAuPerDay": -7.118412046543463e-12,
+      "eccentricityPerDay": -1.398220396988364e-9,
+      "inclinationDegPerDay": 1.1908008213552361e-8
+    },
+    "orbitSource": "JPL approximate mean elements (Standish), fit for 3000 BC to AD 3000",
     "rotationPeriodHours": -5832.539941165383,
-    "obliquityDeg": 177.3
+    "obliquityDeg": 177.3,
+    "rotationalElements": {
+      "poleRaDeg": [
+        272.76,
+        0,
+        0
+      ],
+      "poleDecDeg": [
+        67.16,
+        0,
+        0
+      ],
+      "primeMeridianDeg": [
+        160.2,
+        -1.4813688,
+        0
+      ]
+    }
   },
   {
     "id": "earth",
@@ -42,16 +105,42 @@
     "kind": "planet",
     "radiusKm": 6371.01,
     "orbit": {
-      "semiMajorAxisAu": 1.0009125494279245,
-      "eccentricity": 0.01756190256786036,
-      "inclinationDeg": 0.002977082685807642,
-      "longitudeOfAscendingNodeDeg": 190.1716375775361,
-      "argumentOfPeriapsisDeg": 272.9783142442708,
-      "meanAnomalyAtEpochDeg": 357.4122246804211,
-      "epochJd": 2460676.5
+      "semiMajorAxisAu": 1.00000018,
+      "eccentricity": 0.01673163,
+      "inclinationDeg": -0.00054346,
+      "longitudeOfAscendingNodeDeg": -5.11260389,
+      "argumentOfPeriapsisDeg": 108.04266274,
+      "meanAnomalyAtEpochDeg": -2.4631431299999917,
+      "epochJd": 2451545
     },
+    "rates": {
+      "meanMotionDegPerDay": 0.9856091187759068,
+      "longitudeOfAscendingNodeDegPerDay": -0.000006604751813826146,
+      "argumentOfPeriapsisDegPerDay": 0.000015309819575633124,
+      "semiMajorAxisAuPerDay": -8.213552361396303e-13,
+      "eccentricityPerDay": -1.002327173169062e-9,
+      "inclinationDegPerDay": -3.6609938398357287e-7
+    },
+    "orbitSource": "JPL approximate mean elements (Standish), fit for 3000 BC to AD 3000",
     "rotationPeriodHours": 23.934472399219285,
-    "obliquityDeg": 23.4392911
+    "obliquityDeg": 23.4392911,
+    "rotationalElements": {
+      "poleRaDeg": [
+        0,
+        -0.641,
+        0
+      ],
+      "poleDecDeg": [
+        90,
+        -0.557,
+        0
+      ],
+      "primeMeridianDeg": [
+        190.147,
+        360.9856235,
+        0
+      ]
+    }
   },
   {
     "id": "mars",
@@ -60,16 +149,74 @@
     "kind": "planet",
     "radiusKm": 3389.92,
     "orbit": {
-      "semiMajorAxisAu": 1.5237367794976557,
-      "eccentricity": 0.09343026241683372,
-      "inclinationDeg": 1.847583389630714,
-      "longitudeOfAscendingNodeDeg": 49.48673257018439,
-      "argumentOfPeriapsisDeg": 286.7114828288203,
-      "meanAnomalyAtEpochDeg": 124.444888195349,
-      "epochJd": 2460676.5
+      "semiMajorAxisAu": 1.52371243,
+      "eccentricity": 0.09336511,
+      "inclinationDeg": 1.85181869,
+      "longitudeOfAscendingNodeDeg": 49.71320984,
+      "argumentOfPeriapsisDeg": -73.63065768,
+      "meanAnomalyAtEpochDeg": 19.3493162,
+      "epochJd": 2451545
     },
+    "rates": {
+      "meanMotionDegPerDay": 0.5240328362061601,
+      "longitudeOfAscendingNodeDegPerDay": -0.000007351794934976044,
+      "argumentOfPeriapsisDegPerDay": 0.00001973334866529774,
+      "semiMajorAxisAuPerDay": 2.6557152635181385e-11,
+      "eccentricityPerDay": 2.5048596851471597e-9,
+      "inclinationDegPerDay": -1.9842765229295004e-7
+    },
+    "orbitSource": "JPL approximate mean elements (Standish), fit for 3000 BC to AD 3000",
     "rotationPeriodHours": 24.622955438662025,
-    "obliquityDeg": 25.19
+    "obliquityDeg": 25.19,
+    "rotationalElements": {
+      "poleRaDeg": [
+        317.269202,
+        -0.10927547,
+        0
+      ],
+      "poleDecDeg": [
+        54.432516,
+        -0.05827105,
+        0
+      ],
+      "primeMeridianDeg": [
+        176.049863,
+        350.891982443297,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            79.398797,
+            0.5042615,
+            0
+          ],
+          "ra": 0.419057,
+          "dec": 0,
+          "pm": 0
+        },
+        {
+          "angleDeg": [
+            166.325722,
+            0.5042615,
+            0
+          ],
+          "ra": 0,
+          "dec": 1.591274,
+          "pm": 0
+        },
+        {
+          "angleDeg": [
+            95.391654,
+            0.5042615,
+            0
+          ],
+          "ra": 0,
+          "dec": 0,
+          "pm": 0.584542
+        }
+      ]
+    }
   },
   {
     "id": "jupiter",
@@ -78,16 +225,48 @@
     "kind": "planet",
     "radiusKm": 69911,
     "orbit": {
-      "semiMajorAxisAu": 5.20282710471751,
-      "eccentricity": 0.04830624138918495,
-      "inclinationDeg": 1.303459692430419,
-      "longitudeOfAscendingNodeDeg": 100.5202095061913,
-      "argumentOfPeriapsisDeg": 273.6090683600047,
-      "meanAnomalyAtEpochDeg": 58.98282567286461,
-      "epochJd": 2460676.5
+      "semiMajorAxisAu": 5.20248019,
+      "eccentricity": 0.0485359,
+      "inclinationDeg": 1.29861416,
+      "longitudeOfAscendingNodeDeg": 100.29282654,
+      "argumentOfPeriapsisDeg": -86.0178741,
+      "meanAnomalyAtEpochDeg": 20.059839080000003,
+      "epochJd": 2451545
     },
+    "rates": {
+      "meanMotionDegPerDay": 0.08309113532019165,
+      "longitudeOfAscendingNodeDegPerDay": 0.0000035659463381245725,
+      "argumentOfPeriapsisDegPerDay": 0.0000014167219712525667,
+      "semiMajorAxisAuPerDay": -7.841204654346339e-10,
+      "eccentricityPerDay": 4.935249828884326e-9,
+      "inclinationDegPerDay": -8.83501711156742e-8,
+      "meanAnomalyTerms": {
+        "b": -0.00012452,
+        "c": 0.0606406,
+        "s": -0.35635438,
+        "f": 38.35125
+      }
+    },
+    "orbitSource": "JPL approximate mean elements (Standish), fit for 3000 BC to AD 3000",
     "rotationPeriodHours": 9.925102371306965,
-    "obliquityDeg": 3.13
+    "obliquityDeg": 3.13,
+    "rotationalElements": {
+      "poleRaDeg": [
+        268.056595,
+        -0.006499,
+        0
+      ],
+      "poleDecDeg": [
+        64.495303,
+        0.002413,
+        0
+      ],
+      "primeMeridianDeg": [
+        284.95,
+        870.536,
+        0
+      ]
+    }
   },
   {
     "id": "saturn",
@@ -96,16 +275,48 @@
     "kind": "planet",
     "radiusKm": 58232,
     "orbit": {
-      "semiMajorAxisAu": 9.555678383881443,
-      "eccentricity": 0.05522302318620472,
-      "inclinationDeg": 2.485819253218824,
-      "longitudeOfAscendingNodeDeg": 113.5595556634874,
-      "argumentOfPeriapsisDeg": 337.1663598259115,
-      "meanAnomalyAtEpochDeg": 264.9877650588944,
-      "epochJd": 2460676.5
+      "semiMajorAxisAu": 9.54149883,
+      "eccentricity": 0.05550825,
+      "inclinationDeg": 2.49424102,
+      "longitudeOfAscendingNodeDeg": 113.63998702,
+      "argumentOfPeriapsisDeg": -20.778626390000014,
+      "meanAnomalyAtEpochDeg": -42.78564733999999,
+      "epochJd": 2451545
     },
+    "rates": {
+      "meanMotionDegPerDay": 0.033459683702669406,
+      "longitudeOfAscendingNodeDegPerDay": -0.000006848734291581108,
+      "argumentOfPeriapsisDegPerDay": 0.000021682266940451745,
+      "semiMajorAxisAuPerDay": -8.391512662559891e-10,
+      "eccentricityPerDay": -8.773169062286106e-9,
+      "inclinationDegPerDay": 1.2374236824093085e-7,
+      "meanAnomalyTerms": {
+        "b": 0.00025899,
+        "c": -0.13434469,
+        "s": 0.87320147,
+        "f": 38.35125
+      }
+    },
+    "orbitSource": "JPL approximate mean elements (Standish), fit for 3000 BC to AD 3000",
     "rotationPeriodHours": 10.656221583138441,
-    "obliquityDeg": 26.73
+    "obliquityDeg": 26.73,
+    "rotationalElements": {
+      "poleRaDeg": [
+        40.589,
+        -0.036,
+        0
+      ],
+      "poleDecDeg": [
+        83.537,
+        -0.004,
+        0
+      ],
+      "primeMeridianDeg": [
+        38.9,
+        810.7939024,
+        0
+      ]
+    }
   },
   {
     "id": "uranus",
@@ -114,16 +325,48 @@
     "kind": "planet",
     "radiusKm": 25362,
     "orbit": {
-      "semiMajorAxisAu": 19.30135052232751,
-      "eccentricity": 0.04562415515293685,
-      "inclinationDeg": 0.7728969735590447,
-      "longitudeOfAscendingNodeDeg": 74.0126541901479,
-      "argumentOfPeriapsisDeg": 90.49593456147204,
-      "meanAnomalyAtEpochDeg": 255.8822481742851,
-      "epochJd": 2460676.5
+      "semiMajorAxisAu": 19.18797948,
+      "eccentricity": 0.0468574,
+      "inclinationDeg": 0.77298127,
+      "longitudeOfAscendingNodeDeg": 73.96250215,
+      "argumentOfPeriapsisDeg": 98.47154226,
+      "meanAnomalyAtEpochDeg": 141.76872184,
+      "epochJd": 2451545
     },
+    "rates": {
+      "meanMotionDegPerDay": 0.011731557178644764,
+      "longitudeOfAscendingNodeDegPerDay": 0.0000015714439425051334,
+      "argumentOfPeriapsisDegPerDay": 9.65718275154004e-7,
+      "semiMajorAxisAuPerDay": -5.600273785078713e-9,
+      "eccentricityPerDay": -4.2436687200547574e-10,
+      "inclinationDegPerDay": -4.932375085557837e-8,
+      "meanAnomalyTerms": {
+        "b": 0.00058331,
+        "c": -0.97731848,
+        "s": 0.17689245,
+        "f": 7.67025
+      }
+    },
+    "orbitSource": "JPL approximate mean elements (Standish), fit for 3000 BC to AD 3000",
     "rotationPeriodHours": -17.24003330792427,
-    "obliquityDeg": 97.77
+    "obliquityDeg": 97.77,
+    "rotationalElements": {
+      "poleRaDeg": [
+        257.311,
+        0,
+        0
+      ],
+      "poleDecDeg": [
+        -15.175,
+        0,
+        0
+      ],
+      "primeMeridianDeg": [
+        203.81,
+        -501.1600928,
+        0
+      ]
+    }
   },
   {
     "id": "neptune",
@@ -132,16 +375,59 @@
     "kind": "planet",
     "radiusKm": 24624,
     "orbit": {
-      "semiMajorAxisAu": 30.183632709237763,
-      "eccentricity": 0.01266098870528033,
-      "inclinationDeg": 1.774849832507214,
-      "longitudeOfAscendingNodeDeg": 131.9473970418126,
-      "argumentOfPeriapsisDeg": 268.1146665565159,
-      "meanAnomalyAtEpochDeg": 319.6858384317641,
-      "epochJd": 2460676.5
+      "semiMajorAxisAu": 30.06952752,
+      "eccentricity": 0.00895439,
+      "inclinationDeg": 1.7700552,
+      "longitudeOfAscendingNodeDeg": 131.78635853,
+      "argumentOfPeriapsisDeg": -85.10477129,
+      "meanAnomalyAtEpochDeg": 257.54130563,
+      "epochJd": 2451545
     },
+    "rates": {
+      "meanMotionDegPerDay": 0.005981249914852841,
+      "longitudeOfAscendingNodeDegPerDay": -1.6599644079397672e-7,
+      "argumentOfPeriapsisDegPerDay": 4.4250239561943875e-7,
+      "semiMajorAxisAuPerDay": 1.7650924024640657e-9,
+      "eccentricityPerDay": 2.2395619438740589e-10,
+      "inclinationDegPerDay": 6.132785763175907e-9,
+      "meanAnomalyTerms": {
+        "b": -0.00041348,
+        "c": 0.68346318,
+        "s": -0.10162547,
+        "f": 7.67025
+      }
+    },
+    "orbitSource": "JPL approximate mean elements (Standish), fit for 3000 BC to AD 3000",
     "rotationPeriodHours": 16.110037586020876,
-    "obliquityDeg": 28.32
+    "obliquityDeg": 28.32,
+    "rotationalElements": {
+      "poleRaDeg": [
+        299.36,
+        0,
+        0
+      ],
+      "poleDecDeg": [
+        43.46,
+        0,
+        0
+      ],
+      "primeMeridianDeg": [
+        249.978,
+        541.1397757,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            357.85,
+            52.316
+          ],
+          "ra": 0.7,
+          "dec": -0.51,
+          "pm": -0.48
+        }
+      ]
+    }
   },
   {
     "id": "pluto",
@@ -150,16 +436,162 @@
     "kind": "dwarf",
     "radiusKm": 1188.3,
     "orbit": {
-      "semiMajorAxisAu": 39.28778257358678,
-      "eccentricity": 0.2438605399689669,
-      "inclinationDeg": 16.93906659887321,
-      "longitudeOfAscendingNodeDeg": 110.1714547539489,
-      "argumentOfPeriapsisDeg": 113.5754868232679,
-      "meanAnomalyAtEpochDeg": 51.93655343727463,
-      "epochJd": 2460676.5
+      "semiMajorAxisAu": 39.48686035,
+      "eccentricity": 0.24885238,
+      "inclinationDeg": 17.1410426,
+      "longitudeOfAscendingNodeDeg": 110.30167986,
+      "argumentOfPeriapsisDeg": 113.79534612000002,
+      "meanAnomalyAtEpochDeg": 14.86832412999999,
+      "epochJd": 2451545
     },
+    "rates": {
+      "meanMotionDegPerDay": 0.003974823518959616,
+      "longitudeOfAscendingNodeDegPerDay": -2.2176071184120468e-7,
+      "argumentOfPeriapsisDegPerDay": -4.3489664613278575e-8,
+      "semiMajorAxisAuPerDay": 1.2313511293634495e-7,
+      "eccentricityPerDay": 1.6470910335386722e-9,
+      "inclinationDegPerDay": 1.3716632443531827e-10,
+      "meanAnomalyTerms": {
+        "b": -0.01262724,
+        "c": 0,
+        "s": 0,
+        "f": 0
+      }
+    },
+    "orbitSource": "JPL approximate mean elements (Standish), fit for 3000 BC to AD 3000",
     "rotationPeriodHours": 153.29335198,
-    "obliquityDeg": 119.6
+    "obliquityDeg": 119.6,
+    "rotationalElements": {
+      "poleRaDeg": [
+        132.993,
+        0,
+        0
+      ],
+      "poleDecDeg": [
+        -6.163,
+        0,
+        0
+      ],
+      "primeMeridianDeg": [
+        302.695,
+        56.3625225,
+        0
+      ]
+    }
+  },
+  {
+    "id": "ceres",
+    "systemStarId": 0,
+    "name": "Ceres",
+    "kind": "dwarf",
+    "radiusKm": 469.7,
+    "orbit": {
+      "semiMajorAxisAu": 2.765552595034094,
+      "eccentricity": 0.07969229514816586,
+      "inclinationDeg": 10.58802780183462,
+      "longitudeOfAscendingNodeDeg": 80.24862682043221,
+      "argumentOfPeriapsisDeg": 73.29421453021587,
+      "meanAnomalyAtEpochDeg": 274.4193463761342,
+      "epochJd": 2461200.5
+    },
+    "rates": {
+      "meanMotionDegPerDay": 0.21430445064843,
+      "longitudeOfAscendingNodeDegPerDay": 0,
+      "argumentOfPeriapsisDegPerDay": 0
+    },
+    "orbitSource": "JPL SBDB osculating elements, epoch 2026 Jun 9, within 7.2 degrees of Horizons from 1950 to 2100",
+    "rotationPeriodHours": 9.07417,
+    "rotationalElements": {
+      "poleRaDeg": [
+        291.418,
+        0,
+        0
+      ],
+      "poleDecDeg": [
+        66.764,
+        0,
+        0
+      ],
+      "primeMeridianDeg": [
+        170.65,
+        952.1532,
+        0
+      ]
+    }
+  },
+  {
+    "id": "eris",
+    "systemStarId": 0,
+    "name": "Eris",
+    "kind": "dwarf",
+    "radiusKm": 1163,
+    "orbit": {
+      "semiMajorAxisAu": 67.93394687853566,
+      "eccentricity": 0.4382385347971672,
+      "inclinationDeg": 43.9258279471791,
+      "longitudeOfAscendingNodeDeg": 36.00477044417249,
+      "argumentOfPeriapsisDeg": 150.7949235840312,
+      "meanAnomalyAtEpochDeg": 211.774434275007,
+      "epochJd": 2461200.5
+    },
+    "rates": {
+      "meanMotionDegPerDay": 0.001760247770619088,
+      "longitudeOfAscendingNodeDegPerDay": 0,
+      "argumentOfPeriapsisDegPerDay": 0
+    },
+    "orbitSource": "JPL SBDB osculating elements, epoch 2026 Jun 9, within 0.1 degrees of Horizons from 1950 to 2100",
+    "rotationPeriodHours": 378.504
+  },
+  {
+    "id": "haumea",
+    "systemStarId": 0,
+    "name": "Haumea",
+    "kind": "dwarf",
+    "radiusKm": 797.6,
+    "semiAxesKm": [
+      1161,
+      852,
+      513
+    ],
+    "orbit": {
+      "semiMajorAxisAu": 43.06029023650952,
+      "eccentricity": 0.1944430148898797,
+      "inclinationDeg": 28.20847393040364,
+      "longitudeOfAscendingNodeDeg": 121.7860561329425,
+      "argumentOfPeriapsisDeg": 240.6905472508661,
+      "meanAnomalyAtEpochDeg": 223.2104118812299,
+      "epochJd": 2461200.5
+    },
+    "rates": {
+      "meanMotionDegPerDay": 0.003488097731816818,
+      "longitudeOfAscendingNodeDegPerDay": 0,
+      "argumentOfPeriapsisDegPerDay": 0
+    },
+    "orbitSource": "JPL SBDB osculating elements, epoch 2026 Jun 9, within 0.4 degrees of Horizons from 1950 to 2100",
+    "rotationPeriodHours": 3.9154
+  },
+  {
+    "id": "makemake",
+    "systemStarId": 0,
+    "name": "Makemake",
+    "kind": "dwarf",
+    "radiusKm": 715,
+    "orbit": {
+      "semiMajorAxisAu": 45.57093317300052,
+      "eccentricity": 0.1588889953992523,
+      "inclinationDeg": 29.02785603743067,
+      "longitudeOfAscendingNodeDeg": 79.2948338209406,
+      "argumentOfPeriapsisDeg": 297.0922733397207,
+      "meanAnomalyAtEpochDeg": 169.9379962048232,
+      "epochJd": 2461200.5
+    },
+    "rates": {
+      "meanMotionDegPerDay": 0.003203850120050116,
+      "longitudeOfAscendingNodeDegPerDay": 0,
+      "argumentOfPeriapsisDegPerDay": 0
+    },
+    "orbitSource": "JPL SBDB osculating elements, epoch 2026 Jun 9, within 0.3 degrees of Horizons from 1950 to 2100",
+    "rotationPeriodHours": 22.8266
   },
   {
     "id": "moon",
@@ -168,53 +600,274 @@
     "kind": "moon",
     "radiusKm": 1737.53,
     "orbit": {
-      "semiMajorAxisAu": 0.0025850155421324465,
-      "eccentricity": 0.04034704696474715,
-      "inclinationDeg": 5.004154175941119,
-      "longitudeOfAscendingNodeDeg": 0.531732989166472,
-      "argumentOfPeriapsisDeg": 6.557682814330136,
-      "meanAnomalyAtEpochDeg": 290.7825171697369,
-      "epochJd": 2460676.5
+      "semiMajorAxisAu": 0.0025695552897999907,
+      "eccentricity": 0.0554,
+      "inclinationDeg": 5.16,
+      "longitudeOfAscendingNodeDeg": 125.08,
+      "argumentOfPeriapsisDeg": 318.15,
+      "meanAnomalyAtEpochDeg": 135.27,
+      "epochJd": 2451545
     },
+    "rates": {
+      "meanMotionDegPerDay": 13.176358,
+      "longitudeOfAscendingNodeDegPerDay": -0.052990660396105185,
+      "argumentOfPeriapsisDegPerDay": 0.164353223839846
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 2000 Jan 1, within 2.7 degrees of Horizons from 1950 to 2100",
     "parentBodyId": "earth",
-    "rotationPeriodHours": 664.8546956215548,
-    "obliquityDeg": 6.67
+    "rotationPeriodHours": 655.7198886065481,
+    "obliquityDeg": 6.67,
+    "rotationalElements": {
+      "poleRaDeg": [
+        269.9949,
+        0.0031,
+        0
+      ],
+      "poleDecDeg": [
+        66.5392,
+        0.013,
+        0
+      ],
+      "primeMeridianDeg": [
+        38.3213,
+        13.17635815,
+        -1.4e-12
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            125.045,
+            -1935.5364525
+          ],
+          "ra": -3.8787,
+          "dec": 1.5419,
+          "pm": 3.561
+        },
+        {
+          "angleDeg": [
+            250.089,
+            -3871.072905
+          ],
+          "ra": -0.1204,
+          "dec": 0.0239,
+          "pm": 0.1208
+        },
+        {
+          "angleDeg": [
+            260.008,
+            475263.3328725
+          ],
+          "ra": 0.07,
+          "dec": -0.0278,
+          "pm": -0.0642
+        },
+        {
+          "angleDeg": [
+            176.625,
+            487269.629985
+          ],
+          "ra": -0.0172,
+          "dec": 0.0068,
+          "pm": 0.0158
+        },
+        {
+          "angleDeg": [
+            357.529,
+            35999.0509575
+          ],
+          "ra": 0,
+          "dec": 0,
+          "pm": 0.0252
+        }
+      ]
+    }
   },
   {
     "id": "phobos",
     "systemStarId": 0,
     "name": "Phobos",
     "kind": "moon",
-    "radiusKm": 13.1,
+    "radiusKm": 11.058402868477721,
     "orbit": {
-      "semiMajorAxisAu": 0.00006269319601715431,
-      "eccentricity": 0.01559367482014246,
-      "inclinationDeg": 26.37766999967838,
-      "longitudeOfAscendingNodeDeg": 85.13091230996636,
-      "argumentOfPeriapsisDeg": 356.4060881660871,
-      "meanAnomalyAtEpochDeg": 342.6005509941174,
-      "epochJd": 2460676.5
+      "semiMajorAxisAu": 0.00006267468885838895,
+      "eccentricity": 0.0151,
+      "inclinationDeg": 1.075,
+      "longitudeOfAscendingNodeDeg": 207.784,
+      "argumentOfPeriapsisDeg": 150.057,
+      "meanAnomalyAtEpochDeg": 94.2394819925,
+      "epochJd": 2433282.5
     },
+    "rates": {
+      "meanMotionDegPerDay": 1128.8444085925948,
+      "longitudeOfAscendingNodeDegPerDay": -0.43579001784832494,
+      "argumentOfPeriapsisDegPerDay": 0.871002371303956,
+      "meanAnomalyTerms": {
+        "b": 12.721927969999998,
+        "c": 0,
+        "s": 0,
+        "f": 0
+      }
+    },
+    "laplacePole": {
+      "raDeg": 317.671,
+      "decDeg": 52.893
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 1950 Jan 1, with the orbital terms of its IAU W (NAIF pck00011), within 1.3 degrees of Horizons from 1950 to 2100",
     "parentBodyId": "mars",
-    "rotationPeriodHours": 7.660212212136228
+    "rotationPeriodHours": 7.653844882637157,
+    "rotationalElements": {
+      "poleRaDeg": [
+        317.67071657,
+        -0.10844326,
+        0
+      ],
+      "poleDecDeg": [
+        52.88627266,
+        -0.06134706,
+        0
+      ],
+      "primeMeridianDeg": [
+        35.1877444,
+        1128.84475928,
+        9.536137031212154e-9
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            190.72646643,
+            15917.10818695,
+            0
+          ],
+          "ra": -1.78428399,
+          "dec": -1.07516537,
+          "pm": 1.42421769
+        },
+        {
+          "angleDeg": [
+            21.4689247,
+            31834.27934054,
+            0
+          ],
+          "ra": 0.02212824,
+          "dec": 0.00668626,
+          "pm": -0.02273783
+        },
+        {
+          "angleDeg": [
+            332.86082793,
+            19139.89694742,
+            0
+          ],
+          "ra": -0.01028251,
+          "dec": -0.0064874,
+          "pm": 0.00410711
+        },
+        {
+          "angleDeg": [
+            189.6327156,
+            41215158.1842005,
+            12.711923222
+          ],
+          "ra": 0,
+          "dec": 0,
+          "pm": -1.143
+        }
+      ]
+    }
   },
   {
     "id": "deimos",
     "systemStarId": 0,
     "name": "Deimos",
     "kind": "moon",
-    "radiusKm": 7.8,
+    "radiusKm": 6.203050874487247,
     "orbit": {
-      "semiMajorAxisAu": 0.00015681797919999554,
-      "eccentricity": 0.0002637395029404219,
-      "inclinationDeg": 24.26157855280465,
-      "longitudeOfAscendingNodeDeg": 80.74605390828611,
-      "argumentOfPeriapsisDeg": 21.65246201037153,
-      "meanAnomalyAtEpochDeg": 273.8943716897566,
-      "epochJd": 2460676.5
+      "semiMajorAxisAu": 0.00015680704471417322,
+      "eccentricity": 0.0002,
+      "inclinationDeg": 1.788,
+      "longitudeOfAscendingNodeDeg": 24.525,
+      "argumentOfPeriapsisDeg": 260.729,
+      "meanAnomalyAtEpochDeg": 325.329,
+      "epochJd": 2433282.5
     },
+    "rates": {
+      "meanMotionDegPerDay": 285.161879,
+      "longitudeOfAscendingNodeDegPerDay": -0.018072715865968356,
+      "argumentOfPeriapsisDegPerDay": 0.03601079576648982
+    },
+    "laplacePole": {
+      "raDeg": 316.657,
+      "decDeg": 53.529
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 1950 Jan 1, within 0.6 degrees of Horizons from 1950 to 2100",
     "parentBodyId": "mars",
-    "rotationPeriodHours": 30.304279685850094
+    "rotationPeriodHours": 30.29857998656265,
+    "rotationalElements": {
+      "poleRaDeg": [
+        316.65705808,
+        -0.10518014,
+        0
+      ],
+      "poleDecDeg": [
+        53.50992033,
+        -0.05979094,
+        0
+      ],
+      "primeMeridianDeg": [
+        79.49055322521608,
+        285.161879,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            121.49945940952146,
+            660.1059470044942
+          ],
+          "ra": 3.09217726,
+          "dec": 1.83936004,
+          "pm": -2.73954829
+        },
+        {
+          "angleDeg": [
+            231.2716139683453,
+            660.1059470044942
+          ],
+          "ra": 0.22980637,
+          "dec": 0.1432532,
+          "pm": -0.39968606
+        },
+        {
+          "angleDeg": [
+            251.44553184217244,
+            1320.2118940089883
+          ],
+          "ra": 0.06418655,
+          "dec": 0.01911409,
+          "pm": -0.06563259
+        },
+        {
+          "angleDeg": [
+            217.98635955,
+            38279.9612555,
+            0
+          ],
+          "ra": 0.02533537,
+          "dec": -0.0148259,
+          "pm": -0.0291294
+        },
+        {
+          "angleDeg": [
+            196.19729402,
+            19139.83628608,
+            0
+          ],
+          "ra": 0.00778695,
+          "dec": 0.0019243,
+          "pm": 0.0169916
+        }
+      ]
+    }
   },
   {
     "id": "io",
@@ -223,16 +876,63 @@
     "kind": "moon",
     "radiusKm": 1821.49,
     "orbit": {
-      "semiMajorAxisAu": 0.0028210852715482176,
-      "eccentricity": 0.004228419931613188,
-      "inclinationDeg": 2.184262830697117,
-      "longitudeOfAscendingNodeDeg": 338.066968919613,
-      "argumentOfPeriapsisDeg": 164.6533514126175,
-      "meanAnomalyAtEpochDeg": 74.88524962049125,
-      "epochJd": 2460676.5
+      "semiMajorAxisAu": 0.0028195588481728304,
+      "eccentricity": 0.0041,
+      "inclinationDeg": 0.036,
+      "longitudeOfAscendingNodeDeg": 43.977,
+      "argumentOfPeriapsisDeg": 84.129,
+      "meanAnomalyAtEpochDeg": 342.021,
+      "epochJd": 2450464.5
     },
+    "rates": {
+      "meanMotionDegPerDay": 203.4889583,
+      "longitudeOfAscendingNodeDegPerDay": -0.1328337309120696,
+      "argumentOfPeriapsisDegPerDay": -0.6065392513031117
+    },
+    "laplacePole": {
+      "raDeg": 268.057,
+      "decDeg": 64.495
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 1997 Jan 16, within 0.1 degrees of Horizons from 1950 to 2100",
     "parentBodyId": "jupiter",
-    "rotationPeriodHours": 42.51537583211252
+    "rotationPeriodHours": 42.45930625514436,
+    "rotationalElements": {
+      "poleRaDeg": [
+        268.05,
+        -0.009,
+        0
+      ],
+      "poleDecDeg": [
+        64.5,
+        0.003,
+        0
+      ],
+      "primeMeridianDeg": [
+        200.34890824984421,
+        203.4889583,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            283.6369874084692,
+            4851.752021563342
+          ],
+          "ra": 0.094,
+          "dec": 0.04,
+          "pm": -0.085
+        },
+        {
+          "angleDeg": [
+            355.8,
+            1191.3
+          ],
+          "ra": 0.024,
+          "dec": 0.011,
+          "pm": -0.022
+        }
+      ]
+    }
   },
   {
     "id": "europa",
@@ -241,16 +941,72 @@
     "kind": "moon",
     "radiusKm": 1560.8,
     "orbit": {
-      "semiMajorAxisAu": 0.004486887602977481,
-      "eccentricity": 0.009740025569562362,
-      "inclinationDeg": 2.245018421035425,
-      "longitudeOfAscendingNodeDeg": 326.0277596344292,
-      "argumentOfPeriapsisDeg": 349.2045643684611,
-      "meanAnomalyAtEpochDeg": 40.72575250295771,
-      "epochJd": 2460676.5
+      "semiMajorAxisAu": 0.004486026417754354,
+      "eccentricity": 0.0094,
+      "inclinationDeg": 0.466,
+      "longitudeOfAscendingNodeDeg": 219.106,
+      "argumentOfPeriapsisDeg": 88.97,
+      "meanAnomalyAtEpochDeg": 171.016,
+      "epochJd": 2450464.5
     },
+    "rates": {
+      "meanMotionDegPerDay": 101.3747242,
+      "longitudeOfAscendingNodeDegPerDay": -0.03265393199600969,
+      "argumentOfPeriapsisDegPerDay": -0.7070489837643877
+    },
+    "laplacePole": {
+      "raDeg": 268.084,
+      "decDeg": 64.506
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 1997 Jan 16, within 0.3 degrees of Horizons from 1950 to 2100",
     "parentBodyId": "jupiter",
-    "rotationPeriodHours": 85.27848729079142
+    "rotationPeriodHours": 85.22834531173994,
+    "rotationalElements": {
+      "poleRaDeg": [
+        268.08,
+        -0.009,
+        0
+      ],
+      "poleDecDeg": [
+        64.51,
+        0.003,
+        0
+      ],
+      "primeMeridianDeg": [
+        36.015607949990184,
+        101.3747242,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            355.4537739825443,
+            1192.6848661542538
+          ],
+          "ra": 1.086,
+          "dec": 0.468,
+          "pm": -0.98
+        },
+        {
+          "angleDeg": [
+            119.9,
+            262.1
+          ],
+          "ra": 0.06,
+          "dec": 0.026,
+          "pm": -0.054
+        },
+        {
+          "angleDeg": [
+            229.8,
+            64.3
+          ],
+          "ra": 0.015,
+          "dec": 0.007,
+          "pm": -0.014
+        }
+      ]
+    }
   },
   {
     "id": "ganymede",
@@ -259,16 +1015,72 @@
     "kind": "moon",
     "radiusKm": 2631.2,
     "orbit": {
-      "semiMajorAxisAu": 0.007156574251479677,
-      "eccentricity": 0.001723569500229484,
-      "inclinationDeg": 2.332721144446764,
-      "longitudeOfAscendingNodeDeg": 339.4869144536639,
-      "argumentOfPeriapsisDeg": 0.02754303249978196,
-      "meanAnomalyAtEpochDeg": 355.7249344187845,
-      "epochJd": 2460676.5
+      "semiMajorAxisAu": 0.007155182055676145,
+      "eccentricity": 0.0013,
+      "inclinationDeg": 0.177,
+      "longitudeOfAscendingNodeDeg": 63.552,
+      "argumentOfPeriapsisDeg": 192.417,
+      "meanAnomalyAtEpochDeg": 317.54,
+      "epochJd": 2450464.5
     },
+    "rates": {
+      "meanMotionDegPerDay": 50.3176072,
+      "longitudeOfAscendingNodeDegPerDay": -0.00715196269822335,
+      "argumentOfPeriapsisDegPerDay": 0.015231615086186782
+    },
+    "laplacePole": {
+      "raDeg": 268.168,
+      "decDeg": 64.543
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 1997 Jan 16, within 0.3 degrees of Horizons from 1950 to 2100",
     "parentBodyId": "jupiter",
-    "rotationPeriodHours": 171.78271980469088
+    "rotationPeriodHours": 171.70927794038664,
+    "rotationalElements": {
+      "poleRaDeg": [
+        268.2,
+        -0.009,
+        0
+      ],
+      "poleDecDeg": [
+        64.57,
+        0.003,
+        0
+      ],
+      "primeMeridianDeg": [
+        44.07221835003116,
+        50.3176072,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            355.8,
+            1191.3
+          ],
+          "ra": -0.037,
+          "dec": -0.016,
+          "pm": 0.033
+        },
+        {
+          "angleDeg": [
+            120.11864659790176,
+            261.22543755260784
+          ],
+          "ra": 0.431,
+          "dec": 0.186,
+          "pm": -0.389
+        },
+        {
+          "angleDeg": [
+            229.8,
+            64.3
+          ],
+          "ra": 0.091,
+          "dec": 0.039,
+          "pm": -0.082
+        }
+      ]
+    }
   },
   {
     "id": "callisto",
@@ -277,16 +1089,360 @@
     "kind": "moon",
     "radiusKm": 2410.3,
     "orbit": {
-      "semiMajorAxisAu": 0.012583604816889162,
-      "eccentricity": 0.007245216892383587,
-      "inclinationDeg": 1.94976938450231,
-      "longitudeOfAscendingNodeDeg": 336.7558983297979,
-      "argumentOfPeriapsisDeg": 32.65151937817475,
-      "meanAnomalyAtEpochDeg": 126.0198540648681,
-      "epochJd": 2460676.5
+      "semiMajorAxisAu": 0.012585072175094802,
+      "eccentricity": 0.0074,
+      "inclinationDeg": 0.192,
+      "longitudeOfAscendingNodeDeg": 298.848,
+      "argumentOfPeriapsisDeg": 52.643,
+      "meanAnomalyAtEpochDeg": 181.408,
+      "epochJd": 2450464.5
     },
+    "rates": {
+      "meanMotionDegPerDay": 21.5710728,
+      "longitudeOfAscendingNodeDegPerDay": -0.0017074099257316522,
+      "argumentOfPeriapsisDegPerDay": 0.003588820371917027
+    },
+    "laplacePole": {
+      "raDeg": 268.639,
+      "decDeg": 64.749
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 1997 Jan 16, within 0.1 degrees of Horizons from 1950 to 2100",
     "parentBodyId": "jupiter",
-    "rotationPeriodHours": 400.52470451330635
+    "rotationPeriodHours": 400.5364072574082,
+    "rotationalElements": {
+      "poleRaDeg": [
+        268.72,
+        -0.009,
+        0
+      ],
+      "poleDecDeg": [
+        64.83,
+        0.003,
+        0
+      ],
+      "primeMeridianDeg": [
+        259.498129049991,
+        21.5710728,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            119.9,
+            262.1
+          ],
+          "ra": -0.068,
+          "dec": -0.029,
+          "pm": 0.061
+        },
+        {
+          "angleDeg": [
+            230.28422637269546,
+            62.363147537348596
+          ],
+          "ra": 0.59,
+          "dec": 0.254,
+          "pm": -0.533
+        },
+        {
+          "angleDeg": [
+            113.35,
+            6070
+          ],
+          "ra": 0.01,
+          "dec": -0.004,
+          "pm": -0.009
+        }
+      ]
+    }
+  },
+  {
+    "id": "mimas",
+    "systemStarId": 0,
+    "name": "Mimas",
+    "kind": "moon",
+    "radiusKm": 198.8,
+    "orbit": {
+      "semiMajorAxisAu": 0.0012402516100785653,
+      "eccentricity": 0.0196,
+      "inclinationDeg": 1.574,
+      "longitudeOfAscendingNodeDeg": 173.027,
+      "argumentOfPeriapsisDeg": 332.499,
+      "meanAnomalyAtEpochDeg": 14.848,
+      "epochJd": 2451545
+    },
+    "rates": {
+      "meanMotionDegPerDay": 381.9944948,
+      "longitudeOfAscendingNodeDegPerDay": -0.9994661190965093,
+      "argumentOfPeriapsisDegPerDay": 1.9990870961427125,
+      "meanAnomalyTerms": {
+        "b": 0,
+        "c": 30.901081394463684,
+        "s": -32.50608664008527,
+        "f": 506.2
+      }
+    },
+    "laplacePole": {
+      "raDeg": 40.589,
+      "decDeg": 83.536
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 2000 Jan 1, with the orbital terms of its IAU W (NAIF pck00011), within 7.5 degrees of Horizons from 1950 to 2100",
+    "parentBodyId": "saturn",
+    "rotationPeriodHours": 22.618127008672275,
+    "rotationalElements": {
+      "poleRaDeg": [
+        40.66,
+        -0.036,
+        0
+      ],
+      "poleDecDeg": [
+        83.52,
+        -0.004,
+        0
+      ],
+      "primeMeridianDeg": [
+        334.00971630006546,
+        381.9944948,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            177.4,
+            -36505.5
+          ],
+          "ra": 13.56,
+          "dec": -1.53,
+          "pm": -13.48
+        },
+        {
+          "angleDeg": [
+            316.45,
+            506.2
+          ],
+          "ra": 0,
+          "dec": 0,
+          "pm": -44.85
+        }
+      ]
+    }
+  },
+  {
+    "id": "enceladus",
+    "systemStarId": 0,
+    "name": "Enceladus",
+    "kind": "moon",
+    "radiusKm": 252.3,
+    "orbit": {
+      "semiMajorAxisAu": 0.0015912124877590255,
+      "eccentricity": 0,
+      "inclinationDeg": 0.003,
+      "longitudeOfAscendingNodeDeg": 342.507,
+      "argumentOfPeriapsisDeg": 0.076,
+      "meanAnomalyAtEpochDeg": 199.686,
+      "epochJd": 2451545
+    },
+    "rates": {
+      "meanMotionDegPerDay": 262.7318978,
+      "longitudeOfAscendingNodeDegPerDay": -0.41763825566421886,
+      "argumentOfPeriapsisDegPerDay": 0.8324546312225984
+    },
+    "laplacePole": {
+      "raDeg": 40.586,
+      "decDeg": 83.536
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 2000 Jan 1, within 1.0 degrees of Horizons from 1950 to 2100",
+    "parentBodyId": "saturn",
+    "rotationPeriodHours": 32.88523423439451,
+    "rotationalElements": {
+      "poleRaDeg": [
+        40.66,
+        -0.036,
+        0
+      ],
+      "poleDecDeg": [
+        83.52,
+        -0.004,
+        0
+      ],
+      "primeMeridianDeg": [
+        6.336436700062315,
+        262.7318978,
+        0
+      ]
+    }
+  },
+  {
+    "id": "tethys",
+    "systemStarId": 0,
+    "name": "Tethys",
+    "kind": "moon",
+    "radiusKm": 536.3,
+    "orbit": {
+      "semiMajorAxisAu": 0.0019697606564930874,
+      "eccentricity": 0.0001,
+      "inclinationDeg": 1.091,
+      "longitudeOfAscendingNodeDeg": 259.842,
+      "argumentOfPeriapsisDeg": 45.202,
+      "meanAnomalyAtEpochDeg": 243.367,
+      "epochJd": 2451545
+    },
+    "rates": {
+      "meanMotionDegPerDay": 190.6979109,
+      "longitudeOfAscendingNodeDegPerDay": -0.1978374715711675,
+      "argumentOfPeriapsisDegPerDay": 0.3958338487419905,
+      "meanAnomalyTerms": {
+        "b": 0,
+        "c": -1.5364417281974139,
+        "s": 1.6162446646017872,
+        "f": 506.2
+      }
+    },
+    "laplacePole": {
+      "raDeg": 40.578,
+      "decDeg": 83.537
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 2000 Jan 1, with the orbital terms of its IAU W (NAIF pck00011), within 0.3 degrees of Horizons from 1950 to 2100",
+    "parentBodyId": "saturn",
+    "rotationPeriodHours": 45.30726088829954,
+    "rotationalElements": {
+      "poleRaDeg": [
+        40.66,
+        -0.036,
+        0
+      ],
+      "poleDecDeg": [
+        83.52,
+        -0.004,
+        0
+      ],
+      "primeMeridianDeg": [
+        8.928084400003424,
+        190.6979109,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            300.02841306210905,
+            -7226.013649136892
+          ],
+          "ra": 9.66,
+          "dec": -1.09,
+          "pm": -9.6
+        },
+        {
+          "angleDeg": [
+            316.45,
+            506.2
+          ],
+          "ra": 0,
+          "dec": 0,
+          "pm": 2.23
+        }
+      ]
+    }
+  },
+  {
+    "id": "dione",
+    "systemStarId": 0,
+    "name": "Dione",
+    "kind": "moon",
+    "radiusKm": 562.5,
+    "orbit": {
+      "semiMajorAxisAu": 0.0025228634487509454,
+      "eccentricity": 0.0022,
+      "inclinationDeg": 0.028,
+      "longitudeOfAscendingNodeDeg": 290.415,
+      "argumentOfPeriapsisDeg": 284.315,
+      "meanAnomalyAtEpochDeg": 322.232,
+      "epochJd": 2451545
+    },
+    "rates": {
+      "meanMotionDegPerDay": 131.5349307,
+      "longitudeOfAscendingNodeDegPerDay": -0.08417681128768952,
+      "argumentOfPeriapsisDegPerDay": 0.1684255439794184
+    },
+    "laplacePole": {
+      "raDeg": 40.544,
+      "decDeg": 83.54
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 2000 Jan 1, within 0.1 degrees of Horizons from 1950 to 2100",
+    "parentBodyId": "saturn",
+    "rotationPeriodHours": 65.68597371070803,
+    "rotationalElements": {
+      "poleRaDeg": [
+        40.66,
+        -0.036,
+        0
+      ],
+      "poleDecDeg": [
+        83.52,
+        -0.004,
+        0
+      ],
+      "primeMeridianDeg": [
+        357.60821835003117,
+        131.5349307,
+        0
+      ]
+    }
+  },
+  {
+    "id": "rhea",
+    "systemStarId": 0,
+    "name": "Rhea",
+    "kind": "moon",
+    "radiusKm": 764.5,
+    "orbit": {
+      "semiMajorAxisAu": 0.003523231965359785,
+      "eccentricity": 0.0002,
+      "inclinationDeg": 0.333,
+      "longitudeOfAscendingNodeDeg": 351.042,
+      "argumentOfPeriapsisDeg": 241.619,
+      "meanAnomalyAtEpochDeg": 179.781,
+      "epochJd": 2451545
+    },
+    "rates": {
+      "meanMotionDegPerDay": 79.6900459,
+      "longitudeOfAscendingNodeDegPerDay": -0.02750687327996083,
+      "argumentOfPeriapsisDegPerDay": 0.054943212183932014
+    },
+    "laplacePole": {
+      "raDeg": 40.328,
+      "decDeg": 83.559
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 2000 Jan 1, within 0.2 degrees of Horizons from 1950 to 2100",
+    "parentBodyId": "saturn",
+    "rotationPeriodHours": 108.42006554798584,
+    "rotationalElements": {
+      "poleRaDeg": [
+        40.38,
+        -0.036,
+        0
+      ],
+      "poleDecDeg": [
+        83.55,
+        -0.004,
+        0
+      ],
+      "primeMeridianDeg": [
+        235.1773498500081,
+        79.6900459,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            342.2970571615749,
+            -1004.6885465505693
+          ],
+          "ra": 3.1,
+          "dec": -0.35,
+          "pm": -3.08
+        }
+      ]
+    }
   },
   {
     "id": "titan",
@@ -295,16 +1451,533 @@
     "kind": "moon",
     "radiusKm": 2575.5,
     "orbit": {
-      "semiMajorAxisAu": 0.00816836581932601,
-      "eccentricity": 0.0288317905724529,
-      "inclinationDeg": 27.71117736818323,
-      "longitudeOfAscendingNodeDeg": 169.0716057233001,
-      "argumentOfPeriapsisDeg": 177.4798658320667,
-      "meanAnomalyAtEpochDeg": 32.18862839469676,
-      "epochJd": 2460676.5
+      "semiMajorAxisAu": 0.008167663044150534,
+      "eccentricity": 0.0288,
+      "inclinationDeg": 0.306,
+      "longitudeOfAscendingNodeDeg": 28.06,
+      "argumentOfPeriapsisDeg": 180.532,
+      "meanAnomalyAtEpochDeg": 163.31,
+      "epochJd": 2451545
     },
+    "rates": {
+      "meanMotionDegPerDay": 22.5769756,
+      "longitudeOfAscendingNodeDegPerDay": -0.0014339093695790572,
+      "argumentOfPeriapsisDegPerDay": 0.002834184655868949
+    },
+    "laplacePole": {
+      "raDeg": 36.214,
+      "decDeg": 83.949
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 2000 Jan 1, within 0.1 degrees of Horizons from 1950 to 2100",
     "parentBodyId": "saturn",
-    "rotationPeriodHours": 382.87527117206236
+    "rotationPeriodHours": 382.69076217631203,
+    "rotationalElements": {
+      "poleRaDeg": [
+        39.4827,
+        0,
+        0
+      ],
+      "poleDecDeg": [
+        83.4279,
+        0,
+        0
+      ],
+      "primeMeridianDeg": [
+        186.5964577999983,
+        22.5769756,
+        0
+      ]
+    }
+  },
+  {
+    "id": "hyperion",
+    "systemStarId": 0,
+    "name": "Hyperion",
+    "kind": "moon",
+    "radiusKm": 133,
+    "orbit": {
+      "semiMajorAxisAu": 0.010033117403187745,
+      "eccentricity": 0.0232,
+      "inclinationDeg": 0.615,
+      "longitudeOfAscendingNodeDeg": 263.847,
+      "argumentOfPeriapsisDeg": 303.178,
+      "meanAnomalyAtEpochDeg": 86.342,
+      "epochJd": 2451545
+    },
+    "rates": {
+      "meanMotionDegPerDay": 16.9199503,
+      "longitudeOfAscendingNodeDegPerDay": -0.006372858420842858,
+      "argumentOfPeriapsisDegPerDay": 0.007700806964353125
+    },
+    "laplacePole": {
+      "raDeg": 36.372,
+      "decDeg": 83.862
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 2000 Jan 1, within 22.3 degrees of Horizons from 1950 to 2100",
+    "measuredEccentricity": 0.105,
+    "parentBodyId": "saturn"
+  },
+  {
+    "id": "iapetus",
+    "systemStarId": 0,
+    "name": "Iapetus",
+    "kind": "moon",
+    "radiusKm": 734.5,
+    "orbit": {
+      "semiMajorAxisAu": 0.023802838792678086,
+      "eccentricity": 0.0293,
+      "inclinationDeg": 8.298,
+      "longitudeOfAscendingNodeDeg": 81.105,
+      "argumentOfPeriapsisDeg": 271.606,
+      "meanAnomalyAtEpochDeg": 201.789,
+      "epochJd": 2451545
+    },
+    "rates": {
+      "meanMotionDegPerDay": 4.5379416,
+      "longitudeOfAscendingNodeDegPerDay": -0.00028662508640328154,
+      "argumentOfPeriapsisDegPerDay": 0.0005878404972699524
+    },
+    "laplacePole": {
+      "raDeg": 284.715,
+      "decDeg": 78.749
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 2000 Jan 1, within 10.4 degrees of Horizons from 1950 to 2100",
+    "parentBodyId": "saturn",
+    "rotationPeriodHours": 1903.9469348834284,
+    "rotationalElements": {
+      "poleRaDeg": [
+        283.4205056238858,
+        0,
+        0
+      ],
+      "poleDecDeg": [
+        77.15116551386498,
+        0,
+        0
+      ],
+      "primeMeridianDeg": [
+        388.27970766227594,
+        4.5379416,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            261.10499999998126,
+            -10.46898128087986
+          ],
+          "ra": -42.60490881707297,
+          "dec": 7.692796952777751,
+          "pm": 41.78612687698857
+        },
+        {
+          "angleDeg": [
+            522.2099999999625,
+            -20.93796256175972
+          ],
+          "ra": -15.535995393995726,
+          "dec": 1.2845933786338362,
+          "pm": 15.53892376069157
+        },
+        {
+          "angleDeg": [
+            783.3149999999438,
+            -31.406943842639578
+          ],
+          "ra": -7.628387941010053,
+          "dec": 0.45238994454766307,
+          "pm": 7.62837456853055
+        },
+        {
+          "angleDeg": [
+            1044.419999999925,
+            -41.87592512351944
+          ],
+          "ra": -4.2134447101107595,
+          "dec": 0.20197385694504744,
+          "pm": 4.213441809239813
+        },
+        {
+          "angleDeg": [
+            1305.5249999999064,
+            -52.344906404399296
+          ],
+          "ra": -2.482395388436937,
+          "dec": 0.10190190070186696,
+          "pm": 2.4609277085117798
+        }
+      ]
+    }
+  },
+  {
+    "id": "phoebe",
+    "systemStarId": 0,
+    "name": "Phoebe",
+    "kind": "moon",
+    "radiusKm": 106.6,
+    "orbit": {
+      "semiMajorAxisAu": 0.08655148592298781,
+      "eccentricity": 0.1634,
+      "inclinationDeg": 175.243,
+      "longitudeOfAscendingNodeDeg": 241.086,
+      "argumentOfPeriapsisDeg": 342.5,
+      "meanAnomalyAtEpochDeg": 53.038,
+      "epochJd": 2451545
+    },
+    "rates": {
+      "meanMotionDegPerDay": 0.6541839762686767,
+      "longitudeOfAscendingNodeDegPerDay": 0.0013629247388132204,
+      "argumentOfPeriapsisDegPerDay": 0.002138389055297137
+    },
+    "laplacePole": {
+      "raDeg": 275.954,
+      "decDeg": 67.455
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 2000 Jan 1, within 2.6 degrees of Horizons from 1950 to 2100",
+    "parentBodyId": "saturn",
+    "rotationPeriodHours": 9.273966666666666,
+    "rotationalElements": {
+      "poleRaDeg": [
+        356.9,
+        0,
+        0
+      ],
+      "poleDecDeg": [
+        77.8,
+        0,
+        0
+      ],
+      "primeMeridianDeg": [
+        178.58,
+        931.639,
+        0
+      ]
+    }
+  },
+  {
+    "id": "miranda",
+    "systemStarId": 0,
+    "name": "Miranda",
+    "kind": "moon",
+    "radiusKm": 235.67989734197351,
+    "orbit": {
+      "semiMajorAxisAu": 0.0008683278671826712,
+      "eccentricity": 0.0013,
+      "inclinationDeg": 4.338,
+      "longitudeOfAscendingNodeDeg": 506.438,
+      "argumentOfPeriapsisDeg": 68.312,
+      "meanAnomalyAtEpochDeg": 311.33,
+      "epochJd": 2444239.5
+    },
+    "rates": {
+      "meanMotionDegPerDay": 254.6906576,
+      "longitudeOfAscendingNodeDegPerDay": -0.05541273308413766,
+      "argumentOfPeriapsisDegPerDay": 0.11039544681567964
+    },
+    "laplacePole": {
+      "raDeg": 77.311,
+      "decDeg": 15.175
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 1980 Jan 1, within 1.7 degrees of Horizons from 1950 to 2100",
+    "parentBodyId": "uranus",
+    "rotationPeriodHours": 33.9235057988244,
+    "rotationalElements": {
+      "poleRaDeg": [
+        257.43,
+        0,
+        0
+      ],
+      "poleDecDeg": [
+        -15.08,
+        0,
+        0
+      ],
+      "primeMeridianDeg": [
+        30.41144460000184,
+        -254.6906576,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            102.16251712700222,
+            -2023.950075898128
+          ],
+          "ra": 4.41,
+          "dec": 4.25,
+          "pm": 1.15
+        },
+        {
+          "angleDeg": [
+            316.41,
+            2863.96
+          ],
+          "ra": 0,
+          "dec": 0,
+          "pm": -1.27
+        },
+        {
+          "angleDeg": [
+            204.32503425400444,
+            -4047.900151796256
+          ],
+          "ra": -0.04,
+          "dec": -0.02,
+          "pm": -0.09
+        },
+        {
+          "angleDeg": [
+            632.82,
+            5727.92
+          ],
+          "ra": 0,
+          "dec": 0,
+          "pm": 0.15
+        }
+      ]
+    }
+  },
+  {
+    "id": "ariel",
+    "systemStarId": 0,
+    "name": "Ariel",
+    "kind": "moon",
+    "radiusKm": 578.8979066892538,
+    "orbit": {
+      "semiMajorAxisAu": 0.0012760876816410463,
+      "eccentricity": 0.0012,
+      "inclinationDeg": 0.041,
+      "longitudeOfAscendingNodeDeg": 202.394,
+      "argumentOfPeriapsisDeg": 115.349,
+      "meanAnomalyAtEpochDeg": 39.481,
+      "epochJd": 2444239.5
+    },
+    "rates": {
+      "meanMotionDegPerDay": 142.8356579,
+      "longitudeOfAscendingNodeDegPerDay": -0.017216781081741836,
+      "argumentOfPeriapsisDegPerDay": 0.034237400422660706
+    },
+    "laplacePole": {
+      "raDeg": 77.311,
+      "decDeg": 15.175
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 1980 Jan 1, within 0.7 degrees of Horizons from 1950 to 2100",
+    "parentBodyId": "uranus",
+    "rotationPeriodHours": 60.48909723963263,
+    "rotationalElements": {
+      "poleRaDeg": [
+        257.43,
+        0,
+        0
+      ],
+      "poleDecDeg": [
+        -15.1,
+        0,
+        0
+      ],
+      "primeMeridianDeg": [
+        156.12685870007942,
+        -142.8356579,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            316.41,
+            2863.96
+          ],
+          "ra": 0,
+          "dec": 0,
+          "pm": 0.05
+        },
+        {
+          "angleDeg": [
+            304.01,
+            -51.94
+          ],
+          "ra": 0.29,
+          "dec": 0.28,
+          "pm": 0.08
+        }
+      ]
+    }
+  },
+  {
+    "id": "umbriel",
+    "systemStarId": 0,
+    "name": "Umbriel",
+    "kind": "moon",
+    "radiusKm": 584.7,
+    "orbit": {
+      "semiMajorAxisAu": 0.0017781001745234067,
+      "eccentricity": 0.0039,
+      "inclinationDeg": 0.128,
+      "longitudeOfAscendingNodeDeg": 213.485,
+      "argumentOfPeriapsisDeg": 84.709,
+      "meanAnomalyAtEpochDeg": 12.469,
+      "epochJd": 2444239.5
+    },
+    "rates": {
+      "meanMotionDegPerDay": 86.8688879,
+      "longitudeOfAscendingNodeDegPerDay": -0.007763832371289367,
+      "argumentOfPeriapsisDegPerDay": 0.015608689123104496
+    },
+    "laplacePole": {
+      "raDeg": 77.311,
+      "decDeg": 15.175
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 1980 Jan 1, within 0.8 degrees of Horizons from 1950 to 2100",
+    "parentBodyId": "uranus",
+    "rotationPeriodHours": 99.46023494563465,
+    "rotationalElements": {
+      "poleRaDeg": [
+        257.43,
+        0,
+        0
+      ],
+      "poleDecDeg": [
+        -15.1,
+        0,
+        0
+      ],
+      "primeMeridianDeg": [
+        108.00982140004953,
+        -86.8688879,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            316.41,
+            2863.96
+          ],
+          "ra": 0,
+          "dec": 0,
+          "pm": -0.09
+        },
+        {
+          "angleDeg": [
+            308.71,
+            -93.17
+          ],
+          "ra": 0.21,
+          "dec": 0.2,
+          "pm": 0.06
+        }
+      ]
+    }
+  },
+  {
+    "id": "titania",
+    "systemStarId": 0,
+    "name": "Titania",
+    "kind": "moon",
+    "radiusKm": 788.9,
+    "orbit": {
+      "semiMajorAxisAu": 0.002916485361445723,
+      "eccentricity": 0.0011,
+      "inclinationDeg": 0.079,
+      "longitudeOfAscendingNodeDeg": 279.771,
+      "argumentOfPeriapsisDeg": 284.4,
+      "meanAnomalyAtEpochDeg": 24.614,
+      "epochJd": 2444239.5
+    },
+    "rates": {
+      "meanMotionDegPerDay": 41.3514246,
+      "longitudeOfAscendingNodeDegPerDay": -0.005044947168524978,
+      "argumentOfPeriapsisDegPerDay": 0.006102004540272753
+    },
+    "laplacePole": {
+      "raDeg": 77.311,
+      "decDeg": 15.175
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 1980 Jan 1, within 0.7 degrees of Horizons from 1950 to 2100",
+    "parentBodyId": "uranus",
+    "rotationPeriodHours": 208.94080635857947,
+    "rotationalElements": {
+      "poleRaDeg": [
+        257.43,
+        0,
+        0
+      ],
+      "poleDecDeg": [
+        -15.1,
+        0,
+        0
+      ],
+      "primeMeridianDeg": [
+        77.67607950003162,
+        -41.3514246,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            340.82,
+            -75.32
+          ],
+          "ra": 0.29,
+          "dec": 0.28,
+          "pm": 0.08
+        }
+      ]
+    }
+  },
+  {
+    "id": "oberon",
+    "systemStarId": 0,
+    "name": "Oberon",
+    "kind": "moon",
+    "radiusKm": 761.4,
+    "orbit": {
+      "semiMajorAxisAu": 0.0039004565858436384,
+      "eccentricity": 0.0014,
+      "inclinationDeg": 0.068,
+      "longitudeOfAscendingNodeDeg": 459.771,
+      "argumentOfPeriapsisDeg": 104.4,
+      "meanAnomalyAtEpochDeg": 283.088,
+      "epochJd": 2444239.5
+    },
+    "rates": {
+      "meanMotionDegPerDay": 26.7394888,
+      "longitudeOfAscendingNodeDegPerDay": -0.005044921345997627,
+      "argumentOfPeriapsisDegPerDay": 0.006102193433429646
+    },
+    "laplacePole": {
+      "raDeg": 77.311,
+      "decDeg": 15.175
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 1980 Jan 1, within 0.5 degrees of Horizons from 1950 to 2100",
+    "parentBodyId": "uranus",
+    "rotationPeriodHours": 323.1176207078424,
+    "rotationalElements": {
+      "poleRaDeg": [
+        257.43,
+        0,
+        0
+      ],
+      "poleDecDeg": [
+        -15.1,
+        0,
+        0
+      ],
+      "primeMeridianDeg": [
+        6.729821400017093,
+        -26.7394888,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            259.14,
+            -504.81
+          ],
+          "ra": 0.16,
+          "dec": 0.16,
+          "pm": 0.04
+        }
+      ]
+    }
   },
   {
     "id": "triton",
@@ -313,15 +1986,264 @@
     "kind": "moon",
     "radiusKm": 1352.6,
     "orbit": {
-      "semiMajorAxisAu": 0.002371477351073512,
-      "eccentricity": 0.0001253161638938937,
-      "inclinationDeg": 129.1766133444893,
-      "longitudeOfAscendingNodeDeg": 222.3992799388247,
-      "argumentOfPeriapsisDeg": 97.422342803062,
-      "meanAnomalyAtEpochDeg": 273.1157438944629,
-      "epochJd": 2460676.5
+      "semiMajorAxisAu": 0.002371417442908832,
+      "eccentricity": 0,
+      "inclinationDeg": 156.865,
+      "longitudeOfAscendingNodeDeg": 177.608,
+      "argumentOfPeriapsisDeg": 66.142,
+      "meanAnomalyAtEpochDeg": 352.257,
+      "epochJd": 2451545
     },
+    "rates": {
+      "meanMotionDegPerDay": 61.2572638,
+      "longitudeOfAscendingNodeDegPerDay": 0.001433750844964632,
+      "argumentOfPeriapsisDegPerDay": 0.0025509841146658433
+    },
+    "laplacePole": {
+      "raDeg": 299.456,
+      "decDeg": 43.414
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 2000 Jan 1, within 0.2 degrees of Horizons from 1950 to 2100",
     "parentBodyId": "neptune",
-    "rotationPeriodHours": 141.05626027628523
+    "rotationPeriodHours": 141.0444976486201,
+    "rotationalElements": {
+      "poleRaDeg": [
+        299.36,
+        0,
+        0
+      ],
+      "poleDecDeg": [
+        41.17,
+        0,
+        0
+      ],
+      "primeMeridianDeg": [
+        296.5309131499458,
+        -61.2572638,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            177.83706224270992,
+            52.367749612333185
+          ],
+          "ra": -32.35,
+          "dec": 22.55,
+          "pm": 22.25
+        },
+        {
+          "angleDeg": [
+            355.67412448541984,
+            104.73549922466637
+          ],
+          "ra": -6.28,
+          "dec": 2.1,
+          "pm": 6.73
+        },
+        {
+          "angleDeg": [
+            533.5111867281297,
+            157.10324883699957
+          ],
+          "ra": -2.08,
+          "dec": 0.55,
+          "pm": 2.05
+        },
+        {
+          "angleDeg": [
+            711.3482489708397,
+            209.47099844933274
+          ],
+          "ra": -0.74,
+          "dec": 0.16,
+          "pm": 0.74
+        },
+        {
+          "angleDeg": [
+            889.1853112135495,
+            261.8387480616659
+          ],
+          "ra": -0.28,
+          "dec": 0.05,
+          "pm": 0.28
+        },
+        {
+          "angleDeg": [
+            1067.0223734562594,
+            314.20649767399914
+          ],
+          "ra": -0.11,
+          "dec": 0.02,
+          "pm": 0.11
+        },
+        {
+          "angleDeg": [
+            1244.8594356989695,
+            366.5742472863323
+          ],
+          "ra": -0.07,
+          "dec": 0.01,
+          "pm": 0.05
+        },
+        {
+          "angleDeg": [
+            1422.6964979416794,
+            418.9419968986655
+          ],
+          "ra": -0.02,
+          "dec": 0,
+          "pm": 0.02
+        },
+        {
+          "angleDeg": [
+            1600.5335601843892,
+            471.30974651099865
+          ],
+          "ra": -0.01,
+          "dec": 0,
+          "pm": 0.01
+        }
+      ]
+    }
+  },
+  {
+    "id": "nereid",
+    "systemStarId": 0,
+    "name": "Nereid",
+    "kind": "moon",
+    "radiusKm": 170,
+    "orbit": {
+      "semiMajorAxisAu": 0.03685759679733196,
+      "eccentricity": 0.7507,
+      "inclinationDeg": 7.09,
+      "longitudeOfAscendingNodeDeg": 335.57,
+      "argumentOfPeriapsisDeg": 281.117,
+      "meanAnomalyAtEpochDeg": 216.692,
+      "epochJd": 2451545
+    },
+    "rates": {
+      "meanMotionDegPerDay": 0.9996276,
+      "longitudeOfAscendingNodeDegPerDay": -0.0001042358742653985,
+      "argumentOfPeriapsisDegPerDay": 0.0001218108353098093
+    },
+    "laplacePole": {
+      "raDeg": 269.302,
+      "decDeg": 69.117
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 2000 Jan 1, within 11.2 degrees of Horizons from 1950 to 2100",
+    "parentBodyId": "neptune",
+    "rotationPeriodHours": 11.594
+  },
+  {
+    "id": "proteus",
+    "systemStarId": 0,
+    "name": "Proteus",
+    "kind": "moon",
+    "radiusKm": 208,
+    "orbit": {
+      "semiMajorAxisAu": 0.0007864149365863937,
+      "eccentricity": 0.0005,
+      "inclinationDeg": 0.075,
+      "longitudeOfAscendingNodeDeg": 315.131,
+      "argumentOfPeriapsisDeg": 67.968,
+      "meanAnomalyAtEpochDeg": 250.938,
+      "epochJd": 2451545
+    },
+    "rates": {
+      "meanMotionDegPerDay": 320.7656245,
+      "longitudeOfAscendingNodeDegPerDay": -0.0774437246301215,
+      "argumentOfPeriapsisDegPerDay": 0.15448687827077687
+    },
+    "laplacePole": {
+      "raDeg": 299.406,
+      "decDeg": 42.432
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 2000 Jan 1, within 1.0 degrees of Horizons from 1950 to 2100",
+    "parentBodyId": "neptune",
+    "rotationPeriodHours": 26.93555462331033,
+    "rotationalElements": {
+      "poleRaDeg": [
+        299.27,
+        0,
+        0
+      ],
+      "poleDecDeg": [
+        42.91,
+        0,
+        0
+      ],
+      "primeMeridianDeg": [
+        91.53817645008237,
+        320.7656245,
+        0
+      ],
+      "terms": [
+        {
+          "angleDeg": [
+            357.85,
+            52.316
+          ],
+          "ra": 0.7,
+          "dec": -0.51,
+          "pm": -0.48
+        },
+        {
+          "angleDeg": [
+            141.60196187337888,
+            2828.6320421151877
+          ],
+          "ra": -0.05,
+          "dec": -0.04,
+          "pm": 0.04
+        }
+      ]
+    }
+  },
+  {
+    "id": "charon",
+    "systemStarId": 0,
+    "name": "Charon",
+    "kind": "moon",
+    "radiusKm": 606,
+    "orbit": {
+      "semiMajorAxisAu": 0.00013095774631236113,
+      "eccentricity": 0.0002,
+      "inclinationDeg": 0.08,
+      "longitudeOfAscendingNodeDeg": 26.928,
+      "argumentOfPeriapsisDeg": 146.106,
+      "meanAnomalyAtEpochDeg": 131.07,
+      "epochJd": 2451545
+    },
+    "rates": {
+      "meanMotionDegPerDay": 56.362521,
+      "longitudeOfAscendingNodeDegPerDay": -0.00010926638529337138,
+      "argumentOfPeriapsisDegPerDay": 0.00009683851540842405
+    },
+    "laplacePole": {
+      "raDeg": 132.993,
+      "decDeg": -6.163
+    },
+    "orbitSource": "JPL SSD satellite mean elements, epoch 2000 Jan 1, within 0.4 degrees of Horizons from 1950 to 2100",
+    "parentBodyId": "pluto",
+    "massRatio": 0.1220485755631374,
+    "rotationPeriodHours": 153.29335605836368,
+    "rotationalElements": {
+      "poleRaDeg": [
+        132.993,
+        0,
+        0
+      ],
+      "poleDecDeg": [
+        -6.163,
+        0,
+        0
+      ],
+      "primeMeridianDeg": [
+        122.70869724996541,
+        56.362521,
+        0
+      ]
+    }
   }
 ]

@@ -5,12 +5,13 @@ import { ExoplanetRecord } from '../models/exoplanet.model';
 import { appearanceForBody, appearanceForExoplanet, heliocentricDistanceAu } from './body-appearance';
 import { DEFAULT_EPOCH_JD } from './constants';
 
+const RATES = { meanMotionDegPerDay: 1, longitudeOfAscendingNodeDegPerDay: 0, argumentOfPeriapsisDegPerDay: 0 };
 const ORBIT = { eccentricity: 0, inclinationDeg: 0, longitudeOfAscendingNodeDeg: 0, argumentOfPeriapsisDeg: 0, meanAnomalyAtEpochDeg: 0, epochJd: DEFAULT_EPOCH_JD };
 
-const JUPITER: BodyRecord = { id: 'jupiter', systemStarId: 0, name: 'Jupiter', kind: 'planet', radiusKm: 69911, orbit: { ...ORBIT, semiMajorAxisAu: 5.204 } };
+const JUPITER: BodyRecord = { id: 'jupiter', systemStarId: 0, name: 'Jupiter', kind: 'planet', radiusKm: 69911, orbit: { ...ORBIT, semiMajorAxisAu: 5.204 }, rates: RATES, orbitSource: 'test' };
 /** Europa's own orbit is around Jupiter: 671,000 km, which is 0.00449 AU. */
-const EUROPA: BodyRecord = { id: 'europa', systemStarId: 0, name: 'Europa', kind: 'moon', radiusKm: 1560, parentBodyId: 'jupiter', orbit: { ...ORBIT, semiMajorAxisAu: 0.00449 } };
-const EARTH: BodyRecord = { id: 'earth', systemStarId: 0, name: 'Earth', kind: 'planet', radiusKm: 6371, orbit: { ...ORBIT, semiMajorAxisAu: 1 } };
+const EUROPA: BodyRecord = { id: 'europa', systemStarId: 0, name: 'Europa', kind: 'moon', radiusKm: 1560, parentBodyId: 'jupiter', orbit: { ...ORBIT, semiMajorAxisAu: 0.00449 }, rates: RATES, orbitSource: 'test' };
+const EARTH: BodyRecord = { id: 'earth', systemStarId: 0, name: 'Earth', kind: 'planet', radiusKm: 6371, orbit: { ...ORBIT, semiMajorAxisAu: 1 }, rates: RATES, orbitSource: 'test' };
 const ORPHAN: BodyRecord = { ...EUROPA, id: 'orphan', parentBodyId: 'nowhere' };
 
 const BODIES = [JUPITER, EUROPA, EARTH, ORPHAN];

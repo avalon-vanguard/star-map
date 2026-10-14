@@ -4,7 +4,7 @@ import { luminositySolar } from '../../shared/astro/stellar';
 import { bodyTexturePath } from '../../shared/rendering/texture-catalog';
 import { BodyRecord } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
-import { StarRecord, SUN_STAR_ID } from '../../shared/models/star.model';
+import { StarRecord } from '../../shared/models/star.model';
 import { BodyDetailViewModel } from './body-detail.model';
 
 /** Everything the view model is assembled from — the three catalogues, already loaded. */
@@ -41,7 +41,10 @@ export function buildBodyViewModel(id: string, catalogues: BodyCatalogues): Body
   const body = catalogues.bodies.find((candidate) => candidate.id === id);
   if (body) {
     const hostStar = catalogues.stars.find((star) => star.id === body.systemStarId);
-    const periodDays = heliocentricPeriodDays(body);
+    // The period the map draws, moons included: JPL's own mean motion, which is also what
+    // carries the body round the scene. Europa's card had no period at all while the scene
+    // turned it round Jupiter in 3.55 days.
+    const periodDays = 360 / body.rates.meanMotionDegPerDay;
     return {
       id: body.id,
       name: body.name,
@@ -49,11 +52,13 @@ export function buildBodyViewModel(id: string, catalogues: BodyCatalogues): Body
       hostStarName: hostStar?.name ?? 'Unknown star',
       hostStarId: body.systemStarId,
       radiusKm: body.radiusKm,
-      orbit: body.orbit,
+      semiAxesKm: body.semiAxesKm,
+      orbit: body.measuredEccentricity === undefined ? body.orbit : { ...body.orbit, eccentricity: body.measuredEccentricity },
       appearance: appearanceForBody(body, catalogues.bodies, luminosityOf(hostStar)),
       hasPhotography: bodyTexturePath(body.id) !== undefined,
       orbitalPeriodDays: periodDays,
-      orbitalPeriodSource: periodDays === undefined ? undefined : 'derived',
+      orbitalPeriodSource: 'measured',
+      orbitSource: body.orbitSource,
     };
   }
 
@@ -74,26 +79,11 @@ export function buildBodyViewModel(id: string, catalogues: BodyCatalogues): Body
     orbit: exoplanet.orbit,
     appearance: appearanceForExoplanet(exoplanet, luminosityOf(hostStar)),
     hasPhotography: bodyTexturePath(exoplanet.id) !== undefined,
+    imaged: exoplanet.imaged,
     // `periodDays` is populated for none of the shipped records, and deriving one would need the
     // host star's mass, which is equally absent. Left undefined rather than assuming a solar-mass
     // host, which would silently mis-state the period of every planet around an M dwarf.
     orbitalPeriodDays: exoplanet.periodDays,
     orbitalPeriodSource: exoplanet.periodDays === undefined ? undefined : 'measured',
   };
-}
-
-/**
- * Kepler's third law for a body orbiting the Sun: P² = a³ with P in years and a in AU, which
- * holds exactly in these units because the Sun's mass is the unit of mass.
- *
- * Only for heliocentric orbits. A moon's elements are relative to its parent planet, whose mass
- * the catalogue does not carry, so the same arithmetic there would be wrong by the ratio of the
- * planet's mass to the Sun's — a factor of a thousand for Jupiter.
- */
-export function heliocentricPeriodDays(body: BodyRecord): number | undefined {
-  if (body.parentBodyId !== undefined || body.systemStarId !== SUN_STAR_ID) {
-    return undefined;
-  }
-  const a = body.orbit.semiMajorAxisAu;
-  return a > 0 ? Math.pow(a, 1.5) * 365.25 : undefined;
 }

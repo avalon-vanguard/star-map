@@ -134,7 +134,7 @@ export class RoutingClient {
 
   private ask(request: RoutingRequest): Promise<RoutingResponse> {
     if (!this.worker) {
-      return new Promise((resolve) => resolve(answerRouting(this.localIndex, request)));
+      return Promise.resolve(answerRouting(this.localIndex, request));
     }
     // Shared rather than replaced: an identical request superseding the one it repeats would reject it,
     // and whoever holds that promise would take the rejection for its own question.

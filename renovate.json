@@ -3,5 +3,6 @@
   "extends": [
     "local>avalon-vanguard/renovate-config",
     "local>avalon-vanguard/renovate-config:angular"
-  ]
+  ],
+  "osvVulnerabilityAlerts": true
 }

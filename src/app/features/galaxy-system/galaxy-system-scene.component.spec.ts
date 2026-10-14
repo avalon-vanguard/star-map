@@ -695,7 +695,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       await advanceFrames(engine, 0.3);
       await settle();
 
-      expect(links.mock.calls.length).toBe(asked + 1);
+      expect(links.mock.calls).toHaveLength(asked + 1);
       expect(links.mock.calls.at(-1)![1]).toBe(links.mock.calls[0][1]);
     });
 

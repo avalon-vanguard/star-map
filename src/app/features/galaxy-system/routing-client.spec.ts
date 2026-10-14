@@ -111,6 +111,16 @@ describe('RoutingClient without a worker', () => {
     expect(Array.from(await client.links(1.5, Uint32Array.of(0, 1, 3)))).toEqual([0, 0, 0, 1, 0, 0]);
     client.dispose();
   });
+
+  it('rejects, rather than throwing, when answering in place fails', async () => {
+    const client = new RoutingClient(STARS, POSITIONS, index);
+
+    // A drawn index past the catalogue makes the in-place answer throw; callers only handle a rejection.
+    let asked: Promise<Float32Array> | undefined;
+    expect(() => (asked = client.links(1.5, Uint32Array.of(0, 99)))).not.toThrow();
+    await expect(asked).rejects.toThrow();
+    client.dispose();
+  });
 });
 
 describe('RoutingClient with a worker', () => {

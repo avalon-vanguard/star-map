@@ -12,45 +12,10 @@ import { CartesianCoordinates } from '../../shared/astro/coordinates';
  * the star marker, so they rendered as a lone sphere with nothing around it, and 52% were
  * framed from a distance floor far larger than the system itself.
  *
- * Both quantities are therefore derived from the system's own scale. Because the star and the
- * camera scale together, a compact system ends up looking like a wide one: same apparent star,
- * same apparent spread of orbits.
+ * The camera's distance is therefore derived from the system's own scale. The star is not: it is
+ * drawn at its own radius, like every body here, and the framing only makes room for it when the
+ * star is a giant wider than its system.
  */
-
-/** Star size when there are no orbits to scale against, and the ceiling everywhere else. */
-export const DEFAULT_STAR_MARKER_RADIUS_AU = 0.2;
-
-/**
- * Star radius as a fraction of the innermost orbit. Comfortably below 1 so there is visible
- * space between the star's limb and the closest orbit, rather than the orbit grazing or
- * disappearing inside it.
- */
-const STAR_RADIUS_TO_INNERMOST_ORBIT = 0.45;
-
-/**
- * Halo extent as a multiple of the star's own radius, and the floor on that extent as a
- * fraction of the framed radius.
- *
- * The floor is what keeps a star visible. A system's star is sized against its *innermost*
- * orbit — it must never swallow its closest planet — while the camera is placed to frame the
- * *outermost* ring, and those differ by a factor of a hundred in the solar system. At the
- * distance that fits Pluto in view, a disc that stays clear of Mercury is about one pixel
- * across; there is no radius that satisfies both, because the information genuinely does not
- * fit on one screen at that zoom.
- *
- * The halo resolves it, because light is not a surface: a glow that reaches past the innermost
- * orbit does not claim the star is that large, it claims the star is bright. So the disc stays
- * honest to the orbits and the halo is floored against the frame.
- *
- * The floor is set by what it must not cover. Its visual radius is half the extent, so a floor
- * of `f` puts the halo's edge at `f / 2` of the frame radius — and the orbits it has to leave
- * legible sit at their own fraction of that same radius. In the solar system, framed to hold
- * Pluto, Venus's orbit is at 1.3% of the frame radius and Earth's at 1.8%, so a floor of 2%
- * leaves both of them outside the halo. Mercury's, at 0.7%, is inside it — and would be at any
- * halo large enough to see, since the orbit itself is only a few pixels wide there.
- */
-const STAR_GLOW_TO_MARKER = 3.2;
-const MIN_STAR_GLOW_TO_FRAME = 0.02;
 
 /**
  * Clear space left around the framed radius, as a fraction of it. The camera backs off this
@@ -68,6 +33,8 @@ const FRAME_MARGIN = 0.12;
 export interface SystemViewport {
   fovDegrees: number;
   aspect: number;
+  /** The canvas's shorter side in CSS pixels, which a giant's disc is kept clear of its neighbours' names on. */
+  shorterSidePx?: number;
 }
 
 export const DEFAULT_SYSTEM_VIEWPORT: SystemViewport = { fovDegrees: 50, aspect: 1 };
@@ -86,13 +53,49 @@ const MIN_FRAMING_DISTANCE_AU = 0.06;
 /**
  * Ceiling on the framing distance, so a distant companion does not push the star to a dot.
  *
- * Generous enough to frame the solar system out to Pluto in any window shape, which needs 120 AU
- * on a landscape display and 140 on a portrait one once the camera's real field of view is
- * accounted for. Only genuinely pathological systems reach it now — the handful with
- * directly-imaged companions hundreds of AU out — and those still arrive framed on their inner
- * region, with the orbit controls reaching far enough to pull back to the rest.
+ * Generous enough to frame the solar system out to Eris in any window a reader holds: Eris's
+ * aphelion, 97.7 AU, the furthest it draws, needs 235 AU on a landscape display and 508 on a 390
+ * by 844 phone once the camera's real field of view is accounted for, and 600 holds it down to an
+ * aspect of 0.39. At 500, framed on the 80 AU grid ring inside that aphelion, a phone arrived with
+ * Eris's orbit 3.5 px from the edge; at 200, which framed Pluto's 40 AU ring, a portrait window
+ * arrived with Eris off screen, and a phone with Makemake too. Only genuinely pathological systems
+ * reach it now — the handful with directly-imaged companions hundreds of AU out — and those still
+ * arrive framed on their inner region, with the orbit controls reaching far enough to pull back
+ * to the rest.
  */
-const MAX_FRAMING_DISTANCE_AU = 200;
+const MAX_FRAMING_DISTANCE_AU = 600;
+
+/**
+ * How much of the view's tighter half-extent a giant's disc may take on arrival: inside the ring
+ * the system view names the star's neighbours on, and clear of the names hung inward from it,
+ * whose nearest corners come within 292 px of the centre on a 1 000 px view. Framed to fill the
+ * frame instead, Betelgeuse settled at the three-radius closest approach with a disc 379 px in
+ * radius, past the ring 370 px out, and its neighbours' names on it.
+ */
+const STAR_FRAME_FRACTION = 0.5;
+/**
+ * The ring the system view names a star's neighbours on, as a fraction of the frame's shorter
+ * half-side (see `ringPlacement`). Clear of the scale rail at the top and the dock at the bottom.
+ */
+export const NEIGHBOUR_RING_FRACTION = 0.74;
+/**
+ * How far a neighbour's name reaches in from that ring, in pixels whatever the window: its nearest
+ * corner measured 74 px in on a 390 px phone and 78 px on a 1 000 px view, and a margin on that.
+ * The fraction above left the names 0.24 of the half-side, 47 px on a phone, and at 390x844
+ * Betelgeuse's disc, 98 px in radius, had HD 39374's name 70 px from its centre.
+ */
+const NAME_REACH_PX = 90;
+/** However small the window, the disc still takes this much of it. */
+const MIN_STAR_FRAME_FRACTION = 0.1;
+
+/** The fraction of the tighter half-extent a giant's disc may take in this viewport. */
+function starFrameFraction(viewport: SystemViewport): number {
+  if (!viewport.shorterSidePx) {
+    return STAR_FRAME_FRACTION;
+  }
+  const clear = NEIGHBOUR_RING_FRACTION - NAME_REACH_PX / (viewport.shorterSidePx / 2);
+  return Math.min(STAR_FRAME_FRACTION, Math.max(MIN_STAR_FRAME_FRACTION, clear));
+}
 
 /** Framing for a star with no known planets, where there is nothing to fit. */
 const EMPTY_SYSTEM_FRAMING_DISTANCE_AU = 3;
@@ -129,39 +132,11 @@ export function systemViewDirection(referenceFrame: THREE.Quaternion): THREE.Vec
 }
 
 /**
- * Radius (AU) to draw the system's star at, given its innermost orbit.
- *
- * Never larger than {@link DEFAULT_STAR_MARKER_RADIUS_AU}, and never large enough to reach the
- * closest orbit. Falls back to that default when the system has no planets, since there is
- * then nothing for the star to crowd.
- */
-export function starMarkerRadiusAu(innermostOrbitAu: number): number {
-  if (!Number.isFinite(innermostOrbitAu) || innermostOrbitAu <= 0) {
-    return DEFAULT_STAR_MARKER_RADIUS_AU;
-  }
-  return Math.min(DEFAULT_STAR_MARKER_RADIUS_AU, innermostOrbitAu * STAR_RADIUS_TO_INNERMOST_ORBIT);
-}
-
-/**
  * Radius, in AU, that the camera can see at the star's own distance — the half-height of the
  * view frustum where the system sits, along whichever screen axis is tighter.
  */
 export function systemFrameRadiusAu(distanceAu: number, viewport: SystemViewport = DEFAULT_SYSTEM_VIEWPORT): number {
   return distanceAu * tightHalfExtent(viewport);
-}
-
-/**
- * Extent (AU) of the star's glow sprite — how wide it is drawn, not its radius.
- *
- * Normally a multiple of the star's own radius, so a compact system keeps the corona it has.
- * Floored against the framed radius, so a star framed from far enough out to hold its whole
- * system still reads as a bright point rather than disappearing into it. `glowScale` lets a
- * caller dim the halo for stars drawn without a real photograph.
- */
-export function starGlowExtentAu(markerRadiusAu: number, frameRadiusAu: number, glowScale = 1): number {
-  const fromStar = markerRadiusAu * STAR_GLOW_TO_MARKER * glowScale;
-  const fromFrame = Number.isFinite(frameRadiusAu) && frameRadiusAu > 0 ? frameRadiusAu * MIN_STAR_GLOW_TO_FRAME : 0;
-  return Math.max(fromStar, fromFrame);
 }
 
 /**
@@ -174,15 +149,35 @@ export function starGlowExtentAu(markerRadiusAu: number, frameRadiusAu: number, 
  * was tuned by eye against a 55-degree field, and the engine's camera is 50 — which left the
  * grid overflowing the frame in 368 of the 371 systems the datasets contain.
  *
- * Callers pass the outermost thing actually drawn, which is the reference grid's outer ring
- * rather than the outermost orbit — the ring is always the wider of the two, by construction.
+ * Callers pass the outermost thing actually drawn: the reference grid's outer ring, which runs past
+ * every semi-major axis by construction, or an eccentric orbit's aphelion where that runs past the
+ * ring, as Eris's does.
  */
-export function systemFramingDistanceAu(framedRadiusAu: number, viewport: SystemViewport = DEFAULT_SYSTEM_VIEWPORT): number {
+export function systemFramingDistanceAu(framedRadiusAu: number, viewport: SystemViewport = DEFAULT_SYSTEM_VIEWPORT, starRadiusAu = 0): number {
+  // A giant drawn at its own radius can be wider than the system around it — Betelgeuse's 584
+  // solar radii are 2.7 AU — or than the empty framing. Its disc is a sphere's, whose silhouette
+  // from d subtends asin(R / d): the distance that makes it the fraction above of the view.
+  const star = starRadiusAu * Math.sqrt(1 + 1 / (starFrameFraction(viewport) * tightHalfExtent(viewport)) ** 2);
   if (!Number.isFinite(framedRadiusAu) || framedRadiusAu <= 0) {
-    return EMPTY_SYSTEM_FRAMING_DISTANCE_AU;
+    return Math.max(EMPTY_SYSTEM_FRAMING_DISTANCE_AU, star);
   }
-  const required = (framedRadiusAu * (1 + FRAME_MARGIN)) / tightHalfExtent(viewport);
+  const required = Math.max((framedRadiusAu * (1 + FRAME_MARGIN)) / tightHalfExtent(viewport), star);
   return clamp(required, MIN_FRAMING_DISTANCE_AU, MAX_FRAMING_DISTANCE_AU);
+}
+
+/** How close the camera may come to the star's centre, whatever the star: ten solar radii. */
+const MIN_APPROACH_AU = 0.05;
+/** From three radii out a star spans 39 degrees, most of the view's 50, and the camera stays out of it. */
+const STAR_CLEARANCE_RADII = 3;
+
+/**
+ * The orbit controls' minimum distance in a system. The fixed 0.05 AU it used to be leaves the
+ * Sun 11 degrees across; but 23 211 stars on the map are drawn wider than 3.6 solar radii, which
+ * puts 0.05 AU inside three of their radii, and a giant's surface further out still — a zoom
+ * would have carried the camera through it.
+ */
+export function closestApproachAu(starRadiusAu: number): number {
+  return Math.max(MIN_APPROACH_AU, STAR_CLEARANCE_RADII * starRadiusAu);
 }
 
 /** Roughly how many rings the system grid aims for, and how far past the outermost orbit it runs. */
@@ -223,32 +218,30 @@ export function systemGridRingsAu(outermostOrbitAu: number): number[] {
 }
 
 /**
- * Span of the solar system, in AU, used as the reference every other system's marker sizes are
- * scaled against. The marker constants below were tuned by eye at this scale.
+ * A body is drawn at its true size. Astronomical Unit in kilometres, and what a body with neither
+ * a radius nor a mass to estimate one from is drawn as: an Earth, for want of anything better —
+ * exoplanets with a mass and no radius get an estimate from their mass before they reach here.
  */
-const REFERENCE_SYSTEM_SPAN_AU = 30;
-
-/** Exaggerated (non-physical) marker sizes at the reference scale, so planets stay visible. */
-const MIN_MARKER_RADIUS_AU = 0.012;
-const MAX_MARKER_RADIUS_AU = 0.09;
-/** Physical radius (km) that maps to one AU of marker radius before clamping. */
-const MARKER_RADIUS_KM_PER_AU = 18000;
+const KM_PER_AU = 149597870.7;
+const DEFAULT_BODY_RADIUS_KM = 6371;
 
 /**
- * Radius (AU) to draw a planet, moon or exoplanet marker at, scaled to the system it sits in.
- *
- * Marker sizes are deliberately exaggerated — a true-scale Earth would be invisible next to its
- * own orbit — but the exaggeration has to be relative to the system, not absolute. Fixed AU
- * sizes tuned against the solar system's 30 AU span become grotesque in a system a hundredth
- * that size: a marker of 0.09 AU inside a 0.2 AU system is wider than the orbits it sits on, so
- * a single planet swallows the entire view.
- *
- * Scaling by the span keeps every system looking like the solar system does: orbits legible,
- * planets as small dots on them.
+ * The Sun's own radius, in AU: the unit every star's radius is drawn in, the archive's or the one
+ * `starSurfaceOf` derives from its colour and brightness.
  */
-export function bodyMarkerRadiusAu(radiusKm: number | undefined, systemSpanAu: number): number {
-  const span = Number.isFinite(systemSpanAu) && systemSpanAu > 0 ? systemSpanAu : REFERENCE_SYSTEM_SPAN_AU;
-  const atReferenceScale = radiusKm ? clamp(radiusKm / MARKER_RADIUS_KM_PER_AU, MIN_MARKER_RADIUS_AU, MAX_MARKER_RADIUS_AU) : MIN_MARKER_RADIUS_AU;
+export const SUN_RADIUS_AU = 696340 / KM_PER_AU;
 
-  return atReferenceScale * (span / REFERENCE_SYSTEM_SPAN_AU);
+/**
+ * Radius (AU) to draw a planet, moon or exoplanet marker at: its own, unexaggerated.
+ *
+ * Sizes used to be exaggerated and scaled to the system span, which is what made a moon the size
+ * of its planet — Jupiter and Ganymede both ran past the ceiling and were drawn at one radius, so
+ * every moon orbited inside its parent. True scale needs no rule to prevent that: physics already
+ * puts a moon outside the planet it orbits, and the Sun at a hundredth of Mercury’s orbit.
+ *
+ * What true scale costs is visibility at the framing that holds a whole system, where every body
+ * is sub-pixel. That is paid for on screen instead, in pixels, by the scene's `keepMarkersLegible`.
+ */
+export function bodyMarkerRadiusAu(radiusKm: number | undefined): number {
+  return (radiusKm && radiusKm > 0 ? radiusKm : DEFAULT_BODY_RADIUS_KM) / KM_PER_AU;
 }

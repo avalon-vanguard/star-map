@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildStarNameIndex, normalizeStarName, resolveHostStarId } from './host-star-matching';
+import { ARCHIVE_EPOCH, ARCHIVE_ID_BASE, archiveDistancePc, archiveStarId, buildStarNameIndex, CATALOGUE_EPOCH, normalizeStarName, resolveHostStarId } from './host-star-matching';
 import { propagateProperMotion, raDegDecDistanceToXyz } from './coordinates';
 import { StarRecord } from '../models/star.model';
 
@@ -81,13 +81,13 @@ describe('resolveHostStarId', () => {
       expect(id).toBe(80);
     });
 
-    // GJ 15 A's archive row sits at J2016, 46″ along its proper motion from Groombridge 34's
+    // GJ 15 A's archive row sits at J2015.5, 45″ along its proper motion from Groombridge 34's
     // J2000 place — and only 16″ from an unrelated Gaia entry. Nearest-to-the-published-point
-    // picks the interloper; carrying the query back the sixteen years must put the planets on
-    // the star that actually moved there.
+    // picks the interloper; carrying the query back the fifteen and a half years must put the
+    // planets on the star that actually moved there.
     it('picks the star the proper motion says the query is, not the entry nearest the published point', () => {
       const primary = star(90, 'Groombridge 34', 4.595364, 44.022955, 3.562);
-      const published = propagateProperMotion(4.595364, 44.022955, 2891.5, 411.9, 16);
+      const published = propagateProperMotion(4.595364, 44.022955, 2891.5, 411.9, 15.5);
       const interloper = star(91, 'Gaia DR3 385334196532776576', published.raDeg, published.decDeg + 16 / 3600, 3.563);
 
       const id = resolveHostStarId(
@@ -107,6 +107,17 @@ describe('resolveHostStarId', () => {
       const id = resolveHostStarId({ hostname: 'GJ 273', raDeg: 111.8496, decDeg: 5.2258, distancePc: 5.921535 }, [luytens]);
 
       expect(id).toBeNull();
+    });
+
+    // The archive's 5.92 pc is TICv8's; its own parallax, 263.26 mas, says 3.80 pc, which is the
+    // star's. With the parallax given, the same query is Luyten's Star — and a parallax that
+    // contradicts the star as well rescues nothing.
+    it("accepts the archive's parallax where its sy_dist contradicts the star", () => {
+      const luytens = star(100, "Luyten's Star", 111.8496, 5.2258, 3.79);
+      const query = { hostname: 'GJ 273', raDeg: 111.8496, decDeg: 5.2258, distancePc: 5.921535 };
+
+      expect(resolveHostStarId({ ...query, parallaxMas: 263.26 }, [luytens])).toBe(100);
+      expect(resolveHostStarId({ ...query, parallaxMas: 168.9 }, [luytens])).toBeNull();
     });
 
     // The tolerance is transverse — parsecs on the sky, not an angle — so the same 15″ offset
@@ -196,10 +207,59 @@ describe('resolveHostStarId', () => {
       expect(id).toBe(1);
     });
 
+    it("takes the archive's parallax where it gives no distance, and nothing from a parallax that is none", () => {
+      // mu2 Sco: sy_dist blank, sy_plx 6.31 mas; the catalogue has Pipirima at 145.3 pc.
+      expect(archiveDistancePc(undefined, 6.31)).toBeCloseTo(158.48, 2);
+      expect(archiveDistancePc(145.35, 6.31)).toBe(145.35);
+      expect(archiveDistancePc(undefined, 0)).toBeNaN();
+      expect(archiveDistancePc(undefined, undefined)).toBeNaN();
+    });
+
     it('lets a named host resolve even with no usable distance', () => {
       const id = resolveHostStarId({ hostname: 'Sirius', raDeg: 101.3, decDeg: -16.7, distancePc: 0 }, FIXTURE_STARS);
 
       expect(id).toBe(2);
     });
+  });
+});
+
+describe('the archive epoch', () => {
+  it("carries Barnard's star from the archive's position to where Gaia DR3's goes, to a few milliarcseconds", () => {
+    // The archive publishes Gaia DR2's J2015.5 position and motion; DR3's is at J2016.
+    const archive = propagateProperMotion(269.4486144, 4.7379808, -802.803, 10362.5, CATALOGUE_EPOCH - ARCHIVE_EPOCH);
+    const dr3 = propagateProperMotion(269.44850252543836, 4.739420051112412, -801.5509783684709, 10362.394206546573, CATALOGUE_EPOCH - 2016);
+    const [a, b] = [archive, dr3].map(({ raDeg, decDeg }) => raDegDecDistanceToXyz(raDeg, decDeg, 1));
+    const separationArcsec = (Math.acos(Math.min(1, a.x * b.x + a.y * b.y + a.z * b.z)) * 180 * 3600) / Math.PI;
+    expect(separationArcsec).toBeLessThan(0.02);
+  });
+
+  it("matches Barnard's star from the archive's row at J2015.5, not an entry where a J2016 or J2015 row would carry it", () => {
+    // Half a year of its 10.4″/yr is 5.2″: a decoy placed where carrying the row back sixteen, or
+    // fifteen, years lands is nearer that point than Barnard's star is.
+    const row = { hostname: "Barnard's star", raDeg: 269.4486144, decDeg: 4.7379808, distancePc: 1.8266, pmRaMasPerYear: -802.803, pmDecMasPerYear: 10362.5 };
+    const at = (years: number) => propagateProperMotion(row.raDeg, row.decDeg, row.pmRaMasPerYear, row.pmDecMasPerYear, years);
+    const [truth, fromJ2016, fromJ2015] = [at(CATALOGUE_EPOCH - ARCHIVE_EPOCH), at(CATALOGUE_EPOCH - 2016), at(CATALOGUE_EPOCH - 2015)];
+    const stars = [
+      star(201, 'Gaia DR3 decoy', fromJ2016.raDeg, fromJ2016.decDeg, 1.8266),
+      star(202, 'Gaia DR3 other decoy', fromJ2015.raDeg, fromJ2015.decDeg, 1.8266),
+      star(200, 'GJ 699', truth.raDeg, truth.decDeg, 1.8266)
+    ];
+    expect(resolveHostStarId(row, stars)).toBe(200);
+  });
+});
+
+describe('archiveStarId', () => {
+  it('gives a host the same id whatever else the archive holds, inside the range left for it', () => {
+    const kepler186 = archiveStarId('Kepler-186', new Set());
+    const others = new Set(['1RXS J160929.1-210524', 'Kepler-1860', 'Kepler-452', 'TOI-700'].map((name) => archiveStarId(name, new Set())));
+    expect(archiveStarId('Kepler-186', others)).toBe(kepler186);
+    expect(others.has(kepler186)).toBe(false);
+    expect(kepler186).toBeGreaterThanOrEqual(ARCHIVE_ID_BASE);
+    expect(kepler186).toBeLessThan(2 ** 30);
+  });
+
+  it('moves a host whose id is taken to the next free one', () => {
+    const kepler186 = archiveStarId('Kepler-186', new Set());
+    expect(archiveStarId('Kepler-186', new Set([kepler186, kepler186 + 1]))).toBe(kepler186 + 2);
   });
 });

@@ -66,6 +66,13 @@ describe('equilibriumTemperatureK', () => {
     expect(equilibriumTemperatureK(1, 1, 0.8)!).toBeLessThan(equilibriumTemperatureK(1, 1, 0)!);
   });
 
+  it('never falls below the microwave background, however far the star', () => {
+    // 2MASS J21252752-8138278 b is 7 493 AU out; around a star of a fiftieth of the Sun's output,
+    // starlight alone would hold it at 1.1 K.
+    expect(equilibriumTemperatureK(0.02, 7493)!).toBeGreaterThan(2.7255);
+    expect(equilibriumTemperatureK(0.02, 7493)!).toBeLessThan(3);
+  });
+
   it('has no answer without a star or an orbit', () => {
     expect(equilibriumTemperatureK(null, 1)).toBeNull();
     expect(equilibriumTemperatureK(1, undefined)).toBeNull();

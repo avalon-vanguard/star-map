@@ -83,6 +83,16 @@ describe('SystemObjectCardComponent', () => {
     expect(render(bare).textContent).not.toContain('Measured');
   });
 
+  it('wraps a long designation rather than cutting off the digits that tell it apart', () => {
+    const host = render({ ...earth, name: '2MASS J21252752-8138278 b', hostStarName: '2MASS J21252752-8138278' });
+    const name = host.querySelector('[data-testid="object-card-name"]')!;
+    expect(name.textContent?.trim()).toBe('2MASS J21252752-8138278 b');
+    for (const line of [name, name.nextElementSibling!]) {
+      expect(line.classList).not.toContain('truncate');
+      expect(line.classList).toContain('wrap-break-word');
+    }
+  });
+
   it('says a photographed surface is a photograph', () => {
     expect(render(earth).textContent).toContain('photography');
   });
@@ -98,7 +108,9 @@ describe('SystemObjectCardComponent', () => {
       appearance: appearance({ equilibriumTemperatureK: null }),
     });
     expect(block(host, 'Derived')).not.toContain('Equilibrium temp.');
-    expect(host.textContent).toContain('host star is not in the catalogue');
+    // Not that the host is missing, which it is for 27 of the 2 714 planets without a temperature.
+    expect(host.textContent).toContain('its star’s luminosity or its orbit’s size is not known');
+    expect(host.textContent).not.toContain('not in the catalogue');
   });
 
   it('emits rather than navigating, so the scene decides what selection means', () => {

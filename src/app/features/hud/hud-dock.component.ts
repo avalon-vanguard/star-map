@@ -1,9 +1,28 @@
-import { ChangeDetectionStrategy, Component, computed, ElementRef, HostListener, inject, input, OnInit, output, signal, viewChild } from '@angular/core';
+import {
+  afterRenderEffect,
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  ElementRef,
+  HostListener,
+  inject,
+  input,
+  OnInit,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 
 import { Bookmark, BookmarksStore } from '../../shared/state/bookmarks.store';
+import { CLOCK_WINDOW, TIME_RATES, TimeStore } from '../../shared/state/time.store';
 import { BookmarkIconComponent } from '../../shared/ui/bookmark-icon.component';
 import { SearchComponent } from '../search/search.component';
-import { RouteRequest, RouteResult, RoutesPanelComponent, RouteStarOption } from './routes-panel.component';
+import {
+  RouteRequest,
+  RouteResult,
+  RoutesPanelComponent,
+  RouteStarOption,
+} from './routes-panel.component';
 
 export interface HudReadout {
   readonly label: string;
@@ -31,7 +50,16 @@ export interface HudDisplay {
   readonly plan: boolean;
 }
 
-export const DEFAULT_HUD_DISPLAY: HudDisplay = { labels: true, orbits: true, grid: true, deepSky: true, sky: true, systems: true, jumpLinks: false, plan: false };
+export const DEFAULT_HUD_DISPLAY: HudDisplay = {
+  labels: true,
+  orbits: true,
+  grid: true,
+  deepSky: true,
+  sky: true,
+  systems: true,
+  jumpLinks: false,
+  plan: false,
+};
 
 const DISPLAY_LAYERS: readonly { key: keyof HudDisplay; label: string }[] = [
   { key: 'labels', label: 'Labels' },
@@ -41,17 +69,26 @@ const DISPLAY_LAYERS: readonly { key: keyof HudDisplay; label: string }[] = [
   { key: 'sky', label: 'Sky' },
   { key: 'systems', label: 'Systems' },
   { key: 'jumpLinks', label: 'Jump links' },
-  { key: 'plan', label: 'Plan view' }
+  { key: 'plan', label: 'Plan view' },
 ];
 
 export type DockTab = 'search' | 'readout' | 'routes' | 'bookmarks' | 'display';
 
-const TAB_LABELS: Record<DockTab, string> = { search: 'Search', readout: 'Readout', routes: 'Routes', bookmarks: 'Bookmarks', display: 'Display' };
+const TAB_LABELS: Record<DockTab, string> = {
+  search: 'Search',
+  readout: 'Readout',
+  routes: 'Routes',
+  bookmarks: 'Bookmarks',
+  display: 'Display',
+};
 
 /** Tailwind's `sm` breakpoint: below it the dock is a bare tab strip and its panel is a sheet. */
 const WIDE_VIEWPORT = '(min-width: 640px)';
 /** One live query, read on every pointer-down, rather than a new MediaQueryList per read. */
-const wideViewportQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(WIDE_VIEWPORT) : null;
+const wideViewportQuery =
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia(WIDE_VIEWPORT)
+    : null;
 
 function isWideViewport(): boolean {
   return wideViewportQuery?.matches ?? true;
@@ -74,7 +111,10 @@ function isWideViewport(): boolean {
   selector: 'app-hud-dock',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [BookmarkIconComponent, RoutesPanelComponent, SearchComponent],
-  host: { class: 'pointer-events-none fixed inset-x-2 bottom-2 z-20 block font-body sm:inset-x-6 sm:bottom-6' },
+  host: {
+    class:
+      'pointer-events-none fixed inset-x-2 bottom-2 z-20 block font-body sm:inset-x-6 sm:bottom-6',
+  },
   template: `
     <!-- The column is transparent to the pointer and each surface in it opts back in: it is as
          wide as the strip and as tall as the open panel, so a solid one would swallow every
@@ -85,29 +125,55 @@ function isWideViewport(): boolean {
              locking on, once per switch, never per keystroke. -->
         @switch (tab) {
           @case ('search') {
-            <section id="dock-panel-search" role="tabpanel" aria-labelledby="dock-tab-search" class="hud-acquire pointer-events-auto mb-2 w-full max-w-xl">
+            <section
+              id="dock-panel-search"
+              role="tabpanel"
+              aria-labelledby="dock-tab-search"
+              class="hud-acquire pointer-events-auto mb-2 w-full max-w-xl"
+            >
               <app-search (picked)="onPicked()" />
             </section>
           }
           @case ('readout') {
-            <section id="dock-panel-readout" role="tabpanel" aria-labelledby="dock-tab-readout" class="hud-acquire hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-lg px-4 py-3">
+            <section
+              id="dock-panel-readout"
+              role="tabpanel"
+              aria-labelledby="dock-tab-readout"
+              class="hud-acquire hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-lg px-4 py-3"
+            >
               <p class="type-label text-muted">{{ eyebrow() }}</p>
               <div class="mt-1 flex items-start gap-2">
-                <p data-testid="hud-title" class="min-w-0 flex-1 text-lg font-bold tracking-[0.04em] text-text uppercase">{{ title() }}</p>
+                <p
+                  data-testid="hud-title"
+                  class="min-w-0 flex-1 text-lg font-bold tracking-[0.04em] text-text uppercase"
+                >
+                  {{ title() }}
+                </p>
                 <!-- Against null, not against falsiness: the Sun's catalogue id is 0, and a
                      truthiness test is what would quietly make the Solar System the one
                      system nobody could keep. -->
                 @if (keepableStarId() !== null) {
                   <button
-          type="button"
-          [attr.aria-label]="(bookmarks.has('star', keepableStarId()!) ? 'Forget ' : 'Keep ') + title()"
-          [attr.aria-pressed]="bookmarks.has('star', keepableStarId()!)"
-          (click)="bookmarks.toggle({ kind: 'star', id: keepableStarId()!, name: title() })"
-          class="shrink-0 p-1 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
-          [class]="bookmarks.has('star', keepableStarId()!) ? 'text-accent' : 'text-muted hover:text-accent'"
-        >
-          <app-bookmark-icon class="h-3.5 w-3.5" [kept]="bookmarks.has('star', keepableStarId()!)" />
-        </button>
+                    type="button"
+                    [attr.aria-label]="
+                      (bookmarks.has('star', keepableStarId()!) ? 'Forget ' : 'Keep ') + title()
+                    "
+                    [attr.aria-pressed]="bookmarks.has('star', keepableStarId()!)"
+                    (click)="
+                      bookmarks.toggle({ kind: 'star', id: keepableStarId()!, name: title() })
+                    "
+                    class="shrink-0 p-1 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+                    [class]="
+                      bookmarks.has('star', keepableStarId()!)
+                        ? 'text-accent'
+                        : 'text-muted hover:text-accent'
+                    "
+                  >
+                    <app-bookmark-icon
+                      class="h-3.5 w-3.5"
+                      [kept]="bookmarks.has('star', keepableStarId()!)"
+                    />
+                  </button>
                 }
               </div>
               @if (subtitle()) {
@@ -117,30 +183,54 @@ function isWideViewport(): boolean {
                 <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-1">
                   @for (readout of readouts(); track readout.label) {
                     <div>
-                      <dt class="type-label text-muted">{{ readout.label }}@if (readout.derived) {<span class="text-accent/80" aria-hidden="true">*</span>}</dt>
+                      <dt class="type-label text-muted">
+                        {{ readout.label }}
+                        @if (readout.derived) {
+                          <span class="text-accent/80" aria-hidden="true">*</span>
+                        }
+                      </dt>
                       <dd class="mt-0.5 text-sm text-text tabular-nums">{{ readout.value }}</dd>
                     </div>
                   }
                 </dl>
               }
               @if (note() || hasDerived()) {
-                <p class="mt-3 border-t border-border/40 pt-2 text-[10px] leading-relaxed text-muted">@if (hasDerived()) {<span class="text-accent/80">*</span> Derived, not catalogued. }{{ note() }}</p>
+                <p
+                  class="mt-3 border-t border-border/40 pt-2 text-[10px] leading-relaxed text-muted"
+                >
+                  @if (hasDerived()) {
+                    <span class="text-accent/80">*</span> Derived, not catalogued.
+                  }
+                  {{ note() }}
+                </p>
               }
             </section>
           }
           @case ('bookmarks') {
-            <section id="dock-panel-bookmarks" role="tabpanel" aria-labelledby="dock-tab-bookmarks" class="hud-acquire hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-lg">
+            <section
+              id="dock-panel-bookmarks"
+              role="tabpanel"
+              aria-labelledby="dock-tab-bookmarks"
+              class="hud-acquire hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-lg"
+            >
               @if (bookmarks.bookmarks().length) {
                 <ul class="max-h-64 divide-y divide-border/25 overflow-y-auto">
-                  @for (bookmark of bookmarks.bookmarks(); track bookmark.kind + ':' + bookmark.id) {
+                  @for (
+                    bookmark of bookmarks.bookmarks();
+                    track bookmark.kind + ':' + bookmark.id
+                  ) {
                     <li class="flex items-stretch">
                       <button
                         type="button"
                         (click)="onBookmarkChosen(bookmark)"
                         class="flex min-w-0 flex-1 items-baseline gap-3 px-3 py-2 text-left transition-colors hover:bg-accent/8 focus-visible:bg-accent/12 focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
                       >
-                        <span class="min-w-0 flex-1 truncate text-sm text-text">{{ bookmark.name }}</span>
-                        <span class="type-label shrink-0 text-muted">{{ bookmark.kind === 'star' ? 'System' : 'Body' }}</span>
+                        <span class="min-w-0 flex-1 truncate text-sm text-text">{{
+                          bookmark.name
+                        }}</span>
+                        <span class="type-label shrink-0 text-muted">{{
+                          bookmark.kind === 'star' ? 'System' : 'Body'
+                        }}</span>
                       </button>
                       <button
                         type="button"
@@ -148,7 +238,15 @@ function isWideViewport(): boolean {
                         (click)="bookmarks.remove(bookmark.kind, bookmark.id)"
                         class="shrink-0 border-l border-border/25 px-3 text-muted transition-colors hover:bg-accent/8 hover:text-accent focus-visible:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
                       >
-                        <svg class="h-3 w-3" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+                        <svg
+                          class="h-3 w-3"
+                          viewBox="0 0 14 14"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.5"
+                          stroke-linecap="round"
+                          aria-hidden="true"
+                        >
                           <path d="M3 3l8 8M11 3l-8 8" />
                         </svg>
                       </button>
@@ -157,29 +255,136 @@ function isWideViewport(): boolean {
                 </ul>
               } @else {
                 <p class="px-3 py-3 text-sm text-muted">
-                  Nothing kept yet. The <app-bookmark-icon class="inline-block h-3.5 w-3.5 -mb-0.5 text-accent" /> on a readout or a body keeps it here, in this browser.
+                  Nothing kept yet. The
+                  <app-bookmark-icon class="inline-block h-3.5 w-3.5 -mb-0.5 text-accent" /> on a
+                  readout or a body keeps it here, in this browser.
                 </p>
               }
             </section>
           }
           @case ('display') {
-            <section id="dock-panel-display" role="tabpanel" aria-labelledby="dock-tab-display" class="hud-acquire hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-lg px-4 py-3">
-              <p class="type-label text-muted">Layers</p>
-              <div class="mt-2 flex flex-wrap gap-2">
-                @for (layer of layers; track layer.key) {
+            <section
+              id="dock-panel-display"
+              role="tabpanel"
+              aria-labelledby="dock-tab-display"
+              class="hud-acquire hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-lg px-4 py-3"
+            >
+              @if (display()) {
+                <p class="type-label text-muted">Layers</p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  @for (layer of layers; track layer.key) {
+                    <button
+                      type="button"
+                      [attr.aria-pressed]="isOn(layer.key)"
+                      (click)="toggleLayer(layer.key)"
+                      class="type-label flex items-center gap-2 border px-3 py-1.5 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+                      [class]="
+                        isOn(layer.key)
+                          ? 'border-accent/60 bg-accent/12 text-accent hover:bg-accent/18'
+                          : 'border-border/60 text-muted hover:border-border hover:text-text'
+                      "
+                    >
+                      <!-- The state mark: a filled tick when the layer is drawn, hollow when it is not. -->
+                      <span
+                        aria-hidden="true"
+                        class="h-1.5 w-1.5 border border-current"
+                        [class.bg-current]="isOn(layer.key)"
+                      ></span>
+                      {{ layer.label }}
+                    </button>
+                  }
+                </div>
+              }
+
+              <!-- The clock. Orbits and rotations are both functions of a date, so this is the
+                   difference between a still picture and an orrery. -->
+              <p class="type-label text-muted" [class.mt-4]="display()">Clock</p>
+              <!-- Radios rather than buttons: the rates are one-of-four, and the native control
+                   carries that to a screen reader and to the arrow keys without any script. -->
+              <div
+                class="mt-2 flex flex-wrap items-center gap-2"
+                role="radiogroup"
+                aria-label="Clock rate"
+              >
+                <!-- A rate is picked by its size and the toggle after the radios says which way it
+                     runs, so a month a second backwards is the same radio as forwards. -->
+                @for (rate of timeRates; track rate.secondsPerSecond) {
+                  <label
+                    class="type-label cursor-pointer border px-3 py-1.5 transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-1 has-[:focus-visible]:-outline-offset-1 has-[:focus-visible]:outline-accent"
+                    [class]="
+                      Math.abs(time.rate()) === rate.secondsPerSecond
+                        ? 'border-accent/60 bg-accent/12 text-accent hover:bg-accent/18'
+                        : 'border-border/60 text-muted hover:border-border hover:text-text'
+                    "
+                  >
+                    <input
+                      type="radio"
+                      name="clock-rate"
+                      class="sr-only"
+                      [value]="rate.secondsPerSecond"
+                      [checked]="Math.abs(time.rate()) === rate.secondsPerSecond"
+                      (change)="time.setRate(Math.sign(time.rate()) * rate.secondsPerSecond)"
+                    />
+                    {{ rate.label }}
+                  </label>
+                }
+                <button
+                  type="button"
+                  [attr.aria-pressed]="time.rate() < 0"
+                  (click)="time.setRate(-time.rate())"
+                  class="type-label flex items-center gap-2 border px-3 py-1.5 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+                  [class]="
+                    time.rate() < 0
+                      ? 'border-accent/60 bg-accent/12 text-accent hover:bg-accent/18'
+                      : 'border-border/60 text-muted hover:border-border hover:text-text'
+                  "
+                >
+                  <span
+                    aria-hidden="true"
+                    class="h-1.5 w-1.5 border border-current"
+                    [class.bg-current]="time.rate() < 0"
+                  ></span>
+                  Backwards
+                </button>
+                @if (!time.atNow()) {
                   <button
                     type="button"
-                    [attr.aria-pressed]="isOn(layer.key)"
-                    (click)="toggleLayer(layer.key)"
-                    class="type-label flex items-center gap-2 border px-3 py-1.5 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
-                    [class]="isOn(layer.key) ? 'border-accent/60 bg-accent/12 text-accent hover:bg-accent/18' : 'border-border/60 text-muted hover:border-border hover:text-text'"
+                    (click)="backToNow()"
+                    class="type-label border border-border/60 px-3 py-1.5 text-muted transition-colors hover:border-accent/70 hover:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
                   >
-                    <!-- The state mark: a filled tick when the layer is drawn, hollow when it is not. -->
-                    <span aria-hidden="true" class="h-1.5 w-1.5 border border-current" [class.bg-current]="isOn(layer.key)"></span>
-                    {{ layer.label }}
+                    Back to now
                   </button>
                 }
               </div>
+              <!-- A form, so Enter in the field goes there and the browser holds the field to its
+                   min and max before anything is submitted. Submitted rather than applied on each
+                   change: Chrome reports a year typed digit by digit as 0002, 0020, 0202 and 2020,
+                   and the sky would jump through every one. -->
+              <form class="mt-2 flex flex-wrap items-center gap-2" (submit)="goToDate($event)">
+                <label for="clock-date" class="type-label text-muted">Date (UTC)</label>
+                <input
+                  id="clock-date"
+                  name="date"
+                  type="datetime-local"
+                  required
+                  [min]="clockWindow.min"
+                  [max]="clockWindow.max"
+                  [value]="dateField()"
+                  aria-describedby="clock-date-window"
+                  class="hud-surface min-w-0 flex-1 px-2.5 py-1 text-sm text-text tabular-nums caret-accent scheme-dark focus:border-accent focus:outline-none sm:flex-none"
+                />
+                <button
+                  type="submit"
+                  class="type-label border border-border/60 px-3 py-1.5 text-muted transition-colors hover:border-accent/70 hover:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+                >
+                  Go
+                </button>
+                <!-- One line: on a phone the panel is a sheet over the system it sets the date of, and
+                     each card already says how far its own orbit strays. -->
+                <p id="clock-date-window" class="w-full text-[10px] text-muted">
+                  AD 1 to AD 3000, where the planets’ elements hold.
+                </p>
+              </form>
             </section>
           }
         }
@@ -190,7 +395,13 @@ function isWideViewport(): boolean {
            back with what it had, so it is not acquiring anything — and for the 380 ms the wipe
            runs, its clip path swallows clicks on the suggestions it just brought back. -->
       @if (routing()) {
-        <section id="dock-panel-routes" role="tabpanel" aria-labelledby="dock-tab-routes" [hidden]="activeTab() !== 'routes'" class="hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-xl px-4 py-3">
+        <section
+          id="dock-panel-routes"
+          role="tabpanel"
+          aria-labelledby="dock-tab-routes"
+          [hidden]="activeTab() !== 'routes'"
+          class="hud-brackets hud-surface pointer-events-auto mb-2 w-full max-w-xl px-4 py-3"
+        >
           <app-routes-panel
             [result]="routeResult()"
             [pending]="routePending()"
@@ -205,7 +416,15 @@ function isWideViewport(): boolean {
       }
 
       <div class="hud-brackets hud-surface pointer-events-auto flex w-full items-stretch">
-        <div role="tablist" aria-label="Dock" class="flex items-stretch divide-x divide-border/40">
+        <!-- The tabs give way to the date and the range, and scroll: the five of the system view
+             take 397 px, and on a portrait phone they pushed the date off the right edge. Where
+             the browser draws a scrollbar of its own, it is a thin dark one: on a desktop window
+             under 770 px wide its default was a light bar 15 px tall across the dark dock. -->
+        <div
+          role="tablist"
+          aria-label="Dock"
+          class="flex min-w-0 scheme-dark items-stretch divide-x divide-border/40 overflow-x-auto [scrollbar-width:thin]"
+        >
           @for (tab of tabs(); track tab) {
             <button
               type="button"
@@ -215,21 +434,41 @@ function isWideViewport(): boolean {
               [attr.aria-controls]="activeTab() === tab ? 'dock-panel-' + tab : null"
               (click)="toggleTab(tab)"
               class="type-eyebrow px-3 py-2 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent sm:px-4"
-              [class]="activeTab() === tab ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-accent/8 hover:text-accent'"
+              [class]="
+                activeTab() === tab
+                  ? 'bg-accent/15 text-accent'
+                  : 'text-muted hover:bg-accent/8 hover:text-accent'
+              "
             >
               {{ tabLabel(tab) }}
             </button>
           }
         </div>
+        <!-- Only while the map is away from the present: at the present the date is
+             today's, which the reader's own machine already says. -->
+        @if (date()) {
+          <p
+            class="ml-auto flex shrink-0 items-baseline gap-2 border-l border-border/40 px-3 py-2 sm:px-4"
+            data-testid="hud-date"
+          >
+            <span class="type-label text-muted">Date</span>
+            <span class="text-sm text-accent tabular-nums">{{ date() }}</span>
+          </p>
+        }
+        <!-- Not on a phone, where it never showed before the tabs gave way to it: kept, its 121 px
+             took the Display tab out of sight at the present, the state the map opens in. -->
         @if (range()) {
-          <p class="ml-auto flex items-baseline gap-2 border-l border-border/40 px-3 py-2 sm:px-4">
+          <p
+            class="flex shrink-0 items-baseline gap-2 border-l border-border/40 px-3 py-2 max-sm:hidden sm:px-4"
+            [class.ml-auto]="!date()"
+          >
             <span class="type-label text-muted">Range</span>
             <span class="text-sm text-accent tabular-nums">{{ range() }}</span>
           </p>
         }
       </div>
     </div>
-  `
+  `,
 })
 export class HudDockComponent implements OnInit {
   /** Readout panel contents. An empty title means there is nothing to read out, and no tab for it. */
@@ -241,8 +480,15 @@ export class HudDockComponent implements OnInit {
   readonly note = input('');
   /** Camera range, pre-formatted by the scene, which is the only thing that knows the units. */
   readonly range = input('');
-  /** Layer state; `null` means the surface has no layers to toggle and no Display tab. */
+  /** The date the sky is drawn for; empty while the map is drawn for the present. */
+  readonly date = input('');
+  /**
+   * Layer state; `null` means the surface has no layers to toggle, and no Display tab unless it
+   * has the clock.
+   */
   readonly display = input<HudDisplay | null>(null);
+  /** The clock without the layers, for a surface that is drawn at its date: the tab is then "Clock". */
+  readonly clock = input(false);
   /** Which panel is open on a wide viewport when the dock mounts. */
   readonly defaultTab = input<DockTab | null>(null);
   /** Routing: what the scene found, what it offers for the fields, and where the view is. */
@@ -271,22 +517,49 @@ export class HudDockComponent implements OnInit {
     // Always offered, even with nothing in it: it is the only place that says the map can keep
     // anything at all, and a tab that appears once you already know is a tab that never taught.
     'bookmarks',
-    ...(this.display() ? (['display'] as const) : [])
+    ...(this.display() || this.clock() ? (['display'] as const) : []),
   ]);
 
   readonly activeTab = signal<DockTab | null>(null);
 
   readonly bookmarks = inject(BookmarksStore);
+  readonly time = inject(TimeStore);
+  readonly timeRates = TIME_RATES;
+  readonly clockWindow = CLOCK_WINDOW;
+  protected readonly Math = Math;
+  /**
+   * What the date field holds when the panel opens: the clock's date at that moment. Not bound to
+   * the running clock, which would rewrite the field under the reader's typing on every render.
+   */
+  readonly dateField = signal('');
 
   private readonly search = viewChild(SearchComponent);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
+  private readonly dateShown = computed(() => this.date() !== '');
+  /**
+   * The tab list gives way to the date strip but keeps its scroll, so once the strip is drawn the
+   * tab that matters can be wholly out of sight: after Go on a phone, the tab focus went back to
+   * (0 of its 79 px at 360, 390 and 412 wide), and on a desktop window 640 to 770 px wide, the tab
+   * of the panel left open. Brought back into view whenever the strip comes or goes: the focused
+   * tab, else the selected one.
+   */
+  private readonly keepTabInView = afterRenderEffect(() => {
+    this.dateShown();
+    const list = this.host.nativeElement.querySelector('[role="tablist"]');
+    const focused = document.activeElement;
+    const tab = focused && list?.contains(focused) ? focused : list?.querySelector('[aria-selected="true"]');
+    // Optional: jsdom, which the unit tests run in, lays nothing out and has no scrollIntoView.
+    tab?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  });
+
   ngOnInit(): void {
     this.activeTab.set(isWideViewport() ? this.defaultTab() : null);
+    this.fillDateField();
   }
 
   tabLabel(tab: DockTab): string {
-    return TAB_LABELS[tab];
+    return tab === 'display' && !this.display() ? 'Clock' : TAB_LABELS[tab];
   }
 
   isOn(key: keyof HudDisplay): boolean {
@@ -295,6 +568,35 @@ export class HudDockComponent implements OnInit {
 
   toggleTab(tab: DockTab): void {
     this.activeTab.set(this.activeTab() === tab ? null : tab);
+    this.fillDateField();
+  }
+
+  /** The field's value is read as UTC, which is what the strip and the note print dates in. */
+  goToDate(event: SubmitEvent): void {
+    event.preventDefault();
+    const field = (event.target as HTMLFormElement).elements.namedItem('date') as HTMLInputElement;
+    if (this.time.setDate(new Date(`${field.value}Z`))) {
+      // The field now says what the signal behind it does, so a later reset that fills it with
+      // the present is a change the binding writes back, not one it drops as the same value.
+      this.dateField.set(field.value);
+      // On a phone the sheet covers the system it has just set the date of: at 360 by 640 every
+      // orbit lies behind it. The thing to look at is now the scene, as after a search.
+      // Focus goes back to the tab that folded, not to the page: the form it was in is gone.
+      if (!isWideViewport()) {
+        const tab = this.activeTab();
+        this.activeTab.set(null);
+        this.host.nativeElement.querySelector<HTMLElement>(`#dock-tab-${tab}`)?.focus();
+      }
+    }
+  }
+
+  backToNow(): void {
+    this.time.reset();
+    this.fillDateField();
+  }
+
+  private fillDateField(): void {
+    this.dateField.set(this.time.date().toISOString().slice(0, 16));
   }
 
   toggleLayer(key: keyof HudDisplay): void {
@@ -331,7 +633,10 @@ export class HudDockComponent implements OnInit {
       return;
     }
     const target = event.target as HTMLElement | null;
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+    if (
+      target &&
+      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+    ) {
       return;
     }
     event.preventDefault();
@@ -343,7 +648,11 @@ export class HudDockComponent implements OnInit {
   /** On a narrow viewport the panel is a sheet over the scene: tapping the scene folds it away. */
   @HostListener('document:pointerdown', ['$event'])
   onDocumentPointerDown(event: PointerEvent): void {
-    if (this.activeTab() && !isWideViewport() && !this.host.nativeElement.contains(event.target as Node)) {
+    if (
+      this.activeTab() &&
+      !isWideViewport() &&
+      !this.host.nativeElement.contains(event.target as Node)
+    ) {
       this.activeTab.set(null);
     }
   }

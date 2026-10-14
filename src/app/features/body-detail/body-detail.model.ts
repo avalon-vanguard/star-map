@@ -20,22 +20,25 @@ export interface BodyDetailViewModel {
    */
   hostStarId?: number;
   radiusKm?: number;
+  /** A triaxial body's semi-axes, where `radiusKm` is the mean of them; see `BodyRecord.semiAxesKm`. */
+  semiAxesKm?: readonly [number, number, number];
   massEarth?: number;
   discoveryYear?: number;
   orbit: Partial<OrbitalElements>;
   /**
    * What this world is inferred to look like, and the quantities that inference rests on. Always
    * present — every body has measurements enough to place it somewhere — but its individual
-   * fields are nullable, since a body whose host star is not in the catalogue has no derived
-   * temperature.
+   * fields are nullable, since a body whose host star's luminosity or whose orbit's size is not
+   * known has no derived temperature.
    */
   appearance: PlanetAppearance;
   /** True when a real photograph is being shown rather than the derived surface. */
   hasPhotography: boolean;
+  /** An exoplanet photographed by direct imaging, as a point of light; see `ExoplanetRecord.imaged`. */
+  imaged?: boolean;
   /**
-   * Sidereal orbital period. Measured where the archive published one; otherwise derived from the
-   * semi-major axis for heliocentric orbits, where the central mass is known exactly. Undefined
-   * when neither applies — see `heliocentricPeriodDays`.
+   * Sidereal orbital period. For a solar-system body, 360 degrees over JPL's published mean
+   * motion; for an exoplanet, the archive's period where it published one, and undefined where not.
    */
   orbitalPeriodDays?: number;
   /**
@@ -44,4 +47,6 @@ export interface BodyDetailViewModel {
    * derived surface as a photograph.
    */
   orbitalPeriodSource?: 'measured' | 'derived';
+  /** Where the orbit comes from and the span it holds over; see `BodyRecord.orbitSource`. */
+  orbitSource?: string;
 }

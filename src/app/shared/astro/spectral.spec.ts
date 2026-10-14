@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseSpectralClass, SPECTRAL_CLASSES, spectralTypeToColorIndex } from './spectral';
+import { dwarfSequenceAtColor, dwarfSequenceAtTemperature, dwarfSequenceAtType, isGiant, parseSpectralClass, spectralClassification, SPECTRAL_CLASSES, spectralTypeFromColor, spectralTypeToColorIndex, temperatureToColorIndex } from './spectral';
 
 describe('parseSpectralClass', () => {
   it('reads a clean class and subclass', () => {
@@ -46,6 +46,20 @@ describe('parseSpectralClass', () => {
   });
 });
 
+describe('isGiant', () => {
+  it('reads luminosity classes I to III off the primary, the giant and supergiant prefixes, and carbon and S stars', () => {
+    for (const type of ['M1Ib + B2.5V', 'K5III', 'M2II-IIIvar', 'C7Iab', 'K0IIIb', 'gK0', 'cM2', 'N5', 'Ce+', 'S57:']) {
+      expect(isGiant(type), type).toBe(true);
+    }
+  });
+
+  it('leaves dwarfs, subgiants, a dwarf with a giant companion and the unclassified alone', () => {
+    for (const type of ['G2V', 'B2IV', 'F0IVn', 'M5Ve', 'K1V + M3III', 'g-k', 'Unknown', 'DA', '']) {
+      expect(isGiant(type), type).toBe(false);
+    }
+  });
+});
+
 describe('spectralTypeToColorIndex', () => {
   it('places the Sun near its real B-V of 0.65', () => {
     expect(spectralTypeToColorIndex('G2V')).toBeCloseTo(0.626, 2);
@@ -81,5 +95,121 @@ describe('spectralTypeToColorIndex', () => {
   it('returns null for an unclassified star', () => {
     expect(spectralTypeToColorIndex('Unknown')).toBeNull();
     expect(spectralTypeToColorIndex('')).toBeNull();
+  });
+});
+
+describe('temperatureToColorIndex', () => {
+  it("puts the Sun's temperature at its own B-V and a cool dwarf where the dwarf sequence has it", () => {
+    expect(temperatureToColorIndex(5772)).toBeCloseTo(0.65, 2);
+    // Two thirds of the way from M2 (3 560 K, B−V 1.505) to M2.5 (3 470 K, 1.522).
+    expect(temperatureToColorIndex(3500)).toBeCloseTo(1.5163, 4);
+  });
+
+  it('reads back as the temperature it came from, so the correction is the one at that temperature', () => {
+    for (const temperatureK of [31400, 12000, 7000, 5772, 4000, 3500, 3157, 2566, 2420]) {
+      expect(dwarfSequenceAtColor(temperatureToColorIndex(temperatureK))!.temperatureK).toBeCloseTo(temperatureK, 6);
+    }
+  });
+
+  it('has no answer outside the table, nor for a temperature that is not one', () => {
+    for (const temperatureK of [580, 2419, 31401, 50000, 0, Number.NaN]) {
+      expect(temperatureToColorIndex(temperatureK)).toBeNull();
+    }
+  });
+});
+
+describe('spectralTypeFromColor', () => {
+  it("reads the Sun's type off either colour", () => {
+    expect(spectralTypeFromColor(0.65, 'B-V')).toBe('G2');
+    expect(spectralTypeFromColor(0.82, 'BP-RP')).toBe('G2');
+  });
+
+  it('reads a red dwarf the way it was classified', () => {
+    // TRAPPIST-1 is M8 V, and Gaia has it at BP−RP 4.90; Proxima is M5.5 Ve at B−V 1.81.
+    expect(spectralTypeFromColor(4.902, 'BP-RP')).toBe('M8');
+    expect(spectralTypeFromColor(1.807, 'B-V')).toBe('M5');
+  });
+
+  it('does not read one colour as the other', () => {
+    // 1.43 is a K5 dwarf in BP−RP and an M0 in B−V.
+    expect(spectralTypeFromColor(1.43, 'BP-RP')).toBe('K5');
+    expect(spectralTypeFromColor(1.43, 'B-V')).toBe('M0');
+    expect(spectralTypeFromColor(1.43)).toBe('M0');
+  });
+
+  it('has no answer past either end of the table, nor without a colour', () => {
+    expect(spectralTypeFromColor(-0.35, 'B-V')).toBeNull();
+    expect(spectralTypeFromColor(-0.15, 'BP-RP')).toBeNull();
+    expect(spectralTypeFromColor(5.5, 'BP-RP')).toBeNull();
+    expect(spectralTypeFromColor(null, 'B-V')).toBeNull();
+    expect(spectralTypeFromColor(-0.301, 'B-V')).toBe('B0');
+  });
+});
+
+describe('spectralClassification', () => {
+  it("gives the catalogue's type, else the colour's marked as an estimate, else nothing", () => {
+    expect(spectralClassification({ spectralType: 'M5Ve', colorIndex: 1.807, colorSystem: 'B-V' })).toBe('M5Ve');
+    expect(spectralClassification({ spectralType: 'Unknown', colorIndex: 4.902, colorSystem: 'BP-RP' })).toBe('~M8');
+    expect(spectralClassification({ spectralType: 'Unknown', colorIndex: null })).toBe('');
+  });
+});
+
+describe('dwarfSequenceAtColor', () => {
+  it("puts the Sun's colour in either system at the Sun's temperature and correction", () => {
+    for (const [colour, system] of [[0.65, 'B-V'], [0.823, 'BP-RP']] as const) {
+      const point = dwarfSequenceAtColor(colour, system)!;
+      expect(point.temperatureK).toBeCloseTo(5770, 0);
+      expect(point.bolometricCorrectionV).toBeCloseTo(-0.085, 3);
+      expect(point.gMinusV).toBeCloseTo(-0.165, 3);
+    }
+  });
+
+  it('interpolates between the two types a colour falls between', () => {
+    // Halfway from M1.5 (B−V 1.495, 3 620 K, −1.50) to M2 (1.505, 3 560 K, −1.62).
+    const point = dwarfSequenceAtColor(1.5, 'B-V')!;
+    expect(point.temperatureK).toBeCloseTo(3590, 6);
+    expect(point.bolometricCorrectionV).toBeCloseTo(-1.56, 6);
+  });
+
+  it('has no answer past either end of the table, and no G−V where none is tabulated', () => {
+    expect(dwarfSequenceAtColor(2.2, 'B-V')).toBeNull();
+    expect(dwarfSequenceAtColor(-0.15, 'BP-RP')).toBeNull();
+    expect(dwarfSequenceAtColor(null)).toBeNull();
+    expect(dwarfSequenceAtColor(-0.29, 'B-V')!.gMinusV).toBeNull();
+  });
+
+  it('reads the row at the end a colour is past, when asked to', () => {
+    expect(dwarfSequenceAtColor(2.2, 'B-V', true)).toEqual({ bMinusV: 2.16, temperatureK: 2420, bolometricCorrectionV: -5.78, gMinusV: -3.09 });
+    expect(dwarfSequenceAtColor(5.3, 'BP-RP', true)).toEqual({ bMinusV: 2.16, temperatureK: 2420, bolometricCorrectionV: -5.78, gMinusV: -3.09 });
+    expect(dwarfSequenceAtColor(-0.4, 'B-V', true)).toEqual({ bMinusV: -0.301, temperatureK: 31400, bolometricCorrectionV: -2.99, gMinusV: null });
+    expect(dwarfSequenceAtColor(null, 'B-V', true)).toBeNull();
+  });
+
+  it("reads a white dwarf bluer than BP−RP's end at the temperature measured at its colour, and the table's correction there", () => {
+    // Gentile Fusillo et al. (2021): 15 369 K at −0.15, where B9's row had 10 700; between B6 and B5.
+    const point = dwarfSequenceAtColor(-0.15, 'BP-RP', true)!;
+    expect(point.temperatureK).toBeCloseTo(15369, 6);
+    expect(point.bolometricCorrectionV).toBeCloseTo(-1.13 - 0.21 * (869 / 1200), 6);
+    expect(dwarfSequenceAtColor(-0.13, 'BP-RP', true)!.temperatureK).toBeCloseTo(15369 - 4669 * (2 / 3), 6);
+    expect(dwarfSequenceAtColor(-0.6, 'BP-RP', true)!.temperatureK).toBeCloseTo(28585, 6);
+  });
+});
+
+describe('dwarfSequenceAtType', () => {
+  it("reads an O type off Mamajek's O rows, which carry no colour, and any other off its own row", () => {
+    expect(dwarfSequenceAtType('O7.5Iab:')).toEqual({ bMinusV: null, temperatureK: 36100, bolometricCorrectionV: -3.33, gMinusV: null });
+    expect(dwarfSequenceAtType('B8Ia')!.temperatureK).toBe(12300);
+    expect(dwarfSequenceAtType('O9.7')!.temperatureK).toBeCloseTo(31900 - 500 * (0.2 / 0.5), 6);
+    expect(dwarfSequenceAtType('M9')!.temperatureK).toBe(2420);
+    expect(dwarfSequenceAtType('Unknown')).toBeNull();
+  });
+});
+
+describe('dwarfSequenceAtTemperature', () => {
+  it("is a type's own row at its temperature, between two rows between them, and the end row past either end", () => {
+    expect(dwarfSequenceAtTemperature(5770)).toEqual({ bMinusV: 0.65, temperatureK: 5770, bolometricCorrectionV: -0.085, gMinusV: -0.165 });
+    expect(dwarfSequenceAtTemperature(3615).bolometricCorrectionV).toBeCloseTo(-1.51, 6);
+    expect(dwarfSequenceAtTemperature(50000).temperatureK).toBe(31400);
+    expect(dwarfSequenceAtTemperature(1000).temperatureK).toBe(2420);
   });
 });

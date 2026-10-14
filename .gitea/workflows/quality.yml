@@ -1,0 +1,19 @@
+# Contrôles qualité de chaque push et de chaque PR par le workflow commun avalon-vanguard/ci :
+# secrets (gitleaks), dépendances vulnérables (osv-scanner), duplication (jscpd) et failles du code
+# (semgrep). Gitleaks et semgrep ne regardent que le diff, jamais l'existant.
+name: Qualité
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  quality:
+    uses: avalon-vanguard/ci/.gitea/workflows/quality.yml@v1
+    with:
+      jscpd-path: src
+      # Non bloquant : osv-scanner relève 22 avis sur des dépendances transitives de développement
+      # (fast-uri 3.1.5, source-map-js 1.2.1, undici 7.28.0), tous corrigés en amont. Renovate
+      # (osvVulnerabilityAlerts) propose les montées de version ; repasser à true une fois le lock à jour.
+      osv-blocking: false

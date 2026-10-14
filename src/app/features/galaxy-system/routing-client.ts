@@ -132,9 +132,14 @@ export class RoutingClient {
     delete this.waiting.links;
   }
 
+  /** Async so that a throw from the in-place answer comes back as a rejection, which is all the callers handle. */
+  private async answerInPlace(request: RoutingRequest): Promise<RoutingResponse> {
+    return answerRouting(this.localIndex, request);
+  }
+
   private ask(request: RoutingRequest): Promise<RoutingResponse> {
     if (!this.worker) {
-      return Promise.resolve(answerRouting(this.localIndex, request));
+      return this.answerInPlace(request);
     }
     // Shared rather than replaced: an identical request superseding the one it repeats would reject it,
     // and whoever holds that promise would take the rejection for its own question.

@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   ci:
-    uses: avalon-vanguard/ci/.gitea/workflows/node.yml@v1
+    uses: avalon-vanguard/ci/.gitea/workflows/node.yml@runs-on-input
     # Pas d'e2e pour l'instant : la carte 3D rendue en logiciel par Chromium, sur ng serve,
     # dépasse le runner du VPS (17 tests, 7 en échec par délai dépassé en 16,8 min). À
     # remettre (e2e: true) une fois le runner capable de les passer.

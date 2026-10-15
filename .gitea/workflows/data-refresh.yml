@@ -25,13 +25,13 @@ jobs:
     runs-on: big
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # Les données vivent sur main et le push va sur main, quelle que soit la ref d'où le
           # fichier de workflow a été lancé.
           ref: main
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -43,7 +43,7 @@ jobs:
       # depuis une archive qui expire sous charge. Idem pour la réduction Hipparcos de van Leeuwen
       # (2007), dont fetchStars exige les erreurs de parallaxe. La clé suit gaia.ts, où les
       # requêtes sont écrites : une requête modifiée est retéléchargée.
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             tools/etl/.cache/gaia-dr3-*.csv

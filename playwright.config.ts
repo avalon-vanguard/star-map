@@ -10,6 +10,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
+  // One browser at a time in CI: the VPS's `big` runner has 2.5 CPUs for `ng serve` and Chromium's
+  // software rasterizer, and two browsers there timed out 6 of the 17 tests (Gitea run 407).
+  workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   // Well above Playwright's 5 s, which was a fair ceiling when the star catalogue was 820 kB and
   // is not now that the scheduled refresh has it at 5.4 MB and 447 410 rows: every one of these

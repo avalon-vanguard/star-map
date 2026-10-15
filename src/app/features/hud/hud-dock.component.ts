@@ -84,14 +84,15 @@ const TAB_LABELS: Record<DockTab, string> = {
 
 /** Tailwind's `sm` breakpoint: below it the dock is a bare tab strip and its panel is a sheet. */
 const WIDE_VIEWPORT = '(min-width: 640px)';
-/** One live query, read on every pointer-down, rather than a new MediaQueryList per read. */
-const wideViewportQuery =
-  typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-    ? window.matchMedia(WIDE_VIEWPORT)
-    : null;
-
+/**
+ * Asked anew on every read, not once at import: a query made at import kept whatever `matchMedia`
+ * stood then, and in CI's single test worker another spec imported the dock before
+ * hud-dock.component.spec.ts installed its own, so the phone cases saw a wide viewport (run 367).
+ */
 function isWideViewport(): boolean {
-  return wideViewportQuery?.matches ?? true;
+  return typeof window === 'undefined' || typeof window.matchMedia !== 'function'
+    ? true
+    : window.matchMedia(WIDE_VIEWPORT).matches;
 }
 
 /**

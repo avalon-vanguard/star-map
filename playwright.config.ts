@@ -33,7 +33,10 @@ export default defineConfig({
   webServer: {
     // Uses a dedicated port (rather than the Angular CLI's conventional 4200) so this never
     // collides with an unrelated `ng serve`/other server a developer already has running.
-    command: 'npm run start -- --port=4300',
+    // In CI the production build: minified, without the dev build's source maps, it leaves the
+    // runner's CPUs to Chromium's software rasterizer; on the dev build 4 of 17 tests still timed
+    // out with one browser (Gitea run 417).
+    command: `npm run start -- --port=4300${process.env.CI ? ' --configuration=production' : ''}`,
     url: 'http://localhost:4300',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000

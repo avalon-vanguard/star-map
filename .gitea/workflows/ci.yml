@@ -1,12 +1,9 @@
 name: CI
 
-# Gitea port of .github/workflows/ci.yml, through the organisation's shared workflow
+# star-map CI, through the organisation's shared workflow
 # (avalon-vanguard/ci, node.yml): lint, typecheck, unit tests, production build, then the
 # Playwright suite. Same triggers: pull requests and the branches they merge into, plus manual
 # dispatch.
-#
-# A .gitea/workflows directory makes Gitea ignore .github/workflows, so pages.yml,
-# data-refresh.yml and junie-review.yml now run on GitHub only, until they are ported.
 on:
   push:
     branches: [main, develop]

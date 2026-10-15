@@ -5,9 +5,11 @@ real astronomical data instead of fictional systems. Browse the solar neighbourh
 star's system to see its planets on their real orbits, and drill into a single body for the
 NASA figures behind it.
 
-**Live at <https://avalon-vanguard.github.io/star-map/>**, published from `main` by
-[`.github/workflows/pages.yml`](.github/workflows/pages.yml). There is no backend — the whole
+**Live at <https://projects.avalonvanguard.com/star-map/>**, deployed to Openship from `main` by
+[`.gitea/workflows/deploy.yml`](.gitea/workflows/deploy.yml). There is no backend — the whole
 thing is static files and a few megabytes of baked catalogue.
+
+The source lives on Gitea, where pull requests are made, and is mirrored to GitHub (read-only copy).
 
 The source of a small Claude Code plugin also lives here — see [Plugins](#plugins) below.
 
@@ -214,6 +216,9 @@ camera reaches the catalogued 50 pc the real stars occupy.
 then validates the combined output. Raw responses are cached under `tools/etl/.cache/`, so
 re-runs are cheap and offline-friendly; set `ETL_FORCE_REFRESH=1` to bypass the cache.
 
+Every Monday, [`.gitea/workflows/data-refresh.yml`](.gitea/workflows/data-refresh.yml) re-runs the ETL on
+Gitea and, if the catalogues changed, tests, builds, commits to `main` and triggers the Openship deploy.
+
 | Script | Source | Output |
 | --- | --- | --- |
 | `fetchStars.ts` | HYG database, plus any other positional catalogue wired in (see below) | the catalogue stars, handed to `fetchExoplanets.ts` |
@@ -323,7 +328,7 @@ src/app/
 tools/etl/              build-time data pipeline
 e2e/                    Playwright end-to-end tests
 public/                 files served at the site root (favicon, link-preview image)
-.github/workflows/      CI, the Pages deploy, and an automated review pass
+.gitea/workflows/       CI, the Openship deploy, the weekly data refresh, and an automated review pass
 ```
 
 The design document behind all of this is `.junie/plans/nasa-star-map.md`.

@@ -144,28 +144,27 @@ PATH=/opt/node/bin:$PATH npm run e2e -- --workers=1  # 6 tests, 3 files, ~2.3m
 
 `--workers=1` on the e2e suite is **not optional here** — see Gotchas.
 
-## Build for GitHub Pages
+## Build for the Openship deploy
 
-`.github/workflows/pages.yml` publishes the app on a push to `main`. To reproduce what it builds:
+`.gitea/workflows/deploy.yml` builds the `Dockerfile` and deploys it to Openship on a push to `main`;
+the site is served at <https://projects.avalonvanguard.com/star-map/>. To reproduce the bundle it builds:
 
 ```bash
 export PATH=/opt/node/bin:$PATH
 npm run build -- --base-href "/star-map/"
-cp dist/star-map/browser/index.html dist/star-map/browser/404.html
 ```
 
-Two things differ from a plain `npm run build`, and both exist because a project site is served
-from a subdirectory rather than a domain root:
+`--base-href` is the one thing that differs from a plain `npm run build`, because the site is served
+from a subdirectory rather than a domain root: `DataLoaderService` fetches its catalogues with
+relative URLs (`assets/data/stars.bin`), which resolve against `<base>` rather than the current
+path. Get it wrong and a deep link asks for `/body/assets/data/stars.bin`.
 
-- **`--base-href`.** `DataLoaderService` fetches its catalogues with relative URLs
-  (`assets/data/stars.bin`), which resolve against `<base>` rather than the current path. Get it
-  wrong and a deep link asks for `/body/assets/data/stars.bin`. The workflow derives it from the
-  repository name so a rename cannot strand it.
-- **`404.html`.** Pages has no rewrite rules, so `/body/mars` has no file behind it. Serving the
-  app as the 404 body lets the router render the route. The response stays HTTP 404.
+There is no `404.html` trick: the image's `nginx.conf` falls back to `index.html` (HTTP 200) so the
+router renders deep links. The site root is `dist/star-map/browser`, **not** `dist/star-map` — the
+parent also holds `3rdpartylicenses.txt` and `prerendered-routes.json`, which are not part of the site.
 
-The uploaded artifact is `dist/star-map/browser`, **not** `dist/star-map` — the parent also holds
-`3rdpartylicenses.txt` and `prerendered-routes.json`, which are not part of the site.
+The weekly data refresh is `.gitea/workflows/data-refresh.yml`; it pushes to `main` and dispatches
+`deploy.yml` itself, since a job-token push triggers no workflow.
 
 ## Gotchas
 

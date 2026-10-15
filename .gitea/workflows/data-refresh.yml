@@ -1,0 +1,103 @@
+name: Actualisation des catalogues
+
+# Rejoue l'ETL contre les archives en ligne chaque semaine et redéploie le site quand les données
+# ont réellement changé, pour que les catalogues suivent la NASA sans toucher au code. Les archives
+# lues (HYG, Exoplanet Archive, JPL Horizons, OpenNGC, Gaia) sont des points d'accès publics et
+# anonymes : aucune clé.
+on:
+  schedule:
+    # Lundi 05:23 UTC. Une minute quelconque plutôt que :00, la minute la plus chargée du cron.
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+
+# Jamais deux actualisations à la fois, et jamais d'annulation en plein push.
+concurrency:
+  group: data-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: write # pousser les catalogues régénérés sur main
+  actions: write # lancer le déploiement ensuite — voir la dernière étape
+
+jobs:
+  refresh:
+    name: Récupérer, valider, publier
+    runs-on: big
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Les données vivent sur main et le push va sur main, quelle que soit la ref d'où le
+          # fichier de workflow a été lancé.
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Gaia DR3 est une version figée : la même requête renvoie les mêmes octets, donc ses
+      # réponses passent d'une exécution à l'autre au lieu d'être retéléchargées chaque semaine
+      # depuis une archive qui expire sous charge. Idem pour la réduction Hipparcos de van Leeuwen
+      # (2007), dont fetchStars exige les erreurs de parallaxe. La clé suit gaia.ts, où les
+      # requêtes sont écrites : une requête modifiée est retéléchargée.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            tools/etl/.cache/gaia-dr3-*.csv
+            tools/etl/.cache/hipparcos-errors-*.csv
+          key: gaia-dr3-hipparcos-${{ hashFiles('tools/etl/sources/gaia.ts') }}
+
+      # Les autres sources sont lues en direct sur ce runner neuf. Un téléchargement raté fait
+      # échouer l'exécution, volontairement : pas d'actualisation vaut mieux qu'une partielle.
+      - name: Reconstruire les jeux de données
+        run: npm run etl
+
+      - name: Détecter un vrai changement
+        id: diff
+        run: |
+          summary="${GITHUB_STEP_SUMMARY:-/dev/null}"
+          if git diff --quiet -- src/assets/data; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Les archives n'ont rien publié de nouveau : catalogues identiques à l'octet près." >> "$summary"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            { echo "Changements des catalogues :"; echo '```'; git diff --stat -- src/assets/data; echo '```'; } >> "$summary"
+          fi
+
+      # Les mêmes garde-fous que la CI, joués ici : le push ci-dessous est fait avec le jeton du
+      # job, qui ne déclenche aucun workflow. Les données doivent donc être prouvées avant d'arriver.
+      - name: Tests unitaires sur les nouvelles données
+        if: steps.diff.outputs.changed == 'true'
+        run: npm test -- --no-watch
+
+      - name: Build de production sur les nouvelles données
+        if: steps.diff.outputs.changed == 'true'
+        run: npm run build
+
+      - name: Commit sur main
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "gitea-actions"
+          git config user.email "actions@noreply.avalonvanguard.com"
+          git add src/assets/data
+          git commit -m "Actualisation des catalogues astronomiques" \
+            -m "Nouvelle exécution planifiée de l'ETL contre les archives en ligne. Validée par les tests unitaires et un build de production dans la même exécution, car un push fait avec le jeton du job ne déclenche pas la CI."
+          git push origin HEAD:main
+
+      # Le push ci-dessus ne déclenche pas deploy.yml (même garde anti-récursion que sur GitHub) :
+      # on le lance explicitement par l'API. Les dispatches, eux, passent.
+      # Si l'API répond 403, le jeton du job ne suffit pas : créer un secret de dépôt GITEA_TOKEN
+      # contenant un PAT (portée write:repository) d'un compte ayant accès en écriture.
+      - name: Redéployer le site
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          curl -fsS -X POST \
+            -H "Authorization: token ${GITEA_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d '{"ref":"main"}' \
+            "${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}/actions/workflows/deploy.yml/dispatches"

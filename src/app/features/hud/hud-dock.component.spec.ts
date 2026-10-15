@@ -7,7 +7,10 @@ import { BookmarksStore } from '../../shared/state/bookmarks.store';
 import { TimeStore } from '../../shared/state/time.store';
 import { DEFAULT_HUD_DISPLAY, HudDisplay, HudDockComponent } from './hud-dock.component';
 
-// jsdom has no matchMedia, which the dock reads once, at import: this one answers from `viewport`.
+// jsdom has no matchMedia, which the dock asks on every read: this one answers from `viewport`. The
+// dock must not keep a query from import: Angular's runner shares one jsdom and module cache among
+// the specs of a worker (isolate: false), and with a single worker (CI, 1 CPU) another spec imports
+// the dock before this one installs its matchMedia.
 const viewport = vi.hoisted(() => {
   const state = { wide: true };
   window.matchMedia = (() => ({ get matches() { return state.wide; } })) as unknown as typeof window.matchMedia;

@@ -31,7 +31,10 @@ export async function clickCanvasUntilSystemEntered(page: Page, canvas: Locator,
         await canvas.click();
         return false;
       },
-      { timeout: 15_000, intervals: [300] }
+      // 45 s, inside camera-flight's 90 s test budget: on CI's software rasterizer one read of the
+      // level marker took 7 s and one click 8 s, so 15 s ran out right after the click that
+      // entered the system, before the poll could see it (Gitea run 491).
+      { timeout: 45_000, intervals: [300] }
     )
     .toBe(true);
   await expect(backButton).toBeVisible();

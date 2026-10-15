@@ -12,8 +12,10 @@ test.describe('Bookmarks', () => {
     await page.getByRole('button', { name: 'Keep Earth' }).click();
     await expect(page.getByRole('button', { name: 'Forget Earth' })).toHaveAttribute('aria-pressed', 'true');
 
-    // A later visit, on a different page: kept places outlive the one they were kept from.
-    await page.goto('/');
+    // A later visit, on a different page: kept places outlive the one they were kept from. With
+    // the reduced star field every other scene spec uses: what is under test is the bookmark, and
+    // the default 70 000 sprites on a software rasterizer timed this click out in CI.
+    await page.goto('/?stars=4000');
     // Generously timed on purpose: this suite shares one software rasterizer, and the boot
     // it waits on is the slowest thing in it. The default five seconds is a coin toss
     // under a full parallel run.

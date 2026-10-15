@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   ci:
-    uses: avalon-vanguard/ci/.gitea/workflows/node.yml@runs-on-input
+    uses: avalon-vanguard/ci/.gitea/workflows/node.yml@v1
     # e2e Playwright réactivés, sur le runner `big` du VPS (stack, services/gitea-runner/runner-big.yml) :
     # la carte 3D rendue en logiciel par Chromium sur ng serve dépassait le petit runner (17 tests,
     # 7 en échec par délai dépassé en 16,8 min). Tout le job de vérification tourne donc là.

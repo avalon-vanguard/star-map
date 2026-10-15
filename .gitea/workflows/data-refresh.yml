@@ -89,15 +89,16 @@ jobs:
 
       # Le push ci-dessus ne déclenche pas deploy.yml (même garde anti-récursion que sur GitHub) :
       # on le lance explicitement par l'API. Les dispatches, eux, passent.
-      # Si l'API répond 403, le jeton du job ne suffit pas : créer un secret de dépôt GITEA_TOKEN
-      # contenant un PAT (portée write:repository) d'un compte ayant accès en écriture.
+      # Si l'API répond 403, le jeton du job ne suffit pas : créer le secret de dépôt DEPLOY_TOKEN,
+      # un PAT (portée write:repository) d'un compte ayant accès en écriture. Le préfixe GITEA_
+      # est réservé par Gitea pour les secrets : d'où ce nom.
       - name: Redéployer le site
         if: steps.diff.outputs.changed == 'true'
         env:
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          DISPATCH_TOKEN: ${{ secrets.DEPLOY_TOKEN || secrets.GITEA_TOKEN }}
         run: |
           curl -fsS -X POST \
-            -H "Authorization: token ${GITEA_TOKEN}" \
+            -H "Authorization: token ${DISPATCH_TOKEN}" \
             -H 'Content-Type: application/json' \
             -d '{"ref":"main"}' \
             "${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}/actions/workflows/deploy.yml/dispatches"

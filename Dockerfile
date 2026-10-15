@@ -9,8 +9,6 @@ COPY package.json package-lock.json .npmrc ./
 RUN npm ci
 COPY . .
 RUN npm run build -- --base-href /star-map/
-# Aperçus de liens : adresse canonique de la passerelle au lieu de github.io
-RUN sed -i 's#https://avalon-vanguard.github.io/star-map/#https://projects.avalonvanguard.com/star-map/#g' dist/star-map/browser/index.html
 
 FROM nginx:1.29-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf

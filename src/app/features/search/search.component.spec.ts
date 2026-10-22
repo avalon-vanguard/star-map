@@ -167,8 +167,10 @@ describe('SearchComponent', () => {
   describe('from the keyboard', () => {
     const field = (): HTMLInputElement => element.querySelector('input')!;
     const options = (): HTMLElement[] => [...element.querySelectorAll<HTMLElement>('[role="option"]')];
-    function press(target: Element, key: string): void {
-      target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+    function press(target: Element, key: string): KeyboardEvent {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      target.dispatchEvent(event);
+      return event;
     }
 
     it('picks the first result on Enter, as a click on it would, and nothing when nothing is listed', async () => {
@@ -185,7 +187,8 @@ describe('SearchComponent', () => {
 
     it('walks the list with the arrows, and comes back to the field from its top or on Escape', async () => {
       await type('Iot');
-      press(field(), 'ArrowDown');
+      // Prevented, or the caret would also jump to the end of the text on its way out.
+      expect(press(field(), 'ArrowDown').defaultPrevented).toBe(true);
       expect(document.activeElement).toBe(options()[0]);
       press(options()[0], 'ArrowDown');
       expect(document.activeElement).toBe(options()[1]);

@@ -325,7 +325,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(navigationStore.selectedStarId()).toBeNull();
       expect(navigationStore.viewLevel()).toBe('galaxy');
       expect(location.path()).toBe('/?stars=4000');
-    });
+      // Four flights of five frames each: 4.3-4.8 s on an idle machine, and past Vitest's 5 s
+      // default (5.2 s) on a loaded one.
+    }, 15_000);
 
     it('opens in the system a link names', async () => {
       await mountAt('/?star=42');
@@ -658,6 +660,11 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(component.ringLabelsInTheClear([rung], camera, [rightHand])).toEqual([]);
       // The same name hanging the other way leaves that space empty, and the rung with it.
       expect(component.ringLabelsInTheClear([rung], camera, [{ ...rightHand, side: 'left' }])).toEqual([rung]);
+      // But not the point itself: a rung 0.04 right of it, where no text is, still crowds the name.
+      const onThePoint = at(0.1, -0.12);
+      expect(
+        component.ringLabelsInTheClear([{ ...rung, x: onThePoint.x, y: onThePoint.y, z: onThePoint.z }], camera, [{ ...rightHand, side: 'left' }]),
+      ).toEqual([]);
 
       // And a rung to the left of a name keeps its place: "50 pc" is a third of a star name's
       // width, so it ends well before the name starts, whatever the anchors' spacing suggests.
@@ -971,8 +978,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
   describe('where a name is printed', () => {
     type Spreading = {
-      spreadLabels(candidates: Iterable<LabeledPoint>, camera: THREE.Camera, keepId: null, placed?: readonly LabeledPoint[]): LabeledPoint[];
+      spreadLabels(candidates: Iterable<LabeledPoint>, camera: THREE.Camera, keepId: number | string | null, placed?: readonly LabeledPoint[]): LabeledPoint[];
       ringLabelsInTheClear(candidates: readonly LabeledPoint[], camera: THREE.Camera, names: readonly LabeledPoint[]): LabeledPoint[];
+      cardBodyId: string | null;
     };
     let component: Spreading;
     let camera: THREE.Camera;
@@ -1019,6 +1027,18 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(component.spreadLabels([at(6, 0.2, 0)], camera, null, [{ ...at(1, 0, 0), side: 'right' }])).toEqual([]);
     });
 
+    it('keeps the selection’s name though neither side is clear, and hangs the card’s body left or not at all', () => {
+      const sides = (labels: LabeledPoint[]) => labels.map((label) => `${label.id}:${label.side}`);
+      // 3 again, boxed in on both sides, but the star about to be flown to.
+      expect(sides(component.spreadLabels([at(1, 0, 0), at(2, 0.5, 0), at(3, 0.25, 0)], camera, 3))).toEqual(['1:right', '2:right', '3:right']);
+
+      // The leader to the card leaves the body's right: left with the right clear, and nowhere
+      // once something takes its left.
+      component.cardBodyId = 'earth';
+      expect(sides(component.spreadLabels([at('earth', 0, 0)], camera, null))).toEqual(['earth:left']);
+      expect(component.spreadLabels([at('earth', 0, 0)], camera, null, [at(1, -0.2, 0)])).toEqual([]);
+    });
+
     it('keeps a name out from under the HUD and inside the frame', async () => {
       // A pass first, which names the view and so puts up the banner.
       await advanceFrames(engine, 0.3);
@@ -1045,12 +1065,15 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
           px(4, 1400, 5), // its point on the frame, its text over the top
           px(5, 1590, 450), // too near the right edge for its text to hang there
           px(6, 1000, 400), // clear
+          px(9, 1000, 897), // its point on the frame, its text under the bottom
         ],
         camera,
         null,
       );
 
       expect(placed.map((label) => `${label.id}:${label.side}`)).toEqual(['5:left', '6:right']);
+      // Near the left edge, with its right taken: the left would run off the frame, so nowhere.
+      expect(component.spreadLabels([px(10, 5, 300)], camera, null, [px(11, 80, 300)])).toEqual([]);
       // A distance on a ring as much as a name.
       expect(component.ringLabelsInTheClear([px(7, 200, 700), px(8, 1000, 300)], camera, []).map((label) => label.id)).toEqual([8]);
     });
@@ -1059,7 +1082,16 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
   it('places the deep-sky names after the star names and around them, outside their count', async () => {
     type Spread = { spreadLabels: (...args: unknown[]) => LabeledPoint[] };
     const spread = vi.spyOn(GalaxySystemSceneComponent.prototype as unknown as Spread, 'spreadLabels');
+    const rings = vi.spyOn(GalaxySystemSceneComponent.prototype as unknown as { ringLabelsInTheClear: (...args: unknown[]) => LabeledPoint[] }, 'ringLabelsInTheClear');
     const update = vi.spyOn(StarLabelOverlay.prototype, 'update');
+    // A deep-sky object in the open, where the test's one (Andromeda, straight up) is not.
+    const camera = engine.getCamera();
+    camera.updateMatrixWorld(true);
+    const toward = new THREE.Vector3(0.5, -0.5, 0.5).unproject(camera).sub(camera.position).normalize();
+    const open = camera.position.clone().addScaledVector(toward, camera.position.length());
+    (fixture.componentInstance as unknown as { deepSkyLabels: LabeledPoint[] }).deepSkyLabels = [
+      { id: 'M42', name: 'Orion Nebula', kind: 'Nebula', x: open.x, y: open.y, z: open.z },
+    ];
     await advanceFrames(engine, 0.3);
 
     // The last pass: the stars, then the deep-sky objects around what the stars took.
@@ -1067,7 +1099,11 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(spread.mock.calls.at(-1)?.[3]).toBe(stars);
     const shown = (update.mock.calls.at(-1)?.[0] ?? []) as LabeledPoint[];
     expect(shown.filter((label) => typeof label.id === 'string' && !label.id.startsWith('ring-'))).toEqual(backdrop);
+    // The ring distances keep out of both, a deep-sky name as much as a star's.
+    expect(backdrop.length).toBeGreaterThan(0);
+    expect(rings.mock.calls.at(-1)?.[2]).toEqual(expect.arrayContaining([...stars, ...backdrop]));
     spread.mockRestore();
+    rings.mockRestore();
     update.mockRestore();
   });
 
@@ -1442,7 +1478,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       field.remove();
     });
 
-    it('steps in on + and =, out on -, from the dock’s pair too, and leaves Ctrl with them to the browser', async () => {
+    it('steps in on + and =, out on -, from the dock’s pair too, and leaves Ctrl, Cmd and Alt with them to the browser', async () => {
       const start = distance();
       expect(press(canvas, '+').defaultPrevented).toBe(true);
       expect(distance()).toBeCloseTo(start * 0.8, 6);
@@ -1450,8 +1486,10 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(distance()).toBeCloseTo(start * 0.64, 6);
       press(canvas, '-');
       expect(distance()).toBeCloseTo(start * 0.8, 6);
-      // Ctrl and - is the browser's page zoom.
+      // Ctrl and - is the browser's page zoom, Cmd and = or - the same on a Mac.
       expect(press(canvas, '-', { ctrlKey: true }).defaultPrevented).toBe(false);
+      expect(press(canvas, '=', { metaKey: true }).defaultPrevented).toBe(false);
+      expect(press(canvas, '-', { altKey: true }).defaultPrevented).toBe(false);
       expect(distance()).toBeCloseTo(start * 0.8, 6);
 
       await advanceFrames(engine, 0.3);

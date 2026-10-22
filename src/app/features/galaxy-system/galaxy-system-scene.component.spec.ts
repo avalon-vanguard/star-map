@@ -632,20 +632,50 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     /** Real time, since the rebuild waits on a real timer for the range and the drawn stars to settle. */
     const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
 
-    function linkScene(links: LinkScene['routing']['links']): LinkScene {
+    /** The view's distance from its centre at which its frame is 20 pc tall: well inside the widest the graph is drawn in. */
+    const LINKED_VIEW_DISTANCE = 10 / Math.tan((50 * Math.PI) / 360);
+
+    function linkScene(links: LinkScene['routing']['links'], distance = LINKED_VIEW_DISTANCE): LinkScene {
       const component = fixture.componentInstance as unknown as LinkScene;
       component.routing = { links, route: () => new Promise<never>(() => undefined), dispose: () => undefined };
+      engine.getCamera().position.sub(component.controls.target).setLength(distance).add(component.controls.target);
       component.display.update((display) => ({ ...display, jumpLinks: true }));
       TestBed.tick();
       return component;
     }
 
-    /** Makes the next refocus choose a different set: the field is told it draws one star, then the view moves. */
+    /** Makes the next refocus choose a different set: the field is told it draws one star, then the view moves, camera and all. */
     async function changeDrawnStars(component: LinkScene, targetX: number): Promise<void> {
       component.starField.drawn = Uint32Array.of(0);
+      engine.getCamera().position.x += targetX - component.controls.target.x;
       component.controls.target.set(targetX, 0, 0);
       await advanceFrames(engine, 0.3);
     }
+
+    it('draws no graph at the opening view, where it is a solid disc over the Sun, and asks once the view zooms in', async () => {
+      const links = vi.fn<LinkScene['routing']['links']>(() => Promise.resolve(new Float32Array(6)));
+      const setSegments = vi.spyOn(JumpLinkRenderer.prototype, 'setSegments');
+      const opening = engine.getCamera().position.length();
+      const component = linkScene(links, opening);
+      await advanceFrames(engine, 0.3);
+      await settle();
+      expect(links).not.toHaveBeenCalled();
+
+      engine.getCamera().position.sub(component.controls.target).setLength(LINKED_VIEW_DISTANCE).add(component.controls.target);
+      await advanceFrames(engine, 0.3);
+      await settle();
+      expect(links).toHaveBeenCalledTimes(1);
+      await flushAsync();
+      expect(setSegments.mock.lastCall?.[0]).toHaveLength(6);
+
+      // Back out: the graph comes off the screen rather than staying as it was.
+      engine.getCamera().position.sub(component.controls.target).setLength(opening).add(component.controls.target);
+      await advanceFrames(engine, 0.3);
+      await settle();
+      expect(links).toHaveBeenCalledTimes(1);
+      expect(setSegments.mock.lastCall?.[0]).toHaveLength(0);
+      setSegments.mockRestore();
+    });
 
     it('links the stars being drawn, and asks again once a new set of them holds still', async () => {
       const links = vi.fn<LinkScene['routing']['links']>(() => Promise.resolve(new Float32Array(0)));
@@ -677,7 +707,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       await settle();
 
       const budget = links.mock.calls[0][2];
-      // The view opens centred on the Sun: its frame's half-height there, over 1080 drawn pixels, is a pixel's worth of parsecs.
+      // The view is centred on the Sun: its frame's half-height there, over 1080 drawn pixels, is a pixel's worth of parsecs.
       const halfHeight = engine.getCamera().position.length() * Math.tan((50 * Math.PI) / 360);
       expect(budget?.centre).toEqual({ x: 0, y: 0, z: 0 });
       expect(budget?.lengthPc).toBeCloseTo((1_000_000 * halfHeight) / 1080, 3);

@@ -194,6 +194,19 @@ function servesTheSame(asked: LinkBudget | undefined, now: LinkBudget | undefine
 const JUMP_LINK_PIXEL_BUDGET = 1_000_000;
 
 /**
+ * The widest view the jump-link graph is drawn in: the half-height of the frame at the view's
+ * centre, in parsecs.
+ *
+ * Wider, the stars within 25 pc of the Sun, which are all drawn and all linked, fill a disc about
+ * 110 px across, and their links a solid disc over it that hides Sol's name: at the opening view,
+ * 143 pc, at 3 pc as at 8. From 100 pc it is still solid, from 75 it begins to show the links in
+ * it, and at 50 it is a mesh with holes, with every link around it a line of its own. On the
+ * Ryzen 7700X's Radeon at 1920 × 1080, with vsync off, the disc cost 1.7-2.2 ms a frame over the
+ * 6.6-6.8 ms the view takes without it.
+ */
+const JUMP_LINK_MAX_HALF_HEIGHT_PC = 50;
+
+/**
  * How far in or out the plan view may be zoomed from the extent its distance frames. Under a
  * parallel projection the wheel changes the frame rather than the distance, so the orbit limits
  * stop applying and this is what stands in for them.
@@ -2052,12 +2065,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
     const rangePc = this.jumpRangePc();
     if (!this.display().jumpLinks) {
-      if (this.drawnJumpRangePc !== null) {
-        this.jumpLinks.setSegments(new Float32Array(0));
-        this.drawnJumpRangePc = null;
-        this.linkedStars = null;
-        this.linkedBudget = undefined;
-      }
+      this.clearJumpLinks();
       return;
     }
     // Asked for in parsec space only: inside a system the camera and its centre are in astronomical
@@ -2066,8 +2074,17 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     if (!this.galaxyGroup.visible) {
       return;
     }
+    const centre = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
+    const halfHeight = this.engine.visibleHalfHeight(
+      this.engine.getCamera().position.distanceTo(centre),
+    );
+    // Cleared as when the layer is off, so the zoom back in, which chooses the drawn stars again, asks.
+    if (halfHeight > JUMP_LINK_MAX_HALF_HEIGHT_PC) {
+      this.clearJumpLinks();
+      return;
+    }
     const drawn = this.starField.drawnStars;
-    const budget = this.jumpLinkBudget();
+    const budget = this.jumpLinkBudget(centre, halfHeight);
     if (
       this.drawnJumpRangePc === rangePc &&
       this.linkedStars === drawn &&
@@ -2102,21 +2119,27 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * How much of the graph to draw: the links nearest the view's centre, up to the length that
    * `JUMP_LINK_PIXEL_BUDGET` pixels of line make at that depth. None without a canvas to measure.
    */
-  private jumpLinkBudget(): LinkBudget | undefined {
+  private jumpLinkBudget(centre: THREE.Vector3, halfHeight: number): LinkBudget | undefined {
     // In the pixels the lines are drawn in, not in CSS pixels: a scaled or HiDPI screen draws more of them.
     const heightPx =
       this.canvasRef().nativeElement.clientHeight * this.engine.getRenderer().getPixelRatio();
     if (heightPx === 0) {
       return undefined;
     }
-    const centre = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
-    const halfHeight = this.engine.visibleHalfHeight(
-      this.engine.getCamera().position.distanceTo(centre),
-    );
     return {
       centre: { x: centre.x, y: centre.y, z: centre.z },
       lengthPc: (JUMP_LINK_PIXEL_BUDGET * 2 * halfHeight) / heightPx,
     };
+  }
+
+  /** Takes the graph off the screen and forgets what it was asked for, so the next ask is not skipped. */
+  private clearJumpLinks(): void {
+    if (this.drawnJumpRangePc !== null) {
+      this.jumpLinks?.setSegments(new Float32Array(0));
+      this.drawnJumpRangePc = null;
+      this.linkedStars = null;
+      this.linkedBudget = undefined;
+    }
   }
 
   /** A pinned body wins over a hovered one, so the card does not change under the pointer. */

@@ -186,7 +186,9 @@ body {
   background: none;
   border: 0;
   padding: 0;
-  font: inherit;
+  /* No `font: inherit`: Tailwind's base already gives a button the page's font, and the shorthand
+   * here also took the page's 1.5 line height over .map-label's 1.15, which made a label that is
+   * a button 28.5 px tall where the same label as a div is 21.9. */
 }
 
 /* A star's own name in the field is a button for the keyboard only: the pointer goes through it

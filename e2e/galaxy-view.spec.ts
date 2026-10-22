@@ -72,6 +72,9 @@ test.describe('Galaxy view', () => {
     // The wheel and a drag that start on a name still move the map, as they did when no name
     // could be pressed.
     const box = (await label.boundingBox())!;
+    // Two lines at the labels' 1.15 line height, as tall as a name that is not a button: the
+    // label pass keeps names a 22 px row apart.
+    expect(box.height).toBeLessThan(23);
     const under = await page.evaluate(
       ([x, y]) => document.elementFromPoint(x, y)?.getAttribute('data-testid'),
       [box.x + box.width / 2, box.y + box.height / 2],

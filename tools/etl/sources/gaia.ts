@@ -28,7 +28,7 @@ const GAIA_TAP_URL = 'https://gea.esac.esa.int/tap-server/tap/sync';
  * 117 955, in a 200 with nothing in the CSV to say so (its VOTable read OVERFLOW), until asked for
  * more.
  */
-function tapQueryUrl(query: string, maxRows: number): string {
+export function tapQueryUrl(query: string, maxRows: number): string {
   return `${GAIA_TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&MAXREC=${maxRows}&QUERY=${encodeURIComponent(query)}`;
 }
 

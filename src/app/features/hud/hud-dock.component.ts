@@ -674,7 +674,8 @@ export class HudDockComponent implements OnInit {
     }
     // Focus inside the panel would fall to the page with it: it goes back to the tab that folded,
     // as after a date is set on a phone, so Enter opens the panel again.
-    const hadFocus = this.host.nativeElement.contains(document.activeElement);
+    const panel = this.host.nativeElement.querySelector(`#dock-panel-${tab}`);
+    const hadFocus = !!panel?.contains(document.activeElement);
     this.activeTab.set(null);
     if (hadFocus) {
       this.host.nativeElement.querySelector<HTMLElement>(`#dock-tab-${tab}`)?.focus();

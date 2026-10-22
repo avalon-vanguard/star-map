@@ -327,6 +327,14 @@ describe('HudDockComponent', () => {
       escape(range);
       expect(host().querySelector<HTMLElement>('#dock-panel-routes')!.hidden).toBe(true);
       expect(document.activeElement).toBe(tab('Routes'));
+
+      // Focus anywhere else, such as another tab, is left where it is.
+      tab('Routes').click();
+      fixture.detectChanges();
+      tab('Bookmarks').focus();
+      escape(tab('Bookmarks'));
+      expect(host().querySelector<HTMLElement>('#dock-panel-routes')!.hidden).toBe(true);
+      expect(document.activeElement).toBe(tab('Bookmarks'));
     });
   });
 

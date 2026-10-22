@@ -94,6 +94,35 @@ test.describe('Search-driven navigation', () => {
     await expect(page.getByText('Radius')).toBeVisible();
   });
 
+  for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 740 }]) {
+    test.describe(`on a ${viewport.width}x${viewport.height} phone`, () => {
+      test.use({ viewport, isMobile: true, hasTouch: true });
+
+      test('every tab is whole on the strip, the page does not scroll sideways, and a star picked from Search is named on screen', async ({ page }) => {
+        await page.goto('/?stars=4000');
+        await expect(page.getByRole('tab')).toHaveCount(5);
+        const strip = (await page.getByRole('tablist', { name: 'Dock' }).boundingBox())!;
+        for (const tab of await page.getByRole('tab').all()) {
+          const box = (await tab.boundingBox())!;
+          expect(box.x).toBeGreaterThanOrEqual(strip.x - 0.5);
+          expect(box.x + box.width).toBeLessThanOrEqual(strip.x + strip.width + 0.5);
+        }
+        // One line: on two, the rail ran into the scale bar under it.
+        expect((await page.getByRole('navigation', { name: 'Map scale' }).boundingBox())!.height).toBeLessThan(40);
+
+        await page.getByRole('tab', { name: 'Search' }).tap();
+        await page.getByPlaceholder('Search stars, planets, exoplanets…').fill('Sirius');
+        await page.getByRole('option', { name: /^Sirius/ }).first().tap();
+        await expect(backButtonLocator(page)).toBeVisible({ timeout: 30_000 });
+        // The sheet folds away on a phone, title and all: the nameplate is what names the star.
+        await expect(page.getByTestId('hud-title')).toHaveCount(0);
+        await expect(page.getByTestId('hud-banner')).toBeVisible();
+        await expect(page.getByTestId('hud-banner')).toHaveText('Sirius');
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+      });
+    });
+  }
+
   test('typing fewer than two characters shows no results, and Escape clears the query', async ({ page }) => {
     await page.goto('/?stars=4000');
     const searchInput = await openSearch(page);

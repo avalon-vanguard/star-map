@@ -87,6 +87,21 @@ describe('StarmapHudComponent', () => {
     expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="hud-banner"]')?.textContent?.trim()).toBe('Sol');
   });
 
+  it('names what the view is holding on a phone too, under the scale bar and inside the frame, and across the centre from lg', () => {
+    // jsdom lays nothing out: the classes are what decide it. Hidden below lg, the name was nowhere
+    // on a phone once a search pick had folded the readout away. Measured in Chromium at 390 and 360
+    // wide, it now starts 96 px down, under the scale bar, which ends at 89.
+    fixture.componentRef.setInput('title', 'Gaia DR3 5855802671045627648');
+    const banner = render('system').querySelector('[data-testid="hud-banner"]')!;
+    const place = [...banner.parentElement!.classList];
+
+    expect(place).not.toContain('hidden');
+    expect(place).toEqual(expect.arrayContaining(['top-24', 'left-6', 'max-w-[calc(100%-3rem)]']));
+    expect(place).toEqual(expect.arrayContaining(['lg:top-6', 'lg:left-1/2', 'lg:-translate-x-1/2', 'lg:max-w-none']));
+    // Wrapped, never cut: a designation's last digits are what tell it apart.
+    expect(banner.querySelector(':scope > span')!.classList).toContain('wrap-break-word');
+  });
+
   it('shows no banner when the view is holding nothing', () => {
     // An empty nameplate is worse than none: it reads as a selection that failed to resolve.
     expect(render('galaxy').querySelector('[data-testid="hud-banner"]')).toBeNull();

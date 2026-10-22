@@ -22,7 +22,8 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
 
 /**
  * The top of the map's heads-up display: the scale ladder on the left with the scale bar under
- * it, the nameplate across the centre, and a centre reticle on whatever the camera is holding.
+ * it, the nameplate across the centre (under the scale bar below lg), and a centre reticle on
+ * whatever the camera is holding.
  * Readouts and tools live in the dock along the bottom (`HudDockComponent`).
  *
  * Purely presentational — every value arrives as an input and the only thing it emits is a
@@ -82,13 +83,15 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
     }
 
     @if (title()) {
-      <!-- Hidden below lg: the readout panel names the same thing, and at narrower widths a
-           long star name runs into the scale rail on its left and under the object card on its
-           right — all three share the top-6 line. -->
-      <div class="absolute top-6 left-1/2 hidden -translate-x-1/2 lg:block">
+      <!-- Centred on the rail's line from lg. Below it a long star name ran into the rail on its
+           left and under the object card on its right, so there it sits under the scale bar
+           instead, at the left, held inside the frame and wrapped rather than cut. It used to be
+           hidden there, and the readout that names the same thing folds away on a phone once a
+           search result is picked: after a pick on a phone the star's name was nowhere on screen. -->
+      <div class="absolute top-24 left-6 max-w-[calc(100%-3rem)] lg:top-6 lg:left-1/2 lg:max-w-none lg:-translate-x-1/2">
         <div data-testid="hud-banner" class="hud-brackets hud-acquire hud-surface flex items-center gap-2.5 px-6 py-1.5">
           <app-reticle-icon class="h-3 w-3 shrink-0 text-accent" />
-          <span class="text-[11px] tracking-[0.3em] text-accent uppercase">{{ title() }}</span>
+          <span class="min-w-0 text-[11px] tracking-[0.3em] wrap-break-word text-accent uppercase">{{ title() }}</span>
         </div>
       </div>
     }

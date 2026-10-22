@@ -21,6 +21,18 @@ import { fetchTextCached } from '../lib/http';
 const GAIA_TAP_URL = 'https://gea.esac.esa.int/tap-server/tap/sync';
 
 /**
+ * A synchronous query of the archive returning up to `maxRows` rows of CSV.
+ *
+ * `MAXREC` is the TAP parameter for the row cap, and the archive no longer lets a query's own
+ * `top` stand in for it: on 2026-10-22 it served the Hipparcos reduction's first 50 000 rows of
+ * 117 955, in a 200 with nothing in the CSV to say so (its VOTable read OVERFLOW), until asked for
+ * more.
+ */
+function tapQueryUrl(query: string, maxRows: number): string {
+  return `${GAIA_TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&MAXREC=${maxRows}&QUERY=${encodeURIComponent(query)}`;
+}
+
+/**
  * Gaia DR3 gives positions for J2016.0; HYG for J2000.0, which is the epoch this map keeps.
  * Sixteen years of proper motion is over an arcsecond for anything faster than ~62 mas/yr —
  * which is most of the nearest stars: 62″ for Proxima, 166″ for Barnard's — so as published, the
@@ -171,7 +183,7 @@ export async function fetchGaiaStars(): Promise<StarRecord[]> {
  * {@link DEFAULT_QUERY_ROWS} — or as many as the row limit.
  */
 async function fetchQueryRows(query: string, expectedRows: number | undefined): Promise<Record<string, string>[]> {
-  const url = `${GAIA_TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=${encodeURIComponent(query)}`;
+  const url = tapQueryUrl(query, ROW_LIMIT);
   // Keyed by the whole request, so a response cached for other columns, another order, or
   // another endpoint can never be mistaken for this one — the cache records only that some
   // response arrived, not what it answered.
@@ -249,6 +261,8 @@ function rowsToStars(rows: readonly Record<string, string>[], idBase: number): S
  * its Hipparcos distance.
  */
 const MIN_USABLE_HIP_DISTANCES = 90_000;
+/** A ceiling over both Hipparcos tables, 99 525 and 117 955 rows. */
+const HIP_QUERY_ROWS = 200_000;
 
 /**
  * Gaia's distance for every Hipparcos star it has a usable parallax for, and that distance's
@@ -266,10 +280,10 @@ const MIN_USABLE_HIP_DISTANCES = 90_000;
  */
 export async function fetchGaiaDistancesByHip(): Promise<Map<number, { distancePc: number; relativeError: number }>> {
   const query = [
-    'select top 200000 b.original_ext_source_id as hip, g.parallax, g.parallax_over_error',
+    `select top ${HIP_QUERY_ROWS} b.original_ext_source_id as hip, g.parallax, g.parallax_over_error`,
     'from gaiadr3.hipparcos2_best_neighbour b join gaiadr3.gaia_source g on g.source_id = b.source_id'
   ].join(' ');
-  const url = `${GAIA_TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=${encodeURIComponent(query)}`;
+  const url = tapQueryUrl(query, HIP_QUERY_ROWS);
   console.log('Fetching Gaia DR3 distances for Hipparcos stars (archive cross-match)...');
   const rows = parseCsvObjects(await fetchTextCached(url, `gaia-dr3-hip-${createHash('sha1').update(url).digest('hex').slice(0, 8)}.csv`));
 
@@ -349,7 +363,7 @@ const MIN_HIPPARCOS_ERRORS = 110_000;
  * are the inverse of. HYG publishes the distance and not its error.
  */
 export async function fetchHipparcosParallaxErrors(): Promise<Map<number, { parallaxMas: number; relativeError: number }>> {
-  const url = `${GAIA_TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=${encodeURIComponent('select top 200000 hip, plx, e_plx from public.hipparcos_newreduction order by hip')}`;
+  const url = tapQueryUrl(`select top ${HIP_QUERY_ROWS} hip, plx, e_plx from public.hipparcos_newreduction order by hip`, HIP_QUERY_ROWS);
   console.log('Fetching Hipparcos parallax errors (new reduction)...');
   const rows = parseCsvObjects(await fetchTextCached(url, `hipparcos-errors-${createHash('sha1').update(url).digest('hex').slice(0, 8)}.csv`));
 

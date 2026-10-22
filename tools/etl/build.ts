@@ -129,6 +129,10 @@ function validateStars(stars: StarRecord[]): void {
   const { index, positions, meta } = encodeStarCatalog(stars);
   const decoded = decodeStarCatalog(index, positions, meta);
   assertCondition(decoded.length === stars.length, `Star catalogue round-trip lost records: ${decoded.length} of ${stars.length}.`);
+  // The source id column is what keeps them out: compared against the row id instead, every one of
+  // the 378 105 was written out, 86 % of the index.
+  const spelledOut = index.names.filter((name) => /^Gaia DR3 \d+$/.test(name)).length;
+  assertCondition(spelledOut === 0, `stars-index.json spells out ${spelledOut} Gaia designations that stars-meta.bin should carry as source ids.`);
   for (let i = 0; i < stars.length; i++) {
     assertCondition(decoded[i].id === stars[i].id && decoded[i].name === stars[i].name, `Star catalogue round-trip altered record ${i}.`);
     assertCondition(decoded[i].spectralType === stars[i].spectralType, `Star catalogue round-trip lost the spectral type of star ${stars[i].id}.`);

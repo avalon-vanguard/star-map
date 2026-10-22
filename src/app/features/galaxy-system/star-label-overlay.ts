@@ -45,6 +45,11 @@ export interface LabeledPoint {
 export type LabelSide = 'left' | 'right';
 export type LabelTone = 'normal' | 'ghost';
 
+/** The first line a label prints: its name, and a distance after it when it has one. */
+export function nameLine(point: Pick<LabeledPoint, 'name' | 'distance'>): string {
+  return point.distance ? `${point.name} · ${point.distance}` : point.name;
+}
+
 /** Where the selection mark sits, in the same scene units as the labels. */
 export interface SelectionPoint {
   x: number;
@@ -188,7 +193,7 @@ export class StarLabelOverlay {
 
     const name = document.createElement('span');
     name.className = 'map-label-name';
-    name.textContent = point.distance ? `${point.name} · ${point.distance}` : point.name;
+    name.textContent = nameLine(point);
     element.appendChild(name);
 
     if (point.kind) {

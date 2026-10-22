@@ -235,6 +235,8 @@ body {
   padding: 0 3px;
 }
 
+/* The label pass sizes each label from these sizes, tracking and plates without reading the DOM
+ * (`labelTextPx` in galaxy-system-scene.component.ts): change the two together. */
 .map-label-name {
   font-size: 11px;
   letter-spacing: 0.08em;

@@ -77,7 +77,7 @@ import { MAX_JUMP_RANGE_PC } from '../hud/routes-panel.component';
 import { HostStarRings } from './host-star-rings';
 import { JumpLinkRenderer } from './jump-link-renderer';
 import { ReservedBox, ringPlacement } from './label-ring';
-import { LabeledPoint, LabelSide, StarLabelOverlay } from './star-label-overlay';
+import { LabeledPoint, LabelSide, nameLine, StarLabelOverlay } from './star-label-overlay';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
 import { catalogueCensus, positionsNote, starReadouts, starSubtitle } from './star-readouts';
 
@@ -136,8 +136,8 @@ const LABEL_MAX_COUNT = 15;
  */
 const LABEL_MIN_SEPARATION_NDC = 0.12;
 /**
- * The height of the row a label's text takes, in NDC: two lines are 22 px, 0.04 at 1080 and 0.05
- * at 844, rounded up. Two labels on rows closer than this print into each other.
+ * The least height of the row a label's text takes, in NDC: 32 px at 1080, where two lines are
+ * 22.6. Below 755 px it is less than that, and the label's own text sets the row; see `labelRect`.
  */
 const LABEL_ROW_NDC = LABEL_MIN_SEPARATION_NDC / 2;
 /**
@@ -147,7 +147,10 @@ const LABEL_ROW_NDC = LABEL_MIN_SEPARATION_NDC / 2;
  * so the full separation would have one name clear three rungs.
  */
 const RING_LABEL_CLEARANCE_NDC = LABEL_MIN_SEPARATION_NDC / 2;
-/** How far right of its point a label's text reaches, in aspect-scaled NDC (~135px at 1440). */
+/**
+ * The least reach of a label's text from its point, in aspect-scaled NDC: 162 px at 1080, 108 at
+ * 720. A longer name reaches as far as its own text does; see `labelRect`.
+ */
 const LABEL_REACH_NDC = 0.3;
 /**
  * The same for a ring label, which is shorter: "1.5 kpc" with "Survey edge" under it is the widest
@@ -164,18 +167,46 @@ interface LabelRect {
   readonly top: number;
 }
 
-/** The text of a label hung on `side` of `point`, reaching `reach` from it, `row` tall. */
+/**
+ * How wide and tall a label's text is in CSS px, from its characters and the type styles.css sets:
+ * the name line 11 px JetBrains Mono tracked 0.08em, 7.48 px a character and 12.65 px tall, the
+ * kind line 10 px tracked 0.12em, 7.2 px a character and 10 px tall, each on a plate 3 px a side,
+ * 14 px (the leader's margin) from the point. "Barnard's Star · 1.83 pc" comes to 199.5 px; the
+ * browser drew it 199 px from its point.
+ */
+function labelTextPx(label: Pick<LabeledPoint, 'name' | 'kind' | 'distance'>): {
+  width: number;
+  height: number;
+} {
+  const line = Math.max(nameLine(label).length * 7.48, (label.kind?.length ?? 0) * 7.2);
+  return { width: 14 + line + 6, height: 12.65 + (label.kind ? 10 : 0) };
+}
+
+/**
+ * The text of `label` hung on `side` of `point`, on a canvas `heightPx` tall: as wide and as
+ * tall as that text, and at least `reach` and `row`. Those were what every label got, and on a
+ * phone "Barnard's Star · 1.83 pc" passed the frame test as 111 px of text that is 199, so its
+ * unit printed past the edge, and at 720 px names printed into names in 4 of 60 poses near the
+ * Sun and distances into distances in 7.
+ */
 function labelRect(
   point: THREE.Vector2,
   side: LabelSide,
-  reach: number,
+  label: Pick<LabeledPoint, 'name' | 'kind' | 'distance'>,
+  heightPx: number,
+  reach = LABEL_REACH_NDC,
   row = LABEL_ROW_NDC,
 ): LabelRect {
+  // jsdom lays out no canvas, so there the least sizes are all there is.
+  const ndcPerPx = heightPx > 0 ? 2 / heightPx : 0;
+  const text = labelTextPx(label);
+  const across = Math.max(reach, text.width * ndcPerPx);
+  const tall = Math.max(row, text.height * ndcPerPx);
   return {
-    left: side === 'left' ? point.x - reach : point.x,
-    right: side === 'left' ? point.x : point.x + reach,
-    bottom: point.y - row / 2,
-    top: point.y + row / 2,
+    left: side === 'left' ? point.x - across : point.x,
+    right: side === 'left' ? point.x : point.x + across,
+    bottom: point.y - tall / 2,
+    top: point.y + tall / 2,
   };
 }
 
@@ -1312,13 +1343,14 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     names: readonly LabeledPoint[],
   ): LabeledPoint[] {
     const aspect = this.viewportAspect();
+    const height = this.canvasRef().nativeElement.clientHeight;
     const anchors: THREE.Vector2[] = [];
     const taken = this.reservedRects(aspect);
     for (const name of names) {
       const at = this.screenPoint(name, camera, aspect);
       if (at) {
         anchors.push(at);
-        taken.push(labelRect(at, name.side ?? 'right', LABEL_REACH_NDC));
+        taken.push(labelRect(at, name.side ?? 'right', name, height));
       }
     }
     return candidates.filter((label) => {
@@ -1331,7 +1363,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       // in 30 poses at 35 degrees went from 122 to 75, where 6 of those poses had any overlap; at
       // half a row, to 113.
       const row = label.kind ? LABEL_ROW_NDC : LABEL_ROW_NDC / 2;
-      const rect = labelRect(point, 'right', RING_LABEL_REACH_NDC, row);
+      const rect = labelRect(point, 'right', label, height, RING_LABEL_REACH_NDC, row);
       if (!inTheClear(rect, taken, aspect)) {
         return false;
       }
@@ -1502,16 +1534,17 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     placed: readonly LabeledPoint[] = [],
   ): LabeledPoint[] {
     const aspect = this.viewportAspect();
+    const height = this.canvasRef().nativeElement.clientHeight;
     const anchors: THREE.Vector2[] = [];
     const taken = this.reservedRects(aspect);
-    const place = (point: THREE.Vector2, side: LabelSide) => {
+    const place = (point: THREE.Vector2, side: LabelSide, label: LabeledPoint) => {
       anchors.push(point);
-      taken.push(labelRect(point, side, LABEL_REACH_NDC));
+      taken.push(labelRect(point, side, label, height));
     };
     for (const label of placed) {
       const point = this.screenPoint(label, camera, aspect);
       if (point) {
-        place(point, label.side ?? 'right');
+        place(point, label.side ?? 'right', label);
       }
     }
 
@@ -1532,14 +1565,14 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       // leader line to the card leaves its right, and would otherwise run straight through it.
       const sides: LabelSide[] = candidate.id === this.cardBodyId ? ['left'] : ['right', 'left'];
       const side = point
-        ? sides.find((each) => inTheClear(labelRect(point, each, LABEL_REACH_NDC), taken, aspect))
+        ? sides.find((each) => inTheClear(labelRect(point, each, candidate, height), taken, aspect))
         : undefined;
       if (!side && !isKept) {
         continue;
       }
       const hung = side ?? sides[0];
       if (point) {
-        place(point, hung);
+        place(point, hung, candidate);
       }
       chosen.push({ ...candidate, side: hung });
       // Here rather than at the top of the loop: there, taking the fifteenth label asked the

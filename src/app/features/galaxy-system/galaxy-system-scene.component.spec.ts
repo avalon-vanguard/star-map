@@ -1077,6 +1077,50 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       // A distance on a ring as much as a name.
       expect(component.ringLabelsInTheClear([px(7, 200, 700), px(8, 1000, 300)], camera, []).map((label) => label.id)).toEqual([8]);
     });
+
+    it('measures a name by its own text where that reaches further than the least reach', () => {
+      // 0.35 inside the right edge: room for the 0.3 every name is given, not for a neighbour's
+      // name and distance, which reach 214 px from the point, 0.48 of the frame at 900 px.
+      const nearEdge = at('neighbour:70890', 1600 / 900 - 0.35, 0);
+      const neighbour: LabeledPoint = { ...nearEdge, name: 'Proxima Centauri', distance: '1.30 pc', tone: 'ghost' };
+      expect(component.spreadLabels([neighbour], camera, null).map((label) => label.side)).toEqual(['left']);
+      expect(component.spreadLabels([{ ...nearEdge, name: 'Sirius' }], camera, null).map((label) => label.side)).toEqual(['right']);
+    });
+  });
+
+  describe('on a 1280x720 canvas', () => {
+    type Spreading = {
+      spreadLabels(candidates: Iterable<LabeledPoint>, camera: THREE.Camera, keepId: null): LabeledPoint[];
+      ringLabelsInTheClear(candidates: readonly LabeledPoint[], camera: THREE.Camera, names: readonly LabeledPoint[]): LabeledPoint[];
+    };
+    let component: Spreading;
+    let camera: THREE.Camera;
+    let at: (id: number | string, name: string, x: number, y: number, kind?: string) => LabeledPoint;
+
+    beforeEach(() => {
+      const canvas = (fixture.nativeElement as HTMLElement).querySelector('canvas')!;
+      Object.defineProperty(canvas, 'clientWidth', { value: 1280 });
+      Object.defineProperty(canvas, 'clientHeight', { value: 720 });
+      component = fixture.componentInstance as unknown as Spreading;
+      camera = engine.getCamera();
+      camera.updateMatrixWorld(true);
+      at = (id, name, x, y, kind) => {
+        const point = new THREE.Vector3(x / (1280 / 720), y, 0.5).unproject(camera);
+        return { id, name, ...(kind ? { kind } : {}), x: point.x, y: point.y, z: point.z };
+      };
+    });
+
+    it('keeps names and rungs a row of their own text apart, where that is taller than the least row', () => {
+      const ids = (labels: LabeledPoint[]) => labels.map((label) => label.id);
+      // Two lines are 22.65 px, 0.063 of the frame here: 0.062 up clears the least row, 0.06, and
+      // still prints into the name below. Its left runs into that name too.
+      expect(ids(component.spreadLabels([at(1, 'Sirius', 0, 0, 'Star'), at(2, 'Vega', 0.15, 0.062, 'Star')], camera, null))).toEqual([1]);
+      // A distance is one line, 12.65 px, 0.035 here, against half the least row, 0.03.
+      expect(ids(component.ringLabelsInTheClear([at('ring-12', '12 pc', 0, 0), at('ring-14', '14 pc', 0, 0.032)], camera, []))).toEqual(['ring-12']);
+      // "Groombridge 34" reaches 125 px, 0.35 here: a rung 0.32 along is past the least reach and
+      // still under the name.
+      expect(component.ringLabelsInTheClear([at('ring-16', '16 pc', 0.32, 0)], camera, [at(3, 'Groombridge 34', 0, 0, 'Star')])).toEqual([]);
+    });
   });
 
   it('places the deep-sky names after the star names and around them, outside their count', async () => {

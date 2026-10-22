@@ -136,7 +136,7 @@ describe('SearchComponent', () => {
     await fixture.whenStable();
 
     expect(navigationStore.selectedStarId()).toBe(1);
-    expect(router.navigate).toHaveBeenCalledWith(['/']);
+    expect(router.navigate).toHaveBeenCalledWith(['/'], { queryParamsHandling: 'merge' });
   });
 
   it('navigates straight to a body detail route', async () => {

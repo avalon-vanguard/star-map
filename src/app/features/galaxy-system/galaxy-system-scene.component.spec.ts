@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { Location } from '@angular/common';
+import { provideLocationMocks, SpyLocation } from '@angular/common/testing';
+import { provideRouter, Router } from '@angular/router';
 import * as THREE from 'three/webgpu';
 import { afterEach, beforeEach, describe, expect, it, MockInstance, vi } from 'vitest';
 
@@ -234,7 +236,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       imports: [GalaxySystemSceneComponent],
       providers: [
         { provide: DataLoaderService, useClass: FakeDataLoaderService },
-        { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true) } }
+        // A real router over a mocked location, so the URL the scene writes can be read back and Back pressed.
+        provideRouter([]),
+        provideLocationMocks(),
       ]
     }).overrideComponent(GalaxySystemSceneComponent, {
       set: { providers: [{ provide: EngineService, useValue: engine }] }
@@ -268,6 +272,86 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
     expect(navigationStore.selectedStarId()).toBeNull();
     expect(navigationStore.viewLevel()).toBe('galaxy');
+  });
+
+  describe('the address bar', () => {
+    let location: SpyLocation;
+
+    beforeEach(() => {
+      location = TestBed.inject(Location) as SpyLocation;
+      // What the app's bootstrap does and TestBed does not: it is what subscribes the router to popstate.
+      TestBed.inject(Router).initialNavigation();
+    });
+
+    /** Puts a fresh map on the URL given, as a link, a reload or the body page's back control would. */
+    async function mountAt(url: string): Promise<void> {
+      fixture.destroy();
+      await TestBed.inject(Router).navigateByUrl(url);
+      fixture = TestBed.createComponent(GalaxySystemSceneComponent);
+      fixture.detectChanges();
+      await flushAsync();
+      // Long enough for a star-to-star hop: out of one system, then into the next.
+      await advanceFrames(engine, 5, 0.1);
+    }
+
+    async function choose(starId: number | null): Promise<void> {
+      navigationStore.selectStar(starId);
+      TestBed.tick();
+      await flushAsync();
+      // Long enough for a star-to-star hop: out of one system, then into the next.
+      await advanceFrames(engine, 5, 0.1);
+    }
+
+    async function back(): Promise<void> {
+      location.back();
+      await flushAsync();
+      // Long enough for a star-to-star hop: out of one system, then into the next.
+      await advanceFrames(engine, 5, 0.1);
+    }
+
+    it('names each system entered in ?star=, keeping the other parameters, and Back retraces them to the neighbourhood', async () => {
+      await mountAt('/?stars=4000');
+      const opened = location.urlChanges.length;
+      await choose(SUN.id);
+      await choose(PROXIMA.id);
+      // Pushed, not replaced: one history entry per system.
+      expect(location.urlChanges.slice(opened)).toEqual(['/?stars=4000&star=0', '/?stars=4000&star=42']);
+
+      await back();
+      expect(navigationStore.selectedStarId()).toBe(SUN.id);
+      expect(navigationStore.viewLevel()).toBe('system');
+      await back();
+      expect(navigationStore.selectedStarId()).toBeNull();
+      expect(navigationStore.viewLevel()).toBe('galaxy');
+      expect(location.path()).toBe('/?stars=4000');
+    });
+
+    it('opens in the system a link names', async () => {
+      await mountAt('/?star=42');
+      expect(navigationStore.selectedStarId()).toBe(PROXIMA.id);
+      expect(navigationStore.viewLevel()).toBe('system');
+      expect(location.path()).toBe('/?star=42');
+    });
+
+    it('opens on the neighbourhood for an id the catalogue lacks, replacing the entry so Back does not return to it', async () => {
+      await mountAt('/?star=987654321');
+      expect(navigationStore.selectedStarId()).toBeNull();
+      expect(navigationStore.viewLevel()).toBe('galaxy');
+      expect(location.urlChanges.at(-1)).toBe('replace: /');
+    });
+
+    it('reads anything but digits as no star at all, not as the Sun', async () => {
+      await mountAt('/?star=');
+      expect(navigationStore.selectedStarId()).toBeNull();
+      expect(navigationStore.viewLevel()).toBe('galaxy');
+    });
+
+    it('carries a star chosen before the map mounted, from a body page, onto the URL without a second entry', async () => {
+      navigationStore.selectStar(SUN.id);
+      await mountAt('/');
+      expect(navigationStore.viewLevel()).toBe('system');
+      expect(location.urlChanges.at(-1)).toBe('replace: /?star=0');
+    });
   });
 
   it('chooses the drawn stars again once the view centre has moved, and not for a small drift', async () => {

@@ -1,5 +1,6 @@
 import { AfterViewInit, Component, computed, effect, ElementRef, inject, OnDestroy, signal, viewChild } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { skip, Subscription } from 'rxjs';
 import * as THREE from 'three/webgpu';
 import { normalView, positionViewDirection, texture, uniform } from 'three/tsl';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -208,6 +209,14 @@ const MIN_ROUTE_QUERY_LENGTH = 2;
  * 30 pc, as it was, the search could run for a minute through the dense core before answering.
  */
 const ROUTE_RANGE_CEILING_PC = MAX_JUMP_RANGE_PC;
+
+/**
+ * A `?star=` value as a catalogue id, or null for none. Only digits: `Number('')` is 0, the Sun,
+ * so an empty or garbled parameter would otherwise open a system nobody linked to.
+ */
+function starIdFromParam(value: string | null): number | null {
+  return value !== null && /^\d+$/.test(value) ? Number(value) : null;
+}
 
 /** How many neighbouring stars are named from inside a system. */
 const NEIGHBOUR_COUNT = 4;
@@ -428,6 +437,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private readonly engine = inject(EngineService);
   private readonly dataLoader = inject(DataLoaderService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   readonly navigationStore = inject(NavigationStore);
   readonly time = inject(TimeStore);
 
@@ -583,6 +593,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private exoplanets: readonly ExoplanetRecord[] = [];
   private resizeObserver?: ResizeObserver;
   private unsubscribeTick?: () => void;
+  private queryParamSubscription?: Subscription;
   private labelUpdateAccumulator = 0;
   private pointerDownAt: { x: number; y: number } | null = null;
   private ready = false;
@@ -600,6 +611,35 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private starRotation?: RotationalElements;
 
   constructor() {
+    // The address bar names the system on screen as ?star=<id>, so a link, a reload and Back all
+    // land in it. Read before the mirror below first runs, which would otherwise strip the id from
+    // a fresh deep link while the store is still empty. An absent star keeps what the store holds:
+    // the host star a body page selected before handing back to the map.
+    const linkedStarId = starIdFromParam(this.route.snapshot.queryParamMap.get('star'));
+    if (linkedStarId !== null) {
+      this.navigationStore.selectStar(linkedStarId);
+    }
+    // Later values are Back and Forward; the first is the URL just read.
+    this.queryParamSubscription = this.route.queryParamMap
+      .pipe(skip(1))
+      .subscribe((params) => this.navigationStore.selectStar(starIdFromParam(params.get('star'))));
+    // One place for every way of choosing a star (click, label, search, bookmark, route, ladder).
+    // Each system entered or left is a history entry, so Back retraces them. Two writes replace
+    // the entry instead: the one on mounting, which carries a body page's host star onto the
+    // URL just arrived at, and the one that clears an id the catalogue does not hold, which
+    // would otherwise sit one Back away and bounce the reader forward again.
+    effect(() => {
+      const starId = this.navigationStore.selectedStarId();
+      const inUrl = this.route.snapshot.queryParamMap.get('star');
+      if (inUrl === (starId === null ? null : String(starId))) {
+        return;
+      }
+      void this.router.navigate([], {
+        queryParams: { star: starId },
+        queryParamsHandling: 'merge',
+        replaceUrl: !this.ready || (inUrl !== null && !this.starsById.has(Number(inUrl))),
+      });
+    });
     effect(() => {
       const selectedStarId = this.navigationStore.selectedStarId();
       if (this.ready) {
@@ -621,6 +661,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.queryParamSubscription?.unsubscribe();
     this.unsubscribeTick?.();
     this.resizeObserver?.disconnect();
     this.canvasRef().nativeElement.removeEventListener('pointerdown', this.handlePointerDown);

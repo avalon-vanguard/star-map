@@ -137,7 +137,9 @@ export class SearchComponent {
     this.clear();
     if (result.kind === 'star' && result.starId !== undefined) {
       this.navigationStore.selectStar(result.starId);
-      void this.router.navigate(['/']);
+      // Merged, so a pick made on the map keeps its ?stars= and is a same-URL no-op there; the map
+      // itself writes the ?star= of the system it then flies into.
+      void this.router.navigate(['/'], { queryParamsHandling: 'merge' });
     } else if (result.bodyId) {
       void this.router.navigate(['/body', result.bodyId]);
     }

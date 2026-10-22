@@ -20,6 +20,43 @@ test.describe('Search-driven navigation', () => {
     await expect(backButtonLocator(page)).toBeVisible({ timeout: 15_000 });
   });
 
+  test('the system flown into is in the URL, so a reload lands in it and Back retraces it', async ({ page }) => {
+    // Two searched flights, a reload and two Back flights, on the software rasterizer.
+    test.setTimeout(90_000);
+    await page.goto('/?stars=4000');
+    const title = page.getByTestId('hud-title');
+
+    for (const name of ['Sirius', 'Proxima Centauri']) {
+      await (await openSearch(page)).fill(name);
+      await page.getByRole('button', { name: new RegExp(`^${name}`) }).first().click();
+      await expect(title).toHaveText(name, { timeout: 30_000 });
+    }
+    // ?stars= survives beside the star, as every write merges into what the URL already holds.
+    await expect(page).toHaveURL(/\/\?stars=4000&star=\d+$/);
+    const proxima = page.url();
+
+    await page.reload();
+    await expect(title).toHaveText('Proxima Centauri', { timeout: 30_000 });
+
+    await page.goBack();
+    await expect(title).toHaveText('Sirius', { timeout: 30_000 });
+    expect(page.url()).not.toBe(proxima);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/\?stars=4000$/);
+    await expect(backButtonLocator(page)).toHaveCount(0, { timeout: 30_000 });
+  });
+
+  test('a link to a star the catalogue does not hold opens on the neighbourhood, without an error', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto('/?stars=4000&star=999999999');
+
+    await expect(page.getByTestId('hud-title')).toHaveText('Local Stars', { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/\?stars=4000$/);
+    await expect(backButtonLocator(page)).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
   test('selecting a body result navigates straight to its detail route and shows real NASA data', async ({ page }) => {
     await page.goto('/?stars=4000');
     const searchInput = await openSearch(page);

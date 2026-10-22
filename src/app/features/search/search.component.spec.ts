@@ -163,4 +163,70 @@ describe('SearchComponent', () => {
 
     expect(element.querySelector('[data-testid="search-results"]')).toBeNull();
   });
+
+  describe('from the keyboard', () => {
+    const field = (): HTMLInputElement => element.querySelector('input')!;
+    const options = (): HTMLElement[] => [...element.querySelectorAll<HTMLElement>('[role="option"]')];
+    function press(target: Element, key: string): void {
+      target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+    }
+
+    it('picks the first result on Enter, as a click on it would, and nothing when nothing is listed', async () => {
+      await type('zzzzz');
+      press(field(), 'Enter');
+      expect(router.navigate).not.toHaveBeenCalled();
+
+      await type('Proxima');
+      press(field(), 'Enter');
+      await fixture.whenStable();
+      expect(navigationStore.selectedStarId()).toBe(1);
+      expect(fixture.componentInstance.query()).toBe('');
+    });
+
+    it('walks the list with the arrows, and comes back to the field from its top or on Escape', async () => {
+      await type('Iot');
+      press(field(), 'ArrowDown');
+      expect(document.activeElement).toBe(options()[0]);
+      press(options()[0], 'ArrowDown');
+      expect(document.activeElement).toBe(options()[1]);
+      press(options()[1], 'ArrowUp');
+      expect(document.activeElement).toBe(options()[0]);
+      press(options()[0], 'ArrowUp');
+      expect(document.activeElement).toBe(field());
+
+      const last = options().at(-1)!;
+      last.focus();
+      press(last, 'ArrowDown');
+      expect(document.activeElement).toBe(last);
+      // Escape on an option only goes back to the field: the text stays, and the dock's Escape,
+      // listening on the document, never hears it.
+      const reachedPage = vi.fn();
+      document.addEventListener('keydown', reachedPage);
+      press(last, 'Escape');
+      document.removeEventListener('keydown', reachedPage);
+      expect(document.activeElement).toBe(field());
+      expect(fixture.componentInstance.query()).toBe('Iot');
+      expect(reachedPage).not.toHaveBeenCalled();
+    });
+
+    it('says what the field is, whether its list is open, and how many match, in a region that was there before', async () => {
+      const status = element.querySelector('[aria-live="polite"]')!;
+      expect(status.textContent?.trim()).toBe('');
+      expect(field().getAttribute('role')).toBe('combobox');
+      expect(field().getAttribute('aria-label')).toBe('Search stars, planets and exoplanets');
+      expect(field().getAttribute('aria-expanded')).toBe('false');
+
+      await type('Proxima');
+      const list = element.querySelector('[role="listbox"]')!;
+      expect(field().getAttribute('aria-expanded')).toBe('true');
+      expect(field().getAttribute('aria-controls')).toBe(list.id);
+      expect(options().length).toBe(2);
+      expect(status.textContent?.trim()).toBe('Matches 2');
+
+      await type('zzzzz');
+      expect(field().getAttribute('aria-expanded')).toBe('false');
+      expect(field().getAttribute('aria-controls')).toBeNull();
+      expect(status.textContent?.trim()).toBe('Nothing in the catalog matches “zzzzz”');
+    });
+  });
 });

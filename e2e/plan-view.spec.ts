@@ -9,7 +9,7 @@ test.describe('Plan view', () => {
 
     const searchInput = await openSearch(page);
     await searchInput.fill('Sol');
-    await page.getByRole('button', { name: /^Sol\b/ }).first().click();
+    await page.getByRole('option', { name: /^Sol\b/ }).first().click();
     await expect(page.getByTestId('hud-title')).toHaveText('Sol', { timeout: 45_000 });
 
     // Where the planets are on screen before and after: under a plan view they lie on one

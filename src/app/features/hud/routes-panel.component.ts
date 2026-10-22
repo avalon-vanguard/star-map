@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 
 import { formatParsecs } from '../../shared/format/quantity';
+import { focusFirstOption, onOptionListKeydown } from '../../shared/ui/option-list-keys';
 
 /**
  * The widest jump the Routes panel offers. Past it the drawn graph is a solid sheet of lines, and
@@ -57,21 +58,35 @@ type Field = 'from' | 'to';
           <div class="relative">
             <label [for]="'route-' + field" class="type-label text-muted">{{ field === 'from' ? 'Departure' : 'Destination' }}</label>
             <input
+              #input
               [id]="'route-' + field"
               type="text"
               autocomplete="off"
+              role="combobox"
+              [attr.aria-expanded]="listed(field)"
+              [attr.aria-controls]="listed(field) ? 'route-' + field + '-options' : null"
               [value]="text(field)"
               [placeholder]="field === 'from' ? 'From this system' : 'Search a star'"
               (input)="onInput(field, $event)"
+              (keydown.enter)="chooseFirst(field, $event)"
+              (keydown.arrowdown)="focusFirstOption($event)"
               (keydown.escape)="$event.stopPropagation(); closeOptions()"
               class="hud-surface mt-1 w-full px-2.5 py-1.5 text-sm text-text caret-accent placeholder:text-muted focus:border-accent focus:outline-none"
             />
-            @if (open() === field && options().length) {
-              <ul class="hud-surface absolute bottom-full left-0 z-10 mb-1 max-h-48 w-full overflow-y-auto divide-y divide-border/25">
+            @if (listed(field)) {
+              <ul
+                [id]="'route-' + field + '-options'"
+                role="listbox"
+                aria-label="Matches"
+                class="hud-surface absolute bottom-full left-0 z-10 mb-1 max-h-48 w-full overflow-y-auto divide-y divide-border/25"
+              >
                 @for (option of options(); track option.id) {
-                  <li>
+                  <li role="none">
                     <button
                       type="button"
+                      role="option"
+                      aria-selected="false"
+                      (keydown)="onOptionListKeydown($event, input)"
                       (click)="choose(field, option)"
                       class="flex w-full items-baseline gap-3 px-2.5 py-1.5 text-left transition-colors hover:bg-accent/8 focus-visible:bg-accent/12 focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
                     >
@@ -197,6 +212,14 @@ export class RoutesPanelComponent {
   readonly canPlot = computed(() => this.departure() !== null && this.chosen().to !== null);
   readonly rangeLabel = computed(() => formatParsecs(this.rangePc()));
 
+  protected readonly focusFirstOption = focusFirstOption;
+  protected readonly onOptionListKeydown = onOptionListKeydown;
+
+  /** The field's suggestions are showing: it is the one being typed into, and something matched. */
+  listed(field: Field): boolean {
+    return this.open() === field && this.options().length > 0;
+  }
+
   text(field: Field): string {
     return this.chosen()[field]?.name ?? this.typed()[field];
   }
@@ -217,6 +240,15 @@ export class RoutesPanelComponent {
   choose(field: Field, option: RouteStarOption): void {
     this.chosen.update((current) => ({ ...current, [field]: option }));
     this.closeOptions();
+  }
+
+  /** Enter takes the first suggestion, the one a reader who typed the whole name means. */
+  chooseFirst(field: Field, event: Event): void {
+    const first = this.options()[0];
+    if (this.listed(field) && first) {
+      event.preventDefault();
+      this.choose(field, first);
+    }
   }
 
   closeOptions(): void {

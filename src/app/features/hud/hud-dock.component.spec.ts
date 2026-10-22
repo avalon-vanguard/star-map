@@ -445,6 +445,43 @@ describe('HudDockComponent', () => {
     expect(host().querySelector<HTMLInputElement>('#route-range')!.value).toBe('6');
   });
 
+  it('chooses the first suggestion on Enter, and walks the suggestions with the arrows', () => {
+    setReadout();
+    fixture.componentRef.setInput('routing', true);
+    fixture.componentRef.setInput('currentStar', { id: 0, name: 'Sol', subtitle: 'G2V' });
+    fixture.componentRef.setInput('routeOptions', [{ id: 7, name: 'Sirius', subtitle: '2.6 pc' }, { id: 8, name: 'Sirius B', subtitle: '2.6 pc' }]);
+    fixture.componentRef.setInput('defaultTab', 'routes');
+    fixture.detectChanges();
+    const plot = () => [...host().querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('Plot route'))!;
+    const press = (target: Element, key: string) => {
+      target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+      fixture.detectChanges();
+    };
+    const destination = host().querySelector<HTMLInputElement>('#route-to')!;
+    expect(destination.getAttribute('role')).toBe('combobox');
+    expect(destination.getAttribute('aria-expanded')).toBe('false');
+    destination.value = 'Sir';
+    destination.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const list = host().querySelector('#dock-panel-routes [role="listbox"]')!;
+    const options = [...list.querySelectorAll<HTMLElement>('[role="option"]')];
+    expect(destination.getAttribute('aria-expanded')).toBe('true');
+    expect(destination.getAttribute('aria-controls')).toBe(list.id);
+    press(destination, 'ArrowDown');
+    expect(document.activeElement).toBe(options[0]);
+    press(options[0], 'ArrowDown');
+    expect(document.activeElement).toBe(options[1]);
+    press(options[1], 'Escape');
+    expect(document.activeElement).toBe(destination);
+    expect(tab('Routes').getAttribute('aria-selected')).toBe('true');
+
+    press(destination, 'Enter');
+    expect(destination.value).toBe('Sirius');
+    expect(destination.getAttribute('aria-expanded')).toBe('false');
+    expect(plot().disabled).toBe(false);
+  });
+
   describe('clock', () => {
     let time: TimeStore;
 

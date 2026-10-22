@@ -43,7 +43,7 @@ test.describe('Bookmarks', () => {
 
     const searchInput = await openSearch(page);
     await searchInput.fill('Proxima Centauri');
-    await page.getByRole('button', { name: /Proxima Centauri/ }).first().click();
+    await page.getByRole('option', { name: /Proxima Centauri/ }).first().click();
 
     const readout = page.getByTestId('hud-title');
     await expect(readout).toHaveText('Proxima Centauri', { timeout: 30_000 });

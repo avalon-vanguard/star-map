@@ -9,7 +9,7 @@ test.describe('Search-driven navigation', () => {
     const searchInput = await openSearch(page);
     await searchInput.fill('Proxima Centauri');
 
-    const result = page.getByRole('button', { name: /Proxima Centauri/ });
+    const result = page.getByRole('option', { name: /Proxima Centauri/ });
     await expect(result).toBeVisible();
     await result.click();
 
@@ -17,6 +17,26 @@ test.describe('Search-driven navigation', () => {
     // starts): the thing to look at is now the scene, and the search panel folds away with it.
     await expect(page.getByRole('tab', { name: 'Readout' })).toHaveAttribute('aria-selected', 'true');
     await expect(searchInput).toHaveCount(0);
+    await expect(backButtonLocator(page)).toBeVisible({ timeout: 15_000 });
+  });
+
+  test('Enter in the field flies to the first result, and the arrows reach the list and come back', async ({ page }) => {
+    await page.goto('/?stars=4000');
+    const searchInput = await openSearch(page);
+    await searchInput.fill('Sirius');
+
+    // Waited for: the index loads with the catalogue, and Enter on an empty list picks nothing.
+    const first = page.getByRole('listbox').getByRole('option').first();
+    await expect(first).toContainText('Sirius');
+    await expect(searchInput).toHaveAttribute('aria-expanded', 'true');
+    await searchInput.press('ArrowDown');
+    await expect(first).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(searchInput).toBeFocused();
+    await expect(searchInput).toHaveValue('Sirius');
+
+    await searchInput.press('Enter');
+    await expect(page.getByTestId('hud-title')).toHaveText('Sirius', { timeout: 30_000 });
     await expect(backButtonLocator(page)).toBeVisible({ timeout: 15_000 });
   });
 
@@ -28,7 +48,7 @@ test.describe('Search-driven navigation', () => {
 
     for (const name of ['Sirius', 'Proxima Centauri']) {
       await (await openSearch(page)).fill(name);
-      await page.getByRole('button', { name: new RegExp(`^${name}`) }).first().click();
+      await page.getByRole('option', { name: new RegExp(`^${name}`) }).first().click();
       await expect(title).toHaveText(name, { timeout: 30_000 });
     }
     // ?stars= survives beside the star, as every write merges into what the URL already holds.

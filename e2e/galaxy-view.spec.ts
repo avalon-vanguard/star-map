@@ -48,6 +48,8 @@ test.describe('Galaxy view', () => {
 
     // The rings are distances from the Sun, the survey's own edge called out among them.
     await expect(page.getByText('Survey edge')).toBeVisible({ timeout: 30_000 });
+    // On a plate of the void, 80% opaque, so the label reads over a bright field as over black.
+    await expect(page.getByText('Survey edge')).toHaveCSS('background-color', /^oklab\(0\.12\d* .* \/ 0\.8\)$/);
     const scale = page.getByTestId('hud-scale');
     await expect(scale).toHaveAttribute('aria-label', /^Scale: [\d.]+ k?pc$/);
     const opening = await scale.getAttribute('aria-label');

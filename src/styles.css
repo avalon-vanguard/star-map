@@ -225,6 +225,14 @@ body {
   right: -0.75rem;
 }
 
+/* A plate under each line: the text-shadow alone left the name at 1.0-2.6:1 wherever it sat on
+ * something bright (Sagittarius A* on the bulge, Sol on the clump at the opening view). */
+.map-label-name,
+.map-label-kind {
+  background: color-mix(in oklab, var(--color-void) 80%, transparent);
+  padding: 0 3px;
+}
+
 .map-label-name {
   font-size: 11px;
   letter-spacing: 0.08em;

@@ -1223,6 +1223,70 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(component.currentStarOption()?.subtitle).toBe('M5V');
   });
 
+  describe('from the keyboard', () => {
+    type KeyedScene = { controls: { target: THREE.Vector3; enabled: boolean } };
+    let canvas: HTMLCanvasElement;
+    let component: KeyedScene;
+
+    beforeEach(() => {
+      canvas = (fixture.nativeElement as HTMLElement).querySelector('canvas')!;
+      // OrbitControls pans by pixels of the element's height, of which jsdom lays out none.
+      Object.defineProperty(canvas, 'clientHeight', { value: 900 });
+      component = fixture.componentInstance as unknown as KeyedScene;
+    });
+
+    const distance = (): number => engine.getCamera().position.distanceTo(component.controls.target);
+    function press(on: EventTarget, key: string, init: KeyboardEventInit = {}): KeyboardEvent {
+      const event = new KeyboardEvent('keydown', { key, code: key, bubbles: true, cancelable: true, ...init });
+      on.dispatchEvent(event);
+      return event;
+    }
+
+    it('pans on the arrows while the map has focus, and leaves an arrow typed in a field to the field', () => {
+      expect(canvas.tabIndex).toBe(0);
+      expect(canvas.getAttribute('aria-label')).toMatch(/^Star map\./);
+      const field = document.createElement('input');
+      document.body.appendChild(field);
+      const start = component.controls.target.clone();
+
+      // Prevented, an arrow in Search or a route field would no longer move the caret.
+      expect(press(field, 'ArrowLeft').defaultPrevented).toBe(false);
+      expect(component.controls.target.equals(start)).toBe(true);
+
+      expect(press(canvas, 'ArrowLeft').defaultPrevented).toBe(true);
+      expect(component.controls.target.equals(start)).toBe(false);
+      field.remove();
+    });
+
+    it('steps in on + and =, out on -, from the dock’s pair too, and leaves Ctrl with them to the browser', async () => {
+      const start = distance();
+      expect(press(canvas, '+').defaultPrevented).toBe(true);
+      expect(distance()).toBeCloseTo(start * 0.8, 6);
+      press(canvas, '=');
+      expect(distance()).toBeCloseTo(start * 0.64, 6);
+      press(canvas, '-');
+      expect(distance()).toBeCloseTo(start * 0.8, 6);
+      // Ctrl and - is the browser's page zoom.
+      expect(press(canvas, '-', { ctrlKey: true }).defaultPrevented).toBe(false);
+      expect(distance()).toBeCloseTo(start * 0.8, 6);
+
+      await advanceFrames(engine, 0.3);
+      fixture.detectChanges();
+      const zoomOut = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('button[aria-label="Zoom out"]')!;
+      zoomOut.click();
+      expect(distance()).toBeCloseTo(start, 6);
+    });
+
+    it('leaves the camera to a flight while one is under way', async () => {
+      navigationStore.selectStar(PROXIMA.id);
+      await flushAsync();
+      expect(component.controls.enabled).toBe(false);
+      const before = distance();
+      press(canvas, '+');
+      expect(distance()).toBe(before);
+    });
+  });
+
   describe('each star at its own size and in its own colour', () => {
     type DrawnStar = {
       starMarkerGeometry: THREE.SphereGeometry;

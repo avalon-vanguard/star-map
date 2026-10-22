@@ -139,6 +139,25 @@ describe('HudDockComponent', () => {
     expect(host().textContent).not.toContain('Range');
   });
 
+  it('puts a named zoom pair beside the range, which hands each step to the surface, and none without a range', () => {
+    setReadout();
+    fixture.detectChanges();
+    const steps: string[] = [];
+    fixture.componentInstance.zoom.subscribe((step) => steps.push(step));
+    const zoomIn = host().querySelector<HTMLButtonElement>('button[aria-label="Zoom in"]')!;
+    const zoomOut = host().querySelector<HTMLButtonElement>('button[aria-label="Zoom out"]')!;
+    zoomIn.click();
+    zoomOut.click();
+    expect(steps).toEqual(['in', 'out']);
+    const range = [...host().querySelectorAll('p')].find((p) => p.textContent?.includes('Range'))!;
+    expect(zoomIn.parentElement).toBe(range.parentElement);
+
+    // A body page passes no range, and has no camera of this scene's to move.
+    fixture.componentRef.setInput('range', '');
+    fixture.detectChanges();
+    expect(host().querySelector('[aria-label^="Zoom"]')).toBeNull();
+  });
+
   it('toggles a tab closed when it is clicked while open', () => {
     setReadout();
     fixture.componentRef.setInput('defaultTab', 'readout');
@@ -637,8 +656,9 @@ describe('HudDockComponent', () => {
       expect(tabs.contains('scheme-dark') && tabs.contains('[scrollbar-width:thin]')).toBe(true);
       expect(host().querySelector('[data-testid="hud-date"]')!.classList.contains('shrink-0')).toBe(true);
       // The range keeps its width where it is shown, or '417 AU' wraps and the row grows 20 px; on a
-      // phone it is not shown, where at the present it took the Display tab out of sight.
-      const range = [...host().querySelectorAll('p')].find((p) => p.textContent?.includes('Range'))!.classList;
+      // phone it is not shown, where at the present it took the Display tab out of sight. Its zoom
+      // pair goes with it.
+      const range = [...host().querySelectorAll('p')].find((p) => p.textContent?.includes('Range'))!.parentElement!.classList;
       expect(range.contains('shrink-0') && range.contains('max-sm:hidden')).toBe(true);
     });
 

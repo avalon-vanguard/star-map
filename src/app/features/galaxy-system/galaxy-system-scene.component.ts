@@ -253,6 +253,14 @@ const CLICK_DRAG_SLOP_PX = 5;
  * Earth and Mars are then within 8 px of one another at 1920x1080, and the nearest one wins.
  */
 const BODY_PICK_SLOP_PX = 12;
+/**
+ * How much nearer one press of + (or the dock's zoom-in) takes the camera, about four of the
+ * wheel's 5 % notches: from the 307 pc opening view, 25 presses reach 1.2 pc, which the wheel
+ * takes 109 notches to do.
+ */
+const KEY_ZOOM_SCALE = 0.8;
+/** By `KeyboardEvent.key`, so the numpad's and other layouts' + and - count too. */
+const ZOOM_KEYS: Partial<Record<string, 'in' | 'out'>> = { '+': 'in', '=': 'in', '-': 'out' };
 
 /**
  * Opening pose for the local view, expressed in the galactic frame rather than the equatorial
@@ -369,7 +377,19 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
   imports: [HudDockComponent, StarmapHudComponent, SystemObjectCardComponent],
   template: `
     <div class="relative h-full w-full">
-      <canvas #canvas data-testid="scene-canvas" class="block h-full w-full"></canvas>
+      <!-- Focusable, so the keys move the map only while it has focus: OrbitControls'
+           arrow handler prevents the default with no check of its target, so listening on the
+           window would have frozen the caret in Search and the route fields. The ring is drawn
+           inside the edge, since the canvas fills the window and an outer one would be off it. -->
+      <canvas
+        #canvas
+        data-testid="scene-canvas"
+        tabindex="0"
+        role="application"
+        aria-label="Star map. Arrows pan, Shift and the arrows orbit, plus and minus zoom."
+        (keydown)="onCanvasKeydown($event)"
+        class="block h-full w-full focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+      ></canvas>
       <!-- Between the canvas and the labels, not up in the HUD where it used to live: everything
            in this stack paints in tree order, so from there a decorative gradient was laid over
            the names near the edge of the frame — which is exactly where the neighbour ring is. -->
@@ -425,6 +445,7 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
         defaultTab="readout"
         [overlayOpen]="!!objectCard()"
         (escaped)="dismissObjectCard()"
+        (zoom)="zoom($event)"
         (displayChange)="display.set($event)"
         (routeQuery)="onRouteQuery($event)"
         (routeRequested)="onRouteRequested($event)"
@@ -746,6 +767,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.controls.minDistance = GALAXY_MIN_DISTANCE_PC;
     this.controls.maxDistance = GALAXY_MAX_DISTANCE_PC;
     this.controls.target.copy(GALAXY_OVERVIEW_TARGET);
+    this.controls.listenToKeyEvents(canvas);
 
     this.rig = new CameraRigController(camera, this.controls);
 
@@ -2184,6 +2206,35 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
   dismissObjectCard(): void {
     this.clearObjectCard();
+  }
+
+  /**
+   * Moves the camera one step in or out along its line of sight, as the wheel does. Under the
+   * plan view the same call scales the frame instead. Not during a flight, which owns the camera
+   * until it lands: OrbitControls' own keys are off then too.
+   */
+  zoom(direction: 'in' | 'out'): void {
+    if (!this.controls?.enabled) {
+      return;
+    }
+    if (direction === 'in') {
+      this.controls.dollyIn(KEY_ZOOM_SCALE);
+    } else {
+      this.controls.dollyOut(KEY_ZOOM_SCALE);
+    }
+  }
+
+  /** + (or =, the same key unshifted) and - zoom; the arrows are OrbitControls' own. */
+  onCanvasKeydown(event: KeyboardEvent): void {
+    // Ctrl/Cmd with them is the browser's page zoom, which stays the browser's.
+    if (event.ctrlKey || event.metaKey || event.altKey) {
+      return;
+    }
+    const direction = ZOOM_KEYS[event.key];
+    if (direction) {
+      event.preventDefault();
+      this.zoom(direction);
+    }
   }
 
   /** A kept place, revisited: a star is a system to fly into, a body is a page to open. */

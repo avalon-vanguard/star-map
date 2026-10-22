@@ -166,15 +166,30 @@ function isWideViewport(): boolean {
           </p>
         }
         <!-- Not on a phone, where it never showed before the tabs gave way to it: kept, its 121 px
-             took the Display tab out of sight at the present, the state the map opens in. -->
+             took the Display tab out of sight at the present, the state the map opens in. The zoom
+             pair beside it, for a trackpad, a tablet or the keyboard, goes with it: on a phone it
+             took 73 px more of the tabs and put Bookmarks under the edge with Display, and a pinch
+             zooms there anyway. -->
         @if (range()) {
-          <p
-            class="flex shrink-0 items-baseline gap-2 border-l border-border/40 px-3 py-2 max-sm:hidden sm:px-4"
+          <div
+            class="flex shrink-0 items-stretch divide-x divide-border/40 border-l border-border/40 max-sm:hidden"
             [class.ml-auto]="!date()"
           >
-            <span class="type-label text-muted">Range</span>
-            <span class="text-sm text-accent tabular-nums">{{ range() }}</span>
-          </p>
+            <p class="flex items-baseline gap-2 px-3 py-2 sm:px-4">
+              <span class="type-label text-muted">Range</span>
+              <span class="text-sm text-accent tabular-nums">{{ range() }}</span>
+            </p>
+            @for (step of zoomSteps; track step.direction) {
+              <button
+                type="button"
+                [attr.aria-label]="step.label"
+                (click)="zoom.emit(step.direction)"
+                class="w-9 text-base leading-none text-muted transition-colors hover:bg-accent/8 hover:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+              >
+                {{ step.glyph }}
+              </button>
+            }
+          </div>
         }
       </div>
       @if (activeTab(); as tab) {
@@ -519,6 +534,13 @@ export class HudDockComponent implements OnInit {
   readonly bookmarkChosen = output<Bookmark>();
   /** Escape, for the surface to answer: over an overlay, or with no panel left to fold. */
   readonly escaped = output<void>();
+  /** A step of the camera in or out, from the pair beside the range. */
+  readonly zoom = output<'in' | 'out'>();
+
+  readonly zoomSteps = [
+    { direction: 'out', label: 'Zoom out', glyph: '−' },
+    { direction: 'in', label: 'Zoom in', glyph: '+' },
+  ] as const;
 
   readonly layers = DISPLAY_LAYERS;
   readonly hasDerived = computed(() => this.readouts().some((readout) => readout.derived));

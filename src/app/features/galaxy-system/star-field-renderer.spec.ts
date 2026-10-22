@@ -493,6 +493,7 @@ describe('StarFieldRenderer refocus', () => {
       const drawnStar = catalogue.find((candidate) => candidate.id === renderer.starIdAt(instance))!;
       const expected = colorIndexToRgb(drawnStar.colorIndex, drawnStar.spectralType, drawnStar.colorSystem);
       expect(colorAttribute.getX(instance)).toBeCloseTo(expected.r, 5);
+      expect(colorAttribute.getY(instance)).toBeCloseTo(expected.g, 5);
       expect(colorAttribute.getZ(instance)).toBeCloseTo(expected.b, 5);
       expect(sizeAttribute.getX(instance)).toBeGreaterThan(0);
     }

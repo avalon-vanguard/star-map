@@ -11,6 +11,11 @@ describe('formatParsecs', () => {
     expect(formatParsecs(1.3)).toBe('1.30 pc');
     expect(formatParsecs(250)).toBe('250 pc');
   });
+
+  it('holds a figure to the decimals asked for, as a control stepped in tenths does', () => {
+    expect(formatParsecs(3, 1)).toBe('3.0 pc');
+    expect(formatParsecs(0.5, 1)).toBe('0.5 pc');
+  });
 });
 
 describe('formatDistance', () => {

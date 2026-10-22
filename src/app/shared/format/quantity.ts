@@ -7,10 +7,16 @@
  * false precision at one end (`0.00 pc`) and loses real information at the other (`26000 pc`).
  */
 
-/** Distance in parsecs, switching to kiloparsecs where the number would otherwise run long. */
-export function formatParsecs(distancePc: number): string {
+/**
+ * Distance in parsecs, switching to kiloparsecs where the number would otherwise run long.
+ *
+ * `decimals` fixes the decimals for a figure a control holds to its own step: the jump range
+ * moves by tenths, and at the two decimals a distance gets it read "3.00 pc", hundredths the
+ * slider cannot take.
+ */
+export function formatParsecs(distancePc: number, decimals?: number): string {
   const { divisor, digits, unit } = parsecScale(distancePc);
-  return `${(distancePc / divisor).toFixed(digits)} ${unit}`;
+  return `${(distancePc / divisor).toFixed(decimals ?? digits)} ${unit}`;
 }
 
 function parsecScale(distancePc: number): { divisor: number; digits: number; unit: string } {

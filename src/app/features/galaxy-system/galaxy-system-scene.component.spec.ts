@@ -1342,6 +1342,37 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(component.hudNote()).toContain('1 planet hosts only the NASA Exoplanet Archive places, from its distances');
   });
 
+  it('groups the digits of every count it prints, and gives the Sun’s distance from the centre as the range is given', async () => {
+    await advanceFrames(engine, 0.3);
+    const scene = fixture.componentInstance as unknown as {
+      stars: readonly StarRecord[];
+      exoplanets: readonly ExoplanetRecord[];
+      enterableSystems: number;
+      galacticStrength: number;
+      starField: StarFieldRenderer;
+      updateHud(camera: THREE.Camera): void;
+      hudReadouts(): { label: string; value: string }[];
+      hudNote(): string;
+    };
+    // The catalogue's own sizes, which no fixture this small reaches.
+    scene.stars = Array.from({ length: 455_518 }, () => LENS);
+    scene.exoplanets = Array.from({ length: 6_354 }, () => LENS_B);
+    scene.enterableSystems = 4_737;
+    vi.spyOn(scene.starField, 'drawnCount', 'get').mockReturnValue(70_000);
+    const value = (label: string) => scene.hudReadouts().find((readout) => readout.label === label)?.value;
+
+    scene.updateHud(engine.getCamera());
+    expect(value('Stars')).toBe('70,000 / 455,518');
+    expect(value('Exoplanets')).toBe('6,354');
+    expect(value('Systems')).toBe('4,737');
+
+    scene.galacticStrength = 1;
+    scene.updateHud(engine.getCamera());
+    expect(value('Sun to centre')).toBe('8.2 kpc');
+    expect(value('Catalogued')).toBe('455,518 stars');
+    expect(scene.hudNote()).toContain('The 455,518 catalogued stars are real.');
+  });
+
   it('offers a star for a route by its classification, and a star with none by its name alone', () => {
     const component = fixture.componentInstance as unknown as {
       starSearchIndex(): { entry: { starId?: number; subtitle: string } }[];

@@ -444,13 +444,36 @@ describe('HudDockComponent', () => {
     // asked for still gave up, and saying "no route" beside the offer is saying it did not.
     fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: 6.4, gaveUp: true, least: false });
     fixture.detectChanges();
-    expect(summary()).toBe('Too many stars to search at this range. 6.40 pc would reach.');
+    expect(summary()).toBe('Too many stars to search at this range. 6.4 pc would reach.');
 
     // The other way round: the range asked for was searched to exhaustion and the wider search was
     // the one that gave up. There is no route at this range, and nothing further can be claimed.
     fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: null, gaveUp: false, least: false });
     fixture.detectChanges();
     expect(summary()).toBe('No route at this range.');
+  });
+
+  it('gives the jump range in the tenths its slider steps by, and offers the range a click will set', () => {
+    setReadout();
+    fixture.componentRef.setInput('routing', true);
+    fixture.componentRef.setInput('currentStar', { id: 0, name: 'Sol', subtitle: 'G2V' });
+    fixture.componentRef.setInput('routeOptions', [{ id: 7, name: 'Sirius', subtitle: '2.6 pc' }]);
+    fixture.componentRef.setInput('defaultTab', 'routes');
+    fixture.detectChanges();
+    const output = () => host().querySelector('output[for="route-range"]')!.textContent!.trim();
+    expect(output()).toBe('3.0 pc');
+    typeRoute('to', 'Sir');
+    host().querySelector<HTMLButtonElement>('#dock-panel-routes ul button')!.click();
+
+    // The crossing is 2.31 pc away, and the slider can only hold 2.4: the offer says what it sets.
+    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: 2.31, gaveUp: false, least: true });
+    fixture.detectChanges();
+    const offer = host().querySelector<HTMLButtonElement>('[data-testid="route-summary"] button')!;
+    expect(offer.textContent!.trim()).toBe('2.4 pc would reach.');
+    offer.click();
+    fixture.detectChanges();
+    expect(host().querySelector<HTMLInputElement>('#route-range')!.value).toBe('2.4');
+    expect(output()).toBe('2.4 pc');
   });
 
   it('keeps what the Routes panel was set to across a trip to another tab', () => {

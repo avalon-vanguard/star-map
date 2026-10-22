@@ -1997,14 +1997,16 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       this.hudReadouts.set([
         {
           label: 'Sun to centre',
-          value: `${(SUN_GALACTOCENTRIC_RADIUS_PC / 1000).toFixed(2)} kpc`,
+          // Through the formatter the Range beside it uses: "8.18 kpc" next to "26.2 kpc" read as
+          // two instruments.
+          value: formatParsecs(SUN_GALACTOCENTRIC_RADIUS_PC),
         },
         { label: 'Arms modelled', value: `${MILKY_WAY_ARMS.length}` },
-        { label: 'Catalogued', value: `${this.stars.length} stars` },
+        { label: 'Catalogued', value: `${this.stars.length.toLocaleString('en-GB')} stars` },
       ]);
       // Quotes the catalogue's own reach rather than a figure that has already been raised once.
       this.hudNote.set(
-        `Galactic structure is an illustrative model built on measured arm geometry — no catalogue holds the Galaxy’s stars. The ${this.stars.length} catalogued stars are real.`,
+        `Galactic structure is an illustrative model built on measured arm geometry — no catalogue holds the Galaxy’s stars. The ${this.stars.length.toLocaleString('en-GB')} catalogued stars are real.`,
       );
       return;
     }
@@ -2014,20 +2016,21 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.hudSubtitle.set(this.catalogueCensus);
     this.hudReadouts.set([
       // Both numbers, because they differ: the catalogue is what the map knows and the first is
-      // what it draws. See `STAR_RENDER_BUDGET`.
+      // what it draws. See `STAR_RENDER_BUDGET`. Every count grouped, as the census above them
+      // is: a bare "70000 / 455518" is a figure to count the digits of.
       {
         label: 'Stars',
         value:
           this.starField && this.starField.drawnCount < this.stars.length
-            ? `${this.starField.drawnCount} / ${this.stars.length}`
-            : `${this.stars.length}`,
+            ? `${this.starField.drawnCount.toLocaleString('en-GB')} / ${this.stars.length.toLocaleString('en-GB')}`
+            : this.stars.length.toLocaleString('en-GB'),
       },
       // The radius Gaia is surveyed to, not the edge of the map: the Hipparcos stars Gaia places
       // further out are drawn where it places them.
       { label: 'Survey radius', value: `${SURVEY_EDGE_PC} pc` },
-      { label: 'Exoplanets', value: `${this.exoplanets.length}` },
+      { label: 'Exoplanets', value: this.exoplanets.length.toLocaleString('en-GB') },
       // The one thing the field itself cannot show: which of those points can be flown into.
-      { label: 'Systems', value: `${this.enterableSystems}` },
+      { label: 'Systems', value: this.enterableSystems.toLocaleString('en-GB') },
     ]);
     this.hudNote.set(this.positionsNote);
   }

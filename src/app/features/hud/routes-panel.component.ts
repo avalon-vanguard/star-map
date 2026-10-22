@@ -150,10 +150,10 @@ type Field = 'from' | 'to';
                   (click)="raiseTo(plotted.neededRangePc)"
                   class="text-accent underline decoration-accent/40 underline-offset-2 disabled:opacity-40 disabled:no-underline enabled:hover:decoration-accent focus-visible:outline-1 focus-visible:outline-accent"
                 >
-                  {{ format(plotted.neededRangePc) }} would reach.
+                  {{ format(stepped(plotted.neededRangePc), 1) }} would reach.
                 </button>
               } @else if (plotted.least) {
-                No chain of jumps up to {{ format(maxRangePc) }} reaches it.
+                No chain of jumps up to {{ format(maxRangePc, 1) }} reaches it.
               }
             </p>
           }
@@ -216,7 +216,7 @@ export class RoutesPanelComponent {
   private readonly departure = computed(() => this.chosen().from ?? (this.typed().from.trim() ? null : this.currentStar()));
 
   readonly canPlot = computed(() => this.departure() !== null && this.chosen().to !== null);
-  readonly rangeLabel = computed(() => formatParsecs(this.rangePc()));
+  readonly rangeLabel = computed(() => formatParsecs(this.rangePc(), 1));
 
   protected readonly focusFirstOption = focusFirstOption;
   protected readonly onOptionListKeydown = onOptionListKeydown;
@@ -230,8 +230,8 @@ export class RoutesPanelComponent {
     return this.chosen()[field]?.name ?? this.typed()[field];
   }
 
-  format(distancePc: number): string {
-    return formatParsecs(distancePc);
+  format(distancePc: number, decimals?: number): string {
+    return formatParsecs(distancePc, decimals);
   }
 
   onInput(field: Field, event: Event): void {
@@ -268,10 +268,18 @@ export class RoutesPanelComponent {
     this.rangeChange.emit(value);
   }
 
+  /**
+   * A range rounded up to the control's own step, so the number offered is one it can actually
+   * hold — and up rather than down, since down would land just short of the crossing it names.
+   * The offer prints this, not the crossing's own distance: it read "2.31 pc would reach" and set
+   * the slider to 2.4.
+   */
+  stepped(rangePc: number): number {
+    return Math.min(this.maxRangePc, Math.ceil(rangePc * 10) / 10);
+  }
+
   raiseTo(rangePc: number): void {
-    // Rounded up to the control's own step, so the number shown is one it can actually hold —
-    // and up rather than down, since down would land just short of the crossing it names.
-    const stepped = Math.min(this.maxRangePc, Math.ceil(rangePc * 10) / 10);
+    const stepped = this.stepped(rangePc);
     this.rangePc.set(stepped);
     this.rangeChange.emit(stepped);
     this.plot();

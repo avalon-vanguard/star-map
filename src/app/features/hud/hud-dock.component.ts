@@ -501,6 +501,12 @@ export class HudDockComponent implements OnInit {
   readonly keepableStarId = input<number | null>(null);
   /** Present makes the Routes tab available; absent means this surface cannot route. */
   readonly routing = input(false);
+  /**
+   * Something the surface has put over the scene, such as a body's card, that Escape takes away
+   * before the panel: on a wide screen the readout is open from the start, and folding it first
+   * would make the first Escape close the one thing the reader had not opened.
+   */
+  readonly overlayOpen = input(false);
 
   readonly displayChange = output<HudDisplay>();
   readonly routeQuery = output<string>();
@@ -508,6 +514,8 @@ export class HudDockComponent implements OnInit {
   readonly routeStarSelected = output<number>();
   readonly jumpRangeChange = output<number>();
   readonly bookmarkChosen = output<Bookmark>();
+  /** Escape, for the surface to answer: over an overlay, or with no panel left to fold. */
+  readonly escaped = output<void>();
 
   readonly layers = DISPLAY_LAYERS;
   readonly hasDerived = computed(() => this.readouts().some((readout) => readout.derived));
@@ -627,9 +635,18 @@ export class HudDockComponent implements OnInit {
     this.activeTab.set(isWideViewport() && this.title() ? 'readout' : null);
   }
 
-  /** `/` opens the search from anywhere, unless something else is already taking text. */
+  /**
+   * `/` opens the search from anywhere, unless something else is already taking text. Escape takes
+   * one thing away per press: the surface's overlay, else the open panel, else whatever the surface
+   * does with it. A field with an Escape of its own (clearing the search, closing the suggestions)
+   * stops it before it gets here.
+   */
   @HostListener('document:keydown', ['$event'])
   onKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      this.onEscape();
+      return;
+    }
     if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) {
       return;
     }
@@ -644,6 +661,21 @@ export class HudDockComponent implements OnInit {
     this.activeTab.set('search');
     // The field only exists after the panel renders; defer the focus to after that pass.
     setTimeout(() => this.search()?.focus());
+  }
+
+  private onEscape(): void {
+    const tab = this.activeTab();
+    if (this.overlayOpen() || !tab) {
+      this.escaped.emit();
+      return;
+    }
+    // Focus inside the panel would fall to the page with it: it goes back to the tab that folded,
+    // as after a date is set on a phone, so Enter opens the panel again.
+    const hadFocus = this.host.nativeElement.contains(document.activeElement);
+    this.activeTab.set(null);
+    if (hadFocus) {
+      this.host.nativeElement.querySelector<HTMLElement>(`#dock-tab-${tab}`)?.focus();
+    }
   }
 
   /** On a narrow viewport the panel is a sheet over the scene: tapping the scene folds it away. */

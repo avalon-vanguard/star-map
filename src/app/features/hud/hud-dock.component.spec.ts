@@ -265,6 +265,62 @@ describe('HudDockComponent', () => {
     expect(tab('Search').getAttribute('aria-selected')).toBe('true');
   });
 
+  describe('Escape', () => {
+    const escape = (target: EventTarget = document) => {
+      target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      fixture.detectChanges();
+    };
+
+    it('takes one thing away per press: the overlay, then the panel, then hands it to the surface', () => {
+      setReadout();
+      fixture.componentRef.setInput('defaultTab', 'readout');
+      fixture.componentRef.setInput('overlayOpen', true);
+      fixture.detectChanges();
+      const escaped = vi.fn();
+      fixture.componentInstance.escaped.subscribe(escaped);
+
+      escape();
+      expect(escaped).toHaveBeenCalledTimes(1);
+      expect(tab('Readout').getAttribute('aria-selected')).toBe('true');
+
+      fixture.componentRef.setInput('overlayOpen', false);
+      escape();
+      expect(escaped).toHaveBeenCalledTimes(1);
+      expect(host().querySelector('[role="tabpanel"]')).toBeNull();
+
+      escape();
+      expect(escaped).toHaveBeenCalledTimes(2);
+    });
+
+    it('leaves the search field and the route fields their own Escape, and the panel open', () => {
+      setReadout();
+      fixture.componentRef.setInput('routing', true);
+      fixture.componentRef.setInput('defaultTab', 'search');
+      fixture.detectChanges();
+
+      escape(host().querySelector('#dock-panel-search input')!);
+      expect(tab('Search').getAttribute('aria-selected')).toBe('true');
+
+      tab('Routes').click();
+      fixture.detectChanges();
+      escape(host().querySelector('#route-to')!);
+      expect(tab('Routes').getAttribute('aria-selected')).toBe('true');
+    });
+
+    it('hands focus from the panel it folds to that panel’s tab, not to the page', () => {
+      setReadout();
+      fixture.componentRef.setInput('routing', true);
+      fixture.componentRef.setInput('defaultTab', 'routes');
+      fixture.detectChanges();
+      const range = host().querySelector<HTMLInputElement>('#route-range')!;
+      range.focus();
+
+      escape(range);
+      expect(host().querySelector<HTMLElement>('#dock-panel-routes')!.hidden).toBe(true);
+      expect(document.activeElement).toBe(tab('Routes'));
+    });
+  });
+
   it('hands the panel back to the readout once a result is picked', () => {
     setReadout();
     fixture.componentRef.setInput('defaultTab', 'search');

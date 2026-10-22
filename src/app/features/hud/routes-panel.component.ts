@@ -63,7 +63,7 @@ type Field = 'from' | 'to';
               [value]="text(field)"
               [placeholder]="field === 'from' ? 'From this system' : 'Search a star'"
               (input)="onInput(field, $event)"
-              (keydown.escape)="closeOptions()"
+              (keydown.escape)="$event.stopPropagation(); closeOptions()"
               class="hud-surface mt-1 w-full px-2.5 py-1.5 text-sm text-text caret-accent placeholder:text-muted focus:border-accent focus:outline-none"
             />
             @if (open() === field && options().length) {

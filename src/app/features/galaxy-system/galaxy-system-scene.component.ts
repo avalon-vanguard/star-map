@@ -423,6 +423,8 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
         [currentStar]="currentStarOption()"
         [keepableStarId]="navigationStore.selectedStarId()"
         defaultTab="readout"
+        [overlayOpen]="!!objectCard()"
+        (escaped)="dismissObjectCard()"
         (displayChange)="display.set($event)"
         (routeQuery)="onRouteQuery($event)"
         (routeRequested)="onRouteRequested($event)"

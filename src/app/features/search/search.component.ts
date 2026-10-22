@@ -40,7 +40,7 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
           placeholder="Search stars, planets, exoplanets…"
           [value]="query()"
           (input)="onInput($event)"
-          (keydown.escape)="clear()"
+          (keydown.escape)="$event.stopPropagation(); clear()"
           class="w-full bg-transparent py-2.5 pr-3 pl-10 text-sm tracking-[0.02em] text-text caret-accent placeholder:text-muted focus:outline-none"
         />
       </div>

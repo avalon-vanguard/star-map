@@ -77,7 +77,7 @@ const SUN_SIDE_MIN_SINE = Math.sin((3 * Math.PI) / 180);
            body is drawn at the clock's date and turns at its rate, so both are shown and can be set
            here; an exoplanet, whose day the catalogue does not carry, turns for show whatever the
            clock says. -->
-      <app-hud-dock [date]="date()" [clock]="true" (bookmarkChosen)="goToBookmark($event)" />
+      <app-hud-dock [date]="date()" [clock]="true" (bookmarkChosen)="goToBookmark($event)" (escaped)="leave()" />
     </div>
   `
 })
@@ -88,6 +88,11 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly navigationStore = inject(NavigationStore);
   private readonly time = inject(TimeStore);
+
+  /** Escape with no panel left open: back to the system, where the info panel's System control goes. */
+  leave(): void {
+    void this.router.navigate(['/']);
+  }
 
   /** A kept place, revisited from this page: a star means leaving it for the map. */
   goToBookmark(bookmark: Bookmark): void {

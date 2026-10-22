@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { Location } from '@angular/common';
 import { provideLocationMocks, SpyLocation } from '@angular/common/testing';
 import { provideRouter, Router } from '@angular/router';
@@ -16,7 +17,7 @@ import { StarRecord } from '../../shared/models/star.model';
 import { NavigationStore } from '../../shared/state/navigation.store';
 import { TimeStore } from '../../shared/state/time.store';
 import { LinkBudget } from '../../shared/astro/jump-links';
-import { HudDisplay } from '../hud/hud-dock.component';
+import { HudDisplay, HudDockComponent } from '../hud/hud-dock.component';
 import { GalaxySystemSceneComponent } from './galaxy-system-scene.component';
 import { normalView, positionViewDirection } from 'three/tsl';
 import { galacticNormal } from './grid-plane';
@@ -1055,6 +1056,15 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       canvas.dispatchEvent(new MouseEvent('click', at));
       expect(navigationStore.selectedBodyId()).toBe('earth');
       expect(card()?.name).toBe('Earth');
+
+      // Escape takes the card away before anything in the dock: the panel stays as it was.
+      fixture.detectChanges();
+      const dock = fixture.debugElement.query(By.directive(HudDockComponent)).componentInstance as HudDockComponent;
+      const tab = dock.activeTab();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      fixture.detectChanges();
+      expect(card()).toBeUndefined();
+      expect(dock.activeTab()).toBe(tab);
     });
 
     it('leaves the system outwards even from a phone’s framing, which stands past the 400 AU it used to fly to', async () => {

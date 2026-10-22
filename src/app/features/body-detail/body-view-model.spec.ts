@@ -174,6 +174,15 @@ describe('buildBodyViewModel', () => {
       expect(value(planet, 'System distance')).toBe(systemView);
     });
 
+    it('says it alike for a host the archive alone places, whose error is too large for anything but the archive’s ±', () => {
+      // A microlensing host: its distance is the archive's estimate, not a parallax, and over a
+      // fifth uncertain, which for a parallax would read as a range.
+      const lens: StarRecord = { ...host, id: 1070000536, name: 'KMT-2016-BLG-1107L', x: 7100, source: 'exoplanet-archive', distanceError: 0.2254 };
+      const systemView = starReadouts(lens).find((row) => row.label === 'Distance')?.value;
+      expect(systemView).toContain('±');
+      expect(value({ ...planet, hostStarId: lens.id }, 'System distance', [lens])).toBe(systemView);
+    });
+
     it('prints the host star’s mass to three figures, which two decimals would round away for TRAPPIST-1, and adds none', () => {
       expect(value(planet, 'Host star mass')).toBe('2.09 M☉');
       expect(value({ ...planet, hostStarMassSolar: 0.0898 }, 'Host star mass')).toBe('0.0898 M☉');

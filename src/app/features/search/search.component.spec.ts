@@ -116,7 +116,10 @@ describe('SearchComponent', () => {
     // Eight unscrolled rows were all "HD 1" showed of its 27 563 matches.
     await type('Iot');
     expect(resultNames()).toHaveLength(12);
-    expect(element.querySelector('[data-testid="search-results"]')!.classList).toContain('overflow-y-auto');
+    // Held to a height, or overflow never comes into it and the list grows with its 50 rows (1849 px).
+    const list = element.querySelector('[data-testid="search-results"]')!.classList;
+    expect(list).toContain('max-h-64');
+    expect(list).toContain('overflow-y-auto');
   });
 
   it('puts a host star ahead of its own planets', async () => {

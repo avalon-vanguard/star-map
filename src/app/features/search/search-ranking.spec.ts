@@ -127,9 +127,10 @@ describe('rankSearchResults', () => {
 
   it('finds a star by its type, below every entry found by its name', () => {
     const typed = (name: string, spectralType: string): SearchEntry => ({ kind: 'star', name, subtitle: '', star: { spectralType, colorIndex: 0.65 } });
-    const entries = [typed('Sun', 'G2V'), typed('Alpha Cen A', 'G2V+K1V'), typed('Tau Cet', 'G8V'), typed('XG2V', 'K0V')];
-    // A name containing the query is the weakest name match there is, and still comes first.
-    expect(rank(entries, 'G2V')).toEqual(['XG2V', 'Sun', 'Alpha Cen A']);
+    const entries = [typed('Sun', 'G2V'), typed('Alpha Cen A', 'G2V+K1V'), typed('Gl 1', 'K1V+G2V'), typed('Tau Cet', 'G8V'), typed('XG2V', 'K0V')];
+    // A name containing the query is the weakest name match there is, and still comes first; then
+    // the type exactly, as its first part, and anywhere in it. 'Gl 1', shorter, would win a tie.
+    expect(rank(entries, 'G2V')).toEqual(['XG2V', 'Sun', 'Alpha Cen A', 'Gl 1']);
   });
 
   it("searches a star's own type only, not the estimate its row prints, nor the compact form", () => {

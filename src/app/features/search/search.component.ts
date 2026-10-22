@@ -6,7 +6,11 @@ import { ReticleIconComponent } from '../../shared/ui/reticle-icon.component';
 import { SearchIndexService } from './search-index.service';
 import { entrySubtitle, rankSearchResults, SearchEntry, SearchResultKind } from './search-ranking';
 
-const MAX_RESULTS = 8;
+/**
+ * Rows listed, in a list that scrolls. Eight, unscrolled, was the only view of "HD 1"'s 27 563
+ * matches; every row shown is classified as it is listed, so the cap stays well short of them.
+ */
+const MAX_RESULTS = 50;
 const MIN_QUERY_LENGTH = 2;
 
 const KIND_LABELS: Record<SearchResultKind, string> = {
@@ -57,7 +61,7 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
                 <span> · top {{ results().length }}</span>
               }
             </p>
-            <ul data-testid="search-results" class="divide-y divide-border/25">
+            <ul data-testid="search-results" class="max-h-64 scheme-dark divide-y divide-border/25 overflow-y-auto [scrollbar-width:thin]">
               @for (result of results(); track result.bodyId ?? result.starId) {
                 <li>
                   <button

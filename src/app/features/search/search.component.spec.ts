@@ -108,6 +108,13 @@ describe('SearchComponent', () => {
     expect(resultNames()[0]).toBe('Io');
   });
 
+  it('lists more than eight matches, in a list that scrolls', async () => {
+    // Eight unscrolled rows were all "HD 1" showed of its 27 563 matches.
+    await type('Iot');
+    expect(resultNames()).toHaveLength(12);
+    expect(element.querySelector('[data-testid="search-results"]')!.classList).toContain('overflow-y-auto');
+  });
+
   it('puts a host star ahead of its own planets', async () => {
     await type('Proxima');
     expect(resultNames()[0]).toBe('Proxima Centauri');

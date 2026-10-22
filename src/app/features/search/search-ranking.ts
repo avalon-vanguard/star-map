@@ -39,6 +39,12 @@ const MATCH_PREFIX = 3;
 const MATCH_WORD_START = 2;
 const MATCH_SUBSTRING = 1;
 const NO_MATCH = 0;
+/**
+ * What a match in the subtitle counts for against the same match in the name. A tenth puts the
+ * best of them, an exact "G2V", below the worst name match, so a star named for what was typed is
+ * never crowded out by the thousands that merely share its type.
+ */
+const SUBTITLE_WEIGHT = 0.1;
 
 /**
  * Order for results that match equally well. Solar-system bodies are a few dozen named worlds
@@ -75,21 +81,38 @@ export interface IndexedSearchEntry {
   readonly normalizedName: string;
   readonly compactName: string;
   readonly words: readonly string[];
+  /** The subtitle, normalised; empty when there is none to search. See {@link searchableSubtitle}. */
+  readonly normalizedSubtitle: string;
+}
+
+/**
+ * The subtitle an entry is found by. For a star, the catalogue's own type rather than the line its
+ * row prints: that is a colour estimate ("~G2") for the 383 599 stars typed "Unknown", worked out
+ * for the rows shown only (see {@link SearchEntry.star}), and an estimate never carries the
+ * luminosity class a query like "G2V" asks for.
+ */
+function searchableSubtitle(entry: SearchEntry): string {
+  if (!entry.star) {
+    return entry.subtitle;
+  }
+  return entry.star.spectralType === 'Unknown' ? '' : entry.star.spectralType;
 }
 
 export function buildSearchIndex(entries: readonly SearchEntry[]): IndexedSearchEntry[] {
   return entries.map((entry) => {
     const normalizedName = normalize(entry.name);
+    const subtitle = searchableSubtitle(entry);
     return {
       entry,
       normalizedName,
       compactName: compact(entry.name),
-      words: normalizedName.split(WORD_SEPARATORS)
+      words: normalizedName.split(WORD_SEPARATORS),
+      normalizedSubtitle: subtitle && normalize(subtitle)
     };
   });
 }
 
-function scoreIndexed(indexed: IndexedSearchEntry, normalizedQuery: string, compactQuery: string): number {
+function scoreName(indexed: IndexedSearchEntry, normalizedQuery: string, compactQuery: string): number {
   // Punctuation-insensitive as well as case-insensitive, because the catalogues are
   // inconsistent about it: HYG writes "Gl 357" where a user may well type "gl357".
   if (indexed.normalizedName === normalizedQuery || indexed.compactName === compactQuery) {
@@ -105,6 +128,23 @@ function scoreIndexed(indexed: IndexedSearchEntry, normalizedQuery: string, comp
     return MATCH_SUBSTRING;
   }
   return NO_MATCH;
+}
+
+/** On the normalised form only: compacted, "M4.5V" reads "m45v", and "M45" would find every such dwarf. */
+function scoreSubtitle(subtitle: string, normalizedQuery: string): number {
+  if (subtitle === normalizedQuery) {
+    return MATCH_EXACT * SUBTITLE_WEIGHT;
+  }
+  if (subtitle.startsWith(normalizedQuery)) {
+    return MATCH_PREFIX * SUBTITLE_WEIGHT;
+  }
+  return subtitle.includes(normalizedQuery) ? MATCH_SUBSTRING * SUBTITLE_WEIGHT : NO_MATCH;
+}
+
+/** The name's score, or, where the name does not match at all, the subtitle's. */
+function scoreIndexed(indexed: IndexedSearchEntry, normalizedQuery: string, compactQuery: string): number {
+  const score = scoreName(indexed, normalizedQuery, compactQuery);
+  return score > NO_MATCH || indexed.normalizedSubtitle === '' ? score : scoreSubtitle(indexed.normalizedSubtitle, normalizedQuery);
 }
 
 /**

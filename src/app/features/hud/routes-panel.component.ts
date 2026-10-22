@@ -134,7 +134,7 @@ type Field = 'from' | 'to';
           type="button"
           [disabled]="!canPlot() || pending()"
           (click)="plot()"
-          class="type-label border border-border/60 px-3 py-1.5 text-muted transition-colors enabled:hover:border-accent/70 enabled:hover:text-accent disabled:opacity-40 focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+          class="type-label shrink-0 whitespace-nowrap border border-border/60 px-3 py-1.5 text-muted transition-colors enabled:hover:border-accent/70 enabled:hover:text-accent disabled:opacity-40 focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
         >
           {{ pending() ? 'Plotting…' : 'Plot route' }}
         </button>

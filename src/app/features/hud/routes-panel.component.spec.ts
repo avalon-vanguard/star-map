@@ -38,6 +38,7 @@ describe('RoutesPanelComponent, the route it lists', () => {
       summary: text(host.querySelector('[data-testid="route-summary"]')),
       // Span by span: the template's whitespace between them is not kept.
       steps: [...host.querySelectorAll('[data-testid="route-steps"] li')].map((step) => [...step.querySelectorAll('span')].map(text).join(' ')),
+      plot: [...host.querySelectorAll('button')].find((button) => text(button) === 'Plot route')!,
     };
   }
 
@@ -49,5 +50,12 @@ describe('RoutesPanelComponent, the route it lists', () => {
 
   it('gives one jump no straight line, which its total already is', () => {
     expect(render([0, 1], 5).summary).toBe('1 jump · 5.00 pc');
+  });
+
+  it('keeps the plot button on one line beside a summary long enough to wrap', () => {
+    // At 390 px, '9 jumps · 18 pc · 7.68 pc direct' squeezed the button to two lines, PLOT over ROUTE.
+    const { classList } = render([0, 1, 2, 3], 17.5).plot;
+    expect(classList).toContain('shrink-0');
+    expect(classList).toContain('whitespace-nowrap');
   });
 });

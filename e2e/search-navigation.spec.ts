@@ -92,6 +92,16 @@ test.describe('Search-driven navigation', () => {
     await expect(page.getByRole('heading', { name: 'Earth' })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('Planet · Sol')).toBeVisible();
     await expect(page.getByText('Radius')).toBeVisible();
+
+    // Back returns to the neighbourhood the search was made from, not to Earth's host system, and
+    // leaves that entry as it was for the next Back.
+    await page.goBack();
+    await expect(page.getByTestId('hud-title')).toHaveText('Local Stars', { timeout: 30_000 });
+    await page.goForward();
+    await expect(page.getByRole('heading', { name: 'Earth' })).toBeVisible();
+    await page.goBack();
+    await expect(page).toHaveURL(/\/\?stars=4000$/);
+    await expect(page.getByTestId('hud-title')).toHaveText('Local Stars', { timeout: 30_000 });
   });
 
   for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 740 }]) {

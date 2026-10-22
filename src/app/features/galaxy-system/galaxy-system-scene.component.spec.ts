@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { Location } from '@angular/common';
 import { provideLocationMocks, SpyLocation } from '@angular/common/testing';
-import { provideRouter, Router } from '@angular/router';
+import { Navigation, provideRouter, Router } from '@angular/router';
 import * as THREE from 'three/webgpu';
 import { afterEach, beforeEach, describe, expect, it, MockInstance, vi } from 'vitest';
 
@@ -347,6 +347,21 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       await mountAt('/?star=');
       expect(navigationStore.selectedStarId()).toBeNull();
       expect(navigationStore.viewLevel()).toBe('galaxy');
+    });
+
+    it('opens on the neighbourhood when Back returns to an entry naming no star, whatever a body page chose', async () => {
+      // The body page chose its host star; Back then builds the map under the router's popstate
+      // navigation, still under way while the map is constructed.
+      navigationStore.selectStar(SUN.id);
+      const router = TestBed.inject(Router);
+      vi.spyOn(router, 'currentNavigation').mockReturnValue({ trigger: 'popstate' } as Navigation);
+      const before = location.urlChanges.length;
+      await mountAt('/?stars=4000');
+      expect(navigationStore.selectedStarId()).toBeNull();
+      expect(navigationStore.viewLevel()).toBe('galaxy');
+      // The entry is left as it was, not rewritten to the host star's system.
+      expect(location.path()).toBe('/?stars=4000');
+      expect(location.urlChanges.slice(before)).toEqual(['/?stars=4000']);
     });
 
     it('carries a star chosen before the map mounted, from a body page, onto the URL without a second entry', async () => {

@@ -713,10 +713,12 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   constructor() {
     // The address bar names the system on screen as ?star=<id>, so a link, a reload and Back all
     // land in it. Read before the mirror below first runs, which would otherwise strip the id from
-    // a fresh deep link while the store is still empty. An absent star keeps what the store holds:
-    // the host star a body page selected before handing back to the map.
+    // a fresh deep link while the store is still empty. An absent star keeps what the store holds,
+    // the host star a body page selected before handing back to the map, except on Back and
+    // Forward: that entry is where the reader was, and kept, the host star was written over it, so
+    // Back from Earth's page opened the Sun's system in the neighbourhood's entry for good.
     const linkedStarId = starIdFromParam(this.route.snapshot.queryParamMap.get('star'));
-    if (linkedStarId !== null) {
+    if (linkedStarId !== null || this.router.currentNavigation()?.trigger === 'popstate') {
       this.navigationStore.selectStar(linkedStarId);
     }
     // Later values are Back and Forward; the first is the URL just read.

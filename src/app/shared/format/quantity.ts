@@ -7,14 +7,28 @@
  * false precision at one end (`0.00 pc`) and loses real information at the other (`26000 pc`).
  */
 
-/** Distance in parsecs, switching to kiloparsecs where the number would otherwise run long. */
+/**
+ * Distance in parsecs, switching to kiloparsecs, and for the galaxies the deep-sky backdrop gives
+ * a redshift distance, megaparsecs, where the number would otherwise run long: M87 read 17987.5 kpc.
+ */
 export function formatParsecs(distancePc: number): string {
   const { divisor, digits, unit } = parsecScale(distancePc);
   return `${(distancePc / divisor).toFixed(digits)} ${unit}`;
 }
 
 function parsecScale(distancePc: number): { divisor: number; digits: number; unit: string } {
+  if (distancePc >= 1e6) {
+    return { divisor: 1e6, digits: 1, unit: 'Mpc' };
+  }
   return distancePc >= 1000 ? { divisor: 1000, digits: 1, unit: 'kpc' } : { divisor: 1, digits: distancePc < 10 ? 2 : 0, unit: 'pc' };
+}
+
+/**
+ * An angle on the sky: degrees from one up, arcminutes below, where OpenNGC's sizes mostly are —
+ * the median deep-sky object is 7′ across, and in degrees would read 0.12°.
+ */
+export function formatAngle(degrees: number): string {
+  return degrees >= 1 ? `${degrees.toFixed(2)}°` : `${(degrees * 60).toFixed(degrees * 60 < 10 ? 1 : 0)}′`;
 }
 
 /**

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { StarRecord } from '../../shared/models/star.model';
-import { catalogueCensus, describingCatalogue, positionsNote, starReadouts, starSubtitle } from './star-readouts';
+import { catalogueCensus, deepSkyReadouts, describingCatalogue, positionsNote, starReadouts, starSubtitle } from './star-readouts';
 
 /** Three kinds of star the catalogue holds, each as the decoder gives it back. */
 const HYG_STAR: StarRecord = {
@@ -156,3 +157,34 @@ describe('catalogueCensus', () => {
     expect(catalogueCensus([GAIA_STAR, GAIA_STAR, GAIA_STAR, HYG_STAR, PLACED_BY_GAIA])).toBe('Gaia DR3 3 · HYG 2');
   });
 });
+
+describe('deepSkyReadouts', () => {
+  // The shipped records for M31, M45 and M87, but for their directions.
+  const andromeda: DeepSkyRecord = { id: 'NGC0224', name: 'Andromeda Galaxy', kind: 'galaxy', x: 0, y: 0, z: 1, angularSizeDeg: 2.9638, magnitude: 3.44, distancePc: null, distanceMethod: null, constellation: 'And', messier: 'M31' };
+  const pleiades: DeepSkyRecord = { ...andromeda, id: 'Mel022', name: 'Pleiades', kind: 'cluster', angularSizeDeg: 2.5, magnitude: 1.2, distancePc: 135.8, distanceMethod: 'parallax', constellation: 'Tau', messier: 'M45' };
+  const virgo: DeepSkyRecord = { ...andromeda, id: 'NGC4486', name: 'Virgo Galaxy', angularSizeDeg: 0.1185, magnitude: 9, distancePc: 17_987_547, distanceMethod: 'redshift', constellation: 'Vir', messier: 'M87' };
+
+  it('prints everything the record holds, and says its Messier number and designation under its name', () => {
+    const { subtitle, readouts } = deepSkyReadouts(andromeda);
+    expect(subtitle).toBe('Galaxy · M31 · NGC 224');
+    expect(readouts).toEqual([
+      { label: 'Magnitude', value: '3.44' },
+      { label: 'Apparent size', value: '2.96°' },
+      { label: 'Constellation', value: 'And' },
+      { label: 'Distance', value: 'Not derivable' },
+    ]);
+  });
+
+  it('marks a distance as derived, and says from what', () => {
+    expect(deepSkyReadouts(pleiades).readouts[3]).toEqual({ label: 'Distance', value: '136 pc', derived: true });
+    expect(deepSkyReadouts(pleiades).note).toContain('parallax');
+    expect(deepSkyReadouts(virgo).readouts[3]).toEqual({ label: 'Distance', value: '18.0 Mpc', derived: true });
+    expect(deepSkyReadouts(virgo).note).toContain('redshift, by the Hubble law at 70 km/s/Mpc');
+    expect(deepSkyReadouts(andromeda).note).toContain('Neither a parallax nor a redshift');
+  });
+
+  it('does not repeat a name the object is already called by', () => {
+    expect(deepSkyReadouts({ ...andromeda, name: 'M31' }).subtitle).toBe('Galaxy · NGC 224');
+  });
+});
+

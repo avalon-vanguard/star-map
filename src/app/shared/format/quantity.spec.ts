@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatAu, formatDensity, formatDistance, formatLuminosity, formatMassEarth, formatParsecs, formatPeriod, formatRadiusKm, formatTemperature } from './quantity';
+import { formatAngle, formatAu, formatDensity, formatDistance, formatLuminosity, formatMassEarth, formatParsecs, formatPeriod, formatRadiusKm, formatTemperature } from './quantity';
 
 describe('formatParsecs', () => {
   it('switches to kiloparsecs past a thousand parsecs', () => {
@@ -10,6 +10,19 @@ describe('formatParsecs', () => {
   it('keeps two decimals only while they carry information', () => {
     expect(formatParsecs(1.3)).toBe('1.30 pc');
     expect(formatParsecs(250)).toBe('250 pc');
+  });
+
+  it('switches to megaparsecs for a galaxy’s redshift distance, which in kiloparsecs ran to six figures', () => {
+    expect(formatParsecs(17_987_547)).toBe('18.0 Mpc');
+    expect(formatParsecs(999_000)).toBe('999.0 kpc');
+  });
+});
+
+describe('formatAngle', () => {
+  it('gives an object a degree across or more in degrees, and a smaller one in arcminutes', () => {
+    expect(formatAngle(2.9638)).toBe('2.96°');
+    expect(formatAngle(0.12)).toBe('7.2′');
+    expect(formatAngle(0.5)).toBe('30′');
   });
 });
 

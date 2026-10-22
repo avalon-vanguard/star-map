@@ -79,7 +79,7 @@ import { JumpLinkRenderer } from './jump-link-renderer';
 import { ReservedBox, ringPlacement } from './label-ring';
 import { LabeledPoint, LabelSide, StarLabelOverlay } from './star-label-overlay';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
-import { catalogueCensus, positionsNote, starReadouts, starSubtitle } from './star-readouts';
+import { catalogueCensus, deepSkyReadouts, positionsNote, starReadouts, starSubtitle } from './star-readouts';
 
 /** Radius, in CSS pixels, below which a body in the system view is scaled up to be seen at all. */
 const MIN_MARKER_PIXELS = 3;
@@ -249,6 +249,12 @@ const DEEP_SKY_LABEL_COUNT = 12;
  * Nebula sat behind the crowded centre of the star field, and its name was lost there.
  */
 const DEEP_SKY_VIEWPOINT_PC = 1;
+/**
+ * How far off the view's centre a deep-sky object the search turned to can drift, by the cosine of
+ * the angle, before the readout gives the neighbourhood back: 10°, so a small orbit round it keeps
+ * the record and turning away does not.
+ */
+const DEEP_SKY_FACING_COS = Math.cos((10 * Math.PI) / 180);
 /** How often (seconds) the visible label set is recomputed; doesn't need to be per-frame. */
 const LABEL_UPDATE_INTERVAL_SECONDS = 0.2;
 /**
@@ -576,6 +582,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private deepSky?: DeepSkyRenderer;
   private deepSkyRecords: readonly DeepSkyRecord[] = [];
   private deepSkyLabels: readonly LabeledPoint[] = [];
+  /** The deep-sky object the search last turned the view to; the readout shows it while faced. */
+  private lookedAtDeepSky: DeepSkyRecord | null = null;
   /** Stars with at least one catalogued body, which are the ones the map can be flown into. */
   private starIdsWithBodies = new Set<number>();
   /** Catalogue indices, brightest first, for the labels to walk rather than sort. See `brightestWithin`. */
@@ -1864,6 +1872,18 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
+    const deepSky = this.lookedAtDeepSky;
+    const facing = this.controls?.target.clone().sub(camera.position).normalize();
+    if (deepSky && facing && facing.dot(new THREE.Vector3(deepSky.x, deepSky.y, deepSky.z)) > DEEP_SKY_FACING_COS) {
+      const { subtitle, readouts, note } = deepSkyReadouts(deepSky);
+      this.hudEyebrow.set('Deep Sky');
+      this.hudTitle.set(deepSky.name);
+      this.hudSubtitle.set(subtitle);
+      this.hudReadouts.set(readouts);
+      this.hudNote.set(note);
+      return;
+    }
+
     this.hudEyebrow.set('Solar Neighbourhood');
     this.hudTitle.set('Local Stars');
     this.hudSubtitle.set(this.catalogueCensus);
@@ -2244,6 +2264,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     if (!record || !this.rig || !this.deepSky) {
       return;
     }
+    this.lookedAtDeepSky = record;
     const toward = new THREE.Vector3(record.x, record.y, record.z);
     this.rig.flyTo(
       { position: toward.clone().multiplyScalar(DEEP_SKY_VIEWPOINT_PC), target: toward.multiplyScalar(2 * DEEP_SKY_VIEWPOINT_PC) },

@@ -19,7 +19,7 @@ import { GalaxySystemSceneComponent } from './galaxy-system-scene.component';
 import { SearchIndexService } from '../search/search-index.service';
 import { normalView, positionViewDirection } from 'three/tsl';
 import { galacticNormal } from './grid-plane';
-import { catalogueCensus, positionsNote } from './star-readouts';
+import { catalogueCensus, deepSkyReadouts, positionsNote } from './star-readouts';
 import { closestApproachAu, SUN_RADIUS_AU, systemFramingDistanceAu } from './system-framing';
 import { blackbodyColor, SOLAR_EFFECTIVE_TEMPERATURE_K } from '../../shared/astro/stellar';
 import { appearanceForExoplanet } from '../../shared/astro/body-appearance';
@@ -1135,6 +1135,20 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(engine.getCamera().position.z).toBeCloseTo(1, 5);
       // Taken up, so asking for it again turns the view again.
       expect(navigationStore.deepSkyTarget()).toBeNull();
+    });
+
+    it('shows its record in the readout while the view faces it, and the neighbourhood once it turns away', async () => {
+      const hud = fixture.componentInstance as unknown as { hudTitle(): string; hudReadouts(): unknown };
+      navigationStore.lookAtDeepSky(DEEP_SKY_OBJECT.id);
+      await flushAsync();
+      await advanceFrames(engine, 1.5);
+      expect(hud.hudTitle()).toBe('Andromeda Galaxy');
+      expect(hud.hudReadouts()).toEqual(deepSkyReadouts(DEEP_SKY_OBJECT).readouts);
+
+      // Turned a quarter round, toward +x: what the view shows is no longer the galaxy.
+      scene().controls.target.copy(engine.getCamera().position).add(new THREE.Vector3(1, 0, 0));
+      await advanceFrames(engine, 0.5);
+      expect(hud.hudTitle()).toBe('Local Stars');
     });
 
     it('names it on the backdrop though it is not among the brightest that always are', async () => {

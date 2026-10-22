@@ -17,7 +17,7 @@ function starEntry(star: StarRecord): SearchEntry {
 }
 
 /** "NGC0224" as it is written, "NGC 224"; the padded form is OpenNGC's own. */
-function readableDesignation(id: string): string {
+export function readableDesignation(id: string): string {
   return id.replace(/^([A-Za-z]+)0*(?=\d)/, '$1 ');
 }
 

@@ -58,7 +58,7 @@ import {
   HudDockComponent,
   HudReadout,
 } from '../hud/hud-dock.component';
-import { RouteRequest, RouteResult, RouteStarOption } from '../hud/routes-panel.component';
+import { RouteRequest, RouteResult, routeResultOf, RouteStarOption } from '../hud/routes-panel.component';
 import { SearchIndexService } from '../search/search-index.service';
 import { entrySubtitle, rankSearchResults } from '../search/search-ranking';
 import { StarmapHudComponent } from './starmap-hud.component';
@@ -2013,21 +2013,13 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const request = ++this.routeRequest;
     this.routePending.set(true);
     void this.routing.route(fromId, toId, rangePc, ROUTE_RANGE_CEILING_PC).then(
-      ({ route, neededRangePc, gaveUp, least }) => {
+      (answer) => {
         if (request !== this.routeRequest) {
           return;
         }
         this.routePending.set(false);
-        this.routeResult.set({
-          stars: route
-            ? route.stars.map((id) => ({ id, name: this.starsById.get(id)?.name ?? `Star ${id}` }))
-            : [],
-          totalPc: route?.totalPc ?? 0,
-          neededRangePc,
-          gaveUp,
-          least,
-        });
-        this.jumpLinks?.setRoute(route?.stars ?? [], (id) => this.starsById.get(id));
+        this.routeResult.set(routeResultOf(answer, this.starsById));
+        this.jumpLinks?.setRoute(answer.route?.stars ?? [], (id) => this.starsById.get(id));
       },
       (error: unknown) => {
         // A request replaced by a newer one is settled this way too; only the latest matters.

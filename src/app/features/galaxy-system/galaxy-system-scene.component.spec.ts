@@ -819,7 +819,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     const component = fixture.componentInstance as unknown as {
       routing: { route(): Promise<Answer>; links(): Promise<Float32Array>; dispose(): void };
       routePending(): boolean;
-      routeResult(): { stars: { id: number }[]; gaveUp: boolean } | null;
+      routeResult(): { stars: { id: number; name: string; legPc: number }[]; gaveUp: boolean } | null;
       onRouteRequested(request: { fromId: number; toId: number; rangePc: number }): void;
     };
     component.routing = {
@@ -838,6 +838,8 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     await flushAsync();
 
     expect(component.routeResult()?.stars.map((star) => star.id)).toEqual([SUN.id, PROXIMA.id]);
+    // Named and measured from the catalogue the scene holds, for the panel to list.
+    expect(component.routeResult()?.stars.map(({ name, legPc }) => [name, legPc])).toEqual([['Sol', 0], ['Proxima Centauri', 1.3]]);
     expect(component.routePending()).toBe(false);
 
     // "It gave up" travels to the panel, which says something else for it than for "there is none".

@@ -86,6 +86,15 @@ export function formatMassEarth(massEarth: number): string {
   return `${massEarth.toFixed(massEarth < 1 ? 3 : 2)} M⊕`;
 }
 
+/**
+ * Stellar mass in solar masses, to three figures at most: TRAPPIST-1's 0.0898 M☉ to two decimals
+ * would read 0.09, and the archive's hosts run from 0.0094 to 9.1. No trailing zero, which would
+ * print KMT-2016-BLG-1107L's published 0.087 as a 0.0870 nobody measured.
+ */
+export function formatMassSolar(massSolar: number): string {
+  return `${Number(massSolar.toPrecision(3))} M☉`;
+}
+
 /** Equilibrium temperature. Always a whole kelvin — the model is not good to a fraction of one. */
 export function formatTemperature(kelvin: number): string {
   return `${Math.round(kelvin)} K`;

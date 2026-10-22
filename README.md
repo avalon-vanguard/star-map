@@ -102,11 +102,12 @@ one shared view model and one shared set of readouts, which is what stops the sa
 
 **Measured against derived** — every figure is filed under the heading it earns. A published
 radius is measured; an equilibrium temperature computed from the host star's luminosity is
-derived, and says so. Orbital period is shown where it can honestly be had: for a heliocentric
-orbit it follows exactly from the semi-major axis, because in these units the Sun's mass *is* the
-unit of mass — Mars comes back 687.0 d against a published 686.98. It is deliberately absent for
-moons, whose elements are relative to a parent planet the catalogue carries no mass for, and for
-exoplanets, where assuming a solar-mass host would mis-state every planet around an M dwarf.
+derived, and says so. Orbital period is shown where it was published: for a planet or a moon of
+the Sun, 360° over JPL's mean motion, the rate that also carries it round the scene (Mars reads
+687.0 d); for an exoplanet, the archive's own. It is left out for the 359 exoplanets the archive
+publishes none for, where assuming a solar-mass host would mis-state every planet around an M
+dwarf. An exoplanet's card also gives its system's distance, read off the same catalogue star the
+system view prints it for, and its host star's mass.
 
 **Search** — name search across stars, solar-system bodies and exoplanets, navigating to the
 same place an in-scene click would.

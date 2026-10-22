@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { BodyRecord, OrbitalElements } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord, SUN_STAR_ID } from '../../shared/models/star.model';
+import { starReadouts } from '../galaxy-system/star-readouts';
 import { bodyReadouts } from './body-readouts';
 import { buildBodyViewModel, luminosityOf, publishedTemperaturesK, starSurfaceOf } from './body-view-model';
 
@@ -148,6 +149,46 @@ describe('buildBodyViewModel', () => {
     };
     const model = buildBodyViewModel('x', { bodies: [], exoplanets: [exoplanet], stars: [] });
     expect(model?.orbitalPeriodDays).toBeUndefined();
+  });
+
+  describe('an exoplanet’s host, on the card', () => {
+    // 11 Com b's own row: the archive's host mass and argument of periapsis, and its host star at
+    // the archive's 93.2 pc, with an error large enough for the system view to print one.
+    const host: StarRecord = { id: 60017, name: '11 Com', x: 93.1846, y: 0, z: 0, magnitude: 4.74, spectralType: 'G8III', colorIndex: 0.99, distanceError: 0.04 };
+    const planet: ExoplanetRecord = {
+      id: '11 Com b',
+      hostStarId: host.id,
+      hostStarName: '11 Com',
+      name: '11 Com b',
+      hostStarMassSolar: 2.09,
+      hostDistancePc: 93.1846,
+      orbit: { semiMajorAxisAu: 1.178, eccentricity: 0.238, argumentOfPeriapsisDeg: 91.33 },
+    };
+    const rows = (exoplanet: ExoplanetRecord, stars: StarRecord[] = [host]) =>
+      bodyReadouts(buildBodyViewModel(exoplanet.id, { bodies: [], exoplanets: [exoplanet], stars })!).measured;
+    const value = (exoplanet: ExoplanetRecord, label: string, stars?: StarRecord[]) => rows(exoplanet, stars).find((row) => row.label === label)?.value;
+
+    it('says how far away the system is, exactly as the system view says it beside the star', () => {
+      const systemView = starReadouts(host).find((row) => row.label === 'Distance')?.value;
+      expect(systemView).toBe('93 ± 4 pc');
+      expect(value(planet, 'System distance')).toBe(systemView);
+    });
+
+    it('prints the host star’s mass to three figures, which two decimals would round away for TRAPPIST-1, and adds none', () => {
+      expect(value(planet, 'Host star mass')).toBe('2.09 M☉');
+      expect(value({ ...planet, hostStarMassSolar: 0.0898 }, 'Host star mass')).toBe('0.0898 M☉');
+      expect(value({ ...planet, hostStarMassSolar: 0.087 }, 'Host star mass')).toBe('0.087 M☉');
+    });
+
+    it('prints the argument of periapsis beside the inclination, where the archive gives one', () => {
+      expect(value(planet, 'Arg. of periapsis')).toBe('91.33°');
+      expect(value({ ...planet, orbit: { semiMajorAxisAu: 1.178 } }, 'Arg. of periapsis')).toBeUndefined();
+    });
+
+    it('says no distance for a host the catalogue does not hold, nor for the Sun’s own planets', () => {
+      expect(value({ ...planet, hostStarId: null }, 'System distance', [])).toBeUndefined();
+      expect(bodyReadouts(buildBodyViewModel('earth', catalogues)!).measured.map((row) => row.label)).not.toContain('System distance');
+    });
   });
 
   it('returns undefined for an id in neither catalogue', () => {

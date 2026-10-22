@@ -1,5 +1,5 @@
 import { PLANET_CLASS_LABELS } from '../../shared/astro/planet-appearance';
-import { formatAu, formatDensity, formatMassEarth, formatPeriod, formatRadiusKm, formatTemperature } from '../../shared/format/quantity';
+import { formatAu, formatDensity, formatDistance, formatMassEarth, formatMassSolar, formatPeriod, formatRadiusKm, formatTemperature } from '../../shared/format/quantity';
 import { Readout } from '../../shared/models/readout';
 import { BodyDetailViewModel } from './body-detail.model';
 
@@ -51,6 +51,9 @@ export function bodyReadouts(body: BodyDetailViewModel): BodyReadouts {
     // the node half a turn round, and printed as it stands read "-0.00°".
     measured.push({ label: 'Inclination', value: `${Math.abs(body.orbit.inclinationDeg).toFixed(2)}°` });
   }
+  if (body.orbit.argumentOfPeriapsisDeg !== undefined) {
+    measured.push({ label: 'Arg. of periapsis', value: `${body.orbit.argumentOfPeriapsisDeg.toFixed(2)}°` });
+  }
   // The period sits under whichever heading its provenance calls for. Same number, same field —
   // a published period is an observation and a computed one is not.
   if (body.orbitalPeriodDays !== undefined && body.orbitalPeriodSource === 'measured') {
@@ -58,6 +61,15 @@ export function bodyReadouts(body: BodyDetailViewModel): BodyReadouts {
   }
   if (body.discoveryYear !== undefined) {
     measured.push({ label: 'Discovered', value: `${body.discoveryYear}` });
+  }
+  // The host's distance, as the system view prints it beside the star, and its mass, which no
+  // other surface prints. The detail page, where a search lands, has no system view around it.
+  if (body.hostDistance) {
+    const { pc, relativeError, onDistance } = body.hostDistance;
+    measured.push({ label: 'System distance', value: formatDistance(pc, relativeError, onDistance) });
+  }
+  if (body.hostStarMassSolar !== undefined) {
+    measured.push({ label: 'Host star mass', value: formatMassSolar(body.hostStarMassSolar) });
   }
 
   const derived: Readout[] = [{ label: 'Class', value: PLANET_CLASS_LABELS[body.appearance.planetClass] }];

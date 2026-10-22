@@ -3,9 +3,10 @@ import { DwarfSequencePoint, dwarfSequenceAtColor, dwarfSequenceAtTemperature, d
 /**
  * Stellar luminosity, derived from the two things the star catalogue actually measures.
  *
- * Nothing here is a published luminosity: HYG carries apparent magnitude and a parallax, and
- * the Exoplanet Archive columns that would give a host star's mass or effective temperature are
- * not in the shipped dataset. What those two measurements do give, exactly, is absolute
+ * Nothing here is a published luminosity: the catalogue carries apparent magnitude and a
+ * parallax for every star, where the Exoplanet Archive's own luminosities and temperatures cover
+ * only its hosts, and are preferred there (see `starSurfaceOf`). What those two
+ * measurements do give, exactly, is absolute
  * magnitude — and from there the bolometric correction below turns a V-band brightness into a
  * total energy output, which is what a planet's temperature actually depends on.
  */

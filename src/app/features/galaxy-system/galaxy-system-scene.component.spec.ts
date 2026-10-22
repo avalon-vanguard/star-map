@@ -1031,6 +1031,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     };
     let component: Spreading;
     let camera: THREE.Camera;
+    const sides = (labels: LabeledPoint[]) => labels.map((label) => `${label.id}:${label.side}`);
     // A point on a 1600x900 canvas, from x in the aspect-scaled NDC the label pass works in.
     let at: (id: number | string, x: number, y: number) => LabeledPoint;
 
@@ -1051,7 +1052,6 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     it('keeps a name off the text of one placed on either side of it, on its other side or not at all', () => {
       // Every anchor is further from the others than the 0.12 two names keep: it is the text,
       // up to 0.3 of it, that runs into the next name.
-      const sides = (labels: LabeledPoint[]) => labels.map((label) => `${label.id}:${label.side}`);
       expect(
         sides(
           component.spreadLabels(
@@ -1075,7 +1075,6 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     });
 
     it('keeps the selection’s name though neither side is clear, and hangs the card’s body left or not at all', () => {
-      const sides = (labels: LabeledPoint[]) => labels.map((label) => `${label.id}:${label.side}`);
       // 3 again, boxed in on both sides, but the star about to be flown to.
       expect(sides(component.spreadLabels([at(1, 0, 0), at(2, 0.5, 0), at(3, 0.25, 0)], camera, 3))).toEqual(['1:right', '2:right', '3:right']);
 

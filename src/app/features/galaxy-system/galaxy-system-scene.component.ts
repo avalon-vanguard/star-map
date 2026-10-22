@@ -1345,9 +1345,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     names: readonly LabeledPoint[],
   ): LabeledPoint[] {
     const aspect = this.viewportAspect();
-    const height = this.canvasRef().nativeElement.clientHeight;
     const anchors: THREE.Vector2[] = [];
     const taken = this.reservedRects(aspect);
+    const height = this.canvasRef().nativeElement.clientHeight;
     for (const name of names) {
       const at = this.screenPoint(name, camera, aspect);
       if (at) {

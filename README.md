@@ -36,9 +36,10 @@ npm run e2e:typecheck
 ## What's in it
 
 **Galaxy view** — 455 518 catalogued stars: every star Gaia DR3 measured to G 12 within 250
-parsecs, the HYG catalogue's Hipparcos, Yale Bright Star and Gliese stars, and the planet hosts
-only the NASA Exoplanet Archive places, some of them kiloparsecs out. The readout counts them by
-the catalogue that describes each. They are instanced camera-facing billboards positioned from
+parsecs, with every fainter one within 50 pc that the Gaia Catalogue of Nearby Stars keeps; the
+HYG catalogue's Hipparcos, Yale Bright Star and Gliese stars; and the planet hosts only the NASA
+Exoplanet Archive places, some of them kiloparsecs out. The readout counts them by the catalogue
+that describes each. They are instanced camera-facing billboards positioned from
 real RA/Dec/parallax, coloured by spectral index and sized by magnitude, and the field draws a
 budget of them chosen by what is in view (see "On how many stars" below). A polar grid in the
 galactic plane runs under them with a drop line from each of the brightest, and names label the most prominent stars near whatever the camera is looking at. Behind them

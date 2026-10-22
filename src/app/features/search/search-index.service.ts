@@ -7,8 +7,9 @@ import { buildSearchIndex, IndexedSearchEntry, SearchEntry } from './search-rank
 
 /**
  * Stars indexed per task. All 455 518 at once took 122 ms of the boot task, and the search tab,
- * which built its own copy each time it was opened, held the page 166-306 ms per opening; 20 000
- * are about 5 ms on a Ryzen 7700X, so the frames go on between slices on a machine a few times slower.
+ * which built its own copy each time it was opened, held the page 166-306 ms per opening. 20 000
+ * took 5-23 ms a slice in Chromium on a Ryzen 7700X (medians 7-11 ms over three boots), so a
+ * machine twice as slow still stays under the 50 ms of a long task; one much slower would not.
  */
 export const STARS_PER_SLICE = 20_000;
 
@@ -76,9 +77,9 @@ export class SearchIndexService {
 
       const starIndex: IndexedSearchEntry[] = [];
       for (let start = 0; start < stars.length; start += STARS_PER_SLICE) {
-        if (start > 0) {
-          await nextTask();
-        }
+        // Before the first slice too: the scene asks once its catalogues have loaded, so the await
+        // above resumes in the boot task itself, and the first slice ran there, ahead of the first frame.
+        await nextTask();
         for (const indexed of buildSearchIndex(stars.slice(start, start + STARS_PER_SLICE).map(starEntry))) {
           starIndex.push(indexed);
         }

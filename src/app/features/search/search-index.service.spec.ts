@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DataLoaderService, StarField } from '../../core/data/data-loader.service';
 import { BodyRecord } from '../../shared/models/body.model';
@@ -95,5 +95,17 @@ describe('SearchIndexService', () => {
 
     expect(indexedBeforeTimer).toBe(false);
     expect(service.all()).not.toBeNull();
+  });
+
+  it('yields before every slice, the first included, rather than once for all of them', async () => {
+    // The catalogues are already loaded when the scene asks, so without a yield ahead of it the
+    // first slice ran in the boot task; with a single yield, the rest ran as one long task.
+    const timer = vi.spyOn(globalThis, 'setTimeout');
+    await service.load();
+    const yields = timer.mock.calls.length;
+    timer.mockRestore();
+
+    // Three slices: two of STARS_PER_SLICE and one star.
+    expect(yields).toBe(3);
   });
 });

@@ -931,7 +931,8 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       for (let row = 0; row < 5; row++) {
         for (let column = 0; column < 5; column++) {
           pulled++;
-          const point = new THREE.Vector3(-0.8 + column * 0.4, -0.8 + row * 0.4, 0.5).unproject(camera);
+          // A name's reach apart and clear of the right edge, so every one of them is placed.
+          const point = new THREE.Vector3(-0.9 + column * 0.35, -0.8 + row * 0.4, 0.5).unproject(camera);
           yield { id: row * 5 + column, name: `label-${pulled}`, x: point.x, y: point.y, z: point.z };
         }
       }
@@ -939,6 +940,108 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
     expect(component.spreadLabels(grid(), camera, null)).toHaveLength(15);
     expect(pulled).toBe(15);
+  });
+
+  describe('where a name is printed', () => {
+    type Spreading = {
+      spreadLabels(candidates: Iterable<LabeledPoint>, camera: THREE.Camera, keepId: null, placed?: readonly LabeledPoint[]): LabeledPoint[];
+      ringLabelsInTheClear(candidates: readonly LabeledPoint[], camera: THREE.Camera, names: readonly LabeledPoint[]): LabeledPoint[];
+    };
+    let component: Spreading;
+    let camera: THREE.Camera;
+    // A point on a 1600x900 canvas, from x in the aspect-scaled NDC the label pass works in.
+    let at: (id: number | string, x: number, y: number) => LabeledPoint;
+
+    beforeEach(() => {
+      const canvas = (fixture.nativeElement as HTMLElement).querySelector('canvas')!;
+      Object.defineProperty(canvas, 'clientWidth', { value: 1600 });
+      Object.defineProperty(canvas, 'clientHeight', { value: 900 });
+      canvas.getBoundingClientRect = () => new DOMRect(0, 0, 1600, 900);
+      component = fixture.componentInstance as unknown as Spreading;
+      camera = engine.getCamera();
+      camera.updateMatrixWorld(true);
+      at = (id, x, y) => {
+        const point = new THREE.Vector3(x / (1600 / 900), y, 0.5).unproject(camera);
+        return { id, name: `label-${id}`, x: point.x, y: point.y, z: point.z };
+      };
+    });
+
+    it('keeps a name off the text of one placed on either side of it, on its other side or not at all', () => {
+      // Every anchor is further from the others than the 0.12 two names keep: it is the text,
+      // up to 0.3 of it, that runs into the next name.
+      const sides = (labels: LabeledPoint[]) => labels.map((label) => `${label.id}:${label.side}`);
+      expect(
+        sides(
+          component.spreadLabels(
+            [
+              at(1, 0, 0),
+              at(2, 0.5, 0),
+              // Between the two: its right runs into 2's name and its left into 1's.
+              at(3, 0.25, 0),
+              // 1's name to its right, nothing to its left.
+              at(4, -0.2, 0),
+              // Over the end of 1's name, a row up: clear of it.
+              at(5, 0.15, 0.1),
+            ],
+            camera,
+            null,
+          ),
+        ),
+      ).toEqual(['1:right', '2:right', '4:left', '5:right']);
+      // A name only right-hung ones sit left of used to print into: 1's text runs through it.
+      expect(component.spreadLabels([at(6, 0.2, 0)], camera, null, [{ ...at(1, 0, 0), side: 'right' }])).toEqual([]);
+    });
+
+    it('keeps a name out from under the HUD and inside the frame', async () => {
+      // A pass first, which names the view and so puts up the banner.
+      await advanceFrames(engine, 0.3);
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+      const box = (selector: string, rect: DOMRect) => {
+        const element = host.querySelector(selector)!;
+        expect(element).not.toBeNull();
+        element.getBoundingClientRect = () => rect;
+      };
+      box('[role="tabpanel"]', new DOMRect(24, 600, 512, 260));
+      box('[data-testid="hud-banner"]', new DOMRect(760, 24, 400, 30));
+      box('nav[aria-label="Map scale"]', new DOMRect(24, 24, 360, 30));
+      // Read on the next label pass.
+      await advanceFrames(engine, 0.3);
+      // From pixels on the canvas.
+      const px = (id: number, x: number, y: number) => at(id, (2 * x) / 900 - 1600 / 900, 1 - (2 * y) / 900);
+
+      const placed = component.spreadLabels(
+        [
+          px(1, 200, 700), // under the readout
+          px(2, 900, 39), // under the banner
+          px(3, 100, 39), // under the scale ladder
+          px(4, 1400, 5), // its point on the frame, its text over the top
+          px(5, 1590, 450), // too near the right edge for its text to hang there
+          px(6, 1000, 400), // clear
+        ],
+        camera,
+        null,
+      );
+
+      expect(placed.map((label) => `${label.id}:${label.side}`)).toEqual(['5:left', '6:right']);
+      // A distance on a ring as much as a name.
+      expect(component.ringLabelsInTheClear([px(7, 200, 700), px(8, 1000, 300)], camera, []).map((label) => label.id)).toEqual([8]);
+    });
+  });
+
+  it('places the deep-sky names after the star names and around them, outside their count', async () => {
+    type Spread = { spreadLabels: (...args: unknown[]) => LabeledPoint[] };
+    const spread = vi.spyOn(GalaxySystemSceneComponent.prototype as unknown as Spread, 'spreadLabels');
+    const update = vi.spyOn(StarLabelOverlay.prototype, 'update');
+    await advanceFrames(engine, 0.3);
+
+    // The last pass: the stars, then the deep-sky objects around what the stars took.
+    const [stars, backdrop] = spread.mock.results.slice(-2).map((result) => result.value as LabeledPoint[]);
+    expect(spread.mock.calls.at(-1)?.[3]).toBe(stars);
+    const shown = (update.mock.calls.at(-1)?.[0] ?? []) as LabeledPoint[];
+    expect(shown.filter((label) => typeof label.id === 'string' && !label.id.startsWith('ring-'))).toEqual(backdrop);
+    spread.mockRestore();
+    update.mockRestore();
   });
 
   it('offers every star it names in the field as somewhere to go, as a neighbour’s name is from a system', async () => {

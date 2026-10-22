@@ -135,8 +135,11 @@ const LABEL_MAX_COUNT = 15;
  * Nearer stars win the space; see `spreadLabels`.
  */
 const LABEL_MIN_SEPARATION_NDC = 0.12;
-/** Beyond this the text of a right-hand label would run off the view: hang it on the left. */
-const LABEL_EDGE_NDC = 0.7;
+/**
+ * The height of the row a label's text takes, in NDC: two lines are 22 px, 0.04 at 1080 and 0.05
+ * at 844, rounded up. Two labels on rows closer than this print into each other.
+ */
+const LABEL_ROW_NDC = LABEL_MIN_SEPARATION_NDC / 2;
 /**
  * How far a ring label has to sit from a star's name, in NDC — half what two star names keep
  * between them, as a clearance around the anchor and as the height of the row its text occupies.
@@ -152,6 +155,39 @@ const LABEL_REACH_NDC = 0.3;
  * breadth clear of it.
  */
 const RING_LABEL_REACH_NDC = 0.23;
+
+/** The box a label's text takes on screen, in aspect-scaled NDC (y up). */
+interface LabelRect {
+  readonly left: number;
+  readonly right: number;
+  readonly bottom: number;
+  readonly top: number;
+}
+
+/** The text of a label hung on `side` of `point`, reaching `reach` from it, a row tall. */
+function labelRect(point: THREE.Vector2, side: LabelSide, reach: number): LabelRect {
+  return {
+    left: side === 'left' ? point.x - reach : point.x,
+    right: side === 'left' ? point.x : point.x + reach,
+    bottom: point.y - LABEL_ROW_NDC / 2,
+    top: point.y + LABEL_ROW_NDC / 2,
+  };
+}
+
+function rectsMeet(a: LabelRect, b: LabelRect): boolean {
+  return a.left < b.right && b.left < a.right && a.bottom < b.top && b.bottom < a.top;
+}
+
+/** Whether `rect` is wholly inside a frame `aspect` wide and clear of everything `taken`. */
+function inTheClear(rect: LabelRect, taken: readonly LabelRect[], aspect: number): boolean {
+  return (
+    rect.left >= -aspect &&
+    rect.right <= aspect &&
+    rect.bottom >= -1 &&
+    rect.top <= 1 &&
+    !taken.some((other) => rectsMeet(rect, other))
+  );
+}
 /**
  * How long the range control has to be still before the graph is rebuilt at its value, since a drag
  * emits per pixel; and how often at most a view on the move gets a graph for its new drawn stars.
@@ -475,6 +511,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     HudDockComponent,
     { read: ElementRef },
   );
+  private readonly hudRef = viewChild<StarmapHudComponent, ElementRef<HTMLElement>>(
+    StarmapHudComponent,
+    { read: ElementRef },
+  );
   /**
    * The card's own box, looked up when the card changes rather than in the render loop that
    * draws the leader to it. The host element is a stable wrapper; the panel inside it is what
@@ -581,7 +621,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     direction: THREE.Vector3;
   }[] = [];
   /**
-   * The HUD boxes the ring prints around, read on the label pass rather than per frame: each
+   * The HUD boxes every label prints around, read on the label pass rather than per frame: each
    * read is a forced layout, and the panels move when a tab is switched, not between frames.
    */
   private reserved: readonly ReservedBox[] = [];
@@ -589,6 +629,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private readonly ringBearing = new THREE.Vector3();
   private readonly ringInverse = new THREE.Quaternion();
   private readonly ringPoint = new THREE.Vector3();
+  private readonly labelProjection = new THREE.Vector3();
   private deepSky?: DeepSkyRenderer;
   private deepSkyLabels: readonly LabeledPoint[] = [];
   /** Stars with at least one catalogued body, which are the ones the map can be flown into. */
@@ -922,6 +963,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.labelUpdateAccumulator += deltaSeconds;
     if (this.labelUpdateAccumulator >= LABEL_UPDATE_INTERVAL_SECONDS) {
       this.labelUpdateAccumulator = 0;
+      this.refreshReservedBoxes();
       if (this.galaxyGroup.visible) {
         this.refocusStarField(camera);
         this.updateLabels(camera);
@@ -1242,13 +1284,14 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
-   * The ring labels worth drawing: the ones on screen, and clear of the star names already placed.
+   * The ring labels worth drawing: the ones on screen, and clear of the names already placed and
+   * of the HUD.
    *
    * Not held apart from each other, as the star names are: they are a ladder up one ray, a few
    * hundredths of the screen apart, and reading them in order is the point. What they must not do
-   * is sit on a star's name, which is worth more than a distance — or be handed to the overlay
-   * from beside the camera, which CSS2DRenderer places past the edge of the container rather than
-   * hiding, since all it tests is depth.
+   * is sit on a name, which is worth more than a distance, or under a panel — or be handed to the
+   * overlay from beside the camera, which CSS2DRenderer places past the edge of the container
+   * rather than hiding, since all it tests is depth.
    *
    * A name is a line of text hanging to one side of its point, about 135 px of it, not the point:
    * two anchors a tenth of the screen apart still print one inside the other. So the test is
@@ -1258,42 +1301,56 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private ringLabelsInTheClear(
     candidates: readonly LabeledPoint[],
     camera: SceneCamera,
-    stars: readonly LabeledPoint[],
+    names: readonly LabeledPoint[],
   ): LabeledPoint[] {
-    const projected = new THREE.Vector3();
-    const onScreen = (label: LabeledPoint): THREE.Vector2 | null => {
-      projected.set(label.x, label.y, label.z).project(camera);
-      const outside =
-        projected.z < -1 ||
-        projected.z > 1 ||
-        Math.abs(projected.x) > 1 ||
-        Math.abs(projected.y) > 1;
-      return outside ? null : new THREE.Vector2(projected.x * this.viewportAspect(), projected.y);
-    };
-    const taken = stars
-      .map((star) => ({ at: onScreen(star), side: star.side }))
-      .filter(
-        (name): name is { at: THREE.Vector2; side: LabelSide | undefined } => name.at !== null,
-      )
-      .map(({ at, side }) => ({
-        at,
-        from: side === 'left' ? at.x - LABEL_REACH_NDC : at.x,
-        to: side === 'left' ? at.x : at.x + LABEL_REACH_NDC,
-      }));
+    const aspect = this.viewportAspect();
+    const anchors: THREE.Vector2[] = [];
+    const taken = this.reservedRects(aspect);
+    for (const name of names) {
+      const at = this.screenPoint(name, camera, aspect);
+      if (at) {
+        anchors.push(at);
+        taken.push(labelRect(at, name.side ?? 'right', LABEL_REACH_NDC));
+      }
+    }
     return candidates.filter((label) => {
-      const point = onScreen(label);
+      const point = this.screenPoint(label, camera, aspect);
       // Ring labels hang right, as `applyPresentation` leaves anything with no side of its own.
       return (
         point !== null &&
-        !taken.some(
-          (name) =>
-            name.at.distanceTo(point) < RING_LABEL_CLEARANCE_NDC ||
-            (Math.abs(name.at.y - point.y) < RING_LABEL_CLEARANCE_NDC &&
-              name.from < point.x + RING_LABEL_REACH_NDC &&
-              point.x < name.to),
-        )
+        inTheClear(labelRect(point, 'right', RING_LABEL_REACH_NDC), taken, aspect) &&
+        !anchors.some((at) => at.distanceTo(point) < RING_LABEL_CLEARANCE_NDC)
       );
     });
+  }
+
+  /**
+   * Where a label's point lands on screen, in aspect-scaled NDC, or `null` off the frame or
+   * behind the camera.
+   */
+  private screenPoint(
+    label: LabeledPoint,
+    camera: SceneCamera,
+    aspect: number,
+  ): THREE.Vector2 | null {
+    const projected = this.labelProjection.set(label.x, label.y, label.z).project(camera);
+    const outside =
+      projected.z < -1 ||
+      projected.z > 1 ||
+      Math.abs(projected.x) > 1 ||
+      Math.abs(projected.y) > 1;
+    return outside ? null : new THREE.Vector2(projected.x * aspect, projected.y);
+  }
+
+  /** The HUD boxes read at the start of the pass, in the space `screenPoint` answers in. */
+  private reservedRects(aspect: number): LabelRect[] {
+    const height = this.canvasRef().nativeElement.clientHeight;
+    return this.reserved.map((box) => ({
+      left: (2 * box.left) / height - aspect,
+      right: (2 * box.right) / height - aspect,
+      bottom: 1 - (2 * box.bottom) / height,
+      top: 1 - (2 * box.top) / height,
+    }));
   }
 
   private updateLabels(camera: SceneCamera): void {
@@ -1378,12 +1435,28 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const starLabels: LabeledPoint[] = isGalactic
       ? []
       : this.spreadLabels(candidates(this.stars, this.starsByBrightness), camera, selectedId);
-    const backdropLabels = isGalactic ? this.galacticLabels : this.deepSkyLabels;
+    // After the stars and around them, but outside their count: near the Sun fifteen stars always
+    // place, and sharing the count would leave no deep-sky object named at all.
+    const backdropLabels = this.spreadLabels(
+      isGalactic ? this.galacticLabels : this.deepSkyLabels,
+      camera,
+      null,
+      starLabels,
+    );
     const ringLabels =
       isGalactic || !this.display().grid
         ? []
-        : this.ringLabelsInTheClear(this.ringLabels(camera), camera, starLabels);
+        : this.ringLabelsInTheClear(this.ringLabels(camera), camera, [
+            ...starLabels,
+            ...backdropLabels,
+          ]);
     this.labelOverlay?.update([...starLabels, ...ringLabels, ...backdropLabels]);
+  }
+
+  /** The frame's shape, from the canvas rather than the camera: only one of the two has it. */
+  private viewportAspect(): number {
+    const canvas = this.canvasRef().nativeElement;
+    return canvas.clientHeight > 0 ? canvas.clientWidth / canvas.clientHeight : 1;
   }
 
   /**
@@ -1396,63 +1469,63 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * system is framed out to Pluto. Rejecting on screen separation rather than on distance means
    * the set naturally opens up as the camera closes in, and stays legible when it pulls back.
    *
-   * `keepId` is exempt from both tests — it is the selection, which is about to be flown to, and
-   * its label going missing mid-flight reads as the target having been lost.
+   * Separating the points is not enough either: a name is a line of text up to 160 px long, and
+   * two anchors further apart than the separation still printed one name through the other in 18
+   * of 60 poses near the Sun. So each label's text has a box, on the side it hangs, and a
+   * candidate hangs on whichever side is clear of the boxes placed, the HUD's panels and the
+   * frame's edge, or is dropped: a name half under the readout is one of the fifteen wasted.
+   *
+   * `keepId` is exempt from all of it — it is the selection, which is about to be flown to, and
+   * its label going missing mid-flight reads as the target having been lost. `placed` are labels
+   * an earlier pass kept, to be kept clear of without counting towards this one's fifteen.
    */
-  /** The frame's shape, from the canvas rather than the camera: only one of the two has it. */
-  private viewportAspect(): number {
-    const canvas = this.canvasRef().nativeElement;
-    return canvas.clientHeight > 0 ? canvas.clientWidth / canvas.clientHeight : 1;
-  }
-
   private spreadLabels(
     candidates: Iterable<LabeledPoint>,
     camera: SceneCamera,
     keepId: number | string | null,
+    placed: readonly LabeledPoint[] = [],
   ): LabeledPoint[] {
-    const placed: THREE.Vector2[] = [];
-    const chosen: LabeledPoint[] = [];
-    const projected = new THREE.Vector3();
+    const aspect = this.viewportAspect();
+    const anchors: THREE.Vector2[] = [];
+    const taken = this.reservedRects(aspect);
+    const place = (point: THREE.Vector2, side: LabelSide) => {
+      anchors.push(point);
+      taken.push(labelRect(point, side, LABEL_REACH_NDC));
+    };
+    for (const label of placed) {
+      const point = this.screenPoint(label, camera, aspect);
+      if (point) {
+        place(point, label.side ?? 'right');
+      }
+    }
 
+    const chosen: LabeledPoint[] = [];
     for (const candidate of candidates) {
-      projected.set(candidate.x, candidate.y, candidate.z).project(camera);
       const isKept = candidate.id === keepId;
-      // Offscreen or behind the camera.
+      const point = this.screenPoint(candidate, camera, aspect);
       if (
         !isKept &&
-        (projected.z < -1 ||
-          projected.z > 1 ||
-          Math.abs(projected.x) > 1 ||
-          Math.abs(projected.y) > 1)
+        (point === null ||
+          anchors.some((other) => other.distanceTo(point) < LABEL_MIN_SEPARATION_NDC))
       ) {
         continue;
       }
 
-      const point = new THREE.Vector2(projected.x * this.viewportAspect(), projected.y);
-      if (!isKept && placed.some((other) => other.distanceTo(point) < LABEL_MIN_SEPARATION_NDC)) {
+      // Text hangs on the right unless it would run off the view there, or into a label or a
+      // panel; then on the left. The body the card is about hangs its label on the left only: the
+      // leader line to the card leaves its right, and would otherwise run straight through it.
+      const sides: LabelSide[] = candidate.id === this.cardBodyId ? ['left'] : ['right', 'left'];
+      const side = point
+        ? sides.find((each) => inTheClear(labelRect(point, each, LABEL_REACH_NDC), taken, aspect))
+        : undefined;
+      if (!side && !isKept) {
         continue;
       }
-
-      // Text hangs on the right unless it would run off the view there, or into the space a
-      // label already placed to the right is using; then it hangs on the left, unless *that*
-      // is off the view. A crowded centre still gets right-hand labels — the separation test
-      // above already keeps them apart.
-      const crowdedRight = placed.some(
-        (other) =>
-          other.x > point.x &&
-          other.x - point.x < LABEL_REACH_NDC &&
-          Math.abs(other.y - point.y) < LABEL_MIN_SEPARATION_NDC,
-      );
-      // The body the card is about hangs its label on the left regardless: the leader line to
-      // the card leaves its right, and would otherwise run straight through the text.
-      const side: LabelSide =
-        candidate.id === this.cardBodyId ||
-        ((projected.x > LABEL_EDGE_NDC || crowdedRight) && projected.x > -LABEL_EDGE_NDC)
-          ? 'left'
-          : 'right';
-
-      placed.push(point);
-      chosen.push({ ...candidate, side });
+      const hung = side ?? sides[0];
+      if (point) {
+        place(point, hung);
+      }
+      chosen.push({ ...candidate, side: hung });
       // Here rather than at the top of the loop: there, taking the fifteenth label asked the
       // candidates for a sixteenth first, and near the Sun finding one walks most of the catalogue.
       if (chosen.length >= LABEL_MAX_COUNT) {
@@ -1557,13 +1630,18 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       });
   }
 
-  /** Re-reads the HUD surfaces the ring has to print around, as boxes relative to the canvas. */
+  /**
+   * Re-reads the HUD surfaces the labels have to print around, as boxes relative to the canvas.
+   * Once a label pass, before it writes to the DOM, so the reads cost one layout at most.
+   */
   private refreshReservedBoxes(): void {
     const canvas = this.canvasRef().nativeElement.getBoundingClientRect();
     const panels = [
       this.dockRef()?.nativeElement.querySelector('[role="tabpanel"]'),
       this.dockRef()?.nativeElement.querySelector('[role="tablist"]')?.parentElement,
       this.objectCardRef()?.nativeElement.querySelector('[data-testid="object-card"]'),
+      this.hudRef()?.nativeElement.querySelector('[data-testid="hud-banner"]'),
+      this.hudRef()?.nativeElement.querySelector('nav[aria-label="Map scale"]'),
     ];
     this.reserved = panels.flatMap((panel) => {
       if (!panel) {
@@ -1636,7 +1714,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * direction a viewer can act on: which way to turn to face it.
    */
   private neighbourLabels(camera: SceneCamera): LabeledPoint[] {
-    this.refreshReservedBoxes();
     return this.neighbours.flatMap(({ star, distancePc, direction }) => {
       const position = this.neighbourRingPosition(camera, direction);
       if (!position) {

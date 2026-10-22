@@ -46,10 +46,12 @@ test.describe('Galaxy view', () => {
     await page.goto('/?stars=4000');
     await expect(page.getByTestId('scene-canvas')).toBeVisible({ timeout: 30_000 });
 
-    // The rings are distances from the Sun, the survey's own edge called out among them.
-    await expect(page.getByText('Survey edge')).toBeVisible({ timeout: 30_000 });
+    // The rings are distances from the Sun. Not "Survey edge" by name: at this pose Izar's name
+    // holds the place the 250 pc rung would print in, and a name is worth more than a distance.
+    const rung = page.locator('.map-label--ghost .map-label-name').filter({ hasText: /^\d+ pc$/ }).first();
+    await expect(rung).toBeVisible({ timeout: 30_000 });
     // On a plate of the void, 80% opaque, so the label reads over a bright field as over black.
-    await expect(page.getByText('Survey edge')).toHaveCSS('background-color', /^oklab\(0\.12\d* .* \/ 0\.8\)$/);
+    await expect(rung).toHaveCSS('background-color', /^oklab\(0\.12\d* .* \/ 0\.8\)$/);
     const scale = page.getByTestId('hud-scale');
     await expect(scale).toHaveAttribute('aria-label', /^Scale: [\d.]+ k?pc$/);
     const opening = await scale.getAttribute('aria-label');

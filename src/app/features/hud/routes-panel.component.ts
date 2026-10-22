@@ -55,7 +55,13 @@ type Field = 'from' | 'to';
     <div class="flex flex-col gap-3">
       <div class="grid gap-2 sm:grid-cols-2">
         @for (field of fields; track field) {
-          <div class="relative">
+          <!-- From sm up the suggestions float above their field. Below it the two fields stack,
+               and floating there the Destination list covered Departure, so a tap meant for
+               Departure chose a destination. There the list sits in the flow between the label and
+               the field instead (the field ordered last), pushing what is above it up the sheet: it
+               covers nothing, and the field being typed into does not move. Hung below instead,
+               six matches ran 61 px past the bottom of a 390 by 844 screen. -->
+          <div class="relative max-sm:flex max-sm:flex-col">
             <label [for]="'route-' + field" class="type-label text-muted">{{ field === 'from' ? 'Departure' : 'Destination' }}</label>
             <input
               #input
@@ -71,14 +77,14 @@ type Field = 'from' | 'to';
               (keydown.enter)="chooseFirst(field, $event)"
               (keydown.arrowdown)="focusFirstOption($event)"
               (keydown.escape)="$event.stopPropagation(); closeOptions()"
-              class="hud-surface mt-1 w-full px-2.5 py-1.5 text-sm text-text caret-accent placeholder:text-muted focus:border-accent focus:outline-none"
+              class="hud-surface mt-1 w-full px-2.5 py-1.5 text-sm text-text caret-accent placeholder:text-muted focus:border-accent focus:outline-none max-sm:order-1"
             />
             @if (listed(field)) {
               <ul
                 [id]="'route-' + field + '-options'"
                 role="listbox"
                 aria-label="Matches"
-                class="hud-surface absolute bottom-full left-0 z-10 mb-1 max-h-48 w-full overflow-y-auto divide-y divide-border/25"
+                class="hud-surface mb-1 max-h-48 w-full overflow-y-auto divide-y divide-border/25 max-sm:mt-1 sm:absolute sm:bottom-full sm:left-0 sm:z-10"
               >
                 @for (option of options(); track option.id) {
                   <li role="none">

@@ -461,6 +461,25 @@ describe('HudDockComponent', () => {
     expect(strip.parentElement!.parentElement!.classList).toContain('flex-col-reverse');
   });
 
+  it('floats the route suggestions over the panel only from sm up, and on a phone puts them between the label and the field', () => {
+    // jsdom lays nothing out: the classes are what decide it. Measured in Chromium at 390 by 844,
+    // the floating Destination list covered Departure (list 576-643 px, Departure 605-639).
+    fixture.componentRef.setInput('routing', true);
+    fixture.componentRef.setInput('routeOptions', [{ id: 7, name: 'Sirius', subtitle: '2.6 pc' }]);
+    fixture.componentRef.setInput('defaultTab', 'routes');
+    fixture.detectChanges();
+    const destination = host().querySelector<HTMLInputElement>('#route-to')!;
+    destination.value = 'Sir';
+    destination.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const list = host().querySelector('#route-to-options')!;
+    expect(list.classList).not.toContain('absolute');
+    expect(list.classList).toContain('sm:absolute');
+    expect(destination.classList).toContain('max-sm:order-1');
+    expect([...destination.parentElement!.classList]).toEqual(expect.arrayContaining(['max-sm:flex', 'max-sm:flex-col']));
+  });
+
   it('chooses the first suggestion on Enter, and walks the suggestions with the arrows', () => {
     setReadout();
     fixture.componentRef.setInput('routing', true);

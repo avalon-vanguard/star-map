@@ -166,8 +166,10 @@ export class StarLabelOverlay {
       (element as HTMLButtonElement).type = 'button';
       // Read out as a sentence rather than as the two lines run together — the name and the
       // distance are adjacent spans, so the default accessible name is "Sirius2.64 pc" — and
-      // said as the action it is, since nothing else on screen says these labels are doors.
-      element.setAttribute('aria-label', `Go to ${point.name}${point.kind ? `, ${point.kind} away` : ''}`);
+      // said as the action it is, since nothing else on screen says these labels are doors. Only
+      // a ghost's second line is a distance; a star's own in the field says what it is.
+      const kind = point.tone === 'ghost' ? `${point.kind} away` : point.kind;
+      element.setAttribute('aria-label', point.kind ? `Go to ${point.name}, ${kind}` : `Go to ${point.name}`);
       element.addEventListener('click', (event) => {
         event.stopPropagation();
         this.onSelectStar?.(starId);

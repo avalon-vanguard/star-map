@@ -59,4 +59,27 @@ test.describe('Galaxy view', () => {
     }
     await expect(scale).not.toHaveAttribute('aria-label', opening ?? '', { timeout: 15_000 });
   });
+
+  test('a star’s name is a Tab away from the map and flies there on Enter, and the pointer still reaches the map through it', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.goto('/?stars=4000');
+    await expect(page.getByTestId('scene-canvas')).toBeVisible({ timeout: 30_000 });
+    const label = page.locator('button.map-label:not(.map-label--ghost):visible').first();
+    await expect(label).toHaveAttribute('aria-label', /^Go to .+, (Star|System)$/, { timeout: 30_000 });
+
+    // The wheel and a drag that start on a name still move the map, as they did when no name
+    // could be pressed.
+    const box = (await label.boundingBox())!;
+    const under = await page.evaluate(
+      ([x, y]) => document.elementFromPoint(x, y)?.getAttribute('data-testid'),
+      [box.x + box.width / 2, box.y + box.height / 2],
+    );
+    expect(under).toBe('scene-canvas');
+
+    await page.getByTestId('scene-canvas').focus();
+    await page.keyboard.press('Tab');
+    await expect(label).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/[?&]star=\d+/, { timeout: 30_000 });
+  });
 });

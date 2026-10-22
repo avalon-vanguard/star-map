@@ -189,6 +189,14 @@ body {
   font: inherit;
 }
 
+/* A star's own name in the field is a button for the keyboard only: the pointer goes through it
+ * to the map, as before. There are up to 15 of them over the field, and a wheel turned over one
+ * that took the pointer moved nothing (250 pc before and after, where through it 307 -> 250); a
+ * click on the star itself already selects it. */
+.map-label--select:not(.map-label--ghost) {
+  pointer-events: none;
+}
+
 .map-label--select:hover .map-label-name,
 .map-label--select:focus-visible .map-label-name {
   color: var(--color-accent);

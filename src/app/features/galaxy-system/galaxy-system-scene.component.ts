@@ -1366,6 +1366,9 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
           id: star.id,
           name: star.name,
           kind: starIdsWithBodies.has(star.id) ? 'System' : 'Star',
+          // A button, so a star can be chosen from the field without a pointer; the styles keep
+          // it transparent to one, see `.map-label--select` in styles.css.
+          selectStarId: star.id,
           x: star.x,
           y: star.y,
           z: star.z,

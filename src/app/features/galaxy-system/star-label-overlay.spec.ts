@@ -131,6 +131,14 @@ describe('StarLabelOverlay', () => {
     expect(chosen).toEqual([42]);
   });
 
+  it('names a star of the field by what it is, and keeps "away" for a ghost, whose second line is a distance', () => {
+    overlay.update([{ id: 7, name: 'Canopus', kind: 'Star', selectStarId: 7, x: 1, y: 0, z: 0 }]);
+
+    const label = labels()[0];
+    expect(label.tagName).toBe('BUTTON');
+    expect(label.getAttribute('aria-label')).toBe('Go to Canopus, Star');
+  });
+
   it('leaves a label that offers nothing untouchable, so the scene behind it stays clickable', () => {
     overlay.update([{ id: 1, name: 'Sirius', kind: 'Star', x: 1, y: 0, z: 0 }]);
 

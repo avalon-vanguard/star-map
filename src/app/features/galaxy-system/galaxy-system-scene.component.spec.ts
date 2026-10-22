@@ -941,6 +941,16 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(pulled).toBe(15);
   });
 
+  it('offers every star it names in the field as somewhere to go, as a neighbour’s name is from a system', async () => {
+    const update = vi.spyOn(StarLabelOverlay.prototype, 'update');
+    await advanceFrames(engine, 0.3);
+
+    const stars = ((update.mock.calls.at(-1)?.[0] ?? []) as LabeledPoint[]).filter((label) => typeof label.id === 'number');
+    expect(stars.length).toBeGreaterThan(0);
+    expect(stars.every((label) => label.selectStarId === label.id)).toBe(true);
+    update.mockRestore();
+  });
+
   it('flies the camera into a selected star system: hides the galaxy group, shows the system group, and switches to AU-scale near/far planes', async () => {
     navigationStore.selectStar(SUN.id);
     await flushAsync();

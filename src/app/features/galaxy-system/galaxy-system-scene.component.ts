@@ -59,7 +59,8 @@ import {
   HudReadout,
 } from '../hud/hud-dock.component';
 import { RouteRequest, RouteResult, RouteStarOption } from '../hud/routes-panel.component';
-import { buildSearchIndex, entrySubtitle, IndexedSearchEntry, rankSearchResults } from '../search/search-ranking';
+import { SearchIndexService } from '../search/search-index.service';
+import { entrySubtitle, rankSearchResults } from '../search/search-ranking';
 import { StarmapHudComponent } from './starmap-hud.component';
 import { SystemObjectCardComponent } from './system-object-card.component';
 import { RoutingClient } from './routing-client';
@@ -421,6 +422,7 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
 export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private readonly engine = inject(EngineService);
   private readonly dataLoader = inject(DataLoaderService);
+  private readonly searchIndex = inject(SearchIndexService);
   private readonly router = inject(Router);
   readonly navigationStore = inject(NavigationStore);
   readonly time = inject(TimeStore);
@@ -518,7 +520,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    */
   readonly routeOptions = computed<readonly RouteStarOption[]>(() => {
     const query = this.routeQuery().trim();
-    const index = this.starSearchIndex();
+    const index = this.searchIndex.stars();
     if (query.length < MIN_ROUTE_QUERY_LENGTH || index.length === 0) {
       return [];
     }
@@ -557,8 +559,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private starIdsWithBodies = new Set<number>();
   /** Catalogue indices, brightest first, for the labels to walk rather than sort. See `brightestWithin`. */
   private starsByBrightness: BrightnessIndex = brightnessIndex([]);
-  /** Stars alone, normalised once, for the two routing fields. Empty until the catalogue lands. */
-  private readonly starSearchIndex = signal<IndexedSearchEntry[]>([]);
   private milkyWay?: MilkyWayRenderer;
   private galacticLabels: readonly LabeledPoint[] = [];
   private galacticGrid?: PolarGridPlane;
@@ -723,17 +723,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.neighbourhood = new StarNeighbourhood(stars);
     this.routing = new RoutingClient(stars, positions, this.neighbourhood);
     this.starsByBrightness = brightnessIndex(stars);
-    this.starSearchIndex.set(
-      buildSearchIndex(
-        stars.map((star) => ({
-          kind: 'star' as const,
-          name: star.name,
-          subtitle: '',
-          star,
-          starId: star.id,
-        })),
-      ),
-    );
     this.bodies = bodies;
     this.exoplanets = exoplanets;
     // Which stars can be flown into: those with catalogued bodies of their own, plus the Sun.
@@ -823,6 +812,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       this.tick(this.engine.getCamera(), deltaSeconds),
     );
     this.engine.start();
+    // After the first frame is on its way rather than ahead of it, where it was 122 ms of the boot task.
+    void this.searchIndex.load();
 
     this.ready = true;
     this.reconcileSelection(this.navigationStore.selectedStarId());

@@ -1,10 +1,10 @@
 import { Component, computed, ElementRef, inject, output, signal, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
-import { DataLoaderService } from '../../core/data/data-loader.service';
 import { NavigationStore } from '../../shared/state/navigation.store';
 import { ReticleIconComponent } from '../../shared/ui/reticle-icon.component';
-import { buildSearchIndex, entrySubtitle, IndexedSearchEntry, rankSearchResults, SearchEntry, SearchResultKind } from './search-ranking';
+import { SearchIndexService } from './search-index.service';
+import { entrySubtitle, rankSearchResults, SearchEntry, SearchResultKind } from './search-ranking';
 
 const MAX_RESULTS = 8;
 const MIN_QUERY_LENGTH = 2;
@@ -80,7 +80,7 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
   `
 })
 export class SearchComponent {
-  private readonly dataLoader = inject(DataLoaderService);
+  private readonly searchIndex = inject(SearchIndexService);
   private readonly navigationStore = inject(NavigationStore);
   private readonly router = inject(Router);
 
@@ -90,11 +90,11 @@ export class SearchComponent {
   readonly picked = output<void>();
 
   private readonly field = viewChild.required<ElementRef<HTMLInputElement>>('field');
-  /** Pre-normalised once on load; re-deriving it per keystroke would stutter the render loop. */
-  private readonly index = signal<IndexedSearchEntry[]>([]);
+  /** Pre-normalised once per session; re-deriving it per keystroke would stutter the render loop. */
+  private readonly index = computed(() => this.searchIndex.all() ?? []);
   /** False until the catalogues have loaded — and forever if they fail, which beats a false
    *  "no matches" for bodies that exist but could not be fetched. */
-  readonly indexReady = signal(false);
+  readonly indexReady = computed(() => this.searchIndex.all() !== null);
 
   /** True once the query is long enough to have been searched — so "no matches" is only ever
    *  reported about a search that actually ran, never about a half-typed word. */
@@ -114,7 +114,7 @@ export class SearchComponent {
   readonly results = computed(() => this.matches().slice(0, MAX_RESULTS).map((entry) => ({ ...entry, subtitle: entrySubtitle(entry) })));
 
   constructor() {
-    void this.buildIndex();
+    void this.searchIndex.load();
   }
 
   onInput(event: Event): void {
@@ -142,26 +142,5 @@ export class SearchComponent {
       void this.router.navigate(['/body', result.bodyId]);
     }
     this.picked.emit();
-  }
-
-  private async buildIndex(): Promise<void> {
-    try {
-      const [{ stars }, bodies, exoplanets] = await Promise.all([
-        this.dataLoader.loadStars(),
-        this.dataLoader.loadBodies(),
-        this.dataLoader.loadExoplanets()
-      ]);
-
-      const entries: SearchEntry[] = [
-        ...stars.map((star): SearchEntry => ({ kind: 'star', name: star.name, subtitle: '', star, starId: star.id })),
-        ...bodies.map((body): SearchEntry => ({ kind: 'body', name: body.name, subtitle: body.kind, bodyId: body.id })),
-        ...exoplanets.map((exoplanet): SearchEntry => ({ kind: 'exoplanet', name: exoplanet.name, subtitle: exoplanet.hostStarName, bodyId: exoplanet.id }))
-      ];
-
-      this.index.set(buildSearchIndex(entries));
-      this.indexReady.set(true);
-    } catch (error) {
-      console.error('Failed to build the search index.', error);
-    }
   }
 }

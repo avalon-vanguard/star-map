@@ -16,6 +16,7 @@ import { TimeStore } from '../../shared/state/time.store';
 import { LinkBudget } from '../../shared/astro/jump-links';
 import { HudDisplay } from '../hud/hud-dock.component';
 import { GalaxySystemSceneComponent } from './galaxy-system-scene.component';
+import { SearchIndexService } from '../search/search-index.service';
 import { normalView, positionViewDirection } from 'three/tsl';
 import { galacticNormal } from './grid-plane';
 import { catalogueCensus, positionsNote } from './star-readouts';
@@ -1089,7 +1090,6 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
   it('offers a star for a route by its classification, and a star with none by its name alone', () => {
     const component = fixture.componentInstance as unknown as {
-      starSearchIndex(): { entry: { starId?: number; subtitle: string } }[];
       routeOptions(): { id: number; subtitle: string }[];
       onRouteQuery(query: string): void;
       currentStarOption(): { subtitle: string } | null;
@@ -1101,7 +1101,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(optionFor('KMT-2016', LENS.id)).toBe('');
     expect(optionFor('Proxima', PROXIMA.id)).toBe('M5V');
     // Classified for the options shown only: the index holds none, where all 455 571 stars cost 140-230 ms at boot.
-    expect(component.starSearchIndex().every(({ entry }) => entry.subtitle === '')).toBe(true);
+    expect(TestBed.inject(SearchIndexService).stars().every(({ entry }) => entry.subtitle === '')).toBe(true);
     navigationStore.selectStar(LENS.id);
     expect(component.currentStarOption()?.subtitle).toBe('');
     navigationStore.selectStar(PROXIMA.id);

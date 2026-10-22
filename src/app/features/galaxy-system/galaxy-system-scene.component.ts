@@ -250,6 +250,13 @@ const DEEP_SKY_LABEL_COUNT = 12;
  */
 const DEEP_SKY_VIEWPOINT_PC = 1;
 /**
+ * How close on the sky to a deep-sky object the search turned to another one's permanent label is
+ * dropped, in radians: the labels are not spread, and the Great Orion Nebula's printed over Lower
+ * Sword's, 0.52° away. 6° is a label 130 px wide from the 1 pc pose, 21.6 px a degree on a view
+ * 1080 px tall; a narrower or shorter view, more degrees to the pixel, could still let two touch.
+ */
+const DEEP_SKY_LABEL_CLEARANCE_RAD = THREE.MathUtils.degToRad(6);
+/**
  * How far off the view's centre a deep-sky object the search turned to can drift, by the cosine of
  * the angle, before the readout gives the neighbourhood back: 10°, so a small orbit round it keeps
  * the record and turning away does not.
@@ -2265,12 +2272,22 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.lookedAtDeepSky = record;
+    // The plan frames what the camera's distance to its centre spans: at the 1 pc pose that is
+    // under half a parsec, filled by the object's sprite, with the Sun behind the camera drawn
+    // over it. Swapped now rather than by the plan's effect, which would hand the flight's tween
+    // to a new rig and leave it unfinished.
+    if (this.display().plan) {
+      this.display.update((display) => ({ ...display, plan: false }));
+      this.applyProjection(false);
+    }
     const toward = new THREE.Vector3(record.x, record.y, record.z);
     this.rig.flyTo(
       { position: toward.clone().multiplyScalar(DEEP_SKY_VIEWPOINT_PC), target: toward.multiplyScalar(2 * DEEP_SKY_VIEWPOINT_PC) },
       RETURN_DURATION_SECONDS,
     );
-    const labels = this.deepSky.labelPoints(DEEP_SKY_LABEL_COUNT);
+    const labels = this.deepSky
+      .labelPoints(DEEP_SKY_LABEL_COUNT)
+      .filter((label) => label.id === record.id || toward.angleTo(new THREE.Vector3(label.x, label.y, label.z)) > DEEP_SKY_LABEL_CLEARANCE_RAD);
     this.deepSkyLabels = labels.some((label) => label.id === record.id) ? labels : [...labels, ...deepSkyLabelPoints([record], 1)];
   }
 

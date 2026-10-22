@@ -132,7 +132,10 @@ export function catalogueCensus(stars: readonly StarRecord[]): string {
  */
 export function deepSkyReadouts(record: DeepSkyRecord): { subtitle: string; readouts: HudReadout[]; note: string } {
   const kind = record.kind.charAt(0).toUpperCase() + record.kind.slice(1);
-  const names = [record.messier, readableDesignation(record.id)].filter((name): name is string => !!name && name !== record.name);
+  // 264 of the 488 are named by their designation alone, "NGC6231", which reads "NGC 6231" spaced out.
+  const names = [record.messier, readableDesignation(record.id)].filter(
+    (name): name is string => !!name && name !== record.name && name !== readableDesignation(record.name),
+  );
   const notes = {
     parallax: 'Distance from the parallax OpenNGC lists for it.',
     redshift: `Distance from its redshift, by the Hubble law at ${HUBBLE_CONSTANT_KM_S_PER_MPC} km/s/Mpc.`,

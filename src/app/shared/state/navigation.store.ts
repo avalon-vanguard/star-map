@@ -35,6 +35,11 @@ export class NavigationStore {
   }
 
   lookAtDeepSky(deepSkyId: string | null): void {
+    // The view leaves any system to turn, so no star stays selected. The body route keeps its
+    // host selected, and the map, back from it, flew into the host's system and dropped the request.
+    if (deepSkyId !== null) {
+      this.selectedStarId.set(null);
+    }
     this.deepSkyTarget.set(deepSkyId);
   }
 

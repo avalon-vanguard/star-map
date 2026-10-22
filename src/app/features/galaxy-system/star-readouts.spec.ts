@@ -186,5 +186,10 @@ describe('deepSkyReadouts', () => {
   it('does not repeat a name the object is already called by', () => {
     expect(deepSkyReadouts({ ...andromeda, name: 'M31' }).subtitle).toBe('Galaxy · NGC 224');
   });
+
+  it('does not repeat a designation the object is named by, spaced out as it is written', () => {
+    const cluster: DeepSkyRecord = { ...pleiades, id: 'NGC6231', name: 'NGC6231', messier: null };
+    expect(deepSkyReadouts(cluster).subtitle).toBe('Cluster');
+  });
 });
 

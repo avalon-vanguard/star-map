@@ -1163,16 +1163,68 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(scene().deepSkyLabels).toHaveLength(13);
     });
 
+    it('drops a permanent label so close on the sky that the two would print over each other', async () => {
+      // The Great Orion Nebula is 0.52° from Lower Sword, which is always named.
+      const sword: DeepSkyRecord = { ...DEEP_SKY_OBJECT, id: 'NGC1980', name: 'Lower Sword', x: 1, y: 0, z: 0 };
+      const nebula: DeepSkyRecord = { ...sword, id: 'NGC1976', name: 'Great Orion Nebula', y: Math.tan(THREE.MathUtils.degToRad(0.52)), magnitude: 13 };
+      const records = [sword, ...Array.from({ length: 11 }, (_, i) => ({ ...DEEP_SKY_OBJECT, id: `B${i}`, magnitude: i })), nebula];
+      scene().deepSkyRecords = records;
+      scene().deepSky = new DeepSkyRenderer(records);
+      navigationStore.lookAtDeepSky('NGC1976');
+      await flushAsync();
+
+      const named = scene().deepSkyLabels.map((label) => label.id);
+      expect(named).toContain('NGC1976');
+      expect(named).not.toContain('NGC1980');
+      expect(named).toHaveLength(12);
+    });
+
     it('turns toward one picked on the body route once the map is back, which it was not there to see', async () => {
       fixture.destroy();
+      // The body route selects the planet's host, here Earth's Sun.
+      navigationStore.selectStar(SUN.id);
       navigationStore.lookAtDeepSky(DEEP_SKY_OBJECT.id);
       fixture = TestBed.createComponent(GalaxySystemSceneComponent);
       fixture.detectChanges();
       await flushAsync();
       await advanceFrames(engine, 1.5);
 
+      expect(scene().currentStarId).toBeNull();
       expect(lookingAlong().z).toBeCloseTo(1, 5);
       expect(navigationStore.deepSkyTarget()).toBeNull();
+    });
+
+    it('leaves the plan view to turn, whose frame from a parsec out would be the object sprite alone', async () => {
+      fixture.componentInstance.display.update((display) => ({ ...display, plan: true }));
+      TestBed.tick();
+      expect(engine.currentProjection).toBe('orthographic');
+
+      navigationStore.lookAtDeepSky(DEEP_SKY_OBJECT.id);
+      await flushAsync();
+      await advanceFrames(engine, 1.5);
+
+      expect(engine.currentProjection).toBe('perspective');
+      expect(fixture.componentInstance.display().plan).toBe(false);
+      // Flown by the rig the swap made, so the flight lands.
+      expect(engine.getCamera().position.z).toBeCloseTo(1, 5);
+      expect(lookingAlong().z).toBeCloseTo(1, 5);
+    });
+
+    it('waits for a flight into a star to land before turning, rather than cutting into it', async () => {
+      navigationStore.selectStar(PROXIMA.id);
+      await flushAsync();
+      await advanceFrames(engine, 0.3);
+      navigationStore.lookAtDeepSky(DEEP_SKY_OBJECT.id);
+      await flushAsync();
+
+      // Still on its way in: taken up now, the turn would replace the approach and its landing.
+      expect(navigationStore.deepSkyTarget()).toBe(DEEP_SKY_OBJECT.id);
+      // In, settled, back out and turned: 1.0 + 0.9 + 0.9 + 1.1 + 1.1 s of flight.
+      await advanceFrames(engine, 6);
+
+      expect(scene().currentStarId).toBeNull();
+      expect(navigationStore.deepSkyTarget()).toBeNull();
+      expect(lookingAlong().z).toBeCloseTo(1, 5);
     });
 
     it('leaves a system first, as the scale ladder does, and then turns', async () => {

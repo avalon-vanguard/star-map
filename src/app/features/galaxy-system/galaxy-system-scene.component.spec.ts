@@ -952,6 +952,27 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect((earth.scale.x * (earth.geometry as THREE.SphereGeometry).parameters.radius) / pixelAu).toBeCloseTo(3, 3);
     });
 
+    it('shows Earth’s card on a hover 11 px from its centre, 8 px off its disc, and pins it on a click there', async () => {
+      // A raycast had to land on the 3-pixel disc itself.
+      const canvas = (fixture.nativeElement as HTMLElement).querySelector('canvas')!;
+      Object.defineProperty(canvas, 'clientWidth', { value: 1600 });
+      Object.defineProperty(canvas, 'clientHeight', { value: 1000 });
+      canvas.getBoundingClientRect = () => new DOMRect(0, 0, 1600, 1000);
+      const component = await enterTheSun(1.6);
+      const earth = component.systemRenderer.members.find((member) => member.id === 'earth')!.marker.getWorldPosition(new THREE.Vector3()).project(engine.getCamera());
+      const at = { clientX: ((earth.x + 1) / 2) * 1600 + 11, clientY: ((1 - earth.y) / 2) * 1000 };
+      const card = (): { name: string } | undefined => (component as unknown as { objectCard(): { name: string } | undefined }).objectCard();
+
+      canvas.dispatchEvent(new MouseEvent('pointermove', at));
+      expect(card()?.name).toBe('Earth');
+      canvas.dispatchEvent(new MouseEvent('pointermove', { clientX: 0, clientY: 0 }));
+      expect(card()).toBeUndefined();
+
+      canvas.dispatchEvent(new MouseEvent('click', at));
+      expect(navigationStore.selectedBodyId()).toBe('earth');
+      expect(card()?.name).toBe('Earth');
+    });
+
     it('leaves the system outwards even from a phone’s framing, which stands past the 400 AU it used to fly to', async () => {
       const component = await enterTheSun(390 / 844);
       const camera = engine.getCamera();

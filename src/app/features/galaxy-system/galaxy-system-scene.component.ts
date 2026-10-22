@@ -238,6 +238,12 @@ const LABEL_UPDATE_INTERVAL_SECONDS = 0.2;
 const STAR_FIELD_REFOCUS_PC = FOCUS_RADIUS_PC / 5;
 /** Pointer travel (px) above which a press counts as an orbit drag rather than a selection. */
 const CLICK_DRAG_SLOP_PX = 5;
+/**
+ * How far (CSS px) outside a body's drawn disc a click or hover still picks it: about a fingertip's
+ * half-width, and four times the 3-pixel floor the bodies are drawn at on arrival. Mercury, Venus,
+ * Earth and Mars are then within 8 px of one another at 1920x1080, and the nearest one wins.
+ */
+const BODY_PICK_SLOP_PX = 12;
 
 /**
  * Opening pose for the local view, expressed in the galactic frame rather than the equatorial
@@ -445,7 +451,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     () => this.objectCardRef()?.nativeElement.querySelector('[data-testid="object-card"]') ?? null,
   );
 
-  private readonly raycaster = new THREE.Raycaster();
   private readonly galaxyGroup = new THREE.Group();
   private readonly systemGroup = new THREE.Group();
   /** The colour of the system's star, set on entering it; see `starSurfaceMaterial`. */
@@ -1895,12 +1900,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       ((event.clientX - rect.left) / rect.width) * 2 - 1,
       -((event.clientY - rect.top) / rect.height) * 2 + 1,
     );
-    this.raycaster.setFromCamera(pointerNdc, camera);
-
     if (this.currentStarId === null) {
       this.handleGalaxyClick(pointerNdc, camera);
     } else {
-      this.handleSystemClick();
+      this.handleSystemClick(pointerNdc, camera);
     }
   };
 
@@ -1924,26 +1927,31 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * with it, so comparing two planets meant flying back into the system between each — the card
    * shows the same numbers over the live view instead, and `Full view` still opens the route.
    */
-  private handleSystemClick(): void {
+  private handleSystemClick(pointerNdc: THREE.Vector2, camera: SceneCamera): void {
     if (!this.systemRenderer) {
       return;
     }
-    const [hit] = this.raycaster.intersectObjects(this.systemRenderer.pickableObjects);
-    const member = hit ? this.systemRenderer.memberForObject(hit.object) : undefined;
+    const id = this.bodyAt(pointerNdc, camera);
 
-    this.pinnedBodyId = member ? member.id : null;
-    if (member) {
-      this.navigationStore.selectBody(member.id);
+    this.pinnedBodyId = id;
+    if (id !== null) {
+      this.navigationStore.selectBody(id);
     }
     this.refreshObjectCard();
+  }
+
+  /** The one rule a click and a hover pick a body by, so the card a hover shows is the one a click pins. */
+  private bodyAt(pointerNdc: THREE.Vector2, camera: SceneCamera): string | null {
+    const slopNdc = (2 * BODY_PICK_SLOP_PX) / Math.max(1, this.canvasRef().nativeElement.clientHeight);
+    return this.systemRenderer?.pickAt(pointerNdc, camera, this.viewportAspect(), slopNdc)?.id ?? null;
   }
 
   /**
    * Hover preview, so a body's figures can be read without committing a click.
    *
-   * The raycast is against the system's own handful of pickable meshes rather than the star field,
-   * so it stays cheap even on a software rasterizer — it is the rendering that is slow in that
-   * environment, not the picking. Skipped outside the system view and during a camera flight.
+   * The pick projects the system's own few dozen bodies rather than the star field, so it stays
+   * cheap even on a software rasterizer — it is the rendering that is slow in that environment,
+   * not the picking. Skipped outside the system view and during a camera flight.
    */
   private readonly handlePointerMove = (event: PointerEvent): void => {
     if (!this.systemRenderer || !this.systemGroup.visible || this.rig?.isAnimating) {
@@ -1955,11 +1963,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       ((event.clientX - rect.left) / rect.width) * 2 - 1,
       -((event.clientY - rect.top) / rect.height) * 2 + 1,
     );
-    this.raycaster.setFromCamera(pointerNdc, this.engine.getCamera());
-
-    const [hit] = this.raycaster.intersectObjects(this.systemRenderer.pickableObjects);
-    const hoveredId =
-      (hit ? this.systemRenderer.memberForObject(hit.object) : undefined)?.id ?? null;
+    const hoveredId = this.bodyAt(pointerNdc, this.engine.getCamera());
     if (hoveredId === this.hoveredBodyId) {
       return;
     }

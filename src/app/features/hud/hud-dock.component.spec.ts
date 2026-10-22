@@ -57,6 +57,15 @@ describe('HudDockComponent', () => {
     fixture.componentRef.setInput('range', '21.5 kpc');
   }
 
+  /** Types into a route field as the reader does, and returns the field. */
+  function typeRoute(field: 'from' | 'to', value: string): HTMLInputElement {
+    const input = host().querySelector<HTMLInputElement>(`#route-${field}`)!;
+    input.value = value;
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    return input;
+  }
+
   beforeEach(async () => {
     localStorage.clear();
     await TestBed.configureTestingModule({
@@ -468,10 +477,7 @@ describe('HudDockComponent', () => {
     fixture.componentRef.setInput('routeOptions', [{ id: 7, name: 'Sirius', subtitle: '2.6 pc' }]);
     fixture.componentRef.setInput('defaultTab', 'routes');
     fixture.detectChanges();
-    const destination = host().querySelector<HTMLInputElement>('#route-to')!;
-    destination.value = 'Sir';
-    destination.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
+    const destination = typeRoute('to', 'Sir');
 
     const list = host().querySelector('#route-to-options')!;
     expect(list.classList).not.toContain('absolute');
@@ -495,9 +501,7 @@ describe('HudDockComponent', () => {
     const destination = host().querySelector<HTMLInputElement>('#route-to')!;
     expect(destination.getAttribute('role')).toBe('combobox');
     expect(destination.getAttribute('aria-expanded')).toBe('false');
-    destination.value = 'Sir';
-    destination.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
+    typeRoute('to', 'Sir');
 
     const list = host().querySelector('#dock-panel-routes [role="listbox"]')!;
     const options = [...list.querySelectorAll<HTMLElement>('[role="option"]')];

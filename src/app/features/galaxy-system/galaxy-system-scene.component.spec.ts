@@ -669,6 +669,33 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(component.ringLabelsInTheClear([clearRung], camera, [spanning])).toEqual([clearRung]);
     });
 
+    it('drops a rung whose distance would print on the one kept before it, where the ladder foreshortens', () => {
+      const component = fixture.componentInstance as unknown as {
+        ringLabelsInTheClear(candidates: readonly LabeledPoint[], camera: THREE.Camera, stars: readonly LabeledPoint[]): LabeledPoint[];
+        viewportAspect(): number;
+      };
+      const camera = engine.getCamera();
+      camera.updateMatrixWorld(true);
+      const aspect = component.viewportAspect();
+      // Looking along the ladder's bearing, low over the plane: the rungs step 0.12 across and
+      // barely up, closer than the 0.23 a distance's text reaches.
+      const ladder = [0, 1, 2, 3, 4, 5].map((step): LabeledPoint => {
+        const point = new THREE.Vector3((-0.6 + step * 0.12) / aspect, 0.005 * step, 0.5).unproject(camera);
+        return { id: `ring-${step}`, name: `${step} pc`, x: point.x, y: point.y, z: point.z };
+      });
+
+      expect(component.ringLabelsInTheClear(ladder, camera, []).map((label) => label.id)).toEqual(['ring-0', 'ring-2', 'ring-4']);
+
+      // Straight up, 0.04 apart: a distance is one line, so one clears the next; a rung with
+      // "Survey edge" under its distance is two, and does not.
+      const rung = (id: string, y: number, kind?: string): LabeledPoint => {
+        const point = new THREE.Vector3(0, y, 0.5).unproject(camera);
+        return { id, name: id, ...(kind ? { kind } : {}), x: point.x, y: point.y, z: point.z };
+      };
+      expect(component.ringLabelsInTheClear([rung('a', 0), rung('b', 0.04)], camera, []).map((label) => label.id)).toEqual(['a', 'b']);
+      expect(component.ringLabelsInTheClear([rung('a', 0), rung('b', 0.04, 'Survey edge')], camera, []).map((label) => label.id)).toEqual(['a']);
+    });
+
     it('places the ring labels with the star names rather than over them', async () => {
       const component = fixture.componentInstance as unknown as GridScene;
       const update = vi.spyOn(StarLabelOverlay.prototype, 'update');

@@ -164,13 +164,18 @@ interface LabelRect {
   readonly top: number;
 }
 
-/** The text of a label hung on `side` of `point`, reaching `reach` from it, a row tall. */
-function labelRect(point: THREE.Vector2, side: LabelSide, reach: number): LabelRect {
+/** The text of a label hung on `side` of `point`, reaching `reach` from it, `row` tall. */
+function labelRect(
+  point: THREE.Vector2,
+  side: LabelSide,
+  reach: number,
+  row = LABEL_ROW_NDC,
+): LabelRect {
   return {
     left: side === 'left' ? point.x - reach : point.x,
     right: side === 'left' ? point.x : point.x + reach,
-    bottom: point.y - LABEL_ROW_NDC / 2,
-    top: point.y + LABEL_ROW_NDC / 2,
+    bottom: point.y - row / 2,
+    top: point.y + row / 2,
   };
 }
 
@@ -1284,14 +1289,17 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
-   * The ring labels worth drawing: the ones on screen, and clear of the names already placed and
-   * of the HUD.
+   * The ring labels worth drawing: the ones on screen, and clear of the names already placed, of
+   * the HUD and of each other.
    *
-   * Not held apart from each other, as the star names are: they are a ladder up one ray, a few
-   * hundredths of the screen apart, and reading them in order is the point. What they must not do
-   * is sit on a name, which is worth more than a distance, or under a panel — or be handed to the
-   * overlay from beside the camera, which CSS2DRenderer places past the edge of the container
-   * rather than hiding, since all it tests is depth.
+   * Nearer each other than the star names are kept: they are a ladder up one ray, a few
+   * hundredths of the screen apart, and reading them in order is the point. But where the view
+   * looks along the ladder's bearing it foreshortens, and the rungs' own text stacks up — at
+   * 15 degrees above the plane, 15 of 30 poses printed one distance through the next. So a rung
+   * whose text would land on one already kept is dropped, and the ladder reads every other rung
+   * there. What they must not do either is sit on a name, which is worth more than a distance, or
+   * under a panel — or be handed to the overlay from beside the camera, which CSS2DRenderer places
+   * past the edge of the container rather than hiding, since all it tests is depth.
    *
    * A name is a line of text hanging to one side of its point, about 135 px of it, not the point:
    * two anchors a tenth of the screen apart still print one inside the other. So the test is
@@ -1315,12 +1323,20 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
     return candidates.filter((label) => {
       const point = this.screenPoint(label, camera, aspect);
+      if (point === null || anchors.some((at) => at.distanceTo(point) < RING_LABEL_CLEARANCE_NDC)) {
+        return false;
+      }
       // Ring labels hang right, as `applyPresentation` leaves anything with no side of its own.
-      return (
-        point !== null &&
-        inTheClear(labelRect(point, 'right', RING_LABEL_REACH_NDC), taken, aspect) &&
-        !anchors.some((at) => at.distanceTo(point) < RING_LABEL_CLEARANCE_NDC)
-      );
+      // A distance on its own is one line, half a name's row. Held a whole row apart, the rungs
+      // in 30 poses at 35 degrees went from 122 to 75, where 6 of those poses had any overlap; at
+      // half a row, to 113.
+      const row = label.kind ? LABEL_ROW_NDC : LABEL_ROW_NDC / 2;
+      const rect = labelRect(point, 'right', RING_LABEL_REACH_NDC, row);
+      if (!inTheClear(rect, taken, aspect)) {
+        return false;
+      }
+      taken.push(rect);
+      return true;
     });
   }
 

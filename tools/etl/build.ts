@@ -19,6 +19,7 @@ import { foldsInto } from '../../src/app/shared/astro/star-merge';
 import { propagateProperMotion, raDegDecDistanceToXyz } from '../../src/app/shared/astro/coordinates';
 import { describeSources } from './sources/registry';
 import { dataPath } from './lib/paths';
+import { stampPublicCounts } from './lib/public-counts';
 
 class ValidationError extends Error {}
 
@@ -942,6 +943,8 @@ async function build(): Promise<void> {
   validateBodies(bodies, horizonsOrbits, horizonsTracks);
   validateExoplanets(exoplanets, stars);
   validateDeepSky(deepSky);
+  // Only once the assets have passed: the pages then quote a catalogue that will ship.
+  stampPublicCounts();
 
   console.log('\nETL completed successfully:');
   console.log(`  stars:      ${stars.length}`);

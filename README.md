@@ -13,7 +13,7 @@ The source lives on Gitea, where pull requests are made, and is mirrored to GitH
 
 The source of a small Claude Code plugin also lives here — see [Plugins](#plugins) below.
 
-![The solar neighbourhood: 68 388 catalogued stars within 250 parsecs, on a polar grid lying in the galactic plane](docs/screenshots/galaxy-view.jpg)
+![The solar neighbourhood: 455 518 catalogued stars, on a polar grid lying in the galactic plane](docs/screenshots/galaxy-view.jpg)
 
 ## Running it
 
@@ -35,12 +35,13 @@ npm run e2e:typecheck
 
 ## What's in it
 
-**Galaxy view** — the HYG catalogue out to 250 parsecs, 68 388 stars, as instanced
-camera-facing billboards positioned from real RA/Dec/parallax, coloured by spectral index and
-sized by magnitude — all of them drawn, in one instanced call, with a budget in reserve for
-catalogues larger than a GPU should be asked to hold at once (see "On how many stars" below). A
-polar grid in the galactic plane runs under them with a drop line from each of the brightest,
-and names label the most prominent stars near whatever the camera is looking at. Behind them
+**Galaxy view** — 455 518 catalogued stars: every star Gaia DR3 measured to G 12 within 250
+parsecs, the HYG catalogue's Hipparcos, Yale Bright Star and Gliese stars, and the planet hosts
+only the NASA Exoplanet Archive places, some of them kiloparsecs out. The readout counts them by
+the catalogue that describes each. They are instanced camera-facing billboards positioned from
+real RA/Dec/parallax, coloured by spectral index and sized by magnitude, and the field draws a
+budget of them chosen by what is in view (see "On how many stars" below). A polar grid in the
+galactic plane runs under them with a drop line from each of the brightest, and names label the most prominent stars near whatever the camera is looking at. Behind them
 sits a backdrop of notable deep-sky objects and a Milky Way panorama.
 
 ![The galactic scale: the Milky Way's bar, bulge and five spiral arms, with the Sun on the Orion Spur](docs/screenshots/galactic-view.jpg)
@@ -109,8 +110,10 @@ publishes none for, where assuming a solar-mass host would mis-state every plane
 dwarf. An exoplanet's card also gives its system's distance, read off the same catalogue star the
 system view prints it for, and its host star's mass.
 
-**Search** — name search across stars, solar-system bodies and exoplanets, navigating to the
-same place an in-scene click would.
+**Search** — name search across stars, solar-system bodies, exoplanets and deep-sky objects,
+navigating to the same place an in-scene click would. A deep-sky object has no place to fly
+into: the view turns to it, and the readout gives its magnitude, size, constellation and, where
+one can be derived, its distance.
 
 Screenshots are captured from a real run of the app at `docs/screenshots/`, and are regenerated
 when the views they show change — the galactic one above records the catalogue size and reach in
@@ -219,6 +222,9 @@ re-runs are cheap and offline-friendly; set `ETL_FORCE_REFRESH=1` to bypass the 
 
 Every Monday, [`.gitea/workflows/data-refresh.yml`](.gitea/workflows/data-refresh.yml) re-runs the ETL on
 Gitea and, if the catalogues changed, tests, builds, commits to `main` and triggers the Openship deploy.
+It commits this README and `src/index.html` with the data: the ETL rewrites the counts they state
+from the assets it has just written (`tools/etl/lib/public-counts.ts`), and fails if a phrase it
+stamps has been reworded away.
 
 | Script | Source | Output |
 | --- | --- | --- |
@@ -228,8 +234,8 @@ Gitea and, if the catalogues changed, tests, builds, commits to `main` and trigg
 | `fetchDeepSky.ts` | OpenNGC | `deepsky.json` |
 
 The star catalogue ships as two binary column stores plus a small JSON file, not as an array of
-objects. At 68 388 stars the old encoding — one JSON object per star, its eight key names
-repeated each time — would have been about 17 MB to download and parse before the first frame.
+objects. When the catalogue held 68 388 stars, the old encoding — one JSON object per star, its
+eight key names repeated each time — would have been about 17 MB to download and parse before the first frame.
 Splitting it puts the numbers in `stars.bin` (positions, handed to the GPU verbatim) and
 `stars-meta.bin` (Gaia source id, id, magnitude, colour index, spectral-type index, the distance's
 relative error in two bytes, and the band and colour system those were measured in or whether the
@@ -250,7 +256,7 @@ prints it. Sources are wired in by role, because the roles are not interchangeab
 
 | Source | Role | What it adds |
 | --- | --- | --- |
-| HYG | positional | The named, spectrally classified bright-star spine — 68 388 stars within 250 pc. |
+| HYG | positional | The named, spectrally classified bright-star spine: Hipparcos, Yale Bright Star and Gliese. |
 | Gaia DR3 | positional | Parallaxes fifty times more precise, for 1.8 billion sources. |
 | DECaPS2 | backdrop | 3.32 billion objects across the southern galactic plane. |
 | SDSS-V Milky Way Mapper | enrichment | Spectroscopic temperatures, gravities, metallicities, radial velocities. |
@@ -272,31 +278,35 @@ arcsecond and disagree on its distance by tens of per cent — so a star at 200 
 from itself between catalogues while being unmistakably the same object. Where both have a star,
 the one with the better parallax wins; where only one reaches, the star is still there.
 
-Only HYG has ever run. Every ESA, NOIRLab, SDSS and Euclid endpoint is unreachable from the
-environment this was developed in, so the Gaia query is written against the published DR3 schema
-and has not been executed against it. A source that cannot be reached is reported and skipped
-rather than failing the build.
+HYG and Gaia DR3 run on every refresh; the other four are declared and not fetched, for the
+reason `registry.ts` records against each. A positional source that cannot be reached is reported
+and skipped by `fetchStars.ts` rather than failing the build, though the weekly refresh fails
+outright on a failed download, since no refresh is better than a partial one.
 
 ### On how many stars
 
-Not many, against the Galaxy. It holds 100–400 billion stars and this map ships 68 388 of them —
-about 0.00003%. That gap is not this project's to close: Gaia DR3, the largest stellar catalogue
-ever assembled, has ~1.8 billion sources, roughly 1% of the Galaxy, and is itself blocked by dust
+Not many, against the Galaxy. It holds 100–400 billion stars, and this map ships
+455 518 catalogued stars, about 0.0002% of them. That gap is not this project's to close: Gaia
+DR3, the largest stellar catalogue ever assembled, has ~1.8 billion sources, roughly 1% of the Galaxy, and is itself blocked by dust
 and blind to most red dwarfs beyond a few hundred parsecs. It is the same reason the galactic
 view is a model.
 
-The 250 pc cutoff is where HYG's own measurements stop. 98.6% of its rows carry a Hipparcos
-identifier, and Hipparcos parallaxes are good to about a milliarcsecond — so at 250 pc a
-distance is uncertain by some tens of per cent and beyond it the catalogue would be plotting
-noise. Only the *radial* placement blurs; a star's direction on the sky stays exact at any
-distance. Note also that beyond about 50 pc the sample is magnitude-limited rather than
+The 250 pc cutoff is where HYG's own measurements stop, and the radius Gaia is queried to. 98.6%
+of HYG's rows carry a Hipparcos identifier, and Hipparcos parallaxes are good to about a
+milliarcsecond — so at 250 pc a distance is uncertain by some tens of per cent and beyond it the
+catalogue would be plotting noise. A HYG star Gaia places further out is drawn where Gaia puts it,
+and a planet host only the Exoplanet Archive places sits at the archive's distance, kiloparsecs
+out for the microlensing ones. Only the *radial* placement blurs; a star's direction on the sky
+stays exact at any distance. Note also that beyond about 50 pc the sample is magnitude-limited rather than
 volume-complete: it thins to the intrinsically bright, which is the same selection the naked eye
 makes.
 
-Drawing and knowing are separate. The field draws `STAR_RENDER_BUDGET` stars — every one inside
-25 pc, then the brightest of the rest — while search, navigation and the planet cross-reference
-all see the full catalogue. A real GPU would draw all 68 388 without noticing; the budget exists
-for the machines that would not, and is a single constant to raise.
+Drawing and knowing are separate. The field draws `STAR_RENDER_BUDGET` stars, chosen by what is
+in view — the planet hosts first, then the stars round where the view is centred and round the
+Sun, then the brightest of the rest — while search, navigation and the planet cross-reference
+all see the full catalogue. A discrete GPU draws the whole of it in the time it takes to draw the
+budget, but drawn whole the opening view is a grey wash in which the labels and the grid are
+lost, and an integrated GPU pays for every star; see `STAR_RENDER_BUDGET` for the figures.
 
 ### On deep-sky distances
 
@@ -309,8 +319,8 @@ So deep-sky records store a **unit direction** on the celestial sphere rather th
 the line of sight is always known precisely, and the objects are drawn as a fixed-radius
 backdrop shell where true distance would be unusable anyway. `distancePc` is optional metadata,
 derived from parallax for galactic objects or the Hubble law for genuinely distant galaxies,
-and left `null` — with its `distanceMethod` — whenever neither is trustworthy. 340 of
-the 488 cataloged objects get a distance; the rest honestly report none.
+and left `null` — with its `distanceMethod` — whenever neither is trustworthy.
+340 of the 488 catalogued deep-sky objects get a distance; the rest honestly report none.
 
 ## Layout
 
@@ -351,8 +361,10 @@ plugin's own files are kept so it can be listed from a marketplace of its own la
 
 ## Data credits
 
-Star catalogue: [HYG database](https://github.com/astronexus/HYG-Database) (Hipparcos, Yale
-Bright Star, Gliese) — 68 388 stars within 250 pc. Solar-system orbits: JPL approximate planetary mean elements (Standish), JPL SSD satellite mean elements and the JPL Small-Body Database; rotation: the IAU WGCCRE 2015 report via NAIF's pck00011, with a locked moon's W and its pole's terms within 5 per cent of its node's rate re-rated to its JPL mean elements (but the Moon's and Phobos's) and Iapetus's pole carried round its orbit normal, and for Earth the IERS Conventions 2010; physical data, and the positions the orbits are checked against: NASA/JPL Horizons. Exoplanets: NASA Exoplanet
+Star catalogue: 455 518 catalogued stars, from [Gaia DR3](https://www.cosmos.esa.int/web/gaia/dr3)
+(ESA/Gaia/DPAC), the [HYG database](https://github.com/astronexus/HYG-Database) (Hipparcos, Yale
+Bright Star, Gliese) and the NASA Exoplanet Archive's own positions for the planet hosts neither
+holds. Solar-system orbits: JPL approximate planetary mean elements (Standish), JPL SSD satellite mean elements and the JPL Small-Body Database; rotation: the IAU WGCCRE 2015 report via NAIF's pck00011, with a locked moon's W and its pole's terms within 5 per cent of its node's rate re-rated to its JPL mean elements (but the Moon's and Phobos's) and Iapetus's pole carried round its orbit normal, and for Earth the IERS Conventions 2010; physical data, and the positions the orbits are checked against: NASA/JPL Horizons. Exoplanets: NASA Exoplanet
 Archive. Deep-sky objects: [OpenNGC](https://github.com/mattiaverga/OpenNGC). Body and skybox
 imagery: NASA/JPL/USGS public domain and Solar System Scope (CC BY 4.0) — per-file provenance
 is recorded in `src/assets/textures/README.md`.

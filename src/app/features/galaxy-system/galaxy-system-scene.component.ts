@@ -32,7 +32,7 @@ import { Bookmark } from '../../shared/state/bookmarks.store';
 import { NavigationStore, ViewLevel } from '../../shared/state/navigation.store';
 import { TimeStore } from '../../shared/state/time.store';
 import { CameraRigController } from './camera-rig-controller';
-import { DeepSkyRenderer } from './deep-sky-renderer';
+import { deepSkyLabelPoints, DeepSkyRenderer } from './deep-sky-renderer';
 import { galacticNormal, PolarGridPlane, TetherField } from './grid-plane';
 import { MilkyWayRenderer } from './milky-way-renderer';
 import {
@@ -229,6 +229,13 @@ const HUD_ACCENT = 0x4dd7ff;
  * always named.
  */
 const DEEP_SKY_LABEL_COUNT = 12;
+/**
+ * How far out from the Sun, toward a deep-sky object picked in the search, the view looks at it
+ * from, in parsecs; the orbit's centre is as far again. The backdrop is the sky as seen from the
+ * Sun, and from here it is drawn so. Seen past the Sun from the opening view's 307 pc, the Orion
+ * Nebula sat behind the crowded centre of the star field, and its name was lost there.
+ */
+const DEEP_SKY_VIEWPOINT_PC = 1;
 /** How often (seconds) the visible label set is recomputed; doesn't need to be per-frame. */
 const LABEL_UPDATE_INTERVAL_SECONDS = 0.2;
 /**
@@ -554,6 +561,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private readonly ringInverse = new THREE.Quaternion();
   private readonly ringPoint = new THREE.Vector3();
   private deepSky?: DeepSkyRenderer;
+  private deepSkyRecords: readonly DeepSkyRecord[] = [];
   private deepSkyLabels: readonly LabeledPoint[] = [];
   /** Stars with at least one catalogued body, which are the ones the map can be flown into. */
   private starIdsWithBodies = new Set<number>();
@@ -599,6 +607,12 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       const selectedStarId = this.navigationStore.selectedStarId();
       if (this.ready) {
         this.reconcileSelection(selectedStarId);
+      }
+    });
+    effect(() => {
+      this.navigationStore.deepSkyTarget();
+      if (this.ready) {
+        this.reconcileDeepSky();
       }
     });
     effect(() => this.applyDisplay(this.display()));
@@ -786,6 +800,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.galaxyGroup.add(this.milkyWay.object, this.galacticGrid.object, this.tethers.object);
 
     if (deepSky.length > 0) {
+      this.deepSkyRecords = deepSky;
       this.deepSky = new DeepSkyRenderer(deepSky);
       this.galaxyGroup.add(this.deepSky.object);
       this.deepSkyLabels = this.deepSky.labelPoints(DEEP_SKY_LABEL_COUNT);
@@ -817,6 +832,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     this.ready = true;
     this.reconcileSelection(this.navigationStore.selectedStarId());
+    // Asked for from the body route, which has no scene to turn.
+    this.reconcileDeepSky();
   }
 
   private tick(camera: SceneCamera, deltaSeconds: number): void {
@@ -2160,6 +2177,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.busy = true;
+    // A star chosen while a deep-sky object waited for the view to leave a system wins over it.
+    if (selectedStarId !== null) {
+      this.navigationStore.lookAtDeepSky(null);
+    }
 
     if (selectedStarId === null) {
       this.exitToGalaxy(() => this.finishTransition());
@@ -2185,6 +2206,36 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     if (pending && !this.busy && this.currentStarId === null) {
       this.flyToOverview(pending);
     }
+    this.reconcileDeepSky();
+  }
+
+  /**
+   * Turns the view toward the deep-sky object the search asked for, from beside the Sun (see
+   * {@link DEEP_SKY_VIEWPOINT_PC}), and names it there whether or not it is among the brightest that
+   * always are. From inside a system it leaves first, as the scale ladder does, and the request
+   * waits in the store for `finishTransition`.
+   */
+  private reconcileDeepSky(): void {
+    const deepSkyId = this.navigationStore.deepSkyTarget();
+    if (deepSkyId === null || this.busy) {
+      return;
+    }
+    if (this.currentStarId !== null) {
+      this.navigationStore.selectStar(null);
+      return;
+    }
+    this.navigationStore.lookAtDeepSky(null);
+    const record = this.deepSkyRecords.find((candidate) => candidate.id === deepSkyId);
+    if (!record || !this.rig || !this.deepSky) {
+      return;
+    }
+    const toward = new THREE.Vector3(record.x, record.y, record.z);
+    this.rig.flyTo(
+      { position: toward.clone().multiplyScalar(DEEP_SKY_VIEWPOINT_PC), target: toward.multiplyScalar(2 * DEEP_SKY_VIEWPOINT_PC) },
+      RETURN_DURATION_SECONDS,
+    );
+    const labels = this.deepSky.labelPoints(DEEP_SKY_LABEL_COUNT);
+    this.deepSkyLabels = labels.some((label) => label.id === record.id) ? labels : [...labels, ...deepSkyLabelPoints([record], 1)];
   }
 
   private enterSystem(starId: number, onComplete: () => void): void {

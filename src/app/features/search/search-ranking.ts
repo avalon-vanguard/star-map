@@ -1,6 +1,6 @@
 import { spectralClassification } from '../../shared/astro/spectral';
 
-export type SearchResultKind = 'star' | 'body' | 'exoplanet';
+export type SearchResultKind = 'star' | 'body' | 'exoplanet' | 'deepSky';
 
 export interface SearchEntry {
   kind: SearchResultKind;
@@ -16,6 +16,10 @@ export interface SearchEntry {
   star?: Parameters<typeof spectralClassification>[0];
   /** `bodies.json`/`exoplanets.json` id, for `kind: 'body' | 'exoplanet'` results. */
   bodyId?: string;
+  /** `deepsky.json` id, for `kind: 'deepSky'` results. */
+  deepSkyId?: string;
+  /** Other names the entry answers to as fully as to its own: a deep-sky object's Messier number and designation. */
+  aliases?: readonly string[];
 }
 
 /** The line an entry is listed with: its subtitle, or a star's classification. */
@@ -48,13 +52,15 @@ const SUBTITLE_WEIGHT = 0.1;
 
 /**
  * Order for results that match equally well. Solar-system bodies are a few dozen named worlds
- * and win ties outright; a star outranks an exoplanet because searching a name like "Proxima"
+ * and win ties outright, then the 488 deep-sky objects, each kept for being famous or bright,
+ * ahead of the 455 518 stars; a star outranks an exoplanet because searching a name like "Proxima"
  * is usually an attempt to reach the system rather than one particular planet in it.
  */
 const KIND_PRIORITY: Readonly<Record<SearchResultKind, number>> = {
   body: 0,
-  star: 1,
-  exoplanet: 2
+  deepSky: 1,
+  star: 2,
+  exoplanet: 3
 };
 
 /** Catalogue names separate their parts with spaces, hyphens, underscores and slashes. */
@@ -83,6 +89,15 @@ export interface IndexedSearchEntry {
   readonly words: readonly string[];
   /** The subtitle, normalised; empty when there is none to search. See {@link searchableSubtitle}. */
   readonly normalizedSubtitle: string;
+  /** {@link SearchEntry.aliases}, broken up as the name is; absent, not empty, on the stars, which have none. */
+  readonly aliases?: readonly IndexedName[];
+}
+
+type IndexedName = Pick<IndexedSearchEntry, 'normalizedName' | 'compactName' | 'words'>;
+
+function indexName(name: string): IndexedName {
+  const normalizedName = normalize(name);
+  return { normalizedName, compactName: compact(name), words: normalizedName.split(WORD_SEPARATORS) };
 }
 
 /**
@@ -100,19 +115,22 @@ function searchableSubtitle(entry: SearchEntry): string {
 
 export function buildSearchIndex(entries: readonly SearchEntry[]): IndexedSearchEntry[] {
   return entries.map((entry) => {
+    // Spelled out rather than spread from indexName: over the 455 518 stars, spreading took the
+    // build from about 265 ms to 390 and the index from 176 MB to 186.
     const normalizedName = normalize(entry.name);
     const subtitle = searchableSubtitle(entry);
-    return {
+    const indexed: IndexedSearchEntry = {
       entry,
       normalizedName,
       compactName: compact(entry.name),
       words: normalizedName.split(WORD_SEPARATORS),
       normalizedSubtitle: subtitle && normalize(subtitle)
     };
+    return entry.aliases ? { ...indexed, aliases: entry.aliases.map(indexName) } : indexed;
   });
 }
 
-function scoreName(indexed: IndexedSearchEntry, normalizedQuery: string, compactQuery: string): number {
+function scoreName(indexed: IndexedName, normalizedQuery: string, compactQuery: string): number {
   // Punctuation-insensitive as well as case-insensitive, because the catalogues are
   // inconsistent about it: HYG writes "Gl 357" where a user may well type "gl357".
   if (indexed.normalizedName === normalizedQuery || indexed.compactName === compactQuery) {
@@ -141,9 +159,14 @@ function scoreSubtitle(subtitle: string, normalizedQuery: string): number {
   return subtitle.includes(normalizedQuery) ? MATCH_SUBSTRING * SUBTITLE_WEIGHT : NO_MATCH;
 }
 
-/** The name's score, or, where the name does not match at all, the subtitle's. */
+/** The best of the name's and the aliases' scores, or, where none of them matches at all, the subtitle's. */
 function scoreIndexed(indexed: IndexedSearchEntry, normalizedQuery: string, compactQuery: string): number {
-  const score = scoreName(indexed, normalizedQuery, compactQuery);
+  let score = scoreName(indexed, normalizedQuery, compactQuery);
+  if (indexed.aliases) {
+    for (const alias of indexed.aliases) {
+      score = Math.max(score, scoreName(alias, normalizedQuery, compactQuery));
+    }
+  }
   return score > NO_MATCH || indexed.normalizedSubtitle === '' ? score : scoreSubtitle(indexed.normalizedSubtitle, normalizedQuery);
 }
 

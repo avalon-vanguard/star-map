@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { DataLoaderService, StarField } from '../../core/data/data-loader.service';
 import { BodyRecord } from '../../shared/models/body.model';
+import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
 import { SearchComponent } from './search.component';
@@ -21,6 +22,7 @@ const STARS: StarRecord[] = Array.from({ length: STARS_PER_SLICE * 2 + 1 }, (_, 
 }));
 
 const MARS = { id: 'mars', name: 'Mars', kind: 'planet' } as BodyRecord;
+const ANDROMEDA = { id: 'NGC0224', name: 'Andromeda Galaxy', kind: 'galaxy', messier: 'M31' } as DeepSkyRecord;
 
 class FakeDataLoaderService {
   loadStars(): Promise<StarField> {
@@ -31,6 +33,9 @@ class FakeDataLoaderService {
   }
   loadExoplanets(): Promise<ExoplanetRecord[]> {
     return Promise.resolve([]);
+  }
+  loadDeepSky(): Promise<DeepSkyRecord[]> {
+    return Promise.resolve([ANDROMEDA]);
   }
 }
 
@@ -45,9 +50,27 @@ describe('SearchIndexService', () => {
   it('indexes every star, and the bodies after them for the search tab only', async () => {
     await service.load();
     expect(service.stars()).toHaveLength(STARS.length);
-    expect(service.all()).toHaveLength(STARS.length + 1);
-    expect(service.all()!.at(-1)!.entry.name).toBe('Mars');
+    expect(service.all()).toHaveLength(STARS.length + 2);
+    expect(service.all()!.at(-2)!.entry.name).toBe('Mars');
     expect(service.stars().every(({ entry }) => entry.kind === 'star')).toBe(true);
+  });
+
+  it('indexes a deep-sky object by its Messier number and its designation as written, "NGC 224"', async () => {
+    await service.load();
+    expect(service.all()!.at(-1)!.entry).toEqual({
+      kind: 'deepSky',
+      name: 'Andromeda Galaxy',
+      subtitle: 'Galaxy · M31',
+      deepSkyId: 'NGC0224',
+      aliases: ['M31', 'NGC 224']
+    });
+  });
+
+  it('goes on without the deep-sky objects when their file fails, as the map does', async () => {
+    const loader = TestBed.inject(DataLoaderService);
+    loader.loadDeepSky = () => Promise.reject(new Error('404'));
+    await service.load();
+    expect(service.all()).toHaveLength(STARS.length + 1);
   });
 
   it('builds the index once, however many times the search tab is opened', async () => {

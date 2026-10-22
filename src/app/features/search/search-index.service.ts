@@ -1,6 +1,7 @@
 import { inject, Injectable, signal } from '@angular/core';
 
 import { DataLoaderService } from '../../core/data/data-loader.service';
+import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { StarRecord } from '../../shared/models/star.model';
 import { buildSearchIndex, IndexedSearchEntry, SearchEntry } from './search-ranking';
 
@@ -13,6 +14,26 @@ export const STARS_PER_SLICE = 20_000;
 
 function starEntry(star: StarRecord): SearchEntry {
   return { kind: 'star', name: star.name, subtitle: '', star, starId: star.id };
+}
+
+/** "NGC0224" as it is written, "NGC 224"; the padded form is OpenNGC's own. */
+function readableDesignation(id: string): string {
+  return id.replace(/^([A-Za-z]+)0*(?=\d)/, '$1 ');
+}
+
+/**
+ * A deep-sky object, found by its name, its Messier number or its designation alike: the
+ * Pleiades by "M45", the Andromeda Galaxy by "NGC 224".
+ */
+function deepSkyEntry(record: DeepSkyRecord): SearchEntry {
+  const kind = record.kind.charAt(0).toUpperCase() + record.kind.slice(1);
+  return {
+    kind: 'deepSky',
+    name: record.name,
+    subtitle: record.messier && record.messier !== record.name ? `${kind} · ${record.messier}` : kind,
+    deepSkyId: record.id,
+    aliases: [record.messier, readableDesignation(record.id)].filter((alias): alias is string => !!alias && alias !== record.name)
+  };
 }
 
 /** Lets the event loop run a frame, an input event or a timer before the next slice. */
@@ -34,7 +55,7 @@ export class SearchIndexService {
 
   /** Stars alone, for the routing fields: a route is a chain of stars. Empty until built. */
   readonly stars = this.starIndex.asReadonly();
-  /** Stars, then bodies and exoplanets. Null until built — and for good if the catalogues fail to load. */
+  /** Stars, then bodies, exoplanets and deep-sky objects. Null until built — and for good if the catalogues fail to load. */
   readonly all = this.fullIndex.asReadonly();
 
   /** Starts the build, once; every later call shares it. */
@@ -45,10 +66,12 @@ export class SearchIndexService {
 
   private async build(): Promise<void> {
     try {
-      const [{ stars }, bodies, exoplanets] = await Promise.all([
+      const [{ stars }, bodies, exoplanets, deepSky] = await Promise.all([
         this.dataLoader.loadStars(),
         this.dataLoader.loadBodies(),
-        this.dataLoader.loadExoplanets()
+        this.dataLoader.loadExoplanets(),
+        // The scene draws the map without the backdrop if its file fails, and search goes on without it too.
+        this.dataLoader.loadDeepSky().catch((): DeepSkyRecord[] => [])
       ]);
 
       const starIndex: IndexedSearchEntry[] = [];
@@ -62,7 +85,8 @@ export class SearchIndexService {
       }
       const others = buildSearchIndex([
         ...bodies.map((body): SearchEntry => ({ kind: 'body', name: body.name, subtitle: body.kind, bodyId: body.id })),
-        ...exoplanets.map((exoplanet): SearchEntry => ({ kind: 'exoplanet', name: exoplanet.name, subtitle: exoplanet.hostStarName, bodyId: exoplanet.id }))
+        ...exoplanets.map((exoplanet): SearchEntry => ({ kind: 'exoplanet', name: exoplanet.name, subtitle: exoplanet.hostStarName, bodyId: exoplanet.id })),
+        ...deepSky.map(deepSkyEntry)
       ]);
 
       this.starIndex.set(starIndex);

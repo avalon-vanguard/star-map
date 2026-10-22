@@ -144,6 +144,12 @@ describe('rankSearchResults', () => {
     expect(rank(entries, 'M4.5')).toEqual(['Gl 1']);
   });
 
+  it('finds a deep-sky object by any of its names as fully as by its own, and ahead of a star that matches as well', () => {
+    const pleiades: SearchEntry = { kind: 'deepSky', name: 'Pleiades', subtitle: 'Cluster · M45', deepSkyId: 'Mel022', aliases: ['M45', 'Mel 22'] };
+    expect(rank([star('M451'), pleiades], 'M45')).toEqual(['Pleiades', 'M451']);
+    expect(rank([star('Mel 22'), pleiades], 'mel22')).toEqual(['Pleiades', 'Mel 22']);
+  });
+
   it('carries the full entry through, not just the name', () => {
     const [result] = rankSearchResults(buildSearchIndex([body('Io')]), 'Io', 1);
     expect(result).toMatchObject({ kind: 'body', name: 'Io', bodyId: 'Io' });

@@ -16,14 +16,16 @@ const MIN_QUERY_LENGTH = 2;
 const KIND_LABELS: Record<SearchResultKind, string> = {
   star: 'Star',
   body: 'Body',
-  exoplanet: 'Exoplanet'
+  exoplanet: 'Exoplanet',
+  deepSky: 'Deep sky'
 };
 
 /**
- * Name search across stars, solar-system bodies, and exoplanets. Selecting a star result
- * jumps straight into that system's view; selecting a body/exoplanet result navigates to its
- * detail route — both go through `NavigationStore`/the router so behavior matches an
- * in-scene click, per the "consistent state across views" requirement.
+ * Name search across stars, solar-system bodies, exoplanets and deep-sky objects. Selecting a star
+ * result jumps straight into that system's view; selecting a body/exoplanet result navigates to its
+ * detail route; selecting a deep-sky object turns the map toward it — all through
+ * `NavigationStore`/the router so behavior matches an in-scene click, per the "consistent state
+ * across views" requirement.
  */
 @Component({
   selector: 'app-search',
@@ -62,7 +64,7 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
               }
             </p>
             <ul data-testid="search-results" class="max-h-64 scheme-dark divide-y divide-border/25 overflow-y-auto [scrollbar-width:thin]">
-              @for (result of results(); track result.bodyId ?? result.starId) {
+              @for (result of results(); track result.bodyId ?? result.deepSkyId ?? result.starId) {
                 <li>
                   <button
                     type="button"
@@ -141,6 +143,9 @@ export class SearchComponent {
     this.clear();
     if (result.kind === 'star' && result.starId !== undefined) {
       this.navigationStore.selectStar(result.starId);
+      void this.router.navigate(['/']);
+    } else if (result.kind === 'deepSky' && result.deepSkyId) {
+      this.navigationStore.lookAtDeepSky(result.deepSkyId);
       void this.router.navigate(['/']);
     } else if (result.bodyId) {
       void this.router.navigate(['/body', result.bodyId]);

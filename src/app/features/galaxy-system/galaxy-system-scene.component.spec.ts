@@ -25,6 +25,7 @@ import { blackbodyColor, SOLAR_EFFECTIVE_TEMPERATURE_K } from '../../shared/astr
 import { appearanceForExoplanet } from '../../shared/astro/body-appearance';
 import { planetTexture } from '../../shared/rendering/procedural-planet-texture';
 import { loadCachedTexture, SUN_TEXTURE_PATH } from '../../shared/rendering/texture-catalog';
+import { DeepSkyRenderer } from './deep-sky-renderer';
 import { JumpLinkRenderer } from './jump-link-renderer';
 import { StarFieldRenderer } from './star-field-renderer';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
@@ -1078,6 +1079,85 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(component.currentStarId).toBeNull();
     expect(component.systemGroup.visible).toBe(false);
     expect(navigationStore.viewLevel()).toBe('galactic');
+  });
+
+  describe('a deep-sky object picked in the search', () => {
+    interface SkyScene {
+      currentStarId: number | null;
+      controls: { target: THREE.Vector3 };
+      deepSky: DeepSkyRenderer;
+      deepSkyRecords: readonly DeepSkyRecord[];
+      deepSkyLabels: readonly LabeledPoint[];
+    }
+    const scene = (): SkyScene => fixture.componentInstance as unknown as SkyScene;
+    /** Where the view looks: from the camera through the orbit's centre. */
+    const lookingAlong = (): THREE.Vector3 => scene().controls.target.clone().sub(engine.getCamera().position).normalize();
+
+    it('turns the view toward it from beside the Sun, where the backdrop is the sky seen from the Sun', async () => {
+      navigationStore.lookAtDeepSky(DEEP_SKY_OBJECT.id);
+      await flushAsync();
+      await advanceFrames(engine, 1.5);
+
+      // Andromeda lies along +z: the view looks that way from a parsec out, the Sun behind it.
+      expect(lookingAlong().z).toBeCloseTo(1, 5);
+      expect(engine.getCamera().position.z).toBeCloseTo(1, 5);
+      // Taken up, so asking for it again turns the view again.
+      expect(navigationStore.deepSkyTarget()).toBeNull();
+    });
+
+    it('names it on the backdrop though it is not among the brightest that always are', async () => {
+      const faint: DeepSkyRecord = { ...DEEP_SKY_OBJECT, id: 'NGC7293', name: 'Helix Nebula', kind: 'nebula', x: 1, z: 0, magnitude: 7.6, messier: null };
+      const records = [...Array.from({ length: 12 }, (_, i) => ({ ...DEEP_SKY_OBJECT, id: `B${i}`, magnitude: i })), faint];
+      scene().deepSkyRecords = records;
+      scene().deepSky = new DeepSkyRenderer(records);
+      navigationStore.lookAtDeepSky('NGC7293');
+      await flushAsync();
+
+      expect(scene().deepSkyLabels.map((label) => label.id)).toContain('NGC7293');
+      expect(scene().deepSkyLabels).toHaveLength(13);
+    });
+
+    it('turns toward one picked on the body route once the map is back, which it was not there to see', async () => {
+      fixture.destroy();
+      navigationStore.lookAtDeepSky(DEEP_SKY_OBJECT.id);
+      fixture = TestBed.createComponent(GalaxySystemSceneComponent);
+      fixture.detectChanges();
+      await flushAsync();
+      await advanceFrames(engine, 1.5);
+
+      expect(lookingAlong().z).toBeCloseTo(1, 5);
+      expect(navigationStore.deepSkyTarget()).toBeNull();
+    });
+
+    it('leaves a system first, as the scale ladder does, and then turns', async () => {
+      navigationStore.selectStar(SUN.id);
+      await flushAsync();
+      await advanceFrames(engine, 2.5);
+      expect(navigationStore.viewLevel()).toBe('system');
+
+      navigationStore.lookAtDeepSky(DEEP_SKY_OBJECT.id);
+      await flushAsync();
+      await advanceFrames(engine, 6);
+
+      expect(scene().currentStarId).toBeNull();
+      expect(navigationStore.selectedStarId()).toBeNull();
+      expect(lookingAlong().z).toBeCloseTo(1, 5);
+    });
+
+    it('gives way to a star chosen while the view was leaving the system for it', async () => {
+      navigationStore.selectStar(SUN.id);
+      await flushAsync();
+      await advanceFrames(engine, 2.5);
+      navigationStore.lookAtDeepSky(DEEP_SKY_OBJECT.id);
+      await flushAsync();
+      await advanceFrames(engine, 0.3);
+      navigationStore.selectStar(PROXIMA.id);
+      await flushAsync();
+      await advanceFrames(engine, 8);
+
+      expect(scene().currentStarId).toBe(PROXIMA.id);
+      expect(navigationStore.deepSkyTarget()).toBeNull();
+    });
   });
 
   it('names what the neighbourhood holds, and where the positions of the stars in it come from', async () => {

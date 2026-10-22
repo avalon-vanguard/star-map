@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DataLoaderService, StarField } from '../../core/data/data-loader.service';
 import { BodyRecord } from '../../shared/models/body.model';
+import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
 import { NavigationStore } from '../../shared/state/navigation.store';
@@ -59,6 +60,9 @@ class FakeDataLoaderService {
   }
   loadExoplanets(): Promise<ExoplanetRecord[]> {
     return Promise.resolve([PROXIMA_B]);
+  }
+  loadDeepSky(): Promise<DeepSkyRecord[]> {
+    return Promise.resolve([{ id: 'NGC0224', name: 'Andromeda Galaxy', kind: 'galaxy', messier: 'M31' } as DeepSkyRecord]);
   }
 }
 
@@ -152,6 +156,17 @@ describe('SearchComponent', () => {
     await fixture.whenStable();
 
     expect(router.navigate).toHaveBeenCalledWith(['/body', 'io']);
+  });
+
+  it('turns the map toward a deep-sky object found by its Messier number, back on the galaxy route', async () => {
+    await type('M31');
+    expect(resultNames()).toEqual(['Andromeda Galaxy']);
+    element.querySelector<HTMLButtonElement>('[data-testid="search-results"] button')!.click();
+    await fixture.whenStable();
+
+    expect(navigationStore.deepSkyTarget()).toBe('NGC0224');
+    expect(navigationStore.selectedStarId()).toBeNull();
+    expect(router.navigate).toHaveBeenCalledWith(['/']);
   });
 
   it('clears the query after a selection, so the list closes', async () => {

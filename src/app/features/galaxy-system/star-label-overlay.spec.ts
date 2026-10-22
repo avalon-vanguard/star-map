@@ -104,34 +104,35 @@ describe('StarLabelOverlay', () => {
     expect(scene.children).toHaveLength(0);
   });
 
-  it('says a neighbour more quietly than a body of this system', () => {
+  it('says a neighbour more quietly than a body of this system, with its distance on the name’s line', () => {
     overlay.update([
       { id: 'earth', name: 'Earth', kind: 'Planet', x: 1, y: 0, z: 0 },
-      { id: 'neighbour:1', name: 'Sirius', kind: '2.64 pc', tone: 'ghost', selectStarId: 1, x: 0, y: 1, z: 0 }
+      { id: 'neighbour:1', name: 'Sirius', distance: '2.64 pc', tone: 'ghost', selectStarId: 1, x: 0, y: 1, z: 0 }
     ]);
 
     const [body, ghost] = labels();
     expect(body.classList.contains('map-label--ghost')).toBe(false);
     expect(ghost.classList.contains('map-label--ghost')).toBe(true);
-    expect(ghost.querySelector('.map-label-kind')?.textContent).toBe('2.64 pc');
+    expect(ghost.querySelector('.map-label-name')?.textContent).toBe('Sirius · 2.64 pc');
+    expect(ghost.querySelector('.map-label-kind')).toBeNull();
   });
 
   it('makes a label that offers a star a button, and hands back the star it names', () => {
     const chosen: number[] = [];
     overlay = new StarLabelOverlay(scene, (starId) => chosen.push(starId));
     overlay.setSize(800, 600);
-    overlay.update([{ id: 'neighbour:42', name: 'Sirius', kind: '2.64 pc', tone: 'ghost', selectStarId: 42, x: 1, y: 0, z: 0 }]);
+    overlay.update([{ id: 'neighbour:42', name: 'Sirius', distance: '2.64 pc', tone: 'ghost', selectStarId: 42, x: 1, y: 0, z: 0 }]);
 
     const ghost = labels()[0];
     expect(ghost.tagName).toBe('BUTTON');
-    // Its two lines are adjacent spans, so without this it is announced as "Sirius2.64 pc".
+    // Said as a sentence, not as the "Sirius · 2.64 pc" printed.
     expect(ghost.getAttribute('aria-label')).toBe('Go to Sirius, 2.64 pc away');
     ghost.click();
 
     expect(chosen).toEqual([42]);
   });
 
-  it('names a star of the field by what it is, and keeps "away" for a ghost, whose second line is a distance', () => {
+  it('names a star of the field by what it is, and keeps "away" for a distance', () => {
     overlay.update([{ id: 7, name: 'Canopus', kind: 'Star', selectStarId: 7, x: 1, y: 0, z: 0 }]);
 
     const label = labels()[0];

@@ -1095,6 +1095,19 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(navigationStore.viewLevel()).toBe('system');
   });
 
+  it('prints how far each neighbour is on its name’s own line, not under it', async () => {
+    const update = vi.spyOn(StarLabelOverlay.prototype, 'update');
+    navigationStore.selectStar(SUN.id);
+    await flushAsync();
+    await advanceFrames(engine, 2.5);
+
+    const labels = update.mock.calls.flatMap(([points]) => points as LabeledPoint[]);
+    const proxima = labels.filter((label) => label.id === `neighbour:${PROXIMA.id}`).at(-1);
+    expect(proxima).toMatchObject({ name: 'Proxima Centauri', distance: '1.30 pc', tone: 'ghost', selectStarId: PROXIMA.id });
+    expect(proxima?.kind).toBeUndefined();
+    update.mockRestore();
+  });
+
   it('says where a system’s orbits come from, and for the Sun how long they hold', async () => {
     const note = (): string => (fixture.componentInstance as unknown as { hudNote: () => string }).hudNote();
     navigationStore.selectStar(SUN.id);

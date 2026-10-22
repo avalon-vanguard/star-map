@@ -242,9 +242,16 @@ body {
   color: var(--color-accent);
 }
 
+/* 10 px, the size of the HUD's own labels: at 8 px the line that says whether a name is a star or
+ * a system was the smallest text on screen. Set solid and tracked 0.12em, so the line is as wide as
+ * it was at 8 px and 0.3em (7.2 px a character) and a two-line label 22.6 px tall against 21.8,
+ * inside the reach and close to the row the label pass keeps between names (LABEL_REACH_NDC,
+ * LABEL_ROW_NDC). At 0.3em,
+ * "Galactic centre" ran under the Scutum–Centaurus Arm's name at 1280x720. */
 .map-label-kind {
-  font-size: 8px;
-  letter-spacing: 0.3em;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: color-mix(in oklab, var(--color-accent) 70%, transparent);
 }

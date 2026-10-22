@@ -16,6 +16,12 @@ export interface LabeledPoint {
    */
   kind?: string;
   /**
+   * A distance printed on the name line, after the name: a neighbour's, the one figure the ring of
+   * neighbours exists to give. As the second line it was the quietest text on screen (8 px at 60 %
+   * of the accent) and the first lost over a bright backdrop.
+   */
+  distance?: string;
+  /**
    * Which side of the point the text hangs on. Right is the default; left is for a point close
    * to the right edge of the view, or one whose right-hand text would run into a neighbour's.
    */
@@ -164,12 +170,11 @@ export class StarLabelOverlay {
     if (point.selectStarId !== undefined) {
       const starId = point.selectStarId;
       (element as HTMLButtonElement).type = 'button';
-      // Read out as a sentence rather than as the two lines run together — the name and the
-      // distance are adjacent spans, so the default accessible name is "Sirius2.64 pc" — and
-      // said as the action it is, since nothing else on screen says these labels are doors. Only
-      // a ghost's second line is a distance; a star's own in the field says what it is.
-      const kind = point.tone === 'ghost' ? `${point.kind} away` : point.kind;
-      element.setAttribute('aria-label', point.kind ? `Go to ${point.name}, ${kind}` : `Go to ${point.name}`);
+      // Read out as a sentence rather than as the text run together — "Sirius · 2.64 pc", or a
+      // name and its kind as adjacent spans, "CanopusStar" — and said as the action it is, since
+      // nothing else on screen says these labels are doors.
+      const said = point.distance ? `${point.distance} away` : point.kind;
+      element.setAttribute('aria-label', said ? `Go to ${point.name}, ${said}` : `Go to ${point.name}`);
       element.addEventListener('click', (event) => {
         event.stopPropagation();
         this.onSelectStar?.(starId);
@@ -183,7 +188,7 @@ export class StarLabelOverlay {
 
     const name = document.createElement('span');
     name.className = 'map-label-name';
-    name.textContent = point.name;
+    name.textContent = point.distance ? `${point.name} · ${point.distance}` : point.name;
     element.appendChild(name);
 
     if (point.kind) {

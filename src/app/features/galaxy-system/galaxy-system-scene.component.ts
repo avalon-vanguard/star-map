@@ -1741,7 +1741,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
           // never the one DOM node being asked to be two different things.
           id: `neighbour:${star.id}`,
           name: star.name,
-          kind: formatParsecs(distancePc),
+          distance: formatParsecs(distancePc),
           tone: 'ghost' as const,
           selectStarId: star.id,
           x: position.x,

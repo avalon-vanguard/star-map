@@ -126,8 +126,10 @@ function isWideViewport(): boolean {
          fields were three Shift+Tabs back. -->
     <div class="flex flex-col-reverse items-start">
       <div class="hud-brackets hud-surface pointer-events-auto flex w-full items-stretch">
-        <!-- The tabs give way to the date and the range, and scroll: the five of the system view
-             take 397 px, and on a portrait phone they pushed the date off the right edge. Where
+        <!-- The tabs give way to the date and the range, and scroll: on a portrait phone they
+             pushed the date off the right edge. Below sm they are padded 6 px a side, not 12: the
+             five then take 337 px and fit a 360 px phone's 342 px strip, where at 397 px Display
+             was cut to its first two letters and only a swipe reached it. Where
              the browser draws a scrollbar of its own, it is a thin dark one: on a desktop window
              under 770 px wide its default was a light bar 15 px tall across the dark dock. -->
         <div
@@ -143,7 +145,7 @@ function isWideViewport(): boolean {
               [attr.aria-selected]="activeTab() === tab"
               [attr.aria-controls]="activeTab() === tab ? 'dock-panel-' + tab : null"
               (click)="toggleTab(tab)"
-              class="type-eyebrow px-3 py-2 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent sm:px-4"
+              class="type-eyebrow px-1.5 py-2 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent sm:px-4"
               [class]="
                 activeTab() === tab
                   ? 'bg-accent/15 text-accent'

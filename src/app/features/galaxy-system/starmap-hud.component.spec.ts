@@ -67,6 +67,18 @@ describe('StarmapHudComponent', () => {
     expect(emitted).toEqual(['galactic', 'galaxy']);
   });
 
+  it('keeps the rail on one line on a phone, padding each step 8 px a side below sm and 16 from it', () => {
+    // jsdom lays nothing out: the classes are what decide it. Measured in Chromium at 16 px a side,
+    // the rail was 365 px wide, and on a 360 px phone it broke onto a second line, into the scale
+    // bar under it. At 8 px a side it is 317 px on one line.
+    const steps = [...render('system').querySelectorAll('nav > *')];
+
+    expect(steps).toHaveLength(3);
+    for (const step of steps) {
+      expect([...step.classList]).toEqual(expect.arrayContaining(['px-2', 'sm:px-4']));
+    }
+  });
+
   it('names what the view is holding on the banner across the top', () => {
     fixture.componentRef.setInput('level', 'system');
     fixture.componentRef.setInput('title', 'Sol');

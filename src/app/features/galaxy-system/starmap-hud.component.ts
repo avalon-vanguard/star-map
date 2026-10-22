@@ -46,14 +46,17 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
     }
 
     <!-- Top rail: which scale the view is at, and what it is holding. Both sit on one line
-         across the top of the display; the search lives in the dock below, so nothing sits above. -->
+         across the top of the display; the search lives in the dock below, so nothing sits above.
+         Below sm each step is padded 8 px a side, not 16: the rail is then 317 px wide on one
+         line, where at 365 px it ran under the frame's corner on a 390 px phone and broke onto a
+         second line on a 360 px one, 4 px into the scale bar under it. -->
     <nav aria-label="Map scale" class="hud-brackets hud-surface pointer-events-auto absolute top-6 left-6 flex items-stretch divide-x divide-border/40">
       @for (step of ladder(); track step.level) {
         @if (step.reachable) {
           <button
             type="button"
             (click)="levelSelected.emit(step.level)"
-            class="type-eyebrow px-4 py-1.5 text-muted transition-colors hover:bg-accent/8 hover:text-accent focus-visible:bg-accent/12 focus-visible:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+            class="type-eyebrow px-2 py-1.5 text-muted transition-colors hover:bg-accent/8 hover:text-accent focus-visible:bg-accent/12 focus-visible:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent sm:px-4"
           >
             {{ step.label }}
           </button>
@@ -61,7 +64,7 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
           <span
             [attr.aria-current]="step.state === 'current' ? 'step' : null"
             [attr.data-testid]="step.state === 'current' ? 'hud-current-level' : null"
-            class="type-eyebrow px-4 py-1.5"
+            class="type-eyebrow px-2 py-1.5 sm:px-4"
             [class]="step.state === 'current' ? 'bg-accent/15 text-accent' : 'text-muted/40'"
             >{{ step.label }}</span
           >

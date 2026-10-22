@@ -520,6 +520,21 @@ describe('HudDockComponent', () => {
     expect(strip.parentElement!.parentElement!.classList).toContain('flex-col-reverse');
   });
 
+  it('fits the five tabs on a 360 px phone, padding them 6 px a side below sm and 16 from it', () => {
+    // jsdom lays nothing out: the classes are what decide it. Measured in Chromium, the five took
+    // 397 px at 12 px a side and the strip of a 360 px phone holds 342: Display was cut to "DI".
+    // At 6 px a side they take 337.
+    setReadout();
+    fixture.componentRef.setInput('routing', true);
+    fixture.componentRef.setInput('display', DEFAULT_HUD_DISPLAY);
+    fixture.detectChanges();
+
+    expect(tabNames()).toHaveLength(5);
+    for (const name of tabNames()) {
+      expect([...tab(name).classList]).toEqual(expect.arrayContaining(['px-1.5', 'sm:px-4']));
+    }
+  });
+
   it('floats the route suggestions over the panel only from sm up, and on a phone puts them between the label and the field', () => {
     // jsdom lays nothing out: the classes are what decide it. Measured in Chromium at 390 by 844,
     // the floating Destination list covered Departure (list 576-643 px, Departure 605-639).

@@ -445,6 +445,22 @@ describe('HudDockComponent', () => {
     expect(host().querySelector<HTMLInputElement>('#route-range')!.value).toBe('6');
   });
 
+  it('puts the open panel after the tabs in the focus order, while drawing it above them', () => {
+    setReadout();
+    fixture.componentRef.setInput('routing', true);
+    fixture.componentRef.setInput('defaultTab', 'routes');
+    fixture.detectChanges();
+    const strip = host().querySelector('[role="tablist"]')!;
+    const follows = (id: string) => !!(strip.compareDocumentPosition(host().querySelector(id)!) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+    expect(follows('#dock-panel-routes')).toBe(true);
+    tab('Readout').click();
+    fixture.detectChanges();
+    expect(follows('#dock-panel-readout')).toBe(true);
+    // Drawn above the strip all the same: the column runs bottom-up.
+    expect(strip.parentElement!.parentElement!.classList).toContain('flex-col-reverse');
+  });
+
   it('chooses the first suggestion on Enter, and walks the suggestions with the arrows', () => {
     setReadout();
     fixture.componentRef.setInput('routing', true);

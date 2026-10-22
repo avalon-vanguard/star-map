@@ -119,8 +119,64 @@ function isWideViewport(): boolean {
   template: `
     <!-- The column is transparent to the pointer and each surface in it opts back in: it is as
          wide as the strip and as tall as the open panel, so a solid one would swallow every
-         click in the empty band beside the panel — where the scene, and its labels, are. -->
-    <div class="flex flex-col items-start">
+         click in the empty band beside the panel — where the scene, and its labels, are.
+         The strip comes first in the DOM and is drawn last (flex-col-reverse), so Tab goes on
+         from the tabs into the panel they opened, drawn above them. The other way round, Tab
+         from the Routes tab went to Bookmarks, Display and out of the dock, and the panel's
+         fields were three Shift+Tabs back. -->
+    <div class="flex flex-col-reverse items-start">
+      <div class="hud-brackets hud-surface pointer-events-auto flex w-full items-stretch">
+        <!-- The tabs give way to the date and the range, and scroll: the five of the system view
+             take 397 px, and on a portrait phone they pushed the date off the right edge. Where
+             the browser draws a scrollbar of its own, it is a thin dark one: on a desktop window
+             under 770 px wide its default was a light bar 15 px tall across the dark dock. -->
+        <div
+          role="tablist"
+          aria-label="Dock"
+          class="flex min-w-0 scheme-dark items-stretch divide-x divide-border/40 overflow-x-auto [scrollbar-width:thin]"
+        >
+          @for (tab of tabs(); track tab) {
+            <button
+              type="button"
+              role="tab"
+              [id]="'dock-tab-' + tab"
+              [attr.aria-selected]="activeTab() === tab"
+              [attr.aria-controls]="activeTab() === tab ? 'dock-panel-' + tab : null"
+              (click)="toggleTab(tab)"
+              class="type-eyebrow px-3 py-2 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent sm:px-4"
+              [class]="
+                activeTab() === tab
+                  ? 'bg-accent/15 text-accent'
+                  : 'text-muted hover:bg-accent/8 hover:text-accent'
+              "
+            >
+              {{ tabLabel(tab) }}
+            </button>
+          }
+        </div>
+        <!-- Only while the map is away from the present: at the present the date is
+             today's, which the reader's own machine already says. -->
+        @if (date()) {
+          <p
+            class="ml-auto flex shrink-0 items-baseline gap-2 border-l border-border/40 px-3 py-2 sm:px-4"
+            data-testid="hud-date"
+          >
+            <span class="type-label text-muted">Date</span>
+            <span class="text-sm text-accent tabular-nums">{{ date() }}</span>
+          </p>
+        }
+        <!-- Not on a phone, where it never showed before the tabs gave way to it: kept, its 121 px
+             took the Display tab out of sight at the present, the state the map opens in. -->
+        @if (range()) {
+          <p
+            class="flex shrink-0 items-baseline gap-2 border-l border-border/40 px-3 py-2 max-sm:hidden sm:px-4"
+            [class.ml-auto]="!date()"
+          >
+            <span class="type-label text-muted">Range</span>
+            <span class="text-sm text-accent tabular-nums">{{ range() }}</span>
+          </p>
+        }
+      </div>
       @if (activeTab(); as tab) {
         <!-- Switching tabs remounts the panel and replays its acquire wipe: a new readout
              locking on, once per switch, never per keystroke. -->
@@ -415,59 +471,6 @@ function isWideViewport(): boolean {
           />
         </section>
       }
-
-      <div class="hud-brackets hud-surface pointer-events-auto flex w-full items-stretch">
-        <!-- The tabs give way to the date and the range, and scroll: the five of the system view
-             take 397 px, and on a portrait phone they pushed the date off the right edge. Where
-             the browser draws a scrollbar of its own, it is a thin dark one: on a desktop window
-             under 770 px wide its default was a light bar 15 px tall across the dark dock. -->
-        <div
-          role="tablist"
-          aria-label="Dock"
-          class="flex min-w-0 scheme-dark items-stretch divide-x divide-border/40 overflow-x-auto [scrollbar-width:thin]"
-        >
-          @for (tab of tabs(); track tab) {
-            <button
-              type="button"
-              role="tab"
-              [id]="'dock-tab-' + tab"
-              [attr.aria-selected]="activeTab() === tab"
-              [attr.aria-controls]="activeTab() === tab ? 'dock-panel-' + tab : null"
-              (click)="toggleTab(tab)"
-              class="type-eyebrow px-3 py-2 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent sm:px-4"
-              [class]="
-                activeTab() === tab
-                  ? 'bg-accent/15 text-accent'
-                  : 'text-muted hover:bg-accent/8 hover:text-accent'
-              "
-            >
-              {{ tabLabel(tab) }}
-            </button>
-          }
-        </div>
-        <!-- Only while the map is away from the present: at the present the date is
-             today's, which the reader's own machine already says. -->
-        @if (date()) {
-          <p
-            class="ml-auto flex shrink-0 items-baseline gap-2 border-l border-border/40 px-3 py-2 sm:px-4"
-            data-testid="hud-date"
-          >
-            <span class="type-label text-muted">Date</span>
-            <span class="text-sm text-accent tabular-nums">{{ date() }}</span>
-          </p>
-        }
-        <!-- Not on a phone, where it never showed before the tabs gave way to it: kept, its 121 px
-             took the Display tab out of sight at the present, the state the map opens in. -->
-        @if (range()) {
-          <p
-            class="flex shrink-0 items-baseline gap-2 border-l border-border/40 px-3 py-2 max-sm:hidden sm:px-4"
-            [class.ml-auto]="!date()"
-          >
-            <span class="type-label text-muted">Range</span>
-            <span class="text-sm text-accent tabular-nums">{{ range() }}</span>
-          </p>
-        }
-      </div>
     </div>
   `,
 })

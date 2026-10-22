@@ -722,6 +722,38 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       update.mockRestore();
       cleared.mockRestore();
     });
+
+    it('places the survey edge before the star names, as the one rung the Readout cites', async () => {
+      const update = vi.spyOn(StarLabelOverlay.prototype, 'update');
+      const camera = engine.getCamera();
+      camera.updateMatrixWorld(true);
+      // Where Sol's name would print: 0.15 right of its point, past the 0.12 two names keep
+      // between their points and inside its text.
+      const sol = new THREE.Vector3(SUN.x, SUN.y, SUN.z).project(camera);
+      const point = (dx: number, dy: number) => new THREE.Vector3(sol.x + dx, sol.y + dy, sol.z).unproject(camera);
+      const rung = (radius: number, dy: number, kind?: string): LabeledPoint => {
+        const at = point(0.15, dy);
+        return { id: `ring-${radius}`, name: `${radius} pc`, ...(kind ? { kind } : {}), tone: 'ghost', x: at.x, y: at.y, z: at.z };
+      };
+      // The rung before it in the ladder prints into it, and a deep-sky name would sit on its point.
+      const ladder = vi
+        .spyOn(GalaxySystemSceneComponent.prototype as unknown as { ringLabels: () => LabeledPoint[] }, 'ringLabels')
+        .mockReturnValue([rung(200, -0.02), rung(250, 0, 'Survey edge')]);
+      const nebula = point(0.2, 0);
+      (fixture.componentInstance as unknown as { deepSkyLabels: LabeledPoint[] }).deepSkyLabels = [
+        { id: 'M42', name: 'Orion Nebula', kind: 'Nebula', x: nebula.x, y: nebula.y, z: nebula.z },
+      ];
+      await advanceFrames(engine, 0.3);
+
+      const labels = (update.mock.calls.at(-1)?.[0] ?? []) as LabeledPoint[];
+      expect(labels.map((label) => label.id)).toContain('ring-250');
+      expect(labels.map((label) => label.id)).not.toContain('ring-200');
+      expect(labels.map((label) => label.id)).not.toContain('M42');
+      // The name gives way, to its other side.
+      expect(labels.find((label) => label.id === SUN.id)?.side).toBe('left');
+      update.mockRestore();
+      ladder.mockRestore();
+    });
   });
 
   it('keeps the stars of a plotted route drawn, and the selected star', async () => {
@@ -1127,6 +1159,8 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     type Spread = { spreadLabels: (...args: unknown[]) => LabeledPoint[] };
     const spread = vi.spyOn(GalaxySystemSceneComponent.prototype as unknown as Spread, 'spreadLabels');
     const rings = vi.spyOn(GalaxySystemSceneComponent.prototype as unknown as { ringLabelsInTheClear: (...args: unknown[]) => LabeledPoint[] }, 'ringLabelsInTheClear');
+    // No ladder: at this pose the 250 pc rung, placed before the names, takes Sol's place.
+    const ladder = vi.spyOn(GalaxySystemSceneComponent.prototype as unknown as { ringLabels: () => LabeledPoint[] }, 'ringLabels').mockReturnValue([]);
     const update = vi.spyOn(StarLabelOverlay.prototype, 'update');
     // A deep-sky object in the open, where the test's one (Andromeda, straight up) is not.
     const camera = engine.getCamera();
@@ -1140,7 +1174,8 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
     // The last pass: the stars, then the deep-sky objects around what the stars took.
     const [stars, backdrop] = spread.mock.results.slice(-2).map((result) => result.value as LabeledPoint[]);
-    expect(spread.mock.calls.at(-1)?.[3]).toBe(stars);
+    expect(stars.length).toBeGreaterThan(0);
+    expect(spread.mock.calls.at(-1)?.[3]).toEqual(expect.arrayContaining(stars));
     const shown = (update.mock.calls.at(-1)?.[0] ?? []) as LabeledPoint[];
     expect(shown.filter((label) => typeof label.id === 'string' && !label.id.startsWith('ring-'))).toEqual(backdrop);
     // The ring distances keep out of both, a deep-sky name as much as a star's.
@@ -1148,6 +1183,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(rings.mock.calls.at(-1)?.[2]).toEqual(expect.arrayContaining([...stars, ...backdrop]));
     spread.mockRestore();
     rings.mockRestore();
+    ladder.mockRestore();
     update.mockRestore();
   });
 

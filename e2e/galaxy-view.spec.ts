@@ -46,8 +46,8 @@ test.describe('Galaxy view', () => {
     await page.goto('/?stars=4000');
     await expect(page.getByTestId('scene-canvas')).toBeVisible({ timeout: 30_000 });
 
-    // The rings are distances from the Sun. Not "Survey edge" by name: at this pose Izar's name
-    // holds the place the 250 pc rung would print in, and a name is worth more than a distance.
+    // The rings are distances from the Sun, the survey's own edge called out among them.
+    await expect(page.getByText('Survey edge')).toBeVisible({ timeout: 30_000 });
     const rung = page.locator('.map-label--ghost .map-label-name').filter({ hasText: /^\d+ pc$/ }).first();
     await expect(rung).toBeVisible({ timeout: 30_000 });
     // On a plate of the void, 80% opaque, so the label reads over a bright field as over black.

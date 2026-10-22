@@ -1480,24 +1480,37 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
         };
       }
     };
+    const rings = isGalactic || !this.display().grid ? [] : this.ringLabels(camera);
+    // The survey edge is placed before the names, the other rungs after them: it is the one rung
+    // the Readout cites ("Survey radius 250 pc"), and at the opening view Izar's name took its
+    // place. Cleared of the HUD and the frame first, so it holds no space it cannot print in.
+    const surveyEdge = this.ringLabelsInTheClear(
+      rings.filter((ring) => ring.id === `ring-${SURVEY_EDGE_PC}`),
+      camera,
+      [],
+    );
     const starLabels: LabeledPoint[] = isGalactic
       ? []
-      : this.spreadLabels(candidates(this.stars, this.starsByBrightness), camera, selectedId);
+      : this.spreadLabels(
+          candidates(this.stars, this.starsByBrightness),
+          camera,
+          selectedId,
+          surveyEdge,
+        );
     // After the stars and around them, but outside their count: near the Sun fifteen stars always
     // place, and sharing the count would leave no deep-sky object named at all.
     const backdropLabels = this.spreadLabels(
       isGalactic ? this.galacticLabels : this.deepSkyLabels,
       camera,
       null,
-      starLabels,
+      [...surveyEdge, ...starLabels],
     );
-    const ringLabels =
-      isGalactic || !this.display().grid
-        ? []
-        : this.ringLabelsInTheClear(this.ringLabels(camera), camera, [
-            ...starLabels,
-            ...backdropLabels,
-          ]);
+    // The survey edge first again, so the rungs beside it give way to it rather than it to them.
+    const ringLabels = this.ringLabelsInTheClear(
+      [...surveyEdge, ...rings.filter((ring) => !surveyEdge.includes(ring))],
+      camera,
+      [...starLabels, ...backdropLabels],
+    );
     this.labelOverlay?.update([...starLabels, ...ringLabels, ...backdropLabels]);
   }
 

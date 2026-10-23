@@ -108,4 +108,19 @@ describe('SearchIndexService', () => {
     // Three slices: two of STARS_PER_SLICE and one star.
     expect(yields).toBe(3);
   });
+
+  it('builds what is left in one go once the search tab is open, where someone is waiting on it', async () => {
+    // A yield lets a frame run, and a frame on CI's software rasterizer takes about 2 s: 23
+    // slices of the full catalogue left the search empty for most of a minute after typing.
+    const timer = vi.spyOn(globalThis, 'setTimeout');
+    void service.load();
+    TestBed.createComponent(SearchComponent);
+    await service.load();
+    const yields = timer.mock.calls.length;
+    timer.mockRestore();
+
+    // The one already pending when the tab opened.
+    expect(yields).toBe(1);
+    expect(service.all()).toHaveLength(STARS.length + 2);
+  });
 });

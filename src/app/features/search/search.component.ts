@@ -120,7 +120,7 @@ export class SearchComponent {
   readonly results = computed(() => this.matches().slice(0, MAX_RESULTS).map((entry) => ({ ...entry, subtitle: entrySubtitle(entry) })));
 
   constructor() {
-    void this.searchIndex.load();
+    void this.searchIndex.finish();
   }
 
   onInput(event: Event): void {

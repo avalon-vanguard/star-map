@@ -53,6 +53,7 @@ export class SearchIndexService {
   private readonly starIndex = signal<readonly IndexedSearchEntry[]>([]);
   private readonly fullIndex = signal<readonly IndexedSearchEntry[] | null>(null);
   private building?: Promise<void>;
+  private hurried = false;
 
   /** Stars alone, for the routing fields: a route is a chain of stars. Empty until built. */
   readonly stars = this.starIndex.asReadonly();
@@ -63,6 +64,17 @@ export class SearchIndexService {
   load(): Promise<void> {
     this.building ??= this.build();
     return this.building;
+  }
+
+  /**
+   * Starts the build if it has not, and runs what is left of it without yielding: someone has the
+   * search open. Each yield lets a frame run, and where a frame is slow (2 s on CI's software
+   * rasterizer) the slices kept the search empty for most of a minute; the rest of the build in
+   * one task is what the whole of it cost before it was sliced.
+   */
+  finish(): Promise<void> {
+    this.hurried = true;
+    return this.load();
   }
 
   private async build(): Promise<void> {
@@ -79,7 +91,9 @@ export class SearchIndexService {
       for (let start = 0; start < stars.length; start += STARS_PER_SLICE) {
         // Before the first slice too: the scene asks once its catalogues have loaded, so the await
         // above resumes in the boot task itself, and the first slice ran there, ahead of the first frame.
-        await nextTask();
+        if (!this.hurried) {
+          await nextTask();
+        }
         for (const indexed of buildSearchIndex(stars.slice(start, start + STARS_PER_SLICE).map(starEntry))) {
           starIndex.push(indexed);
         }

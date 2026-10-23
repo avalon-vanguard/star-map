@@ -21,7 +21,11 @@ export function backButtonLocator(page: Page): Locator {
  * by accident once the transition has already completed — until the view reports it is in a
  * system.
  */
-export async function clickCanvasUntilSystemEntered(page: Page, canvas: Locator, backButton: Locator): Promise<void> {
+export async function clickCanvasUntilSystemEntered(
+  page: Page,
+  canvas: Locator,
+  backButton: Locator,
+): Promise<void> {
   await expect
     .poll(
       async () => {
@@ -34,7 +38,7 @@ export async function clickCanvasUntilSystemEntered(page: Page, canvas: Locator,
       // 45 s, inside camera-flight's 90 s test budget: on CI's software rasterizer one read of the
       // level marker took 7 s and one click 8 s, so 15 s ran out right after the click that
       // entered the system, before the poll could see it (Gitea run 491).
-      { timeout: 45_000, intervals: [300] }
+      { timeout: 45_000, intervals: [300] },
     )
     .toBe(true);
   await expect(backButton).toBeVisible();

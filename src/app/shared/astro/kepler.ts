@@ -19,7 +19,9 @@ const DAYS_PER_JULIAN_CENTURY = 36525;
  * an axis far more often than an eccentricity — 1509 exoplanets have the first without the
  * second — and treating those as undrawable simply hid them.
  */
-export function resolveOrbitalElements(partial: Partial<OrbitalElements> & Pick<OrbitalElements, 'semiMajorAxisAu'>): OrbitalElements {
+export function resolveOrbitalElements(
+  partial: Partial<OrbitalElements> & Pick<OrbitalElements, 'semiMajorAxisAu'>,
+): OrbitalElements {
   return {
     semiMajorAxisAu: partial.semiMajorAxisAu,
     eccentricity: partial.eccentricity ?? 0,
@@ -27,7 +29,7 @@ export function resolveOrbitalElements(partial: Partial<OrbitalElements> & Pick<
     longitudeOfAscendingNodeDeg: partial.longitudeOfAscendingNodeDeg ?? 0,
     argumentOfPeriapsisDeg: partial.argumentOfPeriapsisDeg ?? 0,
     meanAnomalyAtEpochDeg: partial.meanAnomalyAtEpochDeg ?? 0,
-    epochJd: partial.epochJd ?? DEFAULT_EPOCH_JD
+    epochJd: partial.epochJd ?? DEFAULT_EPOCH_JD,
   };
 }
 
@@ -45,14 +47,17 @@ export function resolveOrbitalElements(partial: Partial<OrbitalElements> & Pick<
  * describes it.
  */
 export function isPropagatableOrbit(
-  partial: Partial<OrbitalElements>
+  partial: Partial<OrbitalElements>,
 ): partial is Partial<OrbitalElements> & Pick<OrbitalElements, 'semiMajorAxisAu'> {
   const { semiMajorAxisAu, eccentricity } = partial;
 
   if (semiMajorAxisAu === undefined || !Number.isFinite(semiMajorAxisAu) || semiMajorAxisAu <= 0) {
     return false;
   }
-  if (eccentricity !== undefined && (!Number.isFinite(eccentricity) || eccentricity < 0 || eccentricity >= 1)) {
+  if (
+    eccentricity !== undefined &&
+    (!Number.isFinite(eccentricity) || eccentricity < 0 || eccentricity >= 1)
+  ) {
     return false;
   }
   return true;
@@ -76,7 +81,10 @@ export function orbitalPeriodDays(semiMajorAxisAu: number, gmAu3PerDay2: number)
  * star needs to be known or guessed: the period and the semi-major axis between them pin the
  * gravitational parameter exactly.
  */
-export function gravitationalParameterFromPeriod(semiMajorAxisAu: number, periodDays: number): number {
+export function gravitationalParameterFromPeriod(
+  semiMajorAxisAu: number,
+  periodDays: number,
+): number {
   const meanMotion = TWO_PI / periodDays;
   return meanMotion * meanMotion * semiMajorAxisAu * semiMajorAxisAu * semiMajorAxisAu;
 }
@@ -118,7 +126,10 @@ export function resolveGravitationalParameter(input: {
     const impliedMassSolar = derived / GM_SUN_AU3_PER_DAY2;
     // A period and axis drawn from disagreeing solutions can imply something that is not a
     // star; prefer a known-approximate answer over a confidently wrong one.
-    if (impliedMassSolar >= MIN_PLAUSIBLE_STELLAR_MASS_SOLAR && impliedMassSolar <= MAX_PLAUSIBLE_STELLAR_MASS_SOLAR) {
+    if (
+      impliedMassSolar >= MIN_PLAUSIBLE_STELLAR_MASS_SOLAR &&
+      impliedMassSolar <= MAX_PLAUSIBLE_STELLAR_MASS_SOLAR
+    ) {
       return derived;
     }
   }
@@ -144,7 +155,12 @@ function normalizeAngle(angleRad: number): number {
  * Solves Kepler's equation `M = E - e*sin(E)` for the eccentric anomaly `E` (radians) via
  * Newton-Raphson iteration.
  */
-export function solveEccentricAnomaly(meanAnomalyRad: number, eccentricity: number, tolerance = 1e-8, maxIterations = 30): number {
+export function solveEccentricAnomaly(
+  meanAnomalyRad: number,
+  eccentricity: number,
+  tolerance = 1e-8,
+  maxIterations = 30,
+): number {
   const m = normalizeAngle(meanAnomalyRad);
   let e = eccentricity < 0.8 ? m : Math.PI;
 
@@ -160,7 +176,10 @@ export function solveEccentricAnomaly(meanAnomalyRad: number, eccentricity: numb
 }
 
 /** Converts an eccentric anomaly (radians) into the true anomaly (radians). */
-export function trueAnomalyFromEccentricAnomaly(eccentricAnomalyRad: number, eccentricity: number): number {
+export function trueAnomalyFromEccentricAnomaly(
+  eccentricAnomalyRad: number,
+  eccentricity: number,
+): number {
   const cosE = Math.cos(eccentricAnomalyRad);
   const sinE = Math.sin(eccentricAnomalyRad);
   return Math.atan2(Math.sqrt(1 - eccentricity * eccentricity) * sinE, cosE - eccentricity);
@@ -172,7 +191,10 @@ export function trueAnomalyFromEccentricAnomaly(eccentricAnomalyRad: number, ecc
  * planet for moons — see `BodyRecord.parentBodyId`). Standard perifocal-to-reference-frame
  * rotation: argument of periapsis, then inclination, then longitude of ascending node.
  */
-export function positionAtTrueAnomaly(elements: OrbitalElements, trueAnomalyRad: number): CartesianCoordinates {
+export function positionAtTrueAnomaly(
+  elements: OrbitalElements,
+  trueAnomalyRad: number,
+): CartesianCoordinates {
   const { semiMajorAxisAu: a, eccentricity: e } = elements;
   const semiLatusRectum = a * (1 - e * e);
   const radius = semiLatusRectum / (1 + e * Math.cos(trueAnomalyRad));
@@ -204,7 +226,7 @@ export function positionAtTrueAnomaly(elements: OrbitalElements, trueAnomalyRad:
   return {
     x: xTilted * cosRaan - yTilted * sinRaan,
     y: xTilted * sinRaan + yTilted * cosRaan,
-    z: zTilted
+    z: zTilted,
   };
 }
 
@@ -216,7 +238,7 @@ export function keplerRates(semiMajorAxisAu: number, gmAu3PerDay2: number): Mean
   return {
     meanMotionDegPerDay: meanMotionRadPerDay(semiMajorAxisAu, gmAu3PerDay2) / DEG_TO_RAD,
     longitudeOfAscendingNodeDegPerDay: 0,
-    argumentOfPeriapsisDegPerDay: 0
+    argumentOfPeriapsisDegPerDay: 0,
   };
 }
 
@@ -232,7 +254,11 @@ export function keplerRates(semiMajorAxisAu: number, gmAu3PerDay2: number): Mean
  * Taken off, Triton — whose node turns half a degree a year — drifted a degree a year from where
  * Horizons has it, 105 degrees by 2100.
  */
-export function meanElementsAt(elements: OrbitalElements, rates: MeanElementRates, epochJdEval: number): OrbitalElements {
+export function meanElementsAt(
+  elements: OrbitalElements,
+  rates: MeanElementRates,
+  epochJdEval: number,
+): OrbitalElements {
   const days = epochJdEval - elements.epochJd;
   const node = rates.longitudeOfAscendingNodeDegPerDay * days;
   const periapsis = rates.argumentOfPeriapsisDegPerDay * days;
@@ -240,7 +266,9 @@ export function meanElementsAt(elements: OrbitalElements, rates: MeanElementRate
   const terms = rates.meanAnomalyTerms;
   const centuries = days / DAYS_PER_JULIAN_CENTURY;
   const extra = terms
-    ? terms.b * centuries * centuries + terms.c * Math.cos(terms.f * centuries * DEG_TO_RAD) + terms.s * Math.sin(terms.f * centuries * DEG_TO_RAD)
+    ? terms.b * centuries * centuries +
+      terms.c * Math.cos(terms.f * centuries * DEG_TO_RAD) +
+      terms.s * Math.sin(terms.f * centuries * DEG_TO_RAD)
     : 0;
   return {
     semiMajorAxisAu: elements.semiMajorAxisAu + (rates.semiMajorAxisAuPerDay ?? 0) * days,
@@ -248,15 +276,26 @@ export function meanElementsAt(elements: OrbitalElements, rates: MeanElementRate
     inclinationDeg: elements.inclinationDeg + (rates.inclinationDegPerDay ?? 0) * days,
     longitudeOfAscendingNodeDeg: elements.longitudeOfAscendingNodeDeg + node,
     argumentOfPeriapsisDeg: elements.argumentOfPeriapsisDeg + periapsis,
-    meanAnomalyAtEpochDeg: elements.meanAnomalyAtEpochDeg + rates.meanMotionDegPerDay * days - periapsis - nodeAlongOrbit + extra,
-    epochJd: epochJdEval
+    meanAnomalyAtEpochDeg:
+      elements.meanAnomalyAtEpochDeg +
+      rates.meanMotionDegPerDay * days -
+      periapsis -
+      nodeAlongOrbit +
+      extra,
+    epochJd: epochJdEval,
   };
 }
 
 /** Where `elements` put the body at their own epoch (AU, relative to the central body). */
 export function positionAtEpoch(elements: OrbitalElements): CartesianCoordinates {
-  const eccentricAnomalyRad = solveEccentricAnomaly(elements.meanAnomalyAtEpochDeg * DEG_TO_RAD, elements.eccentricity);
-  return positionAtTrueAnomaly(elements, trueAnomalyFromEccentricAnomaly(eccentricAnomalyRad, elements.eccentricity));
+  const eccentricAnomalyRad = solveEccentricAnomaly(
+    elements.meanAnomalyAtEpochDeg * DEG_TO_RAD,
+    elements.eccentricity,
+  );
+  return positionAtTrueAnomaly(
+    elements,
+    trueAnomalyFromEccentricAnomaly(eccentricAnomalyRad, elements.eccentricity),
+  );
 }
 
 /**
@@ -264,15 +303,24 @@ export function positionAtEpoch(elements: OrbitalElements): CartesianCoordinates
  * position (AU) relative to its central body, as opposed to {@link orbitEllipsePoints} which
  * samples the fixed orbit shape independent of time.
  */
-export function propagateOrbit(elements: OrbitalElements, gmAu3PerDay2: number, epochJdEval: number): CartesianCoordinates {
-  return positionAtEpoch(meanElementsAt(elements, keplerRates(elements.semiMajorAxisAu, gmAu3PerDay2), epochJdEval));
+export function propagateOrbit(
+  elements: OrbitalElements,
+  gmAu3PerDay2: number,
+  epochJdEval: number,
+): CartesianCoordinates {
+  return positionAtEpoch(
+    meanElementsAt(elements, keplerRates(elements.semiMajorAxisAu, gmAu3PerDay2), epochJdEval),
+  );
 }
 
 /**
  * Samples `segments` points around the fixed shape of the orbit (AU, relative to the central
  * body), for drawing the orbit ellipse. Independent of epoch/time — unlike {@link propagateOrbit}.
  */
-export function orbitEllipsePoints(elements: OrbitalElements, segments = 128): CartesianCoordinates[] {
+export function orbitEllipsePoints(
+  elements: OrbitalElements,
+  segments = 128,
+): CartesianCoordinates[] {
   const points: CartesianCoordinates[] = [];
   for (let i = 0; i <= segments; i++) {
     const trueAnomalyRad = (i / segments) * TWO_PI;

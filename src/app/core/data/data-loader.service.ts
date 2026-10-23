@@ -50,9 +50,11 @@ export class DataLoaderService {
    */
   private async fetchStars(): Promise<StarField> {
     const [index, positionBuffer, metaBuffer] = await Promise.all([
-      fetch('assets/data/stars-index.json').then((response) => response.json() as Promise<StarCatalogIndex>),
+      fetch('assets/data/stars-index.json').then(
+        (response) => response.json() as Promise<StarCatalogIndex>,
+      ),
       fetch('assets/data/stars.bin').then((response) => response.arrayBuffer()),
-      fetch('assets/data/stars-meta.bin').then((response) => response.arrayBuffer())
+      fetch('assets/data/stars-meta.bin').then((response) => response.arrayBuffer()),
     ]);
 
     const positions = new Float32Array(positionBuffer);

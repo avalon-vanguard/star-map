@@ -135,7 +135,10 @@ export function systemViewDirection(referenceFrame: THREE.Quaternion): THREE.Vec
  * Radius, in AU, that the camera can see at the star's own distance — the half-height of the
  * view frustum where the system sits, along whichever screen axis is tighter.
  */
-export function systemFrameRadiusAu(distanceAu: number, viewport: SystemViewport = DEFAULT_SYSTEM_VIEWPORT): number {
+export function systemFrameRadiusAu(
+  distanceAu: number,
+  viewport: SystemViewport = DEFAULT_SYSTEM_VIEWPORT,
+): number {
   return distanceAu * tightHalfExtent(viewport);
 }
 
@@ -153,15 +156,24 @@ export function systemFrameRadiusAu(distanceAu: number, viewport: SystemViewport
  * every semi-major axis by construction, or an eccentric orbit's aphelion where that runs past the
  * ring, as Eris's does.
  */
-export function systemFramingDistanceAu(framedRadiusAu: number, viewport: SystemViewport = DEFAULT_SYSTEM_VIEWPORT, starRadiusAu = 0): number {
+export function systemFramingDistanceAu(
+  framedRadiusAu: number,
+  viewport: SystemViewport = DEFAULT_SYSTEM_VIEWPORT,
+  starRadiusAu = 0,
+): number {
   // A giant drawn at its own radius can be wider than the system around it — Betelgeuse's 584
   // solar radii are 2.7 AU — or than the empty framing. Its disc is a sphere's, whose silhouette
   // from d subtends asin(R / d): the distance that makes it the fraction above of the view.
-  const star = starRadiusAu * Math.sqrt(1 + 1 / (starFrameFraction(viewport) * tightHalfExtent(viewport)) ** 2);
+  const star =
+    starRadiusAu *
+    Math.sqrt(1 + 1 / (starFrameFraction(viewport) * tightHalfExtent(viewport)) ** 2);
   if (!Number.isFinite(framedRadiusAu) || framedRadiusAu <= 0) {
     return Math.max(EMPTY_SYSTEM_FRAMING_DISTANCE_AU, star);
   }
-  const required = Math.max((framedRadiusAu * (1 + FRAME_MARGIN)) / tightHalfExtent(viewport), star);
+  const required = Math.max(
+    (framedRadiusAu * (1 + FRAME_MARGIN)) / tightHalfExtent(viewport),
+    star,
+  );
   return clamp(required, MIN_FRAMING_DISTANCE_AU, MAX_FRAMING_DISTANCE_AU);
 }
 
@@ -204,7 +216,8 @@ export function systemGridRingsAu(outermostOrbitAu: number): number[] {
   const extent = outermostOrbitAu * GRID_EXTENT_TO_OUTERMOST_ORBIT;
   const target = extent / TARGET_GRID_RING_COUNT;
   const magnitude = Math.pow(10, Math.floor(Math.log10(target)));
-  const step = magnitude * (RING_STEP_MANTISSAS.find((mantissa) => magnitude * mantissa >= target) ?? 10);
+  const step =
+    magnitude * (RING_STEP_MANTISSAS.find((mantissa) => magnitude * mantissa >= target) ?? 10);
 
   // Rounded up, not truncated: the last ring has to enclose the outermost orbit rather than fall
   // just inside it, or the outermost planet spends its year outside the grid meant to measure it.

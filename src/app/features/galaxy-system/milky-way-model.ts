@@ -12,7 +12,7 @@ import {
   ORION_SPUR,
   SpiralArm,
   SUN_GALACTOCENTRIC_RADIUS_PC,
-  SUN_HEIGHT_ABOVE_MIDPLANE_PC
+  SUN_HEIGHT_ABOVE_MIDPLANE_PC,
 } from '../../shared/astro/galaxy';
 
 const DEG_TO_RAD = Math.PI / 180;
@@ -32,7 +32,7 @@ export const DEFAULT_PARTICLE_COUNTS: GalaxyParticleCounts = {
   arms: 24000,
   disc: 12000,
   bulge: 9000,
-  halo: 1600
+  halo: 1600,
 };
 
 /** Vertical scale height of the star-forming ridge in an arm — much thinner than the disc. */
@@ -102,7 +102,11 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-function lerpColor(a: readonly number[], b: readonly number[], t: number): [number, number, number] {
+function lerpColor(
+  a: readonly number[],
+  b: readonly number[],
+  t: number,
+): [number, number, number] {
   return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
 }
 
@@ -112,12 +116,25 @@ function lerpColor(a: readonly number[], b: readonly number[], t: number): [numb
  * position. The polar form of the same mapping lives in `galaxy.ts`; the bar is easier to write
  * in Cartesian, so it gets this one.
  */
-function fromCentreOffset(dx: number, dy: number, heightPc: number): { x: number; y: number; z: number } {
-  return { x: SUN_GALACTOCENTRIC_RADIUS_PC + dx, y: dy, z: heightPc - SUN_HEIGHT_ABOVE_MIDPLANE_PC };
+function fromCentreOffset(
+  dx: number,
+  dy: number,
+  heightPc: number,
+): { x: number; y: number; z: number } {
+  return {
+    x: SUN_GALACTOCENTRIC_RADIUS_PC + dx,
+    y: dy,
+    z: heightPc - SUN_HEIGHT_ABOVE_MIDPLANE_PC,
+  };
 }
 
 interface Writer {
-  push(galactic: { x: number; y: number; z: number }, color: readonly number[], sizePc: number, alpha: number): void;
+  push(
+    galactic: { x: number; y: number; z: number },
+    color: readonly number[],
+    sizePc: number,
+    alpha: number,
+  ): void;
 }
 
 function createWriter(capacity: number): Writer & GalaxyParticles & { finish(): GalaxyParticles } {
@@ -151,7 +168,7 @@ function createWriter(capacity: number): Writer & GalaxyParticles & { finish(): 
     },
     finish() {
       return { count, positions, colors, sizes, alphas };
-    }
+    },
   };
 }
 
@@ -193,7 +210,8 @@ function addArmParticles(writer: Writer, random: () => number, count: number): v
     const radialT = Math.min(radius / DISC_RADIUS_PC, 1);
     const isHii = random() < HII_REGION_FRACTION;
     const color = isHii ? HII_COLOR : lerpColor(ARM_INNER_COLOR, ARM_OUTER_COLOR, radialT);
-    const size = lerp(ARM_SIZE_PC.min, ARM_SIZE_PC.max, random()) * (isHii ? HII_SIZE_MULTIPLIER : 1);
+    const size =
+      lerp(ARM_SIZE_PC.min, ARM_SIZE_PC.max, random()) * (isHii ? HII_SIZE_MULTIPLIER : 1);
     // Fades with radius (the arms thin out) and with distance off the spine (they have edges).
     const ridgeFalloff = Math.exp(-(offset * offset) / (2 * arm.widthPc * arm.widthPc));
     const alpha = (isHii ? 0.85 : 0.4) * ridgeFalloff * lerp(1, 0.35, radialT);
@@ -216,7 +234,12 @@ function addDiscParticles(writer: Writer, random: () => number, count: number): 
     const galactic = fromCentreOffset(-radius * Math.cos(angle), radius * Math.sin(angle), height);
 
     const radialT = Math.min(radius / DISC_RADIUS_PC, 1);
-    writer.push(galactic, DISC_COLOR, lerp(DISC_SIZE_PC.min, DISC_SIZE_PC.max, random()), lerp(0.16, 0.03, radialT));
+    writer.push(
+      galactic,
+      DISC_COLOR,
+      lerp(DISC_SIZE_PC.min, DISC_SIZE_PC.max, random()),
+      lerp(0.16, 0.03, radialT),
+    );
   }
 }
 
@@ -263,7 +286,7 @@ function addBulgeParticles(writer: Writer, random: () => number, count: number):
       fromCentreOffset(dx, dy, height),
       lerpColor(BULGE_CORE_COLOR, BULGE_EDGE_COLOR, coreT),
       lerp(BULGE_SIZE_PC.min, BULGE_SIZE_PC.max, random()),
-      lerp(0.3, 0.06, coreT)
+      lerp(0.3, 0.06, coreT),
     );
   }
 }
@@ -276,7 +299,11 @@ function addHaloParticles(writer: Writer, random: () => number, count: number): 
     const cosTheta = random() * 2 - 1;
     const sinTheta = Math.sqrt(1 - cosTheta * cosTheta);
     const angle = random() * Math.PI * 2;
-    const galactic = fromCentreOffset(radius * sinTheta * Math.cos(angle), radius * sinTheta * Math.sin(angle), radius * cosTheta);
+    const galactic = fromCentreOffset(
+      radius * sinTheta * Math.cos(angle),
+      radius * sinTheta * Math.sin(angle),
+      radius * cosTheta,
+    );
 
     writer.push(galactic, HALO_COLOR, lerp(HALO_SIZE_PC.min, HALO_SIZE_PC.max, random()), 0.05);
   }
@@ -290,7 +317,10 @@ function addHaloParticles(writer: Writer, random: () => number, count: number): 
  * visible edge), so the returned `count` is a little below the requested budget — the arrays are
  * allocated at capacity and the count says how much of them is live.
  */
-export function generateMilkyWayParticles(seed = 20260804, counts: GalaxyParticleCounts = DEFAULT_PARTICLE_COUNTS): GalaxyParticles {
+export function generateMilkyWayParticles(
+  seed = 20260804,
+  counts: GalaxyParticleCounts = DEFAULT_PARTICLE_COUNTS,
+): GalaxyParticles {
   const random = createRandom(seed);
   const writer = createWriter(counts.arms + counts.disc + counts.bulge + counts.halo);
 

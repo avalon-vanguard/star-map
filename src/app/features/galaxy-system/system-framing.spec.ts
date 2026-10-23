@@ -10,7 +10,7 @@ import {
   systemGridRingsAu,
   SystemViewport,
   SYSTEM_VIEW_DIRECTION_IN_PLANE,
-  systemViewDirection
+  systemViewDirection,
 } from './system-framing';
 
 /** Real systems spanning the range the view has to cope with. */
@@ -61,9 +61,15 @@ describe('systemFramingDistanceAu', () => {
   it('backs off to hold a giant wider than its system, and leaves a dwarf to the system', () => {
     // Betelgeuse drawn at 584 solar radii, 2.7 AU, with nothing around it; the Sun inside its own.
     const betelgeuseAu = 2.72;
-    expect(systemFrameRadiusAu(systemFramingDistanceAu(0, undefined, betelgeuseAu))).toBeGreaterThan(betelgeuseAu);
-    expect(systemFrameRadiusAu(systemFramingDistanceAu(0.5, undefined, betelgeuseAu))).toBeGreaterThan(betelgeuseAu);
-    expect(systemFramingDistanceAu(SOLAR.outermost, undefined, 0.00465)).toBe(systemFramingDistanceAu(SOLAR.outermost));
+    expect(
+      systemFrameRadiusAu(systemFramingDistanceAu(0, undefined, betelgeuseAu)),
+    ).toBeGreaterThan(betelgeuseAu);
+    expect(
+      systemFrameRadiusAu(systemFramingDistanceAu(0.5, undefined, betelgeuseAu)),
+    ).toBeGreaterThan(betelgeuseAu);
+    expect(systemFramingDistanceAu(SOLAR.outermost, undefined, 0.00465)).toBe(
+      systemFramingDistanceAu(SOLAR.outermost),
+    );
     expect(systemFramingDistanceAu(0, undefined, 0.00465)).toBe(systemFramingDistanceAu(0));
   });
 
@@ -71,8 +77,15 @@ describe('systemFramingDistanceAu', () => {
     // Betelgeuse at 390x844 and at 1600x1000. Kept to half the half-side, its disc was 98 px in radius
     // on the phone, where the names come within 66 px of the centre.
     const betelgeuseAu = 2.72;
-    for (const [width, height] of [[390, 844], [1600, 1000]]) {
-      const viewport = { fovDegrees: 50, aspect: width / height, shorterSidePx: Math.min(width, height) };
+    for (const [width, height] of [
+      [390, 844],
+      [1600, 1000],
+    ]) {
+      const viewport = {
+        fovDegrees: 50,
+        aspect: width / height,
+        shorterSidePx: Math.min(width, height),
+      };
       const distance = systemFramingDistanceAu(0, viewport, betelgeuseAu);
       const tight = Math.tan((25 * Math.PI) / 180) * Math.min(1, viewport.aspect);
       const halfSidePx = viewport.shorterSidePx / 2;
@@ -85,7 +98,10 @@ describe('systemFramingDistanceAu', () => {
   it("holds a giant's disc inside the ring its neighbours are named on, and the camera clear of its closest approach", () => {
     // The ring is at 0.74 of the tighter half-extent; the disc is kept to half of it, in either window.
     const betelgeuseAu = 2.72;
-    for (const viewport of [{ fovDegrees: 50, aspect: 1.6 }, { fovDegrees: 50, aspect: 0.6 }]) {
+    for (const viewport of [
+      { fovDegrees: 50, aspect: 1.6 },
+      { fovDegrees: 50, aspect: 0.6 },
+    ]) {
       const distance = systemFramingDistanceAu(0, viewport, betelgeuseAu);
       const tight = Math.tan((25 * Math.PI) / 180) * Math.min(1, viewport.aspect);
       expect(Math.tan(Math.asin(betelgeuseAu / distance)) / tight).toBeCloseTo(0.5, 9);
@@ -123,7 +139,10 @@ describe('the grid and the framing together', () => {
    * ring. The scene frames the larger of that ring and the furthest aphelion (`outermostRadiusAu`),
    * which the Eris test below frames where it runs past the ring, and the scene's own spec checks.
    */
-  function fit(outermostOrbitAu: number, viewport?: SystemViewport): { ring: number; frame: number } {
+  function fit(
+    outermostOrbitAu: number,
+    viewport?: SystemViewport,
+  ): { ring: number; frame: number } {
     const rings = systemGridRingsAu(outermostOrbitAu);
     const ring = rings[rings.length - 1];
     return { ring, frame: systemFrameRadiusAu(systemFramingDistanceAu(ring, viewport), viewport) };
@@ -133,14 +152,21 @@ describe('the grid and the framing together', () => {
     { fovDegrees: 50, aspect: 1.78 },
     { fovDegrees: 50, aspect: 1 },
     { fovDegrees: 50, aspect: 0.6 },
-    { fovDegrees: 50, aspect: 390 / 844 } // a phone held upright
+    { fovDegrees: 50, aspect: 390 / 844 }, // a phone held upright
   ];
 
   it('leaves the outermost ring clear of the frame edge at every scale and window shape', () => {
     // The whole point of framing against the grid rather than the orbits: before this, 368 of
     // the 371 systems in the datasets drew a grid wider than the view that was meant to hold it.
     for (const viewport of VIEWPORTS) {
-      for (const { outermost } of [TRAPPIST_1, GL_357, SOLAR, SOLAR_TO_ERIS, { outermost: 1 }, { outermost: 12.4 }]) {
+      for (const { outermost } of [
+        TRAPPIST_1,
+        GL_357,
+        SOLAR,
+        SOLAR_TO_ERIS,
+        { outermost: 1 },
+        { outermost: 12.4 },
+      ]) {
         const { ring, frame } = fit(outermost, viewport);
         expect(ring).toBeLessThan(frame);
         expect(ring / frame).toBeLessThan(0.93);
@@ -152,12 +178,21 @@ describe('the grid and the framing together', () => {
     // The scene frames the aphelion where it runs past the ring. Under the old 500 AU ceiling the
     // phone would hold it at 0.907 of the half-width instead of 1 / 1.12 = 0.893.
     for (const viewport of VIEWPORTS) {
-      expect(ERIS_APHELION_AU / systemFrameRadiusAu(systemFramingDistanceAu(ERIS_APHELION_AU, viewport), viewport)).toBeLessThan(0.9);
+      expect(
+        ERIS_APHELION_AU /
+          systemFrameRadiusAu(systemFramingDistanceAu(ERIS_APHELION_AU, viewport), viewport),
+      ).toBeLessThan(0.9);
     }
   });
 
   it('still encloses the outermost orbit, so no planet sits off the edge of the grid', () => {
-    for (const { outermost } of [TRAPPIST_1, GL_357, SOLAR, { outermost: 1 }, { outermost: 12.4 }]) {
+    for (const { outermost } of [
+      TRAPPIST_1,
+      GL_357,
+      SOLAR,
+      { outermost: 1 },
+      { outermost: 12.4 },
+    ]) {
       expect(fit(outermost).ring).toBeGreaterThan(outermost);
     }
   });
@@ -204,7 +239,9 @@ describe('bodyMarkerRadiusAu', () => {
   it('keeps Phobos outside Mars, where a marker scaled to the system buried it', () => {
     const PHOBOS_SEMI_MAJOR_AXIS_AU = 0.00006268;
 
-    expect(bodyMarkerRadiusAu(3390) + bodyMarkerRadiusAu(11.27)).toBeLessThan(PHOBOS_SEMI_MAJOR_AXIS_AU);
+    expect(bodyMarkerRadiusAu(3390) + bodyMarkerRadiusAu(11.27)).toBeLessThan(
+      PHOBOS_SEMI_MAJOR_AXIS_AU,
+    );
   });
 
   it('still renders a bigger body as a bigger marker', () => {
@@ -213,7 +250,10 @@ describe('bodyMarkerRadiusAu', () => {
 
   it('falls back to an Earth for a body with no published radius', () => {
     for (const nothing of [undefined, 0, -1]) {
-      expect(bodyMarkerRadiusAu(nothing as number | undefined)).toBeCloseTo(EARTH_RADIUS_KM / KM_PER_AU, 12);
+      expect(bodyMarkerRadiusAu(nothing as number | undefined)).toBeCloseTo(
+        EARTH_RADIUS_KM / KM_PER_AU,
+        12,
+      );
     }
   });
 });
@@ -268,7 +308,10 @@ describe('systemGridRingsAu', () => {
 
 describe('systemViewDirection', () => {
   const RAD_TO_DEG = 180 / Math.PI;
-  const ECLIPTIC_FRAME = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), (OBLIQUITY_J2000_DEG * Math.PI) / 180);
+  const ECLIPTIC_FRAME = new THREE.Quaternion().setFromAxisAngle(
+    new THREE.Vector3(1, 0, 0),
+    (OBLIQUITY_J2000_DEG * Math.PI) / 180,
+  );
 
   /** Angle between the camera direction and the plane's own normal, in degrees. */
   function angleFromNormalDeg(frame: THREE.Quaternion): number {
@@ -284,20 +327,34 @@ describe('systemViewDirection', () => {
     // The whole point: one fixed direction in the scene's frame would be face-on for the solar
     // system and edge-on for an exoplanet system measured against the plane of the sky.
     const skyPlanes = [
-      new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0.3, -0.5, 0.81).normalize()),
-      new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(-1, 0, 0)),
-      new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 1, 0))
+      new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        new THREE.Vector3(0.3, -0.5, 0.81).normalize(),
+      ),
+      new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        new THREE.Vector3(-1, 0, 0),
+      ),
+      new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        new THREE.Vector3(0, 1, 0),
+      ),
     ];
 
     // atan(0.6 / 0.8) — the angle the in-plane direction was chosen at, held exactly.
-    const expected = Math.atan2(SYSTEM_VIEW_DIRECTION_IN_PLANE.y, SYSTEM_VIEW_DIRECTION_IN_PLANE.z) * RAD_TO_DEG;
+    const expected =
+      Math.atan2(SYSTEM_VIEW_DIRECTION_IN_PLANE.y, SYSTEM_VIEW_DIRECTION_IN_PLANE.z) * RAD_TO_DEG;
     for (const frame of [ECLIPTIC_FRAME, ...skyPlanes]) {
       expect(angleFromNormalDeg(frame)).toBeCloseTo(expected, 9);
     }
   });
 
   it('is well clear of edge-on in every case, which is what it exists to prevent', () => {
-    for (const axis of [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0.2, 0.9, -0.4).normalize()]) {
+    for (const axis of [
+      new THREE.Vector3(1, 0, 0),
+      new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(0.2, 0.9, -0.4).normalize(),
+    ]) {
       const frame = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), axis);
       expect(angleFromNormalDeg(frame)).toBeLessThan(60);
     }

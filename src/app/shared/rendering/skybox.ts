@@ -15,7 +15,7 @@ export function applyMilkyWaySkybox(scene: THREE.Scene, path: string): void {
       scene.background = texture;
     },
     undefined,
-    (error) => console.error(`Failed to load the skybox texture "${path}".`, error)
+    (error) => console.error(`Failed to load the skybox texture "${path}".`, error),
   );
 }
 
@@ -35,15 +35,15 @@ const GLOW_PROFILES: Readonly<Record<GlowProfile, readonly { offset: number; alp
   corona: [
     { offset: 0, alpha: 0.85 },
     { offset: 0.4, alpha: 0.35 },
-    { offset: 1, alpha: 0 }
+    { offset: 1, alpha: 0 },
   ],
   diffuse: [
     { offset: 0, alpha: 0.5 },
     { offset: 0.18, alpha: 0.34 },
     { offset: 0.45, alpha: 0.13 },
     { offset: 0.75, alpha: 0.03 },
-    { offset: 1, alpha: 0 }
-  ]
+    { offset: 1, alpha: 0 },
+  ],
 };
 
 /**
@@ -55,7 +55,10 @@ const GLOW_PROFILES: Readonly<Record<GlowProfile, readonly { offset: number; alp
  * The cache is process-wide and intentionally not disposed: there is one texture per distinct
  * color/profile pair, they are tiny, and they outlive any individual scene.
  */
-export function createGlowTexture(color: THREE.ColorRepresentation, profile: GlowProfile = 'corona'): THREE.Texture | undefined {
+export function createGlowTexture(
+  color: THREE.ColorRepresentation,
+  profile: GlowProfile = 'corona',
+): THREE.Texture | undefined {
   const key = `${new THREE.Color(color).getHexString()}:${profile}`;
   const cached = glowSpriteCache.get(key);
   if (cached) {
@@ -74,7 +77,14 @@ export function createGlowTexture(color: THREE.ColorRepresentation, profile: Glo
   const rgb = new THREE.Color(color);
   const [r, g, b] = [Math.round(rgb.r * 255), Math.round(rgb.g * 255), Math.round(rgb.b * 255)];
 
-  const gradient = context.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  const gradient = context.createRadialGradient(
+    size / 2,
+    size / 2,
+    0,
+    size / 2,
+    size / 2,
+    size / 2,
+  );
   for (const stop of GLOW_PROFILES[profile]) {
     gradient.addColorStop(stop.offset, `rgba(${r}, ${g}, ${b}, ${stop.alpha})`);
   }
@@ -103,7 +113,7 @@ export function createGlowSprite(color: THREE.ColorRepresentation, extent: numbe
     color: color,
     transparent: true,
     depthWrite: false,
-    blending: THREE.AdditiveBlending
+    blending: THREE.AdditiveBlending,
   });
   const sprite = new THREE.Sprite(material);
   sprite.scale.setScalar(extent);

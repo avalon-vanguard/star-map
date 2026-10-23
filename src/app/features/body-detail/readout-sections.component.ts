@@ -35,8 +35,10 @@ import { BodyReadouts } from './body-readouts';
       }
     </dl>
 
-    <p class="border-t border-border/40 px-4 py-3 text-[10px] leading-relaxed text-muted">{{ readouts().provenance }}</p>
-  `
+    <p class="border-t border-border/40 px-4 py-3 text-[10px] leading-relaxed text-muted">
+      {{ readouts().provenance }}
+    </p>
+  `,
 })
 export class ReadoutSectionsComponent {
   readonly readouts = input.required<BodyReadouts>();

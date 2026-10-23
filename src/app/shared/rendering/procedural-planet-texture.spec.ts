@@ -1,13 +1,32 @@
 import * as THREE from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 
-import { PlanetAppearance, PlanetClass, paletteFor, planetAppearance } from '../astro/planet-appearance';
+import {
+  PlanetAppearance,
+  PlanetClass,
+  paletteFor,
+  planetAppearance,
+} from '../astro/planet-appearance';
 import { averageColor, planetTexture, renderPlanetTexture } from './procedural-planet-texture';
 
 const SIZE = { width: 64, height: 32 };
-const ALL_CLASSES: PlanetClass[] = ['lava', 'scorched', 'iron', 'rocky', 'temperate', 'icy', 'subNeptune', 'iceGiant', 'gasGiant', 'hotGasGiant'];
+const ALL_CLASSES: PlanetClass[] = [
+  'lava',
+  'scorched',
+  'iron',
+  'rocky',
+  'temperate',
+  'icy',
+  'subNeptune',
+  'iceGiant',
+  'gasGiant',
+  'hotGasGiant',
+];
 
-function appearanceOf(planetClass: PlanetClass, overrides: Partial<PlanetAppearance> = {}): PlanetAppearance {
+function appearanceOf(
+  planetClass: PlanetClass,
+  overrides: Partial<PlanetAppearance> = {},
+): PlanetAppearance {
   return {
     planetClass,
     palette: paletteFor(planetClass),
@@ -15,12 +34,17 @@ function appearanceOf(planetClass: PlanetClass, overrides: Partial<PlanetAppeara
     bulkDensityGramsPerCm3: 5,
     polarCapExtentDeg: null,
     seed: 12345,
-    ...overrides
+    ...overrides,
   };
 }
 
 /** RGB of one texel, 0-255. */
-function texelAt(pixels: Uint8Array, width: number, column: number, row: number): [number, number, number] {
+function texelAt(
+  pixels: Uint8Array,
+  width: number,
+  column: number,
+  row: number,
+): [number, number, number] {
   const offset = (row * width + column) * 4;
   return [pixels[offset], pixels[offset + 1], pixels[offset + 2]];
 }
@@ -70,27 +94,43 @@ describe('renderPlanetTexture', () => {
     const column = 40;
     let maximumStep = 0;
     for (let row = 1; row < 64; row++) {
-      maximumStep = Math.max(maximumStep, difference(texelAt(pixels, 128, column, row), texelAt(pixels, 128, column, row - 1)));
+      maximumStep = Math.max(
+        maximumStep,
+        difference(texelAt(pixels, 128, column, row), texelAt(pixels, 128, column, row - 1)),
+      );
     }
     expect(maximumStep).toBeGreaterThan(0);
   });
 
   it('paints a polar cap when the derived temperature calls for one, and not otherwise', () => {
     const withCap = renderPlanetTexture(appearanceOf('temperate', { polarCapExtentDeg: 40 }), SIZE);
-    const without = renderPlanetTexture(appearanceOf('temperate', { polarCapExtentDeg: null }), SIZE);
+    const without = renderPlanetTexture(
+      appearanceOf('temperate', { polarCapExtentDeg: null }),
+      SIZE,
+    );
 
     const pole = 0;
     const equator = SIZE.height / 2;
     // At the pole the capped world is markedly brighter; at the equator the two agree.
     const capPole = texelAt(withCap, SIZE.width, 10, pole);
     const barePole = texelAt(without, SIZE.width, 10, pole);
-    expect(capPole[0] + capPole[1] + capPole[2]).toBeGreaterThan(barePole[0] + barePole[1] + barePole[2] + 60);
-    expect(difference(texelAt(withCap, SIZE.width, 10, equator), texelAt(without, SIZE.width, 10, equator))).toBe(0);
+    expect(capPole[0] + capPole[1] + capPole[2]).toBeGreaterThan(
+      barePole[0] + barePole[1] + barePole[2] + 60,
+    );
+    expect(
+      difference(
+        texelAt(withCap, SIZE.width, 10, equator),
+        texelAt(without, SIZE.width, 10, equator),
+      ),
+    ).toBe(0);
   });
 
   it('grows the cap further toward the equator as the world gets colder', () => {
     const brightnessAt = (extent: number, row: number): number => {
-      const pixels = renderPlanetTexture(appearanceOf('temperate', { polarCapExtentDeg: extent }), SIZE);
+      const pixels = renderPlanetTexture(
+        appearanceOf('temperate', { polarCapExtentDeg: extent }),
+        SIZE,
+      );
       const [r, g, b] = texelAt(pixels, SIZE.width, 20, row);
       return r + g + b;
     };
@@ -114,7 +154,10 @@ describe('renderPlanetTexture', () => {
 
   it('produces no NaN or out-of-range bytes for any class', () => {
     for (const planetClass of ALL_CLASSES) {
-      const pixels = renderPlanetTexture(appearanceOf(planetClass, { polarCapExtentDeg: 30 }), SIZE);
+      const pixels = renderPlanetTexture(
+        appearanceOf(planetClass, { polarCapExtentDeg: 30 }),
+        SIZE,
+      );
       // One assertion per class, not three per byte: 245 760 expect() calls ran past the
       // default 5 s timeout on a slower CI machine.
       const firstBad = pixels.findIndex(
@@ -129,7 +172,16 @@ describe('planetTexture', () => {
   it('builds a data texture at the requested size, with no canvas involved', () => {
     // A DataTexture rather than a CanvasTexture: the pixels are computed, not drawn, so this
     // works in an environment with no 2D context at all — which is this one.
-    const texture = planetTexture(planetAppearance({ id: 'earth', radiusEarth: 1, massEarth: 1, semiMajorAxisAu: 1, hostLuminositySolar: 1 }), SIZE);
+    const texture = planetTexture(
+      planetAppearance({
+        id: 'earth',
+        radiusEarth: 1,
+        massEarth: 1,
+        semiMajorAxisAu: 1,
+        hostLuminositySolar: 1,
+      }),
+      SIZE,
+    );
 
     expect(texture.image.width).toBe(SIZE.width);
     expect(texture.image.height).toBe(SIZE.height);
@@ -137,9 +189,16 @@ describe('planetTexture', () => {
   });
 
   it('caches per body and size, so a system of planets is not re-rendered every frame', () => {
-    const appearance = planetAppearance({ id: 'mars', radiusEarth: 0.53, semiMajorAxisAu: 1.52, hostLuminositySolar: 1 });
+    const appearance = planetAppearance({
+      id: 'mars',
+      radiusEarth: 0.53,
+      semiMajorAxisAu: 1.52,
+      hostLuminositySolar: 1,
+    });
     expect(planetTexture(appearance, SIZE)).toBe(planetTexture(appearance, SIZE));
-    expect(planetTexture(appearance, SIZE)).not.toBe(planetTexture(appearance, { width: 32, height: 16 }));
+    expect(planetTexture(appearance, SIZE)).not.toBe(
+      planetTexture(appearance, { width: 32, height: 16 }),
+    );
   });
 
   it('wraps in longitude and clamps in latitude, matching what the sphere actually does', () => {

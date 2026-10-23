@@ -10,7 +10,9 @@ describe('MilkyWayRenderer', () => {
   it('draws one instance per particle the model placed', () => {
     const renderer = new MilkyWayRenderer(5, SMALL_COUNTS);
     expect(renderer.particleCount).toBeGreaterThan(0);
-    expect((renderer.object.geometry as THREE.InstancedBufferGeometry).instanceCount).toBe(renderer.particleCount);
+    expect((renderer.object.geometry as THREE.InstancedBufferGeometry).instanceCount).toBe(
+      renderer.particleCount,
+    );
     renderer.dispose();
   });
 
@@ -28,7 +30,9 @@ describe('MilkyWayRenderer', () => {
     const renderer = new MilkyWayRenderer(5, SMALL_COUNTS);
 
     expect(renderer.setViewerDistancePc(GALAXY_FADE_NEAR_PC)).toBe(0);
-    expect(renderer.setViewerDistancePc((GALAXY_FADE_NEAR_PC + GALAXY_FADE_FAR_PC) / 2)).toBeCloseTo(0.5, 6);
+    expect(
+      renderer.setViewerDistancePc((GALAXY_FADE_NEAR_PC + GALAXY_FADE_FAR_PC) / 2),
+    ).toBeCloseTo(0.5, 6);
     expect(renderer.setViewerDistancePc(GALAXY_FADE_FAR_PC)).toBe(1);
     expect(renderer.setViewerDistancePc(80000)).toBe(1);
     expect(renderer.object.visible).toBe(true);

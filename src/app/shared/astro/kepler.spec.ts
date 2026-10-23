@@ -14,7 +14,7 @@ import {
   resolveGravitationalParameter,
   resolveOrbitalElements,
   solveEccentricAnomaly,
-  trueAnomalyFromEccentricAnomaly
+  trueAnomalyFromEccentricAnomaly,
 } from './kepler';
 
 // Earth's actual orbital elements (osculating, ~J2000), used as a real-world reference case.
@@ -25,7 +25,7 @@ const EARTH_ELEMENTS = {
   longitudeOfAscendingNodeDeg: -11.26064,
   argumentOfPeriapsisDeg: 102.94719,
   meanAnomalyAtEpochDeg: 100.46435,
-  epochJd: DEFAULT_EPOCH_JD
+  epochJd: DEFAULT_EPOCH_JD,
 };
 
 describe('solveEccentricAnomaly', () => {
@@ -36,7 +36,8 @@ describe('solveEccentricAnomaly', () => {
         const residual = e - eccentricity * Math.sin(e) - meanAnomalyRad;
         // residual is computed against the (possibly un-normalized) input, but the solver
         // normalizes internally, so compare against the normalized mean anomaly instead.
-        const normalizedMeanAnomaly = ((meanAnomalyRad % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        const normalizedMeanAnomaly =
+          ((meanAnomalyRad % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
         expect(e - eccentricity * Math.sin(e)).toBeCloseTo(normalizedMeanAnomaly, 6);
         expect(Number.isFinite(residual)).toBe(true);
       }
@@ -76,7 +77,11 @@ describe('positionAtTrueAnomaly', () => {
   });
 
   it('tilts a 90-degree-inclined orbit entirely onto the z axis at true anomaly 90 degrees', () => {
-    const elements = resolveOrbitalElements({ semiMajorAxisAu: 1, eccentricity: 0, inclinationDeg: 90 });
+    const elements = resolveOrbitalElements({
+      semiMajorAxisAu: 1,
+      eccentricity: 0,
+      inclinationDeg: 90,
+    });
 
     const { x, y, z } = positionAtTrueAnomaly(elements, Math.PI / 2);
 
@@ -101,8 +106,14 @@ describe('meanMotionRadPerDay / orbitalPeriodDays', () => {
 
 describe('propagateOrbit', () => {
   it('reduces to the instantaneous position at the elements own epoch', () => {
-    const eccentricAnomalyRad = solveEccentricAnomaly((EARTH_ELEMENTS.meanAnomalyAtEpochDeg * Math.PI) / 180, EARTH_ELEMENTS.eccentricity);
-    const trueAnomalyRad = trueAnomalyFromEccentricAnomaly(eccentricAnomalyRad, EARTH_ELEMENTS.eccentricity);
+    const eccentricAnomalyRad = solveEccentricAnomaly(
+      (EARTH_ELEMENTS.meanAnomalyAtEpochDeg * Math.PI) / 180,
+      EARTH_ELEMENTS.eccentricity,
+    );
+    const trueAnomalyRad = trueAnomalyFromEccentricAnomaly(
+      eccentricAnomalyRad,
+      EARTH_ELEMENTS.eccentricity,
+    );
     const expected = positionAtTrueAnomaly(EARTH_ELEMENTS, trueAnomalyRad);
 
     const actual = propagateOrbit(EARTH_ELEMENTS, GM_SUN_AU3_PER_DAY2, EARTH_ELEMENTS.epochJd);
@@ -114,7 +125,11 @@ describe('propagateOrbit', () => {
 
   it('stays within the periapsis/apoapsis distance bounds after propagating forward a year', () => {
     const period = orbitalPeriodDays(EARTH_ELEMENTS.semiMajorAxisAu, GM_SUN_AU3_PER_DAY2);
-    const { x, y, z } = propagateOrbit(EARTH_ELEMENTS, GM_SUN_AU3_PER_DAY2, EARTH_ELEMENTS.epochJd + period * 0.37);
+    const { x, y, z } = propagateOrbit(
+      EARTH_ELEMENTS,
+      GM_SUN_AU3_PER_DAY2,
+      EARTH_ELEMENTS.epochJd + period * 0.37,
+    );
     const distance = Math.hypot(x, y, z);
 
     const { semiMajorAxisAu: a, eccentricity: e } = EARTH_ELEMENTS;
@@ -124,8 +139,16 @@ describe('propagateOrbit', () => {
 
   it('returns to (very nearly) the same position after exactly one full orbital period', () => {
     const period = orbitalPeriodDays(EARTH_ELEMENTS.semiMajorAxisAu, GM_SUN_AU3_PER_DAY2);
-    const start = propagateOrbit(EARTH_ELEMENTS, GM_SUN_AU3_PER_DAY2, EARTH_ELEMENTS.epochJd + 12.3);
-    const afterOneOrbit = propagateOrbit(EARTH_ELEMENTS, GM_SUN_AU3_PER_DAY2, EARTH_ELEMENTS.epochJd + 12.3 + period);
+    const start = propagateOrbit(
+      EARTH_ELEMENTS,
+      GM_SUN_AU3_PER_DAY2,
+      EARTH_ELEMENTS.epochJd + 12.3,
+    );
+    const afterOneOrbit = propagateOrbit(
+      EARTH_ELEMENTS,
+      GM_SUN_AU3_PER_DAY2,
+      EARTH_ELEMENTS.epochJd + 12.3 + period,
+    );
 
     expect(afterOneOrbit.x).toBeCloseTo(start.x, 6);
     expect(afterOneOrbit.y).toBeCloseTo(start.y, 6);
@@ -136,13 +159,27 @@ describe('propagateOrbit', () => {
 describe('meanElementsAt', () => {
   /** A circle in the reference plane, prograde (0) or retrograde (180), whose node turns. */
   function circle(inclinationDeg: number) {
-    return { semiMajorAxisAu: 1, eccentricity: 0, inclinationDeg, longitudeOfAscendingNodeDeg: 0, argumentOfPeriapsisDeg: 0, meanAnomalyAtEpochDeg: 0, epochJd: DEFAULT_EPOCH_JD };
+    return {
+      semiMajorAxisAu: 1,
+      eccentricity: 0,
+      inclinationDeg,
+      longitudeOfAscendingNodeDeg: 0,
+      argumentOfPeriapsisDeg: 0,
+      meanAnomalyAtEpochDeg: 0,
+      epochJd: DEFAULT_EPOCH_JD,
+    };
   }
-  const RATES = { meanMotionDegPerDay: 10, longitudeOfAscendingNodeDegPerDay: 0.5, argumentOfPeriapsisDegPerDay: 0.2 };
+  const RATES = {
+    meanMotionDegPerDay: 10,
+    longitudeOfAscendingNodeDegPerDay: 0.5,
+    argumentOfPeriapsisDegPerDay: 0.2,
+  };
 
   /** Longitude in the reference plane a day on, in degrees, signed. */
   function longitudeAfterOneDay(inclinationDeg: number): number {
-    const { x, y } = positionAtEpoch(meanElementsAt(circle(inclinationDeg), RATES, DEFAULT_EPOCH_JD + 1));
+    const { x, y } = positionAtEpoch(
+      meanElementsAt(circle(inclinationDeg), RATES, DEFAULT_EPOCH_JD + 1),
+    );
     return (Math.atan2(y, x) * 180) / Math.PI;
   }
 
@@ -166,10 +203,17 @@ describe('meanElementsAt', () => {
   it('adds Standish’s b T² + c cos(fT) + s sin(fT) to the mean anomaly', () => {
     const terms = { b: -0.00012452, c: 0.0606406, s: -0.35635438, f: 38.35125 };
     const T = 0.7;
-    const withTerms = meanElementsAt(circle(0), { ...RATES, meanAnomalyTerms: terms }, DEFAULT_EPOCH_JD + T * 36525);
+    const withTerms = meanElementsAt(
+      circle(0),
+      { ...RATES, meanAnomalyTerms: terms },
+      DEFAULT_EPOCH_JD + T * 36525,
+    );
     const without = meanElementsAt(circle(0), RATES, DEFAULT_EPOCH_JD + T * 36525);
     const f = (terms.f * T * Math.PI) / 180;
-    expect(withTerms.meanAnomalyAtEpochDeg - without.meanAnomalyAtEpochDeg).toBeCloseTo(terms.b * T * T + terms.c * Math.cos(f) + terms.s * Math.sin(f), 9);
+    expect(withTerms.meanAnomalyAtEpochDeg - without.meanAnomalyAtEpochDeg).toBeCloseTo(
+      terms.b * T * T + terms.c * Math.cos(f) + terms.s * Math.sin(f),
+      9,
+    );
   });
 });
 
@@ -204,7 +248,11 @@ describe('resolveOrbitalElements', () => {
   });
 
   it('preserves explicitly provided fields', () => {
-    const resolved = resolveOrbitalElements({ semiMajorAxisAu: 1.5, eccentricity: 0.1, argumentOfPeriapsisDeg: 50 });
+    const resolved = resolveOrbitalElements({
+      semiMajorAxisAu: 1.5,
+      eccentricity: 0.1,
+      argumentOfPeriapsisDeg: 50,
+    });
     expect(resolved.argumentOfPeriapsisDeg).toBe(50);
   });
 });
@@ -215,7 +263,7 @@ describe('gravitationalParameterFromPeriod', () => {
     expect(orbitalPeriodDays(1, derived)).toBeCloseTo(365.256, 9);
   });
 
-  it('recovers the Sun from Earth\'s orbit', () => {
+  it("recovers the Sun from Earth's orbit", () => {
     // 1 AU in one sidereal year is the definition of the solar gravitational parameter.
     const derived = gravitationalParameterFromPeriod(1, 365.256363);
     expect(derived / GM_SUN_AU3_PER_DAY2).toBeCloseTo(1, 4);
@@ -237,19 +285,27 @@ describe('gravitationalParameterFromPeriod', () => {
 describe('resolveGravitationalParameter', () => {
   it('prefers the measured period over everything else', () => {
     // The period says 0.09 solar masses; the (deliberately wrong) host mass says 5.
-    const gm = resolveGravitationalParameter({ semiMajorAxisAu: 0.01154, periodDays: 1.51088, hostStarMassSolar: 5 });
+    const gm = resolveGravitationalParameter({
+      semiMajorAxisAu: 0.01154,
+      periodDays: 1.51088,
+      hostStarMassSolar: 5,
+    });
     expect(gm / GM_SUN_AU3_PER_DAY2).toBeCloseTo(0.09, 2);
   });
 
   it('corrects a red dwarf planet that the solar-mass assumption spun too fast', () => {
-    const withPeriod = resolveGravitationalParameter({ semiMajorAxisAu: 0.01154, periodDays: 1.51088 });
+    const withPeriod = resolveGravitationalParameter({
+      semiMajorAxisAu: 0.01154,
+      periodDays: 1.51088,
+    });
     const assumingSolar = resolveGravitationalParameter({ semiMajorAxisAu: 0.01154 });
 
     // A heavier central mass pulls harder, so it shortens the period: T scales as 1/sqrt(GM).
     // Assuming the Sun for TRAPPIST-1's 0.09 solar masses therefore made its planets orbit
     // sqrt(0.09) = 0.3x the true period — about 3.3x too fast, not too slow.
     expect(orbitalPeriodDays(0.01154, withPeriod)).toBeCloseTo(1.51088, 4);
-    const ratio = orbitalPeriodDays(0.01154, assumingSolar) / orbitalPeriodDays(0.01154, withPeriod);
+    const ratio =
+      orbitalPeriodDays(0.01154, assumingSolar) / orbitalPeriodDays(0.01154, withPeriod);
     expect(ratio).toBeCloseTo(Math.sqrt(0.09), 2);
   });
 
@@ -264,29 +320,41 @@ describe('resolveGravitationalParameter', () => {
 
   it('ignores a period that is missing, zero, negative or not a number', () => {
     for (const periodDays of [undefined, 0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
-      expect(resolveGravitationalParameter({ semiMajorAxisAu: 1, periodDays })).toBe(GM_SUN_AU3_PER_DAY2);
+      expect(resolveGravitationalParameter({ semiMajorAxisAu: 1, periodDays })).toBe(
+        GM_SUN_AU3_PER_DAY2,
+      );
     }
   });
 
   it('ignores a host mass that is missing, zero or negative', () => {
     for (const hostStarMassSolar of [undefined, 0, -1, Number.NaN]) {
-      expect(resolveGravitationalParameter({ semiMajorAxisAu: 1, hostStarMassSolar })).toBe(GM_SUN_AU3_PER_DAY2);
+      expect(resolveGravitationalParameter({ semiMajorAxisAu: 1, hostStarMassSolar })).toBe(
+        GM_SUN_AU3_PER_DAY2,
+      );
     }
   });
 
   it('rejects a period implying something that cannot be a star, and falls through', () => {
     // 1 AU in a single day implies thousands of solar masses.
-    const gm = resolveGravitationalParameter({ semiMajorAxisAu: 1, periodDays: 1, hostStarMassSolar: 0.5 });
+    const gm = resolveGravitationalParameter({
+      semiMajorAxisAu: 1,
+      periodDays: 1,
+      hostStarMassSolar: 0.5,
+    });
     expect(gm).toBeCloseTo(GM_SUN_AU3_PER_DAY2 * 0.5, 12);
   });
 
   it('rejects a period implying far too little mass', () => {
     // 1 AU taking a million days implies a mass far below any star.
-    expect(resolveGravitationalParameter({ semiMajorAxisAu: 1, periodDays: 1e6 })).toBe(GM_SUN_AU3_PER_DAY2);
+    expect(resolveGravitationalParameter({ semiMajorAxisAu: 1, periodDays: 1e6 })).toBe(
+      GM_SUN_AU3_PER_DAY2,
+    );
   });
 
   it('rejects an implausible host mass too', () => {
-    expect(resolveGravitationalParameter({ semiMajorAxisAu: 1, hostStarMassSolar: 5000 })).toBe(GM_SUN_AU3_PER_DAY2);
+    expect(resolveGravitationalParameter({ semiMajorAxisAu: 1, hostStarMassSolar: 5000 })).toBe(
+      GM_SUN_AU3_PER_DAY2,
+    );
   });
 
   it('keeps a real short-period hot Jupiter around a sun-like star', () => {
@@ -337,13 +405,17 @@ describe('resolveOrbitalElements eccentricity default', () => {
   });
 
   it('keeps a published eccentricity, including exactly zero', () => {
-    expect(resolveOrbitalElements({ semiMajorAxisAu: 2, eccentricity: 0.35 }).eccentricity).toBe(0.35);
+    expect(resolveOrbitalElements({ semiMajorAxisAu: 2, eccentricity: 0.35 }).eccentricity).toBe(
+      0.35,
+    );
     expect(resolveOrbitalElements({ semiMajorAxisAu: 2, eccentricity: 0 }).eccentricity).toBe(0);
   });
 
   it('produces a genuine circle, not a degenerate ellipse', () => {
     const elements = resolveOrbitalElements({ semiMajorAxisAu: 2 });
-    const radii = orbitEllipsePoints(elements).map((point) => Math.hypot(point.x, point.y, point.z));
+    const radii = orbitEllipsePoints(elements).map((point) =>
+      Math.hypot(point.x, point.y, point.z),
+    );
 
     for (const radius of radii) {
       expect(radius).toBeCloseTo(2, 9);

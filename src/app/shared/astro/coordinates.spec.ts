@@ -11,7 +11,7 @@ import {
   propagateProperMotion,
   raDecDistanceToXyz,
   raDecToUnitVector,
-  raDegDecDistanceToXyz
+  raDegDecDistanceToXyz,
 } from './coordinates';
 
 // Reference values taken directly from the HYG v4.1 database (RA/Dec/dist and its own
@@ -66,7 +66,13 @@ describe('propagateProperMotion', () => {
     // Gaia DR3 4472832130942575872 as published for J2016.0, moved back sixteen years with its
     // own proper motion, lands on the J2000.0 position SIMBAD lists to a milliarcsecond — and
     // 0.08″ from where HYG has Barnard's Star, instead of the 166″ the two epochs put between them.
-    const j2000 = propagateProperMotion(269.44850252543836, 4.739420051112412, -801.550978, 10362.394207, -16);
+    const j2000 = propagateProperMotion(
+      269.44850252543836,
+      4.739420051112412,
+      -801.550978,
+      10362.394207,
+      -16,
+    );
     expect(j2000.raDeg).toBeCloseTo(269.4520772, 6);
     expect(j2000.decDeg).toBeCloseTo(4.693365, 6);
   });
@@ -105,7 +111,7 @@ describe('raDecToUnitVector', () => {
       [0, 0],
       [6, 45],
       [13.7, -62.7],
-      [23.99, 89.9]
+      [23.99, 89.9],
     ]) {
       const { x, y, z } = raDecToUnitVector(ra, dec);
       expect(Math.hypot(x, y, z)).toBeCloseTo(1, 12);
@@ -160,7 +166,16 @@ describe('parseSexagesimal', () => {
   });
 
   it('returns null for missing or malformed values', () => {
-    for (const input of ['', '   ', 'not-an-angle', '12:34', '12:34:56:78', '12;34;56', undefined, null]) {
+    for (const input of [
+      '',
+      '   ',
+      'not-an-angle',
+      '12:34',
+      '12:34:56:78',
+      '12;34;56',
+      undefined,
+      null,
+    ]) {
       expect(parseSexagesimal(input)).toBeNull();
     }
   });
@@ -198,7 +213,10 @@ describe('eclipticToEquatorial', () => {
 
   it('preserves length, being a rotation', () => {
     const rotated = eclipticToEquatorial({ x: 0.3, y: -0.5, z: 0.81 });
-    expect(Math.hypot(rotated.x, rotated.y, rotated.z)).toBeCloseTo(Math.hypot(0.3, -0.5, 0.81), 12);
+    expect(Math.hypot(rotated.x, rotated.y, rotated.z)).toBeCloseTo(
+      Math.hypot(0.3, -0.5, 0.81),
+      12,
+    );
   });
 
   it('leaves a point in the ecliptic plane in that plane, tilted out of the equator', () => {
@@ -215,13 +233,13 @@ describe('laplacePlaneToEquatorial', () => {
   it('sends the plane’s own pole to the right ascension and declination it is named by', () => {
     const pole = laplacePlaneToEquatorial({ x: 0, y: 0, z: 1 }, POLE);
     expect(Math.asin(pole.z) / RAD).toBeCloseTo(POLE.decDeg, 9);
-    expect(((Math.atan2(pole.y, pole.x) / RAD) + 360) % 360).toBeCloseTo(POLE.raDeg, 9);
+    expect((Math.atan2(pole.y, pole.x) / RAD + 360) % 360).toBeCloseTo(POLE.raDeg, 9);
   });
 
   it('counts the node from where the plane rises through the equator, 90 degrees past the pole', () => {
     const node = laplacePlaneToEquatorial({ x: 1, y: 0, z: 0 }, POLE);
     expect(node.z).toBeCloseTo(0, 12);
-    expect(((Math.atan2(node.y, node.x) / RAD) + 360) % 360).toBeCloseTo((POLE.raDeg + 90) % 360, 9);
+    expect((Math.atan2(node.y, node.x) / RAD + 360) % 360).toBeCloseTo((POLE.raDeg + 90) % 360, 9);
     // Rising: a quarter-turn on along the plane is north of the equator.
     expect(laplacePlaneToEquatorial({ x: 0, y: 1, z: 0 }, POLE).z).toBeGreaterThan(0);
   });
@@ -233,7 +251,7 @@ describe('equatorialToEcliptic', () => {
       { x: 1, y: 0, z: 0 },
       { x: 0, y: 1, z: 0 },
       { x: 0, y: 0, z: 1 },
-      { x: -0.37, y: 0.42, z: 0.83 }
+      { x: -0.37, y: 0.42, z: 0.83 },
     ]) {
       const round = equatorialToEcliptic(eclipticToEquatorial(point));
       expect(round.x).toBeCloseTo(point.x, 12);

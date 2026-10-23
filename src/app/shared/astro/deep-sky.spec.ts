@@ -7,7 +7,7 @@ import {
   isNotableDeepSkyObject,
   NOTABLE_MAGNITUDE_LIMIT,
   redshiftToDistancePc,
-  SPEED_OF_LIGHT_KM_S
+  SPEED_OF_LIGHT_KM_S,
 } from './deep-sky';
 
 describe('classifyOpenNgcType', () => {
@@ -84,19 +84,31 @@ describe('redshiftToDistancePc', () => {
 describe('estimateDeepSkyDistancePc', () => {
   it('prefers parallax for a galactic object', () => {
     // The Helix Nebula, ~200 pc away.
-    const estimate = estimateDeepSkyDistancePc({ kind: 'nebula', redshift: 0.05, parallaxMas: 4.98 });
+    const estimate = estimateDeepSkyDistancePc({
+      kind: 'nebula',
+      redshift: 0.05,
+      parallaxMas: 4.98,
+    });
     expect(estimate?.method).toBe('parallax');
     expect(estimate?.distancePc).toBeCloseTo(200.8, 1);
   });
 
   it('refuses parallax for a galaxy, because the catalog value is a foreground star', () => {
     // OpenNGC lists 6 mas for M31 — that would put a 780 kpc galaxy at 167 pc.
-    const estimate = estimateDeepSkyDistancePc({ kind: 'galaxy', redshift: -0.001, parallaxMas: 6 });
+    const estimate = estimateDeepSkyDistancePc({
+      kind: 'galaxy',
+      redshift: -0.001,
+      parallaxMas: 6,
+    });
     expect(estimate).toBeNull();
   });
 
   it('falls back to redshift for a distant galaxy', () => {
-    const estimate = estimateDeepSkyDistancePc({ kind: 'galaxy', redshift: 0.00365, parallaxMas: null });
+    const estimate = estimateDeepSkyDistancePc({
+      kind: 'galaxy',
+      redshift: 0.00365,
+      parallaxMas: null,
+    });
     expect(estimate?.method).toBe('redshift');
     expect(estimate!.distancePc).toBeGreaterThan(1e7);
   });
@@ -110,13 +122,21 @@ describe('estimateDeepSkyDistancePc', () => {
 
   it('rejects a parallax implying a distance beyond the Milky Way', () => {
     // 0.000001 mas would imply a billion parsecs — noise, not a measurement.
-    const estimate = estimateDeepSkyDistancePc({ kind: 'cluster', redshift: null, parallaxMas: 1e-6 });
+    const estimate = estimateDeepSkyDistancePc({
+      kind: 'cluster',
+      redshift: null,
+      parallaxMas: 1e-6,
+    });
     expect(estimate).toBeNull();
   });
 
   it('returns null when neither source is usable', () => {
-    expect(estimateDeepSkyDistancePc({ kind: 'nebula', redshift: null, parallaxMas: null })).toBeNull();
-    expect(estimateDeepSkyDistancePc({ kind: 'galaxy', redshift: null, parallaxMas: null })).toBeNull();
+    expect(
+      estimateDeepSkyDistancePc({ kind: 'nebula', redshift: null, parallaxMas: null }),
+    ).toBeNull();
+    expect(
+      estimateDeepSkyDistancePc({ kind: 'galaxy', redshift: null, parallaxMas: null }),
+    ).toBeNull();
   });
 });
 
@@ -126,20 +146,36 @@ describe('isNotableDeepSkyObject', () => {
   });
 
   it('keeps anything with a common name', () => {
-    expect(isNotableDeepSkyObject({ messier: null, commonName: 'Helix Nebula', magnitude: 20 })).toBe(true);
+    expect(
+      isNotableDeepSkyObject({ messier: null, commonName: 'Helix Nebula', magnitude: 20 }),
+    ).toBe(true);
   });
 
   it('keeps an anonymous object that is bright enough', () => {
-    expect(isNotableDeepSkyObject({ messier: null, commonName: null, magnitude: NOTABLE_MAGNITUDE_LIMIT })).toBe(true);
+    expect(
+      isNotableDeepSkyObject({
+        messier: null,
+        commonName: null,
+        magnitude: NOTABLE_MAGNITUDE_LIMIT,
+      }),
+    ).toBe(true);
   });
 
   it('drops an anonymous object fainter than the limit', () => {
-    expect(isNotableDeepSkyObject({ messier: null, commonName: null, magnitude: NOTABLE_MAGNITUDE_LIMIT + 0.1 })).toBe(false);
+    expect(
+      isNotableDeepSkyObject({
+        messier: null,
+        commonName: null,
+        magnitude: NOTABLE_MAGNITUDE_LIMIT + 0.1,
+      }),
+    ).toBe(false);
   });
 
   it('drops an anonymous object with no measured magnitude', () => {
     // Guards the `Number('') === 0` trap: an unphotometered object must not be treated as
     // magnitude 0, which would make it brighter than every star in the sky.
-    expect(isNotableDeepSkyObject({ messier: null, commonName: null, magnitude: null })).toBe(false);
+    expect(isNotableDeepSkyObject({ messier: null, commonName: null, magnitude: null })).toBe(
+      false,
+    );
   });
 });

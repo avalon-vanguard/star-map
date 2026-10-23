@@ -28,11 +28,13 @@ Do not silently revert to normal prose after one terse reply — the
 compression must persist.
 
 Activate on:
+
 - `/cs:caveman` command
 - Phrases: "caveman mode", "talk like caveman", "use caveman", "less
   tokens", "be brief"
 
 Deactivate on:
+
 - "stop caveman"
 - "normal mode"
 
@@ -42,6 +44,7 @@ very next reply. No "OK, switching to caveman mode" announcement.
 ## Rules
 
 Drop:
+
 - Articles — a / an / the
 - Filler — just / really / basically / actually / simply
 - Pleasantries — sure / certainly / of course / happy to
@@ -60,24 +63,29 @@ these stay verbatim, unabbreviated, uncompressed.
 ## Examples
 
 Normal:
+
 > Sure, I think the issue is likely that the database connection is
 > basically timing out because the config file actually has the wrong
 > host set. Let me go ahead and fix the configuration file for you.
 
 Caveman:
+
 > DB conn timeout -> config has wrong host. Fixing config now.
 
 Normal:
+
 > Of course! The function returns undefined because it's missing a return
 > statement. I'll go ahead and add one now.
 
 Caveman:
+
 > `fn` returns undefined -> missing return statement. Adding one.
 
 ## Auto-Clarity Exception
 
 Caveman compression is dropped automatically — full, normal prose used
 instead — for:
+
 - Security warnings (e.g. `**Warning:** ...`)
 - Irreversible action confirmations (deletes, force-pushes, drops, prod
   deploys)

@@ -12,10 +12,17 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block', 'aria-hidden': 'true' },
   template: `
-    <svg class="h-full w-full" viewBox="0 0 24 24" [attr.fill]="kept() ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+    <svg
+      class="h-full w-full"
+      viewBox="0 0 24 24"
+      [attr.fill]="kept() ? 'currentColor' : 'none'"
+      stroke="currentColor"
+      stroke-width="1.5"
+      stroke-linejoin="round"
+    >
       <path d="M7 4h10v16l-5-4-5 4z" />
     </svg>
-  `
+  `,
 })
 export class BookmarkIconComponent {
   readonly kept = input(false);

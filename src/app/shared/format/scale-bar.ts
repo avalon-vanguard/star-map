@@ -32,7 +32,12 @@ export function roundLengthAtMost(value: number): number | null {
  * `ceil(2.5 × count) + 2` rings — `ceil(reach / step) - floor(nearest / step) + 1` — and the
  * callout can add one: 5 to 16 for a count of 5.
  */
-export function distanceRings(nearest: number, reach: number, count: number, callout: number): number[] {
+export function distanceRings(
+  nearest: number,
+  reach: number,
+  count: number,
+  callout: number,
+): number[] {
   const step = roundLengthAtMost((reach - nearest) / count);
   if (step === null) {
     return [];
@@ -41,7 +46,9 @@ export function distanceRings(nearest: number, reach: number, count: number, cal
   const first = Math.max(1, Math.floor(nearest / step));
   const last = Math.ceil(reach / step);
   // `toPrecision` clears the binary noise of stepping by a tenth: 0.1 × 3 is 0.30000000000000004.
-  const radii = Array.from({ length: last - first + 1 }, (_, index) => Number((step * (first + index)).toPrecision(12)));
+  const radii = Array.from({ length: last - first + 1 }, (_, index) =>
+    Number((step * (first + index)).toPrecision(12)),
+  );
   if (callout > radii[0] && callout < radii[radii.length - 1] && !radii.includes(callout)) {
     radii.push(callout);
     radii.sort((a, b) => a - b);
@@ -64,7 +71,11 @@ export interface ScaleBar {
  * measures `unitsPerPx` at the point the view is centred on, which is where the map is being
  * read. Under the plan view it is exact everywhere.
  */
-export function scaleBar(unitsPerPx: number, maxWidthPx: number, unit: LengthUnit): ScaleBar | null {
+export function scaleBar(
+  unitsPerPx: number,
+  maxWidthPx: number,
+  unit: LengthUnit,
+): ScaleBar | null {
   const length = roundLengthAtMost(unitsPerPx * maxWidthPx);
   if (length === null) {
     return null;

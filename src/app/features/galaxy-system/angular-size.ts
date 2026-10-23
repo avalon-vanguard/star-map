@@ -16,4 +16,5 @@ export const REFERENCE_VIEWPORT_HEIGHT_PX = 900;
 export const REFERENCE_FOV_DEGREES = 55;
 
 /** Multiply a size in reference pixels by this to get the angular size the material wants. */
-export const PIXELS_TO_ANGULAR_SIZE = (2 * Math.tan((REFERENCE_FOV_DEGREES * Math.PI) / 180 / 2)) / REFERENCE_VIEWPORT_HEIGHT_PX;
+export const PIXELS_TO_ANGULAR_SIZE =
+  (2 * Math.tan((REFERENCE_FOV_DEGREES * Math.PI) / 180 / 2)) / REFERENCE_VIEWPORT_HEIGHT_PX;

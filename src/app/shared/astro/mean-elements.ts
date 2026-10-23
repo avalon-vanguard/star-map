@@ -29,7 +29,7 @@ const PLANET_ROW_NAMES: Record<string, string> = {
   saturn: 'Saturn',
   uranus: 'Uranus',
   neptune: 'Neptune',
-  pluto: 'Pluto'
+  pluto: 'Pluto',
 };
 
 function numbers(text: string): number[] {
@@ -45,7 +45,9 @@ export function parsePlanetMeanElements(text: string, bodyId: string): MeanOrbit
   const name = PLANET_ROW_NAMES[bodyId];
   const lines = text.split(/\r?\n/);
   // A row is the name followed by a number: the notes above the table start a line with "Pluto" too.
-  const rows = lines.flatMap((line, index) => (name && new RegExp(`^${name}\\s+-?[\\d.]`).test(line) ? [index] : []));
+  const rows = lines.flatMap((line, index) =>
+    name && new RegExp(`^${name}\\s+-?[\\d.]`).test(line) ? [index] : [],
+  );
   if (rows.length === 0) {
     throw new Error(`No row for ${bodyId} in Standish's Table 2a.`);
   }
@@ -53,7 +55,20 @@ export function parsePlanetMeanElements(text: string, bodyId: string): MeanOrbit
   if (values.length !== 12 || !values.every(Number.isFinite)) {
     throw new Error(`Standish's Table 2a rows for ${name} did not parse: ${values.join(' ')}`);
   }
-  const [a, e, inclination, meanLongitude, perihelion, node, aRate, eRate, inclinationRate, meanLongitudeRate, perihelionRate, nodeRate] = values;
+  const [
+    a,
+    e,
+    inclination,
+    meanLongitude,
+    perihelion,
+    node,
+    aRate,
+    eRate,
+    inclinationRate,
+    meanLongitudeRate,
+    perihelionRate,
+    nodeRate,
+  ] = values;
   // Table 2b repeats the name further down, with b, c, s, f (Pluto has b alone).
   const extra = rows[1] === undefined ? undefined : numbers(lines[rows[1]].slice(name.length));
   const [b = 0, c = 0, s = 0, f = 0] = extra ?? [];
@@ -66,7 +81,7 @@ export function parsePlanetMeanElements(text: string, bodyId: string): MeanOrbit
       longitudeOfAscendingNodeDeg: node,
       argumentOfPeriapsisDeg: perihelion - node,
       meanAnomalyAtEpochDeg: meanLongitude - perihelion,
-      epochJd: J2000_JD
+      epochJd: J2000_JD,
     },
     rates: {
       meanMotionDegPerDay: meanLongitudeRate / DAYS_PER_JULIAN_CENTURY,
@@ -75,9 +90,9 @@ export function parsePlanetMeanElements(text: string, bodyId: string): MeanOrbit
       semiMajorAxisAuPerDay: aRate / DAYS_PER_JULIAN_CENTURY,
       eccentricityPerDay: eRate / DAYS_PER_JULIAN_CENTURY,
       inclinationDegPerDay: inclinationRate / DAYS_PER_JULIAN_CENTURY,
-      ...(extra ? { meanAnomalyTerms: { b, c, s, f } } : {})
+      ...(extra ? { meanAnomalyTerms: { b, c, s, f } } : {}),
     },
-    orbitSource: PLANET_ORBIT_SOURCE
+    orbitSource: PLANET_ORBIT_SOURCE,
   };
 }
 
@@ -113,9 +128,12 @@ export function parseSatelliteMeanElements(
   planetName: string,
   moonName: string,
   apsidesRegress: boolean,
-  equatorPole?: { raDeg: number; decDeg: number }
+  equatorPole?: { raDeg: number; decDeg: number },
 ): MeanOrbit {
-  const text = html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
+  const text = html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ');
   const section = text.indexOf(`Satellites of ${planetName} jump to`);
   if (section < 0) {
     throw new Error(`No section for the satellites of ${planetName}.`);
@@ -131,21 +149,41 @@ export function parseSatelliteMeanElements(
   }
   // The nearest heading above the row says which plane its section is referred to; the ecliptic
   // where there is none.
-  const [plane] = ['Mean ecliptic', 'Laplace plane', 'Mean equatorial'].sort((x, y) => before.lastIndexOf(y) - before.lastIndexOf(x));
+  const [plane] = ['Mean ecliptic', 'Laplace plane', 'Mean equatorial'].sort(
+    (x, y) => before.lastIndexOf(y) - before.lastIndexOf(x),
+  );
   const laplace = plane === 'Laplace plane';
   const equatorial = plane === 'Mean equatorial';
   if (equatorial !== (equatorPole !== undefined)) {
-    throw new Error(`${moonName}'s elements are ${equatorial ? '' : 'not '}referred to ${planetName}'s equator, and its pole was ${equatorPole ? '' : 'not '}given.`);
+    throw new Error(
+      `${moonName}'s elements are ${equatorial ? '' : 'not '}referred to ${planetName}'s equator, and its pole was ${equatorPole ? '' : 'not '}given.`,
+    );
   }
   const values = numbers(row[1]);
   const expected = laplace ? 14 : 11;
   if (values.length !== expected || !values.every(Number.isFinite)) {
-    throw new Error(`${moonName}'s row has ${values.length} numbers, ${expected} expected: ${row[1]}`);
+    throw new Error(
+      `${moonName}'s row has ${values.length} numbers, ${expected} expected: ${row[1]}`,
+    );
   }
-  const [aKm, e, periapsis, meanAnomaly, inclination, node, meanMotion, , periapsisPeriodYears, nodePeriodYears, raDeg, decDeg] = values;
+  const [
+    aKm,
+    e,
+    periapsis,
+    meanAnomaly,
+    inclination,
+    node,
+    meanMotion,
+    ,
+    periapsisPeriodYears,
+    nodePeriodYears,
+    raDeg,
+    decDeg,
+  ] = values;
   const nodeSense = inclination > 90 ? 1 : -1;
   const periapsisSense = apsidesRegress ? -1 : 1;
-  const perDay = (periodYears: number): number => (periodYears > 0 ? 360 / (periodYears * DAYS_PER_JULIAN_YEAR) : 0);
+  const perDay = (periodYears: number): number =>
+    periodYears > 0 ? 360 / (periodYears * DAYS_PER_JULIAN_YEAR) : 0;
 
   return {
     orbit: {
@@ -155,15 +193,19 @@ export function parseSatelliteMeanElements(
       longitudeOfAscendingNodeDeg: node,
       argumentOfPeriapsisDeg: periapsis,
       meanAnomalyAtEpochDeg: meanAnomaly,
-      epochJd: julianDate(Number(epoch[1]), epoch[2], Number(epoch[3]))
+      epochJd: julianDate(Number(epoch[1]), epoch[2], Number(epoch[3])),
     },
     rates: {
       meanMotionDegPerDay: meanMotion,
       longitudeOfAscendingNodeDegPerDay: nodeSense * perDay(nodePeriodYears),
-      argumentOfPeriapsisDegPerDay: periapsisSense * perDay(periapsisPeriodYears)
+      argumentOfPeriapsisDegPerDay: periapsisSense * perDay(periapsisPeriodYears),
     },
-    ...(laplace ? { laplacePole: { raDeg, decDeg } } : equatorPole ? { laplacePole: equatorPole } : {}),
-    orbitSource: `JPL SSD satellite mean elements, epoch ${epoch[1]} ${epoch[2]} ${Math.floor(Number(epoch[3]))}`
+    ...(laplace
+      ? { laplacePole: { raDeg, decDeg } }
+      : equatorPole
+        ? { laplacePole: equatorPole }
+        : {}),
+    orbitSource: `JPL SSD satellite mean elements, epoch ${epoch[1]} ${epoch[2]} ${Math.floor(Number(epoch[3]))}`,
   };
 }
 
@@ -190,14 +232,18 @@ export interface SmallBody extends MeanOrbit {
  */
 export function parseSmallBodyElements(answer: SbdbAnswer): SmallBody {
   const element = (name: string): number => {
-    const value = Number(answer.orbit.elements.find((candidate) => candidate.name === name)?.value ?? NaN);
+    const value = Number(
+      answer.orbit.elements.find((candidate) => candidate.name === name)?.value ?? NaN,
+    );
     if (!Number.isFinite(value)) {
       throw new Error(`The SBDB answer has no element ${name}.`);
     }
     return value;
   };
   const physical = (name: string): number | undefined => {
-    const value = Number(answer.phys_par?.find((candidate) => candidate.name === name)?.value ?? NaN);
+    const value = Number(
+      answer.phys_par?.find((candidate) => candidate.name === name)?.value ?? NaN,
+    );
     return Number.isFinite(value) ? value : undefined;
   };
   const epochJd = Number(answer.orbit.epoch);
@@ -213,11 +259,15 @@ export function parseSmallBodyElements(answer: SbdbAnswer): SmallBody {
       longitudeOfAscendingNodeDeg: element('om'),
       argumentOfPeriapsisDeg: element('w'),
       meanAnomalyAtEpochDeg: element('ma'),
-      epochJd
+      epochJd,
     },
-    rates: { meanMotionDegPerDay: element('n'), longitudeOfAscendingNodeDegPerDay: 0, argumentOfPeriapsisDegPerDay: 0 },
+    rates: {
+      meanMotionDegPerDay: element('n'),
+      longitudeOfAscendingNodeDegPerDay: 0,
+      argumentOfPeriapsisDegPerDay: 0,
+    },
     orbitSource: `JPL SBDB osculating elements, epoch ${epoch.getUTCFullYear()} ${MONTHS[epoch.getUTCMonth()]} ${epoch.getUTCDate()}`,
     ...(diameterKm !== undefined ? { radiusKm: diameterKm / 2 } : {}),
-    ...(rotationPeriodHours !== undefined ? { rotationPeriodHours } : {})
+    ...(rotationPeriodHours !== undefined ? { rotationPeriodHours } : {}),
   };
 }

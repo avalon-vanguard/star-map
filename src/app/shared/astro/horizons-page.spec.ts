@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { extractGmKm3PerS2, extractObliquityDeg, extractRadiusKm, extractRotationPeriodHours, isTidallyLocked } from './horizons-page';
+import {
+  extractGmKm3PerS2,
+  extractObliquityDeg,
+  extractRadiusKm,
+  extractRotationPeriodHours,
+  isTidallyLocked,
+} from './horizons-page';
 
 // Lines as the Horizons pages print them.
 const JUPITER = `  Vol. Mean Radius (km) = 69911+-6          Flattening            = 0.06487
@@ -30,7 +36,9 @@ describe('Horizons page radius', () => {
     // (240 × 234.2 × 232.9)^(1/3); the IAU's mean radius for Miranda is 235.8.
     expect(extractRadiusKm(MIRANDA)).toBeCloseTo(235.7, 1);
     // Phobos spaces its axes out; it was drawn at its longest, 13.1 km, against the IAU's 11.08.
-    expect(extractRadiusKm('  Radius (km)             = 13.1 x11.1 x9.3 Density (g cm^-3)   =  1.90')).toBeCloseTo(11.06, 2);
+    expect(
+      extractRadiusKm('  Radius (km)             = 13.1 x11.1 x9.3 Density (g cm^-3)   =  1.90'),
+    ).toBeCloseTo(11.06, 2);
   });
 });
 
@@ -60,7 +68,15 @@ describe('Horizons page GM', () => {
 
 describe('Horizons page obliquity', () => {
   it('reads the arcminutes Mercury gives its tilt in, and the degrees every other page uses', () => {
-    expect(extractObliquityDeg("  Obliquity to orbit[1] =  2.11' +/- 0.1' Hill's sphere rad. Rp = 94.4 ")).toBeCloseTo(2.11 / 60, 9);
-    expect(extractObliquityDeg('  Obliquity to orbit    =   25.19 deg     Max. angular diam.    =  17.9"')).toBe(25.19);
+    expect(
+      extractObliquityDeg(
+        "  Obliquity to orbit[1] =  2.11' +/- 0.1' Hill's sphere rad. Rp = 94.4 ",
+      ),
+    ).toBeCloseTo(2.11 / 60, 9);
+    expect(
+      extractObliquityDeg(
+        '  Obliquity to orbit    =   25.19 deg     Max. angular diam.    =  17.9"',
+      ),
+    ).toBe(25.19);
   });
 });

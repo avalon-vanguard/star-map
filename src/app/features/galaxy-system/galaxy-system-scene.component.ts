@@ -31,6 +31,7 @@ import { StarRecord, SUN_STAR_ID } from '../../shared/models/star.model';
 import { Bookmark } from '../../shared/state/bookmarks.store';
 import { NavigationStore, ViewLevel } from '../../shared/state/navigation.store';
 import { TimeStore } from '../../shared/state/time.store';
+import { dismissBootLoader, failBootLoader } from '../../shared/ui/boot-loader';
 import { CameraRigController } from './camera-rig-controller';
 import { deepSkyLabelPoints, DeepSkyRenderer } from './deep-sky-renderer';
 import { galacticNormal, PolarGridPlane, TetherField } from './grid-plane';
@@ -654,7 +655,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    void this.bootstrap();
+    // A catalogue that fails to load would otherwise leave the launch screen spinning forever.
+    this.bootstrap().catch((error: unknown) => {
+      console.error('Failed to load the catalogue.', error);
+      failBootLoader('The catalogue could not be loaded');
+    });
   }
 
   ngOnDestroy(): void {
@@ -721,6 +726,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       await this.engine.init(canvas);
     } catch (error) {
       console.error('Failed to initialize the 3D engine.', error);
+      failBootLoader('This browser could not start the 3D view');
       return;
     }
 
@@ -855,6 +861,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       this.tick(this.engine.getCamera(), deltaSeconds),
     );
     this.engine.start();
+    dismissBootLoader();
     // After the first frame is on its way rather than ahead of it, where it was 122 ms of the boot task.
     void this.searchIndex.load();
 

@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('Route plotting', () => {
-  test('chains one star to another through the crossings a chosen range allows', async ({ page }) => {
+  test('chains one star to another through the crossings a chosen range allows', async ({
+    page,
+  }) => {
     test.setTimeout(90_000);
     await page.goto('/?stars=4000');
     // Generously timed on purpose: this suite shares one software rasterizer, and the boot
@@ -32,7 +34,9 @@ test.describe('Route plotting', () => {
     await expect(steps.last()).toContainText('Sirius');
   });
 
-  test('says what range a crossing would need, rather than only that there is none', async ({ page }) => {
+  test('says what range a crossing would need, rather than only that there is none', async ({
+    page,
+  }) => {
     test.setTimeout(90_000);
     await page.goto('/?stars=4000');
     await expect(page.getByTestId('scene-canvas')).toBeVisible({ timeout: 30_000 });

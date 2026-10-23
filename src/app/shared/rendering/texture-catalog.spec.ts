@@ -9,7 +9,26 @@ import { bodyTexturePath, saturnRing } from './texture-catalog';
 
 describe('bodyTexturePath', () => {
   it('wraps the moons and dwarf planets that have a mission mosaic in it', () => {
-    const mapped = ['phobos', 'deimos', 'io', 'europa', 'ganymede', 'callisto', 'mimas', 'enceladus', 'tethys', 'dione', 'rhea', 'titan', 'iapetus', 'phoebe', 'triton', 'ceres', 'pluto', 'charon'];
+    const mapped = [
+      'phobos',
+      'deimos',
+      'io',
+      'europa',
+      'ganymede',
+      'callisto',
+      'mimas',
+      'enceladus',
+      'tethys',
+      'dione',
+      'rhea',
+      'titan',
+      'iapetus',
+      'phoebe',
+      'triton',
+      'ceres',
+      'pluto',
+      'charon',
+    ];
     for (const id of mapped) {
       expect(bodyTexturePath(id)).toBe(`assets/textures/bodies/${id}.jpg`);
     }
@@ -22,7 +41,9 @@ describe('bodyTexturePath', () => {
     // here, so the check is pinned to those bytes.
     expect(bodyTexturePath('venus')).toBe('assets/textures/bodies/venus.jpg');
     const bytes = readFileSync(`${process.cwd()}/src/assets/textures/bodies/venus.jpg`);
-    expect(createHash('sha256').update(bytes).digest('hex')).toBe('4528b8e9a3cf880d80e8a5321a3001e8792bc18f266c06f3456a6bd8475e021d');
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe(
+      '4528b8e9a3cf880d80e8a5321a3001e8792bc18f266c06f3456a6bd8475e021d',
+    );
   });
 
   it('leaves the bodies with no map it could check to their derived surface', () => {
@@ -36,7 +57,10 @@ describe('saturnRing', () => {
   const SATURN_RADIUS_KM = 58232;
 
   /** Each vertex's distance from the centre, in km, beside the texture coordinate it samples. */
-  function radiiAndU(ring: THREE.Mesh, kmPerUnit: number): Array<{ km: number; u: number; y: number }> {
+  function radiiAndU(
+    ring: THREE.Mesh,
+    kmPerUnit: number,
+  ): Array<{ km: number; u: number; y: number }> {
     const position = ring.geometry.attributes['position'];
     const uv = ring.geometry.attributes['uv'];
     const vertex = new THREE.Vector3();
@@ -48,7 +72,10 @@ describe('saturnRing', () => {
 
   it('reaches from 69 400 to 141 000 km, drawn against the planet at whatever size it is drawn', () => {
     for (const drawnRadius of [1, 3.9e-4]) {
-      const radii = radiiAndU(saturnRing(SATURN_RADIUS_KM, drawnRadius), SATURN_RADIUS_KM / drawnRadius).map(({ km }) => km);
+      const radii = radiiAndU(
+        saturnRing(SATURN_RADIUS_KM, drawnRadius),
+        SATURN_RADIUS_KM / drawnRadius,
+      ).map(({ km }) => km);
       expect(Math.min(...radii)).toBeCloseTo(69400, 0);
       expect(Math.max(...radii)).toBeCloseTo(141000, 0);
     }
@@ -73,7 +100,8 @@ describe('saturnRing', () => {
     const vertices = radiiAndU(saturnRing(SATURN_RADIUS_KM, 1), SATURN_RADIUS_KM);
     const inner = vertices.reduce((a, b) => (b.km < a.km ? b : a));
     const outer = vertices.reduce((a, b) => (b.km > a.km ? b : a));
-    const uAt = (km: number): number => inner.u + ((km - inner.km) / (outer.km - inner.km)) * (outer.u - inner.u);
+    const uAt = (km: number): number =>
+      inner.u + ((km - inner.km) / (outer.km - inner.km)) * (outer.u - inner.u);
     expect(Math.abs(uAt(92000) * 1280 - 404.5)).toBeLessThan(1.5);
     expect(Math.abs(uAt(136775) * 1280 - 1204)).toBeLessThan(1.5);
   });

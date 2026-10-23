@@ -11,7 +11,8 @@ import { fetchJsonCached, fetchTextCached } from './http';
  * dropped Pluto, so this reads the plain-text file as JPL last published it, from the Internet
  * Archive's copy — pinned to one capture, so the numbers cannot move under the cache.
  */
-const PLANET_ELEMENTS_URL = 'https://web.archive.org/web/20210420020242id_/https://ssd.jpl.nasa.gov/txt/p_elem_t2.txt';
+const PLANET_ELEMENTS_URL =
+  'https://web.archive.org/web/20210420020242id_/https://ssd.jpl.nasa.gov/txt/p_elem_t2.txt';
 
 /**
  * JPL SSD's planetary satellite mean elements, as the page stood until 2021: each moon's elements,
@@ -21,7 +22,8 @@ const PLANET_ELEMENTS_URL = 'https://web.archive.org/web/20210420020242id_/https
  * Phobos, which is a revolution out within a decade — so a period from it would not hold. Pinned
  * to one Internet Archive capture for the same reason as the planets.
  */
-const SATELLITE_ELEMENTS_URL = 'https://web.archive.org/web/20210203000649id_/https://ssd.jpl.nasa.gov/?sat_elem';
+const SATELLITE_ELEMENTS_URL =
+  'https://web.archive.org/web/20210203000649id_/https://ssd.jpl.nasa.gov/?sat_elem';
 
 export async function fetchPlanetMeanElementsText(): Promise<string> {
   return fetchTextCached(PLANET_ELEMENTS_URL, 'jpl-planet-mean-elements-t2.txt');
@@ -36,6 +38,12 @@ export async function fetchSatelliteMeanElementsHtml(): Promise<string> {
  * (without `full-prec` they come rounded to three figures: Ceres's n as 0.214 degrees a day for
  * 0.2143045, which is 1.1 degrees out within a decade) and its physical parameters.
  */
-export async function fetchSmallBodyAnswer(designation: string, cacheKey: string): Promise<SbdbAnswer> {
-  return fetchJsonCached<SbdbAnswer>(`https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=${encodeURIComponent(designation)}&phys-par=1&full-prec=1`, cacheKey);
+export async function fetchSmallBodyAnswer(
+  designation: string,
+  cacheKey: string,
+): Promise<SbdbAnswer> {
+  return fetchJsonCached<SbdbAnswer>(
+    `https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=${encodeURIComponent(designation)}&phys-par=1&full-prec=1`,
+    cacheKey,
+  );
 }

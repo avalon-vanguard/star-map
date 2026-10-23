@@ -21,7 +21,7 @@ All paths below are relative to the repo root.
 Two container quirks have to be handled first. **Both are one-liners, and both are silent
 footguns if skipped** — see Gotchas for why.
 
-**1. Node.** The default `node` on `PATH` is *below* the floor the Angular CLI enforces. A
+**1. Node.** The default `node` on `PATH` is _below_ the floor the Angular CLI enforces. A
 satisfying build is at `/opt/node`. The driver picks it automatically; anything you run by hand
 needs the prefix:
 
@@ -79,12 +79,12 @@ node .claude/skills/run-star-map/driver.mjs shot galaxy          # ~1m
 node .claude/skills/run-star-map/driver.mjs shot field system
 ```
 
-| View | What it shows |
-|---|---|
-| `field` | Solar-neighbourhood star field — the default landing view |
-| `galaxy` | Galactic scale: arms, bar, Sol's position |
-| `system` | Sol at ~120 AU, outer planets labelled |
-| `inner` | Sol zoomed to <6 AU, inner four planets labelled |
+| View     | What it shows                                             |
+| -------- | --------------------------------------------------------- |
+| `field`  | Solar-neighbourhood star field — the default landing view |
+| `galaxy` | Galactic scale: arms, bar, Sol's position                 |
+| `system` | Sol at ~120 AU, outer planets labelled                    |
+| `inner`  | Sol zoomed to <6 AU, inner four planets labelled          |
 
 **Look at the PNG you produced.** A black frame means the scene never initialized — that is a
 failure, not a dark theme.
@@ -169,7 +169,7 @@ The weekly data refresh is `.gitea/workflows/data-refresh.yml`; it pushes to `ma
 ## Gotchas
 
 - **The wrong Node is first on `PATH`.** `/opt/node22` is v22.22.2; `/opt/node` is v22.23.2.
-  `PATH` finds the *older* one, and `package.json#engines` requires `^22.22.3`. `ng serve` then
+  `PATH` finds the _older_ one, and `package.json#engines` requires `^22.22.3`. `ng serve` then
   dies with "Node.js version v22.22.2 detected" and nothing else. The names invert what you'd
   guess — `/opt/node` is newer than `/opt/node22`.
 - **`npm run e2e` fails at full parallelism**, passing 4 of 6. The two camera-flight specs time
@@ -178,7 +178,7 @@ The weekly data refresh is `.gitea/workflows/data-refresh.yml`; it pushes to `ma
 - **Never stop the dev server with `pkill -f`.** It matches against every process's full command
   line — including the shell running your own `pkill`, which then kills itself (exit 144). Narrowing
   the pattern does not save you, and neither does the `[n]g` bracket trick: the match is against the
-  *whole* command line, so a literal `ng serve` anywhere else in it — inside an `echo`, a comment, a
+  _whole_ command line, so a literal `ng serve` anywhere else in it — inside an `echo`, a comment, a
   later `pgrep` — re-arms the self-match. Kill by port instead, which does no pattern matching at all:
 
   ```bash
@@ -186,6 +186,7 @@ The weekly data refresh is `.gitea/workflows/data-refresh.yml`; it pushes to `ma
   ```
 
   Or just let the driver clean up after itself, which it does unless you pass `--keep-server`.
+
 - **The star count must be cut for anything interactive.** The full catalogue is 68 388 stars and
   runs at roughly 1 fps here. `?stars=N` overrides it; the driver defaults to 12 000.
 - **One canvas click is not enough to enter a system.** Bootstrap (data fetch + raycaster wiring)
@@ -210,12 +211,12 @@ The weekly data refresh is `.gitea/workflows/data-refresh.yml`; it pushes to `ma
 
 ## Troubleshooting
 
-| Symptom | Fix |
-|---|---|
-| `Node.js version v22.22.2 detected. The Angular CLI requires...` | `export PATH=/opt/node/bin:$PATH` |
+| Symptom                                                                                | Fix                                                                               |
+| -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `Node.js version v22.22.2 detected. The Angular CLI requires...`                       | `export PATH=/opt/node/bin:$PATH`                                                 |
 | `browserType.launch: Executable doesn't exist at .../chromium_headless_shell-1234/...` | Apply the browser shim in Prerequisites. Do **not** run `npx playwright install`. |
-| e2e: 2 specs time out on camera flights | Add `-- --workers=1` |
-| Your shell exits with code 144 while cleaning up | A `pkill -f` matched your own command line. Use `fuser -k 4300/tcp`. |
-| Screenshot is entirely black | Scene never initialized — check the driver's `[pageerror]` lines. |
-| `Top-level await is currently not supported with the "cjs" output format` | Name the script `.mjs` (or `.mts`) and keep it inside the repo. |
-| Driver hangs at "starting dev server" | Another server holds port 4300: `fuser -k 4300/tcp`, or pass `--port=4301`. |
+| e2e: 2 specs time out on camera flights                                                | Add `-- --workers=1`                                                              |
+| Your shell exits with code 144 while cleaning up                                       | A `pkill -f` matched your own command line. Use `fuser -k 4300/tcp`.              |
+| Screenshot is entirely black                                                           | Scene never initialized — check the driver's `[pageerror]` lines.                 |
+| `Top-level await is currently not supported with the "cjs" output format`              | Name the script `.mjs` (or `.mts`) and keep it inside the repo.                   |
+| Driver hangs at "starting dev server"                                                  | Another server holds port 4300: `fuser -k 4300/tcp`, or pass `--port=4301`.       |

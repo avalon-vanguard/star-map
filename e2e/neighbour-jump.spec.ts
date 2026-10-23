@@ -11,7 +11,10 @@ test.describe('Neighbour jump', () => {
 
     const searchInput = await openSearch(page);
     await searchInput.fill('Sol');
-    await page.getByRole('button', { name: /^Sol\b/ }).first().click();
+    await page
+      .getByRole('button', { name: /^Sol\b/ })
+      .first()
+      .click();
 
     const readout = page.getByTestId('hud-title');
     await expect(readout).toHaveText('Sol', { timeout: 30_000 });

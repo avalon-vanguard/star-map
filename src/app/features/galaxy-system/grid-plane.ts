@@ -11,7 +11,11 @@ const SEGMENTS_PER_RING = 180;
  */
 export function galacticFrameQuaternion(): THREE.Quaternion {
   const { x, y, z } = GALACTIC_BASIS_EQUATORIAL;
-  const basis = new THREE.Matrix4().makeBasis(new THREE.Vector3(x.x, x.y, x.z), new THREE.Vector3(y.x, y.y, y.z), new THREE.Vector3(z.x, z.y, z.z));
+  const basis = new THREE.Matrix4().makeBasis(
+    new THREE.Vector3(x.x, x.y, x.z),
+    new THREE.Vector3(y.x, y.y, y.z),
+    new THREE.Vector3(z.x, z.y, z.z),
+  );
   return new THREE.Quaternion().setFromRotationMatrix(basis);
 }
 
@@ -126,7 +130,7 @@ export class PolarGridPlane {
       transparent: true,
       opacity: 0,
       depthWrite: false,
-      blending: THREE.AdditiveBlending
+      blending: THREE.AdditiveBlending,
     });
 
     this.object = new THREE.LineSegments(this.geometry, this.material);
@@ -169,7 +173,10 @@ export class TetherField {
   private readonly normal: THREE.Vector3;
   private readonly peakOpacity: number;
 
-  constructor(maxCount: number, options: { color?: THREE.ColorRepresentation; normal?: THREE.Vector3; opacity?: number } = {}) {
+  constructor(
+    maxCount: number,
+    options: { color?: THREE.ColorRepresentation; normal?: THREE.Vector3; opacity?: number } = {},
+  ) {
     this.maxCount = maxCount;
     this.normal = (options.normal ?? galacticNormal()).clone().normalize();
     this.peakOpacity = options.opacity ?? 0.45;
@@ -178,7 +185,13 @@ export class TetherField {
     this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     this.geometry.setDrawRange(0, 0);
 
-    this.material = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+    this.material = new THREE.LineBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
     this.object = new THREE.LineSegments(this.geometry, this.material);
     // The buffer is rewritten in place as the visible set changes, so its bounds are stale by
     // construction; culling on those bounds would blink the whole field in and out.
@@ -202,8 +215,15 @@ export class TetherField {
       const point = points[index];
       const height = point.dot(normal) - planeOffset;
       this.positions.set(
-        [point.x, point.y, point.z, point.x - normal.x * height, point.y - normal.y * height, point.z - normal.z * height],
-        index * 6
+        [
+          point.x,
+          point.y,
+          point.z,
+          point.x - normal.x * height,
+          point.y - normal.y * height,
+          point.z - normal.z * height,
+        ],
+        index * 6,
       );
     }
 

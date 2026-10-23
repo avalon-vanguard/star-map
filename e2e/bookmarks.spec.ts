@@ -10,7 +10,10 @@ test.describe('Bookmarks', () => {
     await expect(page.getByRole('heading', { name: 'Earth' })).toBeVisible({ timeout: 30_000 });
 
     await page.getByRole('button', { name: 'Keep Earth' }).click();
-    await expect(page.getByRole('button', { name: 'Forget Earth' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: 'Forget Earth' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
 
     // A later visit, on a different page: kept places outlive the one they were kept from. With
     // the reduced star field every other scene spec uses: what is under test is the bookmark, and
@@ -43,7 +46,10 @@ test.describe('Bookmarks', () => {
 
     const searchInput = await openSearch(page);
     await searchInput.fill('Proxima Centauri');
-    await page.getByRole('button', { name: /Proxima Centauri/ }).first().click();
+    await page
+      .getByRole('button', { name: /Proxima Centauri/ })
+      .first()
+      .click();
 
     const readout = page.getByTestId('hud-title');
     await expect(readout).toHaveText('Proxima Centauri', { timeout: 30_000 });
@@ -54,7 +60,12 @@ test.describe('Bookmarks', () => {
     await expect(readout).toHaveText('Local Stars', { timeout: 30_000 });
 
     await page.getByRole('tab', { name: 'Bookmarks' }).click();
-    await page.locator('#dock-panel-bookmarks li').filter({ hasText: 'Proxima Centauri' }).getByRole('button').first().click();
+    await page
+      .locator('#dock-panel-bookmarks li')
+      .filter({ hasText: 'Proxima Centauri' })
+      .getByRole('button')
+      .first()
+      .click();
 
     await expect(readout).toHaveText('Proxima Centauri', { timeout: 45_000 });
   });

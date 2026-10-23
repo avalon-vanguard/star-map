@@ -21,7 +21,7 @@ describe('StarNeighbourhood', () => {
   it('measures the separation it found each star by', () => {
     const index = new StarNeighbourhood([
       { id: 1, x: 0, y: 0, z: 0 },
-      { id: 2, x: 3, y: 4, z: 0 }
+      { id: 2, x: 3, y: 4, z: 0 },
     ]);
 
     expect(index.nearest(1, 1)[0].distancePc).toBeCloseTo(5);
@@ -32,7 +32,7 @@ describe('StarNeighbourhood', () => {
     const index = new StarNeighbourhood([
       { id: 1, x: 0, y: 0, z: 0 },
       { id: 2, x: 12, y: 0, z: 0 },
-      { id: 3, x: 40, y: 0, z: 0 }
+      { id: 3, x: 40, y: 0, z: 0 },
     ]);
 
     expect(ids(index.nearest(1, 2))).toEqual([2, 3]);
@@ -44,7 +44,7 @@ describe('StarNeighbourhood', () => {
     const index = new StarNeighbourhood([
       { id: 1, x: 0, y: 0, z: 0 },
       { id: 2, x: 5, y: 5, z: 5 },
-      { id: 3, x: 6, y: 0, z: 0 }
+      { id: 3, x: 6, y: 0, z: 0 },
     ]);
 
     expect(ids(index.nearest(1, 1))).toEqual([3]);
@@ -53,18 +53,29 @@ describe('StarNeighbourhood', () => {
   it('agrees with a brute-force scan over a pseudo-random cloud', () => {
     // The property that matters: the grid is an optimisation, never a different answer.
     let seed = 7;
-    const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 100 - 50;
-    const cloud: StarPoint[] = Array.from({ length: 400 }, (_, id) => ({ id, x: random(), y: random(), z: random() }));
+    const random = () =>
+      ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 100 - 50;
+    const cloud: StarPoint[] = Array.from({ length: 400 }, (_, id) => ({
+      id,
+      x: random(),
+      y: random(),
+      z: random(),
+    }));
     const index = new StarNeighbourhood(cloud);
 
     for (const origin of [cloud[0], cloud[199], cloud[399]]) {
       const brute = cloud
         .filter((point) => point.id !== origin.id)
-        .map((point) => ({ id: point.id, distancePc: Math.hypot(point.x - origin.x, point.y - origin.y, point.z - origin.z) }))
+        .map((point) => ({
+          id: point.id,
+          distancePc: Math.hypot(point.x - origin.x, point.y - origin.y, point.z - origin.z),
+        }))
         .sort((a, b) => a.distancePc - b.distancePc);
 
       expect(ids(index.nearest(origin.id, 5))).toEqual(ids(brute.slice(0, 5)));
-      expect(ids(index.within(origin.id, 20))).toEqual(ids(brute.filter((neighbour) => neighbour.distancePc <= 20)));
+      expect(ids(index.within(origin.id, 20))).toEqual(
+        ids(brute.filter((neighbour) => neighbour.distancePc <= 20)),
+      );
     }
   });
 
@@ -110,7 +121,7 @@ describe('StarNeighbourhood', () => {
     const index = new StarNeighbourhood([
       { id: 1, x: 0, y: 0, z: 0 },
       { id: 2, x: 2.63, y: 0, z: 0 },
-      { id: 3, x: 2.63, y: 0, z: 0 }
+      { id: 3, x: 2.63, y: 0, z: 0 },
     ]);
 
     expect(ids(index.nearest(1, 2)).sort()).toEqual([2, 3]);
@@ -127,12 +138,18 @@ describe('StarNeighbourhood', () => {
     const points = cloud();
     const origin = points[0];
     const expected = points
-      .filter((point) => point.id !== origin.id && Math.hypot(point.x - origin.x, point.y - origin.y, point.z - origin.z) <= 7)
+      .filter(
+        (point) =>
+          point.id !== origin.id &&
+          Math.hypot(point.x - origin.x, point.y - origin.y, point.z - origin.z) <= 7,
+      )
       .map((point) => point.id)
       .sort((a, b) => a - b);
 
     const visited: number[] = [];
-    new StarNeighbourhood(points).forEachWithin(origin.id, 7, (neighbour) => visited.push(neighbour.id));
+    new StarNeighbourhood(points).forEachWithin(origin.id, 7, (neighbour) =>
+      visited.push(neighbour.id),
+    );
 
     expect(visited.sort((a, b) => a - b)).toEqual(expected);
   });
@@ -144,7 +161,13 @@ describe('StarNeighbourhood', () => {
     let expected = 0;
     for (let i = 0; i < points.length; i++) {
       for (let j = i + 1; j < points.length; j++) {
-        if (Math.hypot(points[j].x - points[i].x, points[j].y - points[i].y, points[j].z - points[i].z) <= 5) {
+        if (
+          Math.hypot(
+            points[j].x - points[i].x,
+            points[j].y - points[i].y,
+            points[j].z - points[i].z,
+          ) <= 5
+        ) {
           expected++;
         }
       }

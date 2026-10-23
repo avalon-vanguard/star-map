@@ -13,7 +13,11 @@ export interface CartesianCoordinates {
  * +X toward the vernal equinox (epoch 2000), +Z toward the north celestial pole,
  * +Y toward RA 6h / Dec 0.
  */
-export function raDecDistanceToXyz(raHours: number, decDeg: number, distancePc: number): CartesianCoordinates {
+export function raDecDistanceToXyz(
+  raHours: number,
+  decDeg: number,
+  distancePc: number,
+): CartesianCoordinates {
   const raRad = raHours * HOURS_TO_DEG * DEG_TO_RAD;
   const decRad = decDeg * DEG_TO_RAD;
   const cosDec = Math.cos(decRad);
@@ -21,7 +25,7 @@ export function raDecDistanceToXyz(raHours: number, decDeg: number, distancePc: 
   return {
     x: distancePc * cosDec * Math.cos(raRad),
     y: distancePc * cosDec * Math.sin(raRad),
-    z: distancePc * Math.sin(decRad)
+    z: distancePc * Math.sin(decRad),
   };
 }
 
@@ -29,7 +33,11 @@ export function raDecDistanceToXyz(raHours: number, decDeg: number, distancePc: 
  * Same conversion as {@link raDecDistanceToXyz}, but for sources (e.g. exoplanet host
  * stars, deep-sky catalogs) that report right ascension in degrees rather than hours.
  */
-export function raDegDecDistanceToXyz(raDeg: number, decDeg: number, distancePc: number): CartesianCoordinates {
+export function raDegDecDistanceToXyz(
+  raDeg: number,
+  decDeg: number,
+  distancePc: number,
+): CartesianCoordinates {
   return raDecDistanceToXyz(raDeg / HOURS_TO_DEG, decDeg, distancePc);
 }
 
@@ -41,10 +49,16 @@ const MAS_TO_DEG = 1 / 3_600_000;
  * μα cos δ, the on-sky rate Hipparcos and Gaia both publish, hence the division by cos δ to turn
  * it back into right ascension.
  */
-export function propagateProperMotion(raDeg: number, decDeg: number, pmRaMasPerYear: number, pmDecMasPerYear: number, years: number): { raDeg: number; decDeg: number } {
+export function propagateProperMotion(
+  raDeg: number,
+  decDeg: number,
+  pmRaMasPerYear: number,
+  pmDecMasPerYear: number,
+  years: number,
+): { raDeg: number; decDeg: number } {
   return {
     raDeg: raDeg + (years * pmRaMasPerYear * MAS_TO_DEG) / Math.cos(decDeg * DEG_TO_RAD),
-    decDeg: decDeg + years * pmDecMasPerYear * MAS_TO_DEG
+    decDeg: decDeg + years * pmDecMasPerYear * MAS_TO_DEG,
   };
 }
 
@@ -74,7 +88,7 @@ export function eclipticToEquatorial(position: CartesianCoordinates): CartesianC
   return {
     x: position.x,
     y: position.y * cos - position.z * sin,
-    z: position.y * sin + position.z * cos
+    z: position.y * sin + position.z * cos,
   };
 }
 
@@ -89,7 +103,10 @@ export function eclipticToEquatorial(position: CartesianCoordinates): CartesianC
  * where Horizons has it between 1950 and 2100, Phobos 54 and Titan 127: their nodes are counted
  * from a different line altogether.
  */
-export function laplacePlaneToEquatorial(position: CartesianCoordinates, pole: { raDeg: number; decDeg: number }): CartesianCoordinates {
+export function laplacePlaneToEquatorial(
+  position: CartesianCoordinates,
+  pole: { raDeg: number; decDeg: number },
+): CartesianCoordinates {
   const tilt = (90 - pole.decDeg) * DEG_TO_RAD;
   const node = (pole.raDeg + 90) * DEG_TO_RAD;
   const y = position.y * Math.cos(tilt) - position.z * Math.sin(tilt);
@@ -97,7 +114,7 @@ export function laplacePlaneToEquatorial(position: CartesianCoordinates, pole: {
   return {
     x: position.x * Math.cos(node) - y * Math.sin(node),
     y: position.x * Math.sin(node) + y * Math.cos(node),
-    z
+    z,
   };
 }
 
@@ -110,7 +127,7 @@ export function equatorialToEcliptic(position: CartesianCoordinates): CartesianC
   return {
     x: position.x,
     y: position.y * cos + position.z * sin,
-    z: -position.y * sin + position.z * cos
+    z: -position.y * sin + position.z * cos,
   };
 }
 

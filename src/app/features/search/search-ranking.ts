@@ -48,7 +48,7 @@ const NO_MATCH = 0;
 const KIND_PRIORITY: Readonly<Record<SearchResultKind, number>> = {
   body: 0,
   star: 1,
-  exoplanet: 2
+  exoplanet: 2,
 };
 
 /** Catalogue names separate their parts with spaces, hyphens, underscores and slashes. */
@@ -84,19 +84,25 @@ export function buildSearchIndex(entries: readonly SearchEntry[]): IndexedSearch
       entry,
       normalizedName,
       compactName: compact(entry.name),
-      words: normalizedName.split(WORD_SEPARATORS)
+      words: normalizedName.split(WORD_SEPARATORS),
     };
   });
 }
 
-function scoreIndexed(indexed: IndexedSearchEntry, normalizedQuery: string, compactQuery: string): number {
+function scoreIndexed(
+  indexed: IndexedSearchEntry,
+  normalizedQuery: string,
+  compactQuery: string,
+): number {
   // Punctuation-insensitive as well as case-insensitive, because the catalogues are
   // inconsistent about it: HYG writes "Gl 357" where a user may well type "gl357".
   if (indexed.normalizedName === normalizedQuery || indexed.compactName === compactQuery) {
     return MATCH_EXACT;
   }
   if (indexed.normalizedName.startsWith(normalizedQuery)) {
-    return WORD_SEPARATORS.test(indexed.normalizedName.charAt(normalizedQuery.length)) ? MATCH_WORD_PREFIX : MATCH_PREFIX;
+    return WORD_SEPARATORS.test(indexed.normalizedName.charAt(normalizedQuery.length))
+      ? MATCH_WORD_PREFIX
+      : MATCH_PREFIX;
   }
   if (indexed.words.some((word) => word.startsWith(normalizedQuery))) {
     return MATCH_WORD_START;
@@ -116,7 +122,11 @@ export function scoreSearchMatch(name: string, query: string): number {
   if (normalizedQuery === '') {
     return NO_MATCH;
   }
-  return scoreIndexed(buildSearchIndex([{ kind: 'star', name, subtitle: '' }])[0], normalizedQuery, compact(query));
+  return scoreIndexed(
+    buildSearchIndex([{ kind: 'star', name, subtitle: '' }])[0],
+    normalizedQuery,
+    compact(query),
+  );
 }
 
 /**
@@ -132,7 +142,11 @@ export function scoreSearchMatch(name: string, query: string): number {
  * the query is the closer match — and finally alphabetically, so the order is fully determined
  * rather than dependent on the input order.
  */
-export function rankSearchResults(index: readonly IndexedSearchEntry[], query: string, limit: number): SearchEntry[] {
+export function rankSearchResults(
+  index: readonly IndexedSearchEntry[],
+  query: string,
+  limit: number,
+): SearchEntry[] {
   const normalizedQuery = normalize(query);
   if (limit <= 0 || normalizedQuery === '') {
     return [];
@@ -152,7 +166,7 @@ export function rankSearchResults(index: readonly IndexedSearchEntry[], query: s
       b.score - a.score ||
       KIND_PRIORITY[a.entry.kind] - KIND_PRIORITY[b.entry.kind] ||
       a.entry.name.length - b.entry.name.length ||
-      a.entry.name.localeCompare(b.entry.name)
+      a.entry.name.localeCompare(b.entry.name),
   );
 
   return scored.slice(0, limit).map((match) => match.entry);

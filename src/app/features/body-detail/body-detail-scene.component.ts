@@ -1,4 +1,12 @@
-import { AfterViewInit, Component, ElementRef, inject, OnDestroy, signal, viewChild } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  inject,
+  OnDestroy,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import * as THREE from 'three/webgpu';
@@ -9,7 +17,13 @@ import { EngineService } from '../../core/engine/engine.service';
 import { bodyPageView } from '../../shared/rendering/body-orientation';
 import { planetTexture } from '../../shared/rendering/procedural-planet-texture';
 import { applyMilkyWaySkybox, createGlowSprite } from '../../shared/rendering/skybox';
-import { atmosphereColorFor, bodyTexturePath, loadCachedTexture, MILKY_WAY_SKYBOX_PATH, saturnRing } from '../../shared/rendering/texture-catalog';
+import {
+  atmosphereColorFor,
+  bodyTexturePath,
+  loadCachedTexture,
+  MILKY_WAY_SKYBOX_PATH,
+  saturnRing,
+} from '../../shared/rendering/texture-catalog';
 import { BodyRecord } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord } from '../../shared/models/star.model';
@@ -61,9 +75,13 @@ const SUN_SIDE_MIN_SINE = Math.sin((3 * Math.PI) / 180);
       @if (viewModel()) {
         <app-info-panel [body]="viewModel()!" />
       } @else if (notFound()) {
-        <div class="hud-brackets hud-acquire hud-surface absolute top-4 right-4 w-80 max-w-[calc(100%-2rem)] p-4 font-body text-text">
+        <div
+          class="hud-brackets hud-acquire hud-surface absolute top-4 right-4 w-80 max-w-[calc(100%-2rem)] p-4 font-body text-text"
+        >
           <p class="type-eyebrow text-accent">No record</p>
-          <p class="mt-2 text-sm text-muted">That id isn't in the catalog — it may have been renamed or mistyped.</p>
+          <p class="mt-2 text-sm text-muted">
+            That id isn't in the catalog — it may have been renamed or mistyped.
+          </p>
           <a
             routerLink="/"
             class="type-label mt-4 inline-flex items-center gap-2 border border-border/60 px-3 py-1.5 text-muted transition-colors hover:border-accent/70 hover:text-accent focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -80,7 +98,7 @@ const SUN_SIDE_MIN_SINE = Math.sin((3 * Math.PI) / 180);
            clock says. -->
       <app-hud-dock [date]="date()" [clock]="true" (bookmarkChosen)="goToBookmark($event)" />
     </div>
-  `
+  `,
 })
 export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
   private readonly engine = inject(EngineService);
@@ -148,7 +166,11 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
   }
 
   private async bootstrap(): Promise<void> {
-    const [stars, bodies, exoplanets] = await Promise.all([this.dataLoader.loadStars(), this.dataLoader.loadBodies(), this.dataLoader.loadExoplanets()]);
+    const [stars, bodies, exoplanets] = await Promise.all([
+      this.dataLoader.loadStars(),
+      this.dataLoader.loadBodies(),
+      this.dataLoader.loadExoplanets(),
+    ]);
     this.stars = stars.stars;
     this.bodies = bodies;
     this.exoplanets = exoplanets;
@@ -169,7 +191,11 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     }
 
     // Shared with the system view's object card, so the same body cannot read differently there.
-    const viewModel = buildBodyViewModel(id, { bodies: this.bodies, exoplanets: this.exoplanets, stars: this.stars });
+    const viewModel = buildBodyViewModel(id, {
+      bodies: this.bodies,
+      exoplanets: this.exoplanets,
+      stars: this.stars,
+    });
     if (!viewModel) {
       this.viewModel.set(undefined);
       this.notFound.set(true);
@@ -198,11 +224,16 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     // properties wherever it does not — which is every exoplanet, since none has had its
     // surface imaged, and the handful of moons no probe returned a usable map of.
     const realTexturePath = bodyTexturePath(viewModel.id);
-    this.planetMaterial.map = realTexturePath ? loadCachedTexture(realTexturePath) : planetTexture(viewModel.appearance);
+    this.planetMaterial.map = realTexturePath
+      ? loadCachedTexture(realTexturePath)
+      : planetTexture(viewModel.appearance);
     // The texture supplies its own colour, so the base stays white rather than tinting it twice.
     this.planetMaterial.color.set(0xffffff);
     // A fluid envelope scatters light more evenly than a solid surface does.
-    this.planetMaterial.roughness = GAS_GIANT_IDS.has(viewModel.id) || viewModel.appearance.palette.structure === 'banded' ? 0.55 : 0.85;
+    this.planetMaterial.roughness =
+      GAS_GIANT_IDS.has(viewModel.id) || viewModel.appearance.palette.structure === 'banded'
+        ? 0.55
+        : 0.85;
     this.planetMaterial.needsUpdate = true;
     // Back to the page's own light and a sphere at rest; `tick` turns both where the IAU says how.
     this.body = this.bodies.find((body) => body.id === viewModel.id);
@@ -283,7 +314,7 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
       // photograph or a surface derived from the body's own measurements.
       color: 0xffffff,
       roughness: 0.85,
-      metalness: 0.05
+      metalness: 0.05,
     });
     this.planet = new THREE.Mesh(geometry, this.planetMaterial);
     scene.add(this.planet);
@@ -308,17 +339,33 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
       return;
     }
     const sunAzimuth = Math.atan2(SUN_LIGHT_POSITION.x, SUN_LIGHT_POSITION.z);
-    if (this.body && bodyPageView(this.body, this.bodies, this.time.julianDate(), sunAzimuth, this.planet.quaternion, this.sunLight.position)) {
+    if (
+      this.body &&
+      bodyPageView(
+        this.body,
+        this.bodies,
+        this.time.julianDate(),
+        sunAzimuth,
+        this.planet.quaternion,
+        this.sunLight.position,
+      )
+    ) {
       this.sunLight.position.multiplyScalar(SUN_LIGHT_POSITION.length());
     } else if (this.body?.rotationPeriodHours !== undefined) {
       // Counted from the orbit's epoch, as `spinFor` counts: where the meridian starts is unknown.
-      const turns = ((this.time.julianDate() - this.body.orbit.epochJd) * 24) / this.body.rotationPeriodHours;
+      const turns =
+        ((this.time.julianDate() - this.body.orbit.epochJd) * 24) / this.body.rotationPeriodHours;
       this.planet.rotation.set(0, (turns % 1) * 2 * Math.PI, 0);
     } else if (!this.body) {
       this.planet.rotation.y += deltaSeconds * 0.08;
     }
     const sunLatitudeSine = this.sunLight.position.y / this.sunLight.position.length();
-    const sunSide = this.sunSide !== 0 && Math.abs(sunLatitudeSine) < SUN_SIDE_MIN_SINE ? this.sunSide : sunLatitudeSine < 0 ? -1 : 1;
+    const sunSide =
+      this.sunSide !== 0 && Math.abs(sunLatitudeSine) < SUN_SIDE_MIN_SINE
+        ? this.sunSide
+        : sunLatitudeSine < 0
+          ? -1
+          : 1;
     if (sunSide !== this.sunSide) {
       // Above or below the equator, whichever side the Sun is on, when a body is shown and again
       // whenever the Sun is well across it (SUN_SIDE_MIN_SINE), as the clock runs or is set: held

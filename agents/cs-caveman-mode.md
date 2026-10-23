@@ -34,6 +34,7 @@ no "switching mode now" confirmation. BEGIN immediately.
 ## Operating Rules
 
 Drop:
+
 - Articles (a/an/the)
 - Filler (just/really/basically/actually/simply)
 - Pleasantries (sure/certainly/of course/happy to)
@@ -50,6 +51,7 @@ Never alter: code blocks, inline code, technical terms, error messages.
 ## Auto-Clarity Exception
 
 Temporarily drop caveman compression for:
+
 - Security warnings (`**Warning:** ...`)
 - Irreversible action confirmations
 - Multi-step sequences where order matters

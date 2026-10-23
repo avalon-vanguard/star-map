@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 
-import { propagateProperMotion, raDegDecDistanceToXyz } from '../../../src/app/shared/astro/coordinates';
+import {
+  propagateProperMotion,
+  raDegDecDistanceToXyz,
+} from '../../../src/app/shared/astro/coordinates';
 import { StarRecord } from '../../../src/app/shared/models/star.model';
 import { parseCsvObjects, parseOptionalNumber } from '../lib/csv';
 import { fetchTextCached } from '../lib/http';
@@ -41,7 +44,9 @@ const CATALOGUE_EPOCH = 2000.0;
 const DEFAULT_DISTANCE_CUTOFF_PC = 250;
 const DEFAULT_MAGNITUDE_LIMIT = 12;
 const DEFAULT_ROW_LIMIT = 500_000;
-const DISTANCE_CUTOFF_PC = Number(process.env['ETL_GAIA_DISTANCE_PC'] ?? DEFAULT_DISTANCE_CUTOFF_PC);
+const DISTANCE_CUTOFF_PC = Number(
+  process.env['ETL_GAIA_DISTANCE_PC'] ?? DEFAULT_DISTANCE_CUTOFF_PC,
+);
 const MAGNITUDE_LIMIT = Number(process.env['ETL_GAIA_MAGNITUDE_LIMIT'] ?? DEFAULT_MAGNITUDE_LIMIT);
 const ROW_LIMIT = Number(process.env['ETL_GAIA_ROW_LIMIT'] ?? DEFAULT_ROW_LIMIT);
 
@@ -66,7 +71,7 @@ function buildQuery(): string {
     `and phot_g_mean_mag < ${MAGNITUDE_LIMIT}`,
     // source_id breaks the ties — 20 064 groups share a G at the published precision — so the
     // row order, and with it the ids assigned below, is a pure function of the archive's content.
-    'order by phot_g_mean_mag asc, source_id asc'
+    'order by phot_g_mean_mag asc, source_id asc',
   ].join(' ');
 }
 
@@ -97,7 +102,7 @@ function buildNearbyQuery(): string {
     `where g.parallax > ${parallaxFloorMas(NEARBY_DISTANCE_PC).toFixed(6)}`,
     `and g.parallax_over_error > ${(1 / MAX_PARALLAX_ERROR_RATIO).toFixed(1)}`,
     `and (g.phot_g_mean_mag >= ${MAGNITUDE_LIMIT} or g.phot_g_mean_mag is null)`,
-    'order by g.phot_g_mean_mag asc, g.source_id asc'
+    'order by g.phot_g_mean_mag asc, g.source_id asc',
   ].join(' ');
 }
 
@@ -156,10 +161,20 @@ const NEARBY_ID_BASE = 1_050_000_000;
 
 export async function fetchGaiaStars(): Promise<StarRecord[]> {
   const unchanged = MAGNITUDE_LIMIT === DEFAULT_MAGNITUDE_LIMIT && ROW_LIMIT === DEFAULT_ROW_LIMIT;
-  console.log(`Fetching Gaia DR3 (within ${DISTANCE_CUTOFF_PC} pc, G < ${MAGNITUDE_LIMIT}, at most ${ROW_LIMIT} rows)...`);
-  const rows = await fetchQueryRows(buildQuery(), unchanged && DISTANCE_CUTOFF_PC === DEFAULT_DISTANCE_CUTOFF_PC ? DEFAULT_QUERY_ROWS : undefined);
-  console.log(`Fetching Gaia DR3's nearby complement (within ${NEARBY_DISTANCE_PC} pc, G >= ${MAGNITUDE_LIMIT} or none, kept by the GCNS)...`);
-  const nearbyRows = await fetchQueryRows(buildNearbyQuery(), unchanged ? DEFAULT_NEARBY_QUERY_ROWS : undefined);
+  console.log(
+    `Fetching Gaia DR3 (within ${DISTANCE_CUTOFF_PC} pc, G < ${MAGNITUDE_LIMIT}, at most ${ROW_LIMIT} rows)...`,
+  );
+  const rows = await fetchQueryRows(
+    buildQuery(),
+    unchanged && DISTANCE_CUTOFF_PC === DEFAULT_DISTANCE_CUTOFF_PC ? DEFAULT_QUERY_ROWS : undefined,
+  );
+  console.log(
+    `Fetching Gaia DR3's nearby complement (within ${NEARBY_DISTANCE_PC} pc, G >= ${MAGNITUDE_LIMIT} or none, kept by the GCNS)...`,
+  );
+  const nearbyRows = await fetchQueryRows(
+    buildNearbyQuery(),
+    unchanged ? DEFAULT_NEARBY_QUERY_ROWS : undefined,
+  );
 
   const stars = [...rowsToStars(rows, GAIA_ID_BASE), ...rowsToStars(nearbyRows, NEARBY_ID_BASE)];
   console.log(`  kept ${stars.length} Gaia stars (of ${rows.length} + ${nearbyRows.length} rows).`);
@@ -170,7 +185,10 @@ export async function fetchGaiaStars(): Promise<StarRecord[]> {
  * One query's rows, refused when there are fewer than `expectedRows` — see
  * {@link DEFAULT_QUERY_ROWS} — or as many as the row limit.
  */
-async function fetchQueryRows(query: string, expectedRows: number | undefined): Promise<Record<string, string>[]> {
+async function fetchQueryRows(
+  query: string,
+  expectedRows: number | undefined,
+): Promise<Record<string, string>[]> {
   const url = `${GAIA_TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=${encodeURIComponent(query)}`;
   // Keyed by the whole request, so a response cached for other columns, another order, or
   // another endpoint can never be mistaken for this one — the cache records only that some
@@ -180,14 +198,16 @@ async function fetchQueryRows(query: string, expectedRows: number | undefined): 
   if (expectedRows !== undefined && rows.length < expectedRows * MIN_ROW_SHARE) {
     throw new GaiaAnswerError(
       `Gaia returned ${rows.length} rows, not the ~${expectedRows} this query holds — the answer was cut short, it was an error page ` +
-        `served with a 200, or the query was edited without updating its row count; delete tools/etl/.cache/${cacheKey} once the archive answers properly`
+        `served with a 200, or the query was edited without updating its row count; delete tools/etl/.cache/${cacheKey} once the archive answers properly`,
     );
   }
   // Not gated like the floor above it: the only ways to reach this cap are the overrides that
   // *widen* the query, and they are exactly when it is worth saying. What it must not fire on is
   // a deliberately smaller slice, where filling the limit is the whole point.
   if (ROW_LIMIT >= DEFAULT_ROW_LIMIT && rows.length >= ROW_LIMIT) {
-    throw new GaiaAnswerError(`Gaia returned the query's own ${ROW_LIMIT}-row limit, so it is the limit deciding what the map holds; raise ETL_GAIA_ROW_LIMIT.`);
+    throw new GaiaAnswerError(
+      `Gaia returned the query's own ${ROW_LIMIT}-row limit, so it is the limit deciding what the map holds; raise ETL_GAIA_ROW_LIMIT.`,
+    );
   }
   return rows;
 }
@@ -212,7 +232,13 @@ function rowsToStars(rows: readonly Record<string, string>[], idBase: number): S
     const parallaxErrorMas = parseOptionalNumber(row['parallax_error']);
     const pmRaMasYr = parseOptionalNumber(row['pmra']);
     const pmDecMasYr = parseOptionalNumber(row['pmdec']);
-    const j2000 = propagateProperMotion(raDeg, decDeg, pmRaMasYr ?? 0, pmDecMasYr ?? 0, CATALOGUE_EPOCH - GAIA_DR3_EPOCH);
+    const j2000 = propagateProperMotion(
+      raDeg,
+      decDeg,
+      pmRaMasYr ?? 0,
+      pmDecMasYr ?? 0,
+      CATALOGUE_EPOCH - GAIA_DR3_EPOCH,
+    );
     const { x, y, z } = raDegDecDistanceToXyz(j2000.raDeg, j2000.decDeg, distancePc);
     const magnitudeG = parseOptionalNumber(row['phot_g_mean_mag']);
     const colorIndex = parseOptionalNumber(row['bp_rp']);
@@ -235,7 +261,7 @@ function rowsToStars(rows: readonly Record<string, string>[], idBase: number): S
       distanceFromGaia: true,
       source: 'gaia',
       pmRaMasYr,
-      pmDecMasYr
+      pmDecMasYr,
     });
   });
 
@@ -264,31 +290,46 @@ const MIN_USABLE_HIP_DISTANCES = 90_000;
  * distance, the 6 833 that Gaia puts past 250 pc move back inside, and the published map would
  * flip between the two with the archive's availability.
  */
-export async function fetchGaiaDistancesByHip(): Promise<Map<number, { distancePc: number; relativeError: number }>> {
+export async function fetchGaiaDistancesByHip(): Promise<
+  Map<number, { distancePc: number; relativeError: number }>
+> {
   const query = [
     'select top 200000 b.original_ext_source_id as hip, g.parallax, g.parallax_over_error',
-    'from gaiadr3.hipparcos2_best_neighbour b join gaiadr3.gaia_source g on g.source_id = b.source_id'
+    'from gaiadr3.hipparcos2_best_neighbour b join gaiadr3.gaia_source g on g.source_id = b.source_id',
   ].join(' ');
   const url = `${GAIA_TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=${encodeURIComponent(query)}`;
   console.log('Fetching Gaia DR3 distances for Hipparcos stars (archive cross-match)...');
-  const rows = parseCsvObjects(await fetchTextCached(url, `gaia-dr3-hip-${createHash('sha1').update(url).digest('hex').slice(0, 8)}.csv`));
+  const rows = parseCsvObjects(
+    await fetchTextCached(
+      url,
+      `gaia-dr3-hip-${createHash('sha1').update(url).digest('hex').slice(0, 8)}.csv`,
+    ),
+  );
 
   const distances = new Map<number, { distancePc: number; relativeError: number }>();
   for (const row of rows) {
     const hip = parseOptionalNumber(row['hip']);
     const parallaxMas = parseOptionalNumber(row['parallax']);
     const overError = parseOptionalNumber(row['parallax_over_error']);
-    if (hip !== undefined && parallaxMas !== undefined && parallaxMas > 0 && overError !== undefined && overError > 1 / MAX_PARALLAX_ERROR_RATIO) {
+    if (
+      hip !== undefined &&
+      parallaxMas !== undefined &&
+      parallaxMas > 0 &&
+      overError !== undefined &&
+      overError > 1 / MAX_PARALLAX_ERROR_RATIO
+    ) {
       distances.set(hip, { distancePc: 1000 / parallaxMas, relativeError: 1 / overError });
     }
   }
   if (distances.size < MIN_USABLE_HIP_DISTANCES) {
     throw new Error(
       `the Hipparcos cross-match gave ${distances.size} usable distances (of ${rows.length} rows), not the ~97 751 it holds; ` +
-        'delete tools/etl/.cache/gaia-dr3-hip-*.csv once the archive answers properly'
+        'delete tools/etl/.cache/gaia-dr3-hip-*.csv once the archive answers properly',
     );
   }
-  console.log(`  ${distances.size} Hipparcos stars have a Gaia distance (of ${rows.length} cross-matched).`);
+  console.log(
+    `  ${distances.size} Hipparcos stars have a Gaia distance (of ${rows.length} cross-matched).`,
+  );
   return distances;
 }
 
@@ -321,18 +362,45 @@ export async function fetchBrightGaiaSources(): Promise<BrightGaiaSource[]> {
     `select top ${ROW_LIMIT} source_id, ra, dec, pmra, pmdec, parallax, parallax_over_error, phot_g_mean_mag`,
     'from gaiadr3.gaia_source',
     `where phot_g_mean_mag < ${BRIGHT_MAGNITUDE_LIMIT} and parallax_over_error > ${(1 / MAX_PARALLAX_ERROR_RATIO).toFixed(1)}`,
-    'order by source_id'
+    'order by source_id',
   ].join(' ');
-  console.log(`Fetching Gaia DR3's sources brighter than G ${BRIGHT_MAGNITUDE_LIMIT}, for the naked-eye stars the cross-match lacks...`);
+  console.log(
+    `Fetching Gaia DR3's sources brighter than G ${BRIGHT_MAGNITUDE_LIMIT}, for the naked-eye stars the cross-match lacks...`,
+  );
   const rows = await fetchQueryRows(query, BRIGHT_QUERY_ROWS);
   const sources: BrightGaiaSource[] = [];
   for (const row of rows) {
-    const [raDeg, decDeg, parallaxMas, overError, magnitudeG] = ['ra', 'dec', 'parallax', 'parallax_over_error', 'phot_g_mean_mag'].map((column) => parseOptionalNumber(row[column]));
-    if (raDeg === undefined || decDeg === undefined || !parallaxMas || parallaxMas <= 0 || overError === undefined || magnitudeG === undefined) {
+    const [raDeg, decDeg, parallaxMas, overError, magnitudeG] = [
+      'ra',
+      'dec',
+      'parallax',
+      'parallax_over_error',
+      'phot_g_mean_mag',
+    ].map((column) => parseOptionalNumber(row[column]));
+    if (
+      raDeg === undefined ||
+      decDeg === undefined ||
+      !parallaxMas ||
+      parallaxMas <= 0 ||
+      overError === undefined ||
+      magnitudeG === undefined
+    ) {
       continue;
     }
-    const j2000 = propagateProperMotion(raDeg, decDeg, parseOptionalNumber(row['pmra']) ?? 0, parseOptionalNumber(row['pmdec']) ?? 0, CATALOGUE_EPOCH - GAIA_DR3_EPOCH);
-    sources.push({ designation: `Gaia DR3 ${row['source_id']}`, direction: raDegDecDistanceToXyz(j2000.raDeg, j2000.decDeg, 1), magnitudeG, distancePc: 1000 / parallaxMas, relativeError: 1 / overError });
+    const j2000 = propagateProperMotion(
+      raDeg,
+      decDeg,
+      parseOptionalNumber(row['pmra']) ?? 0,
+      parseOptionalNumber(row['pmdec']) ?? 0,
+      CATALOGUE_EPOCH - GAIA_DR3_EPOCH,
+    );
+    sources.push({
+      designation: `Gaia DR3 ${row['source_id']}`,
+      direction: raDegDecDistanceToXyz(j2000.raDeg, j2000.decDeg, 1),
+      magnitudeG,
+      distancePc: 1000 / parallaxMas,
+      relativeError: 1 / overError,
+    });
   }
   return sources;
 }
@@ -348,22 +416,36 @@ const MIN_HIPPARCOS_ERRORS = 110_000;
  * From van Leeuwen's 2007 reduction, which the ESA archive hosts beside Gaia and HYG's distances
  * are the inverse of. HYG publishes the distance and not its error.
  */
-export async function fetchHipparcosParallaxErrors(): Promise<Map<number, { parallaxMas: number; relativeError: number }>> {
+export async function fetchHipparcosParallaxErrors(): Promise<
+  Map<number, { parallaxMas: number; relativeError: number }>
+> {
   const url = `${GAIA_TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=${encodeURIComponent('select top 200000 hip, plx, e_plx from public.hipparcos_newreduction order by hip')}`;
   console.log('Fetching Hipparcos parallax errors (new reduction)...');
-  const rows = parseCsvObjects(await fetchTextCached(url, `hipparcos-errors-${createHash('sha1').update(url).digest('hex').slice(0, 8)}.csv`));
+  const rows = parseCsvObjects(
+    await fetchTextCached(
+      url,
+      `hipparcos-errors-${createHash('sha1').update(url).digest('hex').slice(0, 8)}.csv`,
+    ),
+  );
 
   const errors = new Map<number, { parallaxMas: number; relativeError: number }>();
   for (const row of rows) {
     const hip = parseOptionalNumber(row['hip']);
     const parallaxMas = parseOptionalNumber(row['plx']);
     const errorMas = parseOptionalNumber(row['e_plx']);
-    if (hip !== undefined && parallaxMas !== undefined && parallaxMas > 0 && errorMas !== undefined) {
+    if (
+      hip !== undefined &&
+      parallaxMas !== undefined &&
+      parallaxMas > 0 &&
+      errorMas !== undefined
+    ) {
       errors.set(hip, { parallaxMas, relativeError: errorMas / parallaxMas });
     }
   }
   if (errors.size < MIN_HIPPARCOS_ERRORS) {
-    throw new Error(`the Hipparcos reduction gave ${errors.size} parallax errors (of ${rows.length} rows), not the ~117 955 it holds; delete tools/etl/.cache/hipparcos-errors-*.csv once the archive answers properly`);
+    throw new Error(
+      `the Hipparcos reduction gave ${errors.size} parallax errors (of ${rows.length} rows), not the ~117 955 it holds; delete tools/etl/.cache/hipparcos-errors-*.csv once the archive answers properly`,
+    );
   }
   return errors;
 }

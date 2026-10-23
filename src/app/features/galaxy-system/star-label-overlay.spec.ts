@@ -58,18 +58,21 @@ describe('StarLabelOverlay', () => {
   it('touches the DOM only for labels that actually changed', () => {
     overlay.update([
       { id: 1, name: 'Sirius', kind: 'Star', x: 1, y: 0, z: 0 },
-      { id: 2, name: 'Vega', kind: 'Star', x: 0, y: 1, z: 0 }
+      { id: 2, name: 'Vega', kind: 'Star', x: 0, y: 1, z: 0 },
     ]);
     const sirius = labels()[0];
 
     overlay.update([
       { id: 1, name: 'Sirius', kind: 'Star', x: 1, y: 0, z: 0 },
-      { id: 3, name: 'Altair', kind: 'Star', x: 0, y: 0, z: 1 }
+      { id: 3, name: 'Altair', kind: 'Star', x: 0, y: 0, z: 1 },
     ]);
 
     // Same element instance: the label that stayed was not torn down and rebuilt.
     expect(labels()[0]).toBe(sirius);
-    expect(labels().map((label) => label.querySelector('.map-label-name')?.textContent)).toEqual(['Sirius', 'Altair']);
+    expect(labels().map((label) => label.querySelector('.map-label-name')?.textContent)).toEqual([
+      'Sirius',
+      'Altair',
+    ]);
   });
 
   it('drops every label when given none', () => {
@@ -107,7 +110,16 @@ describe('StarLabelOverlay', () => {
   it('says a neighbour more quietly than a body of this system', () => {
     overlay.update([
       { id: 'earth', name: 'Earth', kind: 'Planet', x: 1, y: 0, z: 0 },
-      { id: 'neighbour:1', name: 'Sirius', kind: '2.64 pc', tone: 'ghost', selectStarId: 1, x: 0, y: 1, z: 0 }
+      {
+        id: 'neighbour:1',
+        name: 'Sirius',
+        kind: '2.64 pc',
+        tone: 'ghost',
+        selectStarId: 1,
+        x: 0,
+        y: 1,
+        z: 0,
+      },
     ]);
 
     const [body, ghost] = labels();
@@ -120,7 +132,18 @@ describe('StarLabelOverlay', () => {
     const chosen: number[] = [];
     overlay = new StarLabelOverlay(scene, (starId) => chosen.push(starId));
     overlay.setSize(800, 600);
-    overlay.update([{ id: 'neighbour:42', name: 'Sirius', kind: '2.64 pc', tone: 'ghost', selectStarId: 42, x: 1, y: 0, z: 0 }]);
+    overlay.update([
+      {
+        id: 'neighbour:42',
+        name: 'Sirius',
+        kind: '2.64 pc',
+        tone: 'ghost',
+        selectStarId: 42,
+        x: 1,
+        y: 0,
+        z: 0,
+      },
+    ]);
 
     const ghost = labels()[0];
     expect(ghost.tagName).toBe('BUTTON');
@@ -142,7 +165,7 @@ describe('StarLabelOverlay', () => {
   it('leaves nothing behind when disposed', () => {
     overlay.update([
       { id: 1, name: 'Sirius', kind: 'Star', x: 1, y: 0, z: 0 },
-      { id: 'ngc:224', name: 'Andromeda', kind: 'GALAXY', x: 0, y: 1, z: 0 }
+      { id: 'ngc:224', name: 'Andromeda', kind: 'GALAXY', x: 0, y: 1, z: 0 },
     ]);
     overlay.dispose();
 

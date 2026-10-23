@@ -20,6 +20,11 @@ export default defineConfig({
   // The heavy waits already carry their own longer timeouts; this is the same judgement applied
   // to the assertions that were left on the default. A ceiling costs nothing when it is not hit.
   expect: { timeout: 15_000 },
+  // The test itself had kept Playwright's 30 s. On the `big` runner a frame of the scene takes
+  // about 2 s (Gitea run 1164's traces), and every locator step waits at least one frame, so a
+  // dozen steps use the whole budget before any assertion is slow: the phone tests timed out
+  // while waiting for tabs that were already there.
+  timeout: process.env.CI ? 90_000 : 30_000,
   use: {
     baseURL: 'http://localhost:4300',
     trace: 'on-first-retry'

@@ -41,5 +41,5 @@ export interface StarSource {
  */
 export const PARALLAX_PRECISION_MAS: Readonly<Record<string, number>> = {
   hyg: 1,
-  gaia: 0.02
+  gaia: 0.02,
 };

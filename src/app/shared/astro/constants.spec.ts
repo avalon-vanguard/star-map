@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { tdbFromUtc, ttMinusUtSeconds } from './constants';
 
-const jd = (year: number, month = 1, day = 1): number => Date.UTC(year, month - 1, day) / 86400000 + 2440587.5;
+const jd = (year: number, month = 1, day = 1): number =>
+  Date.UTC(year, month - 1, day) / 86400000 + 2440587.5;
 
 describe('ttMinusUtSeconds', () => {
   it('follows the historical record before 1972: within 1 per cent of Horizons at AD 1, 6 per cent at AD 1000, 0.2 s in 1950', () => {

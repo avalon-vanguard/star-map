@@ -30,7 +30,7 @@ export class CameraRigController {
 
   constructor(
     private readonly camera: SceneCamera,
-    private readonly controls: OrbitControls
+    private readonly controls: OrbitControls,
   ) {}
 
   get isAnimating(): boolean {
@@ -45,7 +45,7 @@ export class CameraRigController {
       to: { position: to.position.clone(), target: to.target.clone() },
       duration: Math.max(durationSeconds, 0.001),
       elapsed: 0,
-      onComplete
+      onComplete,
     };
   }
 

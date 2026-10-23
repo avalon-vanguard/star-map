@@ -5,7 +5,9 @@ import { StarNeighbourhood, StarPoint } from './star-neighbourhood';
 
 /** Stars a parsec apart along x, so a chain's length is the number of hops it takes. */
 function chain(count: number): StarNeighbourhood {
-  return new StarNeighbourhood(Array.from({ length: count }, (_, i) => ({ id: i, x: i, y: 0, z: 0 })));
+  return new StarNeighbourhood(
+    Array.from({ length: count }, (_, i) => ({ id: i, x: i, y: 0, z: 0 })),
+  );
 }
 
 function index(points: StarPoint[]): StarNeighbourhood {
@@ -38,11 +40,11 @@ describe('routeBetween', () => {
         { id: 0, x: 0, y: 0, z: 0 },
         { id: 1, x: 5, y: 0.5, z: 0 },
         { id: 2, x: 5, y: 3, z: 0 },
-        { id: 3, x: 10, y: 0, z: 0 }
+        { id: 3, x: 10, y: 0, z: 0 },
       ]),
       0,
       3,
-      6
+      6,
     );
 
     expect(route?.stars).toEqual([0, 1, 3]);
@@ -53,7 +55,7 @@ describe('routeBetween', () => {
     const split = index([
       { id: 0, x: 0, y: 0, z: 0 },
       { id: 1, x: 1, y: 0, z: 0 },
-      { id: 2, x: 20, y: 0, z: 0 }
+      { id: 2, x: 20, y: 0, z: 0 },
     ]);
 
     expect(routeBetween(split, 0, 2, 5)).toEqual({ route: null, gaveUp: false });
@@ -72,27 +74,31 @@ describe('routeBetween', () => {
       index([
         { id: 0, x: 0, y: 0, z: 0 },
         { id: 1, x: 1, y: 0, z: 0 },
-        { id: 2, x: 5, y: 0, z: 0 }
+        { id: 2, x: 5, y: 0, z: 0 },
       ]),
       0,
       2,
-      4
+      4,
     );
 
     expect(route?.longestHopPc).toBeCloseTo(4);
   });
 
-  it('says it gave up rather than that there is no chain, once it has spent its budget', { timeout: 30_000 }, () => {
-    // Nothing reaches the island, but the crowd around the departure is larger than the budget, so
-    // the search stops without having looked everywhere the range reaches. Read as "no chain", that
-    // is a confident wrong answer — and the range search downstream would build on it.
-    // Cells sized for the range asked of them, as the real catalogue's are: a search that settles
-    // 40 000 stars scans every cell it touches 40 000 times.
-    const search = routeBetween(knotAndChain(1.5), 0, ISLAND, 1.5);
+  it(
+    'says it gave up rather than that there is no chain, once it has spent its budget',
+    { timeout: 30_000 },
+    () => {
+      // Nothing reaches the island, but the crowd around the departure is larger than the budget, so
+      // the search stops without having looked everywhere the range reaches. Read as "no chain", that
+      // is a confident wrong answer — and the range search downstream would build on it.
+      // Cells sized for the range asked of them, as the real catalogue's are: a search that settles
+      // 40 000 stars scans every cell it touches 40 000 times.
+      const search = routeBetween(knotAndChain(1.5), 0, ISLAND, 1.5);
 
-    expect(search.route).toBeNull();
-    expect(search.gaveUp).toBe(true);
-  });
+      expect(search.route).toBeNull();
+      expect(search.gaveUp).toBe(true);
+    },
+  );
 
   it('reports a dead end proved with the last star of the budget as a dead end, not a give-up', () => {
     // Exactly the budget's worth of stars reach each other, and the destination is not among them.
@@ -125,9 +131,22 @@ const ISLAND = 999;
 function knotAndChain(cellSizePc?: number): StarNeighbourhood {
   let seed = 7;
   const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 30 - 15;
-  const knot: StarPoint[] = Array.from({ length: 45000 }, (_, i) => ({ id: 1000 + i, x: random(), y: random(), z: random() }));
-  const chainOut: StarPoint[] = Array.from({ length: CHAIN_END }, (_, i) => ({ id: i + 1, x: i + 1, y: 0, z: 0 }));
-  return new StarNeighbourhood([{ id: 0, x: 0, y: 0, z: 0 }, ...knot, ...chainOut, { id: ISLAND, x: 500, y: 0, z: 0 }], cellSizePc);
+  const knot: StarPoint[] = Array.from({ length: 45000 }, (_, i) => ({
+    id: 1000 + i,
+    x: random(),
+    y: random(),
+    z: random(),
+  }));
+  const chainOut: StarPoint[] = Array.from({ length: CHAIN_END }, (_, i) => ({
+    id: i + 1,
+    x: i + 1,
+    y: 0,
+    z: 0,
+  }));
+  return new StarNeighbourhood(
+    [{ id: 0, x: 0, y: 0, z: 0 }, ...knot, ...chainOut, { id: ISLAND, x: 500, y: 0, z: 0 }],
+    cellSizePc,
+  );
 }
 
 /**
@@ -155,10 +174,23 @@ const CROWD_ISLAND = 999999;
 function crowdedKnot(): StarNeighbourhood {
   let seed = 11;
   const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 10 - 5;
-  const knot: StarPoint[] = Array.from({ length: 45000 }, (_, i) => ({ id: 1000 + i, x: random(), y: random(), z: random() }));
-  const chainOut: StarPoint[] = Array.from({ length: CROWD_CHAIN_END }, (_, i) => ({ id: i + 1, x: 5 + i + 1, y: 0, z: 0 }));
+  const knot: StarPoint[] = Array.from({ length: 45000 }, (_, i) => ({
+    id: 1000 + i,
+    x: random(),
+    y: random(),
+    z: random(),
+  }));
+  const chainOut: StarPoint[] = Array.from({ length: CROWD_CHAIN_END }, (_, i) => ({
+    id: i + 1,
+    x: 5 + i + 1,
+    y: 0,
+    z: 0,
+  }));
   // One star nothing reaches, for the questions that have no answer.
-  return new StarNeighbourhood([{ id: 0, x: 0, y: 0, z: 0 }, ...knot, ...chainOut, { id: CROWD_ISLAND, x: 500, y: 0, z: 0 }], 0.25);
+  return new StarNeighbourhood(
+    [{ id: 0, x: 0, y: 0, z: 0 }, ...knot, ...chainOut, { id: CROWD_ISLAND, x: 500, y: 0, z: 0 }],
+    0.25,
+  );
 }
 
 describe('minimumRangeBetween', () => {
@@ -169,32 +201,41 @@ describe('minimumRangeBetween', () => {
   });
 
   // 7,5 s sur un poste récent, autour de 30 s sur le runner Gitea du VPS : 90 s de marge.
-  it('stops bisecting where a search gave up, and hands back a range that does work', { timeout: 90_000 }, () => {
-    // Below the chain's own hop of a parsec, the crowd is still one connected piece and larger than
-    // the budget, so those probes give up. Reading a give-up as "no chain at this range" is what
-    // used to report ranges up to 29% wider than needed, and went on paying for probes whose
-    // answers it could not use; the answer now is the narrowest range a chain was found at.
-    const knot = crowdedKnot();
+  it(
+    'stops bisecting where a search gave up, and hands back a range that does work',
+    { timeout: 90_000 },
+    () => {
+      // Below the chain's own hop of a parsec, the crowd is still one connected piece and larger than
+      // the budget, so those probes give up. Reading a give-up as "no chain at this range" is what
+      // used to report ranges up to 29% wider than needed, and went on paying for probes whose
+      // answers it could not use; the answer now is the narrowest range a chain was found at.
+      const knot = crowdedKnot();
 
-    const needed = minimumRangeBetween(knot, 0, CROWD_CHAIN_END, 1.2);
+      const needed = minimumRangeBetween(knot, 0, CROWD_CHAIN_END, 1.2);
 
-    expect(needed.least).toBe(false);
-    expect(needed.rangePc).not.toBeNull();
-    expect(routeBetween(knot, 0, CROWD_CHAIN_END, needed.rangePc!).route).not.toBeNull();
-    // Narrower than the ceiling's own route, too: stopping before the bisection has found a range
-    // of its own hands back the ceiling, which is the control's maximum — the question, not an answer.
-    expect(needed.rangePc!).toBeLessThan(routeBetween(knot, 0, CROWD_CHAIN_END, 1.2).route!.longestHopPc);
-  });
+      expect(needed.least).toBe(false);
+      expect(needed.rangePc).not.toBeNull();
+      expect(routeBetween(knot, 0, CROWD_CHAIN_END, needed.rangePc!).route).not.toBeNull();
+      // Narrower than the ceiling's own route, too: stopping before the bisection has found a range
+      // of its own hands back the ceiling, which is the control's maximum — the question, not an answer.
+      expect(needed.rangePc!).toBeLessThan(
+        routeBetween(knot, 0, CROWD_CHAIN_END, 1.2).route!.longestHopPc,
+      );
+    },
+  );
 
   it('names the shortest range that opens a way through', () => {
     // Hops of 1 and 4: no range under 4 connects them, and 4 exactly does.
     const stepped = index([
       { id: 0, x: 0, y: 0, z: 0 },
       { id: 1, x: 1, y: 0, z: 0 },
-      { id: 2, x: 5, y: 0, z: 0 }
+      { id: 2, x: 5, y: 0, z: 0 },
     ]);
 
-    expect(minimumRangeBetween(stepped, 0, 2, 50)).toEqual({ rangePc: expect.closeTo(4) as number, least: true });
+    expect(minimumRangeBetween(stepped, 0, 2, 50)).toEqual({
+      rangePc: expect.closeTo(4) as number,
+      least: true,
+    });
     expect(routeBetween(stepped, 0, 2, 4).route).not.toBeNull();
     expect(routeBetween(stepped, 0, 2, 3.99).route).toBeNull();
   });
@@ -205,7 +246,7 @@ describe('minimumRangeBetween', () => {
       { id: 0, x: 0, y: 0, z: 0 },
       { id: 1, x: 0, y: 4, z: 0 },
       { id: 2, x: 6, y: 7, z: 0 },
-      { id: 3, x: 10, y: 0, z: 0 }
+      { id: 3, x: 10, y: 0, z: 0 },
     ]);
 
     const needed = minimumRangeBetween(both, 0, 3, 50);
@@ -225,7 +266,7 @@ describe('minimumRangeBetween', () => {
   it('finds nothing when even the ceiling does not reach', () => {
     const split = index([
       { id: 0, x: 0, y: 0, z: 0 },
-      { id: 1, x: 100, y: 0, z: 0 }
+      { id: 1, x: 100, y: 0, z: 0 },
     ]);
 
     expect(minimumRangeBetween(split, 0, 1, 50)).toEqual({ rangePc: null, least: true });
@@ -237,7 +278,9 @@ describe('minimumRangeBetween', () => {
  * sits. Positions are compared as the float32 the buffer holds.
  */
 function linksDrawn(segments: Float32Array, points: readonly StarPoint[]): string[] {
-  const idAt = new Map(points.map((point) => [[point.x, point.y, point.z].map(Math.fround).join(), point.id]));
+  const idAt = new Map(
+    points.map((point) => [[point.x, point.y, point.z].map(Math.fround).join(), point.id]),
+  );
   const links: string[] = [];
   for (let at = 0; at < segments.length; at += 6) {
     const a = idAt.get(Array.from(segments.subarray(at, at + 3)).join())!;
@@ -252,12 +295,29 @@ function linksDrawn(segments: Float32Array, points: readonly StarPoint[]): strin
  * is to the centre, then taken until one does not fit. Lengths and distances as the float32 buffer
  * holds them.
  */
-function nearestFirst(points: readonly StarPoint[], rangePc: number, centre: { x: number; y: number; z: number }, lengthPc: number): string[] {
+function nearestFirst(
+  points: readonly StarPoint[],
+  rangePc: number,
+  centre: { x: number; y: number; z: number },
+  lengthPc: number,
+): string[] {
   const all = jumpLinkSegments(index([...points]), rangePc);
   const links = Array.from({ length: all.length / 6 }, (_, link) => {
     const v = Array.from(all.subarray(link * 6, link * 6 + 6));
-    const nearer = Math.fround(Math.sqrt(Math.min((v[0] - centre.x) ** 2 + (v[1] - centre.y) ** 2 + (v[2] - centre.z) ** 2, (v[3] - centre.x) ** 2 + (v[4] - centre.y) ** 2 + (v[5] - centre.z) ** 2)));
-    return { link, nearer, length: Math.fround(Math.hypot(v[3] - v[0], v[4] - v[1], v[5] - v[2])), key: linksDrawn(all.subarray(link * 6, link * 6 + 6), points)[0] };
+    const nearer = Math.fround(
+      Math.sqrt(
+        Math.min(
+          (v[0] - centre.x) ** 2 + (v[1] - centre.y) ** 2 + (v[2] - centre.z) ** 2,
+          (v[3] - centre.x) ** 2 + (v[4] - centre.y) ** 2 + (v[5] - centre.z) ** 2,
+        ),
+      ),
+    );
+    return {
+      link,
+      nearer,
+      length: Math.fround(Math.hypot(v[3] - v[0], v[4] - v[1], v[5] - v[2])),
+      key: linksDrawn(all.subarray(link * 6, link * 6 + 6), points)[0],
+    };
   }).sort((a, b) => a.nearer - b.nearer || a.link - b.link);
   const kept: string[] = [];
   let total = 0;
@@ -308,11 +368,18 @@ describe('jumpLinkSegments', () => {
   it('keeps exactly the links a full nearest-first sort would, without sorting them all', () => {
     let seed = 7;
     const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 40 - 20;
-    const points: StarPoint[] = Array.from({ length: 600 }, (_, id) => ({ id, x: random(), y: random(), z: random() }));
+    const points: StarPoint[] = Array.from({ length: 600 }, (_, id) => ({
+      id,
+      x: random(),
+      y: random(),
+      z: random(),
+    }));
     const centre = { x: 3, y: -2, z: 1 };
 
     for (const lengthPc of [0, 5, 60, 900, 4000, 1e9]) {
-      expect(linksDrawn(jumpLinkSegments(index(points), 4, { centre, lengthPc }), points).sort()).toEqual(nearestFirst(points, 4, centre, lengthPc).sort());
+      expect(
+        linksDrawn(jumpLinkSegments(index(points), 4, { centre, lengthPc }), points).sort(),
+      ).toEqual(nearestFirst(points, 4, centre, lengthPc).sort());
     }
   });
 
@@ -321,27 +388,42 @@ describe('jumpLinkSegments', () => {
     // centre share the band the budget ends in, in whatever order the grid walks them.
     let seed = 3;
     const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
-    const points: StarPoint[] = [{ id: 0, x: 4000, y: 0, z: 0 }, { id: 1, x: 4000.03, y: 0, z: 0 }];
+    const points: StarPoint[] = [
+      { id: 0, x: 4000, y: 0, z: 0 },
+      { id: 1, x: 4000.03, y: 0, z: 0 },
+    ];
     for (let pair = 0; pair < 40; pair++) {
       const r = 0.05 + random() * 0.9;
       const theta = random() * Math.PI * 2;
       const x = r * Math.cos(theta);
       const y = r * Math.sin(theta);
-      points.push({ id: 2 + pair * 2, x, y, z: 0 }, { id: 3 + pair * 2, x, y, z: 0.005 + random() * 0.04 });
+      points.push(
+        { id: 2 + pair * 2, x, y, z: 0 },
+        { id: 3 + pair * 2, x, y, z: 0.005 + random() * 0.04 },
+      );
     }
     const centre = { x: 0, y: 0, z: 0 };
 
     for (const lengthPc of [0.1, 0.3, 0.5]) {
-      expect(linksDrawn(jumpLinkSegments(index(points), 0.05, { centre, lengthPc }), points).sort()).toEqual(nearestFirst(points, 0.05, centre, lengthPc).sort());
+      expect(
+        linksDrawn(jumpLinkSegments(index(points), 0.05, { centre, lengthPc }), points).sort(),
+      ).toEqual(nearestFirst(points, 0.05, centre, lengthPc).sort());
     }
   });
 
   it('counts the budget in parsecs of link, not in links', () => {
     // Stars at 0, 1 and 3: a 2 pc link nearest the centre, then a 1 pc one. Two and a half parsecs
     // hold the first and not both, though two links would fit a count of two and a half.
-    const points: StarPoint[] = [{ id: 0, x: 0, y: 0, z: 0 }, { id: 1, x: 1, y: 0, z: 0 }, { id: 2, x: 3, y: 0, z: 0 }];
+    const points: StarPoint[] = [
+      { id: 0, x: 0, y: 0, z: 0 },
+      { id: 1, x: 1, y: 0, z: 0 },
+      { id: 2, x: 3, y: 0, z: 0 },
+    ];
 
-    const segments = jumpLinkSegments(index(points), 2.5, { centre: { x: 3, y: 0, z: 0 }, lengthPc: 2.5 });
+    const segments = jumpLinkSegments(index(points), 2.5, {
+      centre: { x: 3, y: 0, z: 0 },
+      lengthPc: 2.5,
+    });
 
     expect(linksDrawn(segments, points)).toEqual(['1-2']);
   });
@@ -350,7 +432,9 @@ describe('jumpLinkSegments', () => {
     // 5 000 stars a tenth of a parsec apart, ten neighbours each way in range: some 50 000 links, far past
     // the 4 096 the buffer starts with, so it has to grow several times.
     const count = 5000;
-    const line = new StarNeighbourhood(Array.from({ length: count }, (_, i) => ({ id: i, x: i / 10, y: 0, z: 0 })));
+    const line = new StarNeighbourhood(
+      Array.from({ length: count }, (_, i) => ({ id: i, x: i / 10, y: 0, z: 0 })),
+    );
     // 1.05 rather than 1: the tenth neighbour sits at 1.0, which float steps of a tenth put either side of it.
     const segments = jumpLinkSegments(line, 1.05);
 
@@ -367,7 +451,12 @@ describe('jumpLinkSegments', () => {
     // the route cannot take.
     let seed = 11;
     const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 30 - 15;
-    const points: StarPoint[] = Array.from({ length: 120 }, (_, id) => ({ id, x: random(), y: random(), z: random() }));
+    const points: StarPoint[] = Array.from({ length: 120 }, (_, id) => ({
+      id,
+      x: random(),
+      y: random(),
+      z: random(),
+    }));
     const cloud = index(points);
     // 9 rather than 6: at 6 this cloud falls into pieces and 0 never reaches 119, which an
     // earlier version of this test hid by only checking the route it happened to find.

@@ -60,7 +60,7 @@ const KIND_BY_OPENNGC_TYPE: Readonly<Record<string, DeepSkyKind>> = {
   // Star clusters and associations.
   OCl: 'cluster',
   GCl: 'cluster',
-  '*Ass': 'cluster'
+  '*Ass': 'cluster',
 };
 
 /** Maps an OpenNGC `Type` code to a backdrop kind, or `null` if it isn't a deep-sky object. */
@@ -104,7 +104,12 @@ export function estimateDeepSkyDistancePc(input: {
 }): DeepSkyDistanceEstimate | null {
   const { kind, redshift, parallaxMas } = input;
 
-  if (kind !== 'galaxy' && parallaxMas !== null && Number.isFinite(parallaxMas) && parallaxMas > 0) {
+  if (
+    kind !== 'galaxy' &&
+    parallaxMas !== null &&
+    Number.isFinite(parallaxMas) &&
+    parallaxMas > 0
+  ) {
     const distancePc = parallaxMasToParsecs(parallaxMas);
     if (Number.isFinite(distancePc) && distancePc <= MAX_PARALLAX_DISTANCE_PC) {
       return { distancePc, method: 'parallax' };

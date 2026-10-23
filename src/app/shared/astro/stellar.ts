@@ -1,4 +1,12 @@
-import { DwarfSequencePoint, dwarfSequenceAtColor, dwarfSequenceAtTemperature, dwarfSequenceAtType, isGiant, parseSpectralClass, SpectralClass } from './spectral';
+import {
+  DwarfSequencePoint,
+  dwarfSequenceAtColor,
+  dwarfSequenceAtTemperature,
+  dwarfSequenceAtType,
+  isGiant,
+  parseSpectralClass,
+  SpectralClass,
+} from './spectral';
 
 /**
  * Stellar luminosity, derived from the two things the star catalogue actually measures.
@@ -36,7 +44,7 @@ const BOLOMETRIC_CORRECTION_ANCHORS: Readonly<Record<SpectralClass, number>> = {
   F: -0.01,
   G: -0.06,
   K: -0.24,
-  M: -1.21
+  M: -1.21,
 };
 
 /** Correction at the cool end of class M, so the latest subclasses interpolate toward it. */
@@ -83,7 +91,10 @@ export function bolometricCorrection(spectralType: string | null | undefined): n
   const classes = Object.keys(BOLOMETRIC_CORRECTION_ANCHORS) as SpectralClass[];
   const index = classes.indexOf(spectralClass);
   const from = BOLOMETRIC_CORRECTION_ANCHORS[spectralClass];
-  const to = index < classes.length - 1 ? BOLOMETRIC_CORRECTION_ANCHORS[classes[index + 1]] : BEYOND_M_CORRECTION;
+  const to =
+    index < classes.length - 1
+      ? BOLOMETRIC_CORRECTION_ANCHORS[classes[index + 1]]
+      : BEYOND_M_CORRECTION;
   const t = Math.min(Math.max(subclass, 0), 10) / 10;
 
   return from + (to - from) * t;
@@ -135,7 +146,10 @@ export function luminositySolar(star: StellarPhotometry): number | null {
   // with its temperature: see giantSurface.
   const sequence = sequenceAtColour(star) ?? dwarfSequenceAtType(star.spectralType);
   const absoluteV = absolute - (star.magnitudeBand === 'G' ? (sequence?.gMinusV ?? 0) : 0);
-  const correction = giantSurface(star.spectralType)?.bolometricCorrectionV ?? sequence?.bolometricCorrectionV ?? bolometricCorrection(star.spectralType);
+  const correction =
+    giantSurface(star.spectralType)?.bolometricCorrectionV ??
+    sequence?.bolometricCorrectionV ??
+    bolometricCorrection(star.spectralType);
   const bolometric = absoluteV + correction;
   const luminosity = Math.pow(10, (SOLAR_BOLOMETRIC_MAGNITUDE - bolometric) / 2.5);
   return Math.min(Math.max(luminosity, MIN_LUMINOSITY_SOLAR), MAX_LUMINOSITY_SOLAR);
@@ -151,11 +165,18 @@ export function luminositySolar(star: StellarPhotometry): number | null {
  * off-table colour is more often a bad one than an extreme star — HD 49748, G5 V, at B−V −0.32 —
  * and the type is read instead.
  */
-function sequenceAtColour(star: Pick<StellarPhotometry, 'spectralType' | 'colorIndex' | 'colorSystem'>): DwarfSequencePoint | null {
+function sequenceAtColour(
+  star: Pick<StellarPhotometry, 'spectralType' | 'colorIndex' | 'colorSystem'>,
+): DwarfSequencePoint | null {
   if (star.colorIndex == null) {
     return null;
   }
-  return dwarfSequenceAtColor(star.colorIndex, star.colorSystem) ?? (parseSpectralClass(star.spectralType) ? null : dwarfSequenceAtColor(star.colorIndex, star.colorSystem, true));
+  return (
+    dwarfSequenceAtColor(star.colorIndex, star.colorSystem) ??
+    (parseSpectralClass(star.spectralType)
+      ? null
+      : dwarfSequenceAtColor(star.colorIndex, star.colorSystem, true))
+  );
 }
 
 /** The Sun's effective temperature, the IAU 2015 nominal value. */
@@ -172,7 +193,11 @@ export function effectiveTemperatureK(star: StellarPhotometry): number | null {
   if (star.distancePc === 0) {
     return SOLAR_EFFECTIVE_TEMPERATURE_K;
   }
-  return giantSurface(star.spectralType)?.temperatureK ?? (sequenceAtColour(star) ?? dwarfSequenceAtType(star.spectralType))?.temperatureK ?? null;
+  return (
+    giantSurface(star.spectralType)?.temperatureK ??
+    (sequenceAtColour(star) ?? dwarfSequenceAtType(star.spectralType))?.temperatureK ??
+    null
+  );
 }
 
 /**
@@ -181,7 +206,9 @@ export function effectiveTemperatureK(star: StellarPhotometry): number | null {
  * type's row: 224 stars that are not giants with no colour, and 36 whose colour is off the table
  * (HD 49748, G5 V at B−V −0.32). The card said their radii came "from colour and brightness".
  */
-export function temperatureFromColour(star: Pick<StellarPhotometry, 'spectralType' | 'colorIndex' | 'colorSystem'>): boolean {
+export function temperatureFromColour(
+  star: Pick<StellarPhotometry, 'spectralType' | 'colorIndex' | 'colorSystem'>,
+): boolean {
   return giantSurface(star.spectralType) === null && sequenceAtColour(star) !== null;
 }
 
@@ -231,9 +258,27 @@ function giantSurfaceOfType(spectralType: string | null | undefined): GiantSurfa
   const { spectralClass, subclass } = parsed;
   if (spectralClass === 'G' || spectralClass === 'K' || spectralClass === 'M') {
     // van Belle's index: G0 at 50, K0 at 60, K5 at 65 and M0 at 66, so a K later than K5 falls between.
-    const index = spectralClass === 'G' ? 50 + subclass : spectralClass === 'K' ? 60 + Math.min(subclass, 5) + Math.max(subclass - 5, 0) / 5 : 66 + subclass;
-    const temperatureK = index <= 61 ? 7856 - 52.74 * index : index <= 64 ? 16751 - 199.41 * index : index < 72 ? 9491 - 85.98 * index : 3134;
-    return { temperatureK, bolometricCorrectionV: index < M_GIANT_CORRECTIONS[0][0] ? dwarfSequenceAtTemperature(temperatureK).bolometricCorrectionV : mGiantCorrection(index) };
+    const index =
+      spectralClass === 'G'
+        ? 50 + subclass
+        : spectralClass === 'K'
+          ? 60 + Math.min(subclass, 5) + Math.max(subclass - 5, 0) / 5
+          : 66 + subclass;
+    const temperatureK =
+      index <= 61
+        ? 7856 - 52.74 * index
+        : index <= 64
+          ? 16751 - 199.41 * index
+          : index < 72
+            ? 9491 - 85.98 * index
+            : 3134;
+    return {
+      temperatureK,
+      bolometricCorrectionV:
+        index < M_GIANT_CORRECTIONS[0][0]
+          ? dwarfSequenceAtTemperature(temperatureK).bolometricCorrectionV
+          : mGiantCorrection(index),
+    };
   }
   const dwarf = dwarfSequenceAtType(primary)!;
   return { temperatureK: dwarf.temperatureK, bolometricCorrectionV: dwarf.bolometricCorrectionV };
@@ -256,7 +301,7 @@ const M_GIANT_CORRECTIONS: readonly (readonly [number, number])[] = [
   [71, -2.68],
   [71.5, -3.34],
   [72, -3.94],
-  [73.5, -4.86]
+  [73.5, -4.86],
 ];
 
 function mGiantCorrection(index: number): number {
@@ -264,7 +309,10 @@ function mGiantCorrection(index: number): number {
   if (next <= 0) {
     return M_GIANT_CORRECTIONS[next === 0 ? 0 : M_GIANT_CORRECTIONS.length - 1][1];
   }
-  const [[fromIndex, from], [toIndex, to]] = [M_GIANT_CORRECTIONS[next - 1], M_GIANT_CORRECTIONS[next]];
+  const [[fromIndex, from], [toIndex, to]] = [
+    M_GIANT_CORRECTIONS[next - 1],
+    M_GIANT_CORRECTIONS[next],
+  ];
   return from + ((to - from) * (index - fromIndex)) / (toIndex - fromIndex);
 }
 
@@ -302,7 +350,10 @@ const PLANCKIAN_LOCUS_MAX_K = 25000;
  * (208, 219, 255): Charity's table, which integrates the Planck spectrum, gives (255, 182, 98),
  * (255, 241, 231) at 5 800 K and (211, 221, 255).
  */
-export function blackbodyColor(temperatureK: number, whitePointK?: number): [number, number, number] {
+export function blackbodyColor(
+  temperatureK: number,
+  whitePointK?: number,
+): [number, number, number] {
   const rgb = blackbodyLinearSrgb(temperatureK);
   const white = whitePointK === undefined ? [1, 1, 1] : blackbodyLinearSrgb(whitePointK);
   const relative = rgb.map((channel, i) => channel / white[i]);
@@ -313,7 +364,9 @@ export function blackbodyColor(temperatureK: number, whitePointK?: number): [num
 function blackbodyLinearSrgb(temperatureK: number): number[] {
   const t = 1000 / Math.min(Math.max(temperatureK, PLANCKIAN_LOCUS_MIN_K), PLANCKIAN_LOCUS_MAX_K);
   const x =
-    t >= 0.25 ? -0.2661239 * t ** 3 - 0.2343589 * t ** 2 + 0.8776956 * t + 0.17991 : -3.0258469 * t ** 3 + 2.1070379 * t ** 2 + 0.2226347 * t + 0.24039;
+    t >= 0.25
+      ? -0.2661239 * t ** 3 - 0.2343589 * t ** 2 + 0.8776956 * t + 0.17991
+      : -3.0258469 * t ** 3 + 2.1070379 * t ** 2 + 0.2226347 * t + 0.24039;
   const y =
     t >= 1000 / 2222
       ? -1.1063814 * x ** 3 - 1.3481102 * x ** 2 + 2.18555832 * x - 0.20219683
@@ -322,5 +375,9 @@ function blackbodyLinearSrgb(temperatureK: number): number[] {
         : 3.081758 * x ** 3 - 5.8733867 * x ** 2 + 3.75112997 * x - 0.37001483;
   const [X, Y, Z] = [x / y, 1, (1 - x - y) / y];
   // Below 1 920 K the locus leaves the sRGB gamut, and blue comes out negative.
-  return [3.2406 * X - 1.5372 * Y - 0.4986 * Z, -0.9689 * X + 1.8758 * Y + 0.0415 * Z, 0.0557 * X - 0.204 * Y + 1.057 * Z].map((channel) => Math.max(channel, 0));
+  return [
+    3.2406 * X - 1.5372 * Y - 0.4986 * Z,
+    -0.9689 * X + 1.8758 * Y + 0.0415 * Z,
+    0.0557 * X - 0.204 * Y + 1.057 * Z,
+  ].map((channel) => Math.max(channel, 0));
 }

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { parsePlanetMeanElements, parseSatelliteMeanElements, parseSmallBodyElements, SbdbAnswer } from './mean-elements';
+import {
+  parsePlanetMeanElements,
+  parseSatelliteMeanElements,
+  parseSmallBodyElements,
+  SbdbAnswer,
+} from './mean-elements';
 
 /** Standish's p_elem_t2.txt, cut to the lines that matter here, as JPL published them. */
 const TABLE_2 = `Keplerian elements and their rates, with respect to the mean ecliptic and equinox of J2000,
@@ -72,15 +77,15 @@ const CERES: SbdbAnswer = {
       { name: 'tp', value: '2461599.841466614066' },
       { name: 'per', value: '1679.853119758983' },
       { name: 'n', value: '.21430445064843' },
-      { name: 'ad', value: '2.985945828685327' }
-    ]
+      { name: 'ad', value: '2.985945828685327' },
+    ],
   },
   phys_par: [
     { name: 'H', value: '3.34' },
     { name: 'diameter', value: '939.4' },
     { name: 'GM', value: '62.6284' },
-    { name: 'rot_per', value: '9.074170' }
-  ]
+    { name: 'rot_per', value: '9.074170' },
+  ],
 };
 
 describe('parsePlanetMeanElements', () => {
@@ -106,7 +111,12 @@ describe('parsePlanetMeanElements', () => {
   });
 
   it('carries Table 2b’s terms for Jupiter and beyond, and none for the inner planets', () => {
-    expect(parsePlanetMeanElements(TABLE_2, 'jupiter').rates.meanAnomalyTerms).toEqual({ b: -0.00012452, c: 0.0606406, s: -0.35635438, f: 38.35125 });
+    expect(parsePlanetMeanElements(TABLE_2, 'jupiter').rates.meanAnomalyTerms).toEqual({
+      b: -0.00012452,
+      c: 0.0606406,
+      s: -0.35635438,
+      f: 38.35125,
+    });
     expect(parsePlanetMeanElements(TABLE_2, 'earth').rates.meanAnomalyTerms).toBeUndefined();
   });
 
@@ -152,8 +162,12 @@ describe('parseSatelliteMeanElements', () => {
     expect(titania.rates.meanMotionDegPerDay).toBe(41.3514246);
     // Read as ecliptic elements, which is what a missing pole would mean, Titania is 88 degrees
     // from Horizons on 2025-01-01.
-    expect(() => parseSatelliteMeanElements(SATELLITES, 'Uranus', 'Titania', false)).toThrow(/equator/);
-    expect(() => parseSatelliteMeanElements(SATELLITES, 'Jupiter', 'Io', true, pole)).toThrow(/equator/);
+    expect(() => parseSatelliteMeanElements(SATELLITES, 'Uranus', 'Titania', false)).toThrow(
+      /equator/,
+    );
+    expect(() => parseSatelliteMeanElements(SATELLITES, 'Jupiter', 'Io', true, pole)).toThrow(
+      /equator/,
+    );
   });
 
   it('turns the periapsis backwards where a resonance holds it', () => {
@@ -172,9 +186,13 @@ describe('parseSmallBodyElements', () => {
       longitudeOfAscendingNodeDeg: 80.24862682043221,
       argumentOfPeriapsisDeg: 73.29421453021587,
       meanAnomalyAtEpochDeg: 274.4193463761342,
-      epochJd: 2461200.5
+      epochJd: 2461200.5,
     });
-    expect(ceres.rates).toEqual({ meanMotionDegPerDay: 0.21430445064843, longitudeOfAscendingNodeDegPerDay: 0, argumentOfPeriapsisDegPerDay: 0 });
+    expect(ceres.rates).toEqual({
+      meanMotionDegPerDay: 0.21430445064843,
+      longitudeOfAscendingNodeDegPerDay: 0,
+      argumentOfPeriapsisDegPerDay: 0,
+    });
     expect(ceres.laplacePole).toBeUndefined();
     expect(ceres.orbitSource).toBe('JPL SBDB osculating elements, epoch 2026 Jun 9');
   });
@@ -186,7 +204,10 @@ describe('parseSmallBodyElements', () => {
   });
 
   it('leaves out what the answer does not publish', () => {
-    const eris = parseSmallBodyElements({ ...CERES, phys_par: [{ name: 'rot_per', value: '25.9' }] });
+    const eris = parseSmallBodyElements({
+      ...CERES,
+      phys_par: [{ name: 'rot_per', value: '25.9' }],
+    });
     expect(eris.radiusKm).toBeUndefined();
     expect(eris.rotationPeriodHours).toBe(25.9);
   });

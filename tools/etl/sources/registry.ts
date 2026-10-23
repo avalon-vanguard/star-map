@@ -16,7 +16,7 @@ export const STAR_SOURCES: readonly StarSource[] = [
     endpoint: 'https://raw.githubusercontent.com/astronexus/HYG-Database',
     contributes:
       'A complete, named, spectrally classified bright-star catalogue. Its Hipparcos parallaxes give way to Gaia’s wherever Gaia has a usable one, so its stars sit where the better measurement puts them.',
-    unimplementedBecause: null
+    unimplementedBecause: null,
   },
   {
     id: 'gaia',
@@ -26,7 +26,7 @@ export const STAR_SOURCES: readonly StarSource[] = [
     contributes:
       'Parallaxes fifty times more precise than Hipparcos, for 1.8 billion sources — the only survey that can add stars to a 3D map, because it is the only one that measures how far away they are.',
     unimplementedBecause: null,
-    fetch: fetchGaiaStars
+    fetch: fetchGaiaStars,
   },
   {
     id: 'decaps2',
@@ -36,7 +36,7 @@ export const STAR_SOURCES: readonly StarSource[] = [
     contributes:
       'The deepest optical census of the southern galactic plane: 3.32 billion objects across 130 degrees, in the dust-obscured region every other catalogue thins out in.',
     unimplementedBecause:
-      'Photometric only — no parallaxes, so not one of its 3.32 billion objects can be placed in depth. Fifty times Gaia’s object count and zero stars this map can position. It would enter as a direction-only backdrop layer, alongside the deep-sky shell.'
+      'Photometric only — no parallaxes, so not one of its 3.32 billion objects can be placed in depth. Fifty times Gaia’s object count and zero stars this map can position. It would enter as a direction-only backdrop layer, alongside the deep-sky shell.',
   },
   {
     id: 'sdss5-mwm',
@@ -46,36 +46,45 @@ export const STAR_SOURCES: readonly StarSource[] = [
     contributes:
       'All-sky optical and infrared spectroscopy: effective temperatures, surface gravities, metallicities and radial velocities, which is real spectral classification rather than a colour index standing in for one.',
     unimplementedBecause:
-      'Adds no positions. It is keyed to targets Gaia already places, so it joins onto an existing catalogue rather than extending it — worth having once Gaia is in, and worth nothing before.'
+      'Adds no positions. It is keyed to targets Gaia already places, so it joins onto an existing catalogue rather than extending it — worth having once Gaia is in, and worth nothing before.',
   },
   {
     id: 'euclid-q2-bulge',
     name: 'Euclid Galactic Bulge Survey (Q2)',
     role: 'backdrop',
     endpoint: 'https://easidr.esac.esa.int/sas',
-    contributes: 'High-resolution imagery and astrometry of the crowded inner bulge, around 8 kpc away.',
+    contributes:
+      'High-resolution imagery and astrometry of the crowded inner bulge, around 8 kpc away.',
     unimplementedBecause:
-      'At 8 kpc a parallax is a few microarcseconds, so this is astrometry without usable distances for a map of this kind. Its natural use here is imagery — a real photograph of the bulge on the galactic view, in place of part of the procedural model.'
+      'At 8 kpc a parallax is a few microarcseconds, so this is astrometry without usable distances for a map of this kind. Its natural use here is imagery — a real photograph of the bulge on the galactic view, in place of part of the procedural model.',
   },
   {
     id: 'saga',
     name: 'SAGA (Stellar Abundances for Galactic Archaeology)',
     role: 'enrichment',
     endpoint: 'https://sagadatabase.jp',
-    contributes: 'Compiled elemental abundances for metal-poor stars — the chemical record of how the Galaxy assembled.',
+    contributes:
+      'Compiled elemental abundances for metal-poor stars — the chemical record of how the Galaxy assembled.',
     unimplementedBecause:
-      'A compilation keyed to stars other catalogues place, covering tens of thousands of objects rather than millions. Like SDSS-V it enriches; it cannot extend the map on its own.'
-  }
+      'A compilation keyed to stars other catalogues place, covering tens of thousands of objects rather than millions. Like SDSS-V it enriches; it cannot extend the map on its own.',
+  },
 ];
 
 export function positionalSources(): readonly StarSource[] {
-  return STAR_SOURCES.filter((source) => source.role === 'positional' && source.fetch !== undefined);
+  return STAR_SOURCES.filter(
+    (source) => source.role === 'positional' && source.fetch !== undefined,
+  );
 }
 
 /** A one-line-per-source report of what the pipeline can and cannot draw on. */
 export function describeSources(): string {
   return STAR_SOURCES.map((source) => {
-    const status = source.unimplementedBecause === null ? (source.fetch ? 'wired in' : 'wired in (built separately)') : 'declared, not fetched';
+    const status =
+      source.unimplementedBecause === null
+        ? source.fetch
+          ? 'wired in'
+          : 'wired in (built separately)'
+        : 'declared, not fetched';
     return `  [${source.role}] ${source.name} — ${status}`;
   }).join('\n');
 }

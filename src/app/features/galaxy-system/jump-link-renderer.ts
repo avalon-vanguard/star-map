@@ -36,8 +36,18 @@ export class JumpLinkRenderer {
   private routed = false;
 
   constructor(accent: THREE.ColorRepresentation) {
-    this.linkMaterial = new THREE.LineBasicMaterial({ color: accent, transparent: true, opacity: LINK_OPACITY, depthWrite: false });
-    this.routeMaterial = new THREE.LineBasicMaterial({ color: accent, transparent: true, opacity: ROUTE_OPACITY, depthWrite: false });
+    this.linkMaterial = new THREE.LineBasicMaterial({
+      color: accent,
+      transparent: true,
+      opacity: LINK_OPACITY,
+      depthWrite: false,
+    });
+    this.routeMaterial = new THREE.LineBasicMaterial({
+      color: accent,
+      transparent: true,
+      opacity: ROUTE_OPACITY,
+      depthWrite: false,
+    });
 
     this.links = new THREE.LineSegments(new THREE.BufferGeometry(), this.linkMaterial);
     this.route = new THREE.Line(new THREE.BufferGeometry(), this.routeMaterial);
@@ -60,8 +70,13 @@ export class JumpLinkRenderer {
   }
 
   /** The chain to draw over the graph, departure first. Fewer than two stars draws nothing. */
-  setRoute(starIds: readonly number[], positionOf: (starId: number) => LinkPoint | undefined): void {
-    const points = starIds.map(positionOf).filter((point): point is LinkPoint => point !== undefined);
+  setRoute(
+    starIds: readonly number[],
+    positionOf: (starId: number) => LinkPoint | undefined,
+  ): void {
+    const points = starIds
+      .map(positionOf)
+      .filter((point): point is LinkPoint => point !== undefined);
     this.routed = points.length >= 2;
     this.applyOpacity();
     const vertices = new Float32Array(points.length < 2 ? 0 : points.length * 3);
@@ -81,7 +96,8 @@ export class JumpLinkRenderer {
   }
 
   private applyOpacity(): void {
-    this.linkMaterial.opacity = LINK_OPACITY * this.strength * (this.routed ? GROUND_WHILE_ROUTED : 1);
+    this.linkMaterial.opacity =
+      LINK_OPACITY * this.strength * (this.routed ? GROUND_WHILE_ROUTED : 1);
     this.routeMaterial.opacity = ROUTE_OPACITY * this.strength;
   }
 

@@ -1,8 +1,18 @@
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 
-import { propagateProperMotion, raDegDecDistanceToXyz } from '../../src/app/shared/astro/coordinates';
-import { ARCHIVE_EPOCH, archiveDistancePc, archiveStarId, buildStarNameIndex, CATALOGUE_EPOCH, resolveHostStarId } from '../../src/app/shared/astro/host-star-matching';
+import {
+  propagateProperMotion,
+  raDegDecDistanceToXyz,
+} from '../../src/app/shared/astro/coordinates';
+import {
+  ARCHIVE_EPOCH,
+  archiveDistancePc,
+  archiveStarId,
+  buildStarNameIndex,
+  CATALOGUE_EPOCH,
+  resolveHostStarId,
+} from '../../src/app/shared/astro/host-star-matching';
 import { temperatureToColorIndex } from '../../src/app/shared/astro/spectral';
 import { ExoplanetRecord } from '../../src/app/shared/models/exoplanet.model';
 import { isDesignation } from '../../src/app/shared/models/star-catalog';
@@ -29,7 +39,7 @@ const TAP_COLUMNS = [
   'pl_rade',
   'pl_bmasse',
   'st_mass',
-  'disc_year'
+  'disc_year',
 ].join(',');
 // Ordered explicitly: without it the archive is free to return rows in any order, and a
 // scheduled re-run of the ETL would then rewrite exoplanets.json — and commit a diff — when
@@ -82,7 +92,7 @@ const COMPOSITE_COLUMNS = [
   'st_teff',
   'st_rad',
   'st_mass',
-  'st_lum'
+  'st_lum',
 ].join(',');
 // pl_name is unique here too, one row per planet.
 const COMPOSITE_URL = `${TAP_BASE_URL}?query=select+${COMPOSITE_COLUMNS}+from+pscomppars+order+by+pl_name&format=csv`;
@@ -112,7 +122,9 @@ const UNKNOWN_MAGNITUDE = 15;
  * own figures for each host the catalogue lacks but the archive places, and writes
  * `exoplanets.json` together with the star assets, which those additions change. Returns both.
  */
-export async function fetchExoplanets(stars?: StarRecord[]): Promise<{ exoplanets: ExoplanetRecord[]; stars: StarRecord[] }> {
+export async function fetchExoplanets(
+  stars?: StarRecord[],
+): Promise<{ exoplanets: ExoplanetRecord[]; stars: StarRecord[] }> {
   console.log('Fetching confirmed exoplanets from the NASA Exoplanet Archive...');
   const knownStars = stars ?? (await fetchStars());
   const nameIndex = buildStarNameIndex(knownStars);
@@ -120,9 +132,22 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<{ exoplanet
 
   const csv = await fetchTextCached(TAP_URL, CACHE_FILE);
   const rows = parseCsvObjects(csv);
-  const composite = new Map(parseCsvObjects(await fetchTextCached(COMPOSITE_URL, COMPOSITE_CACHE_FILE)).map((row) => [row['pl_name'], row]));
-  const distanceErrors = new Map(parseCsvObjects(await fetchTextCached(DISTANCE_ERRORS_URL, DISTANCE_ERRORS_CACHE_FILE)).map((row) => [row['pl_name'], row]));
-  const imaged = new Set(parseCsvObjects(await fetchTextCached(IMAGED_URL, IMAGED_CACHE_FILE)).map((row) => row['pl_name']));
+  const composite = new Map(
+    parseCsvObjects(await fetchTextCached(COMPOSITE_URL, COMPOSITE_CACHE_FILE)).map((row) => [
+      row['pl_name'],
+      row,
+    ]),
+  );
+  const distanceErrors = new Map(
+    parseCsvObjects(await fetchTextCached(DISTANCE_ERRORS_URL, DISTANCE_ERRORS_CACHE_FILE)).map(
+      (row) => [row['pl_name'], row],
+    ),
+  );
+  const imaged = new Set(
+    parseCsvObjects(await fetchTextCached(IMAGED_URL, IMAGED_CACHE_FILE)).map(
+      (row) => row['pl_name'],
+    ),
+  );
 
   let matched = 0;
   // Catalogue stars known only by their Gaia designation, which take the archive's host name —
@@ -143,9 +168,17 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<{ exoplanet
     const pmDecMasPerYear = host('sy_pmdec');
 
     let hostStarId = resolveHostStarId(
-      { hostname: row['hostname'], raDeg, decDeg, distancePc, pmRaMasPerYear, pmDecMasPerYear, parallaxMas: host('sy_plx') },
+      {
+        hostname: row['hostname'],
+        raDeg,
+        decDeg,
+        distancePc,
+        pmRaMasPerYear,
+        pmDecMasPerYear,
+        parallaxMas: host('sy_plx'),
+      },
       knownStars,
-      nameIndex
+      nameIndex,
     );
     if (hostStarId !== null) {
       matched++;
@@ -157,7 +190,13 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<{ exoplanet
       let archiveStar = archiveStars.get(row['hostname']);
       if (!archiveStar) {
         // Carried back from the archive's epoch like any Gaia row, and placed at `sy_dist`.
-        const j2000 = propagateProperMotion(raDeg, decDeg, pmRaMasPerYear ?? 0, pmDecMasPerYear ?? 0, ARCHIVE_TO_CATALOGUE_YEARS);
+        const j2000 = propagateProperMotion(
+          raDeg,
+          decDeg,
+          pmRaMasPerYear ?? 0,
+          pmDecMasPerYear ?? 0,
+          ARCHIVE_TO_CATALOGUE_YEARS,
+        );
         // V where the archive has it, as HYG's stars are; else Gaia's G, the band the catalogue's
         // Gaia stars are already in.
         const v = host('sy_vmag');
@@ -168,10 +207,18 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<{ exoplanet
         bands[band ?? 'none']++;
         // B-V where the archive has both magnitudes, else the effective temperature's; with
         // neither, null leaves the colour to the spectral type, as for any other star.
-        const colorIndex = b !== undefined && v !== undefined ? b - v : temperatureK !== undefined ? temperatureToColorIndex(temperatureK) : null;
+        const colorIndex =
+          b !== undefined && v !== undefined
+            ? b - v
+            : temperatureK !== undefined
+              ? temperatureToColorIndex(temperatureK)
+              : null;
         // The archive gives the distance's error as two one-sided ones; their mean, relative.
         const errors = distanceErrors.get(row['pl_name']);
-        const [above, below] = [parseOptionalNumber(errors?.['sy_disterr1']), parseOptionalNumber(errors?.['sy_disterr2'])];
+        const [above, below] = [
+          parseOptionalNumber(errors?.['sy_disterr1']),
+          parseOptionalNumber(errors?.['sy_disterr2']),
+        ];
         archiveStar = {
           id: archiveStarId(row['hostname'], archiveIds),
           name: row['hostname'],
@@ -181,9 +228,13 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<{ exoplanet
           spectralType: compositeRow?.['st_spectype'] || 'Unknown',
           colorIndex,
           ...(colorIndex === null ? {} : { colorSystem: 'B-V' as const }),
-          ...(colorIndex !== null && (b === undefined || v === undefined) ? { colorFromTemperature: true } : {}),
-          ...(above === undefined || below === undefined ? {} : { distanceError: (Math.abs(above) + Math.abs(below)) / 2 / distancePc }),
-          source: ARCHIVE_SOURCE
+          ...(colorIndex !== null && (b === undefined || v === undefined)
+            ? { colorFromTemperature: true }
+            : {}),
+          ...(above === undefined || below === undefined
+            ? {}
+            : { distanceError: (Math.abs(above) + Math.abs(below)) / 2 / distancePc }),
+          source: ARCHIVE_SOURCE,
         };
         archiveStars.set(row['hostname'], archiveStar);
         archiveIds.add(archiveStar.id);
@@ -208,7 +259,8 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<{ exoplanet
       hostStarRadiusSolar: host('st_rad'),
       hostStarTemperatureK: host('st_teff'),
       // Published as log10(L/L☉).
-      hostStarLuminositySolar: ((logLuminosity) => (logLuminosity === undefined ? undefined : 10 ** logLuminosity))(host('st_lum')),
+      hostStarLuminositySolar: ((logLuminosity) =>
+        logLuminosity === undefined ? undefined : 10 ** logLuminosity)(host('st_lum')),
       // Kept so the cross-reference can be redone without the archive; see the record's own
       // documentation. Undefined rather than NaN, which JSON cannot represent.
       hostRaDeg: host('ra'),
@@ -220,15 +272,20 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<{ exoplanet
         semiMajorAxisAu: parseOptionalNumber(row['pl_orbsmax']),
         eccentricity: parseOptionalNumber(row['pl_orbeccen']),
         inclinationDeg: parseOptionalNumber(row['pl_orbincl']),
-        argumentOfPeriapsisDeg: parseOptionalNumber(row['pl_orblper'])
-      }
+        argumentOfPeriapsisDeg: parseOptionalNumber(row['pl_orblper']),
+      },
     };
   });
 
   // Appended after the catalogue, whose ids all sit below ARCHIVE_ID_BASE, and sorted, so the list
   // stays in the id order `fetchStars` sorted it into.
   const added = [...archiveStars.values()].sort((a, b) => a.id - b.id);
-  const allStars = [...knownStars.map((star) => (renamed.has(star.id) ? { ...star, name: renamed.get(star.id)! } : star)), ...added];
+  const allStars = [
+    ...knownStars.map((star) =>
+      renamed.has(star.id) ? { ...star, name: renamed.get(star.id)! } : star,
+    ),
+    ...added,
+  ];
   writeStarAssets(allStars);
 
   ensureDataDir();
@@ -236,7 +293,7 @@ export async function fetchExoplanets(stars?: StarRecord[]): Promise<{ exoplanet
   console.log(
     `  wrote ${exoplanets.length} exoplanets: ${matched} on a catalogue star (${renamed.size} Gaia designations named after their host), ` +
       `${exoplanets.filter((exoplanet) => exoplanet.hostStarId !== null).length - matched} on ${added.length} stars added from the archive ` +
-      `(${added.filter((star) => Math.hypot(star.x, star.y, star.z) <= 250).length} within 250 pc; magnitude in V for ${bands.V}, in G for ${bands.G}, none for ${bands.none}).`
+      `(${added.filter((star) => Math.hypot(star.x, star.y, star.z) <= 250).length} within 250 pc; magnitude in V for ${bands.V}, in G for ${bands.G}, none for ${bands.none}).`,
   );
   return { exoplanets, stars: allStars };
 }

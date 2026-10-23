@@ -64,7 +64,17 @@ describe('BookmarksStore', () => {
   });
 
   it('reads past whatever else is in there, rather than losing the lot', () => {
-    localStorage.setItem(KEY, JSON.stringify([SIRIUS, { kind: 'moon', id: 1, name: 'No such kind' }, { id: 'no-kind' }, null, 42, EARTH]));
+    localStorage.setItem(
+      KEY,
+      JSON.stringify([
+        SIRIUS,
+        { kind: 'moon', id: 1, name: 'No such kind' },
+        { id: 'no-kind' },
+        null,
+        42,
+        EARTH,
+      ]),
+    );
 
     expect(store().bookmarks()).toEqual([SIRIUS, EARTH]);
   });
@@ -101,7 +111,11 @@ describe('BookmarksStore', () => {
   });
 
   it('bounds what a hand-edited store can make it hold', () => {
-    const many = Array.from({ length: 500 }, (_, i) => ({ kind: 'star' as const, id: i, name: `Star ${i}` }));
+    const many = Array.from({ length: 500 }, (_, i) => ({
+      kind: 'star' as const,
+      id: i,
+      name: `Star ${i}`,
+    }));
     localStorage.setItem(KEY, JSON.stringify(many));
 
     expect(store().bookmarks()).toHaveLength(200);

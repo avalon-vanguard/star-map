@@ -9,16 +9,69 @@ import { bodyOrientation, bodyPageView } from './body-orientation';
 
 // Earth (the Earth-Moon barycentre's mean elements) and the Moon as bodies.json carries them.
 const EARTH: BodyRecord = {
-  id: 'earth', systemStarId: 0, name: 'Earth', kind: 'planet', radiusKm: 6371, orbitSource: 'test',
-  orbit: {semiMajorAxisAu: 1.00000018, eccentricity: 0.01673163, inclinationDeg: -0.00054346, longitudeOfAscendingNodeDeg: -5.11260389, argumentOfPeriapsisDeg: 108.04266274, meanAnomalyAtEpochDeg: -2.4631431299999917, epochJd: 2451545},
-  rates: {meanMotionDegPerDay: 0.9856091187759068, longitudeOfAscendingNodeDegPerDay: -0.000006604751813826146, argumentOfPeriapsisDegPerDay: 0.000015309819575633124, semiMajorAxisAuPerDay: -8.213552361396303e-13, eccentricityPerDay: -1.002327173169062e-9, inclinationDegPerDay: -3.6609938398357287e-7},
-  rotationalElements: {poleRaDeg: [0, -0.641, 0], poleDecDeg: [90, -0.557, 0], primeMeridianDeg: [190.147, 360.9856235, 0]}
+  id: 'earth',
+  systemStarId: 0,
+  name: 'Earth',
+  kind: 'planet',
+  radiusKm: 6371,
+  orbitSource: 'test',
+  orbit: {
+    semiMajorAxisAu: 1.00000018,
+    eccentricity: 0.01673163,
+    inclinationDeg: -0.00054346,
+    longitudeOfAscendingNodeDeg: -5.11260389,
+    argumentOfPeriapsisDeg: 108.04266274,
+    meanAnomalyAtEpochDeg: -2.4631431299999917,
+    epochJd: 2451545,
+  },
+  rates: {
+    meanMotionDegPerDay: 0.9856091187759068,
+    longitudeOfAscendingNodeDegPerDay: -0.000006604751813826146,
+    argumentOfPeriapsisDegPerDay: 0.000015309819575633124,
+    semiMajorAxisAuPerDay: -8.213552361396303e-13,
+    eccentricityPerDay: -1.002327173169062e-9,
+    inclinationDegPerDay: -3.6609938398357287e-7,
+  },
+  rotationalElements: {
+    poleRaDeg: [0, -0.641, 0],
+    poleDecDeg: [90, -0.557, 0],
+    primeMeridianDeg: [190.147, 360.9856235, 0],
+  },
 };
 const MOON: BodyRecord = {
-  id: 'moon', systemStarId: 0, name: 'Moon', kind: 'moon', radiusKm: 1737.4, orbitSource: 'test', parentBodyId: 'earth',
-  orbit: {semiMajorAxisAu: 0.0025695552897999907, eccentricity: 0.0554, inclinationDeg: 5.16, longitudeOfAscendingNodeDeg: 125.08, argumentOfPeriapsisDeg: 318.15, meanAnomalyAtEpochDeg: 135.27, epochJd: 2451545},
-  rates: {meanMotionDegPerDay: 13.176358, longitudeOfAscendingNodeDegPerDay: -0.052990660396105185, argumentOfPeriapsisDegPerDay: 0.164353223839846},
-  rotationalElements: {poleRaDeg: [269.9949, 0.0031, 0], poleDecDeg: [66.5392, 0.013, 0], primeMeridianDeg: [38.3213, 13.17635815, -1.4e-12], terms: [{angleDeg: [125.045, -1935.5364525], ra: -3.8787, dec: 1.5419, pm: 3.561}, {angleDeg: [250.089, -3871.072905], ra: -0.1204, dec: 0.0239, pm: 0.1208}, {angleDeg: [260.008, 475263.3328725], ra: 0.07, dec: -0.0278, pm: -0.0642}, {angleDeg: [176.625, 487269.629985], ra: -0.0172, dec: 0.0068, pm: 0.0158}, {angleDeg: [357.529, 35999.0509575], ra: 0, dec: 0, pm: 0.0252}]}
+  id: 'moon',
+  systemStarId: 0,
+  name: 'Moon',
+  kind: 'moon',
+  radiusKm: 1737.4,
+  orbitSource: 'test',
+  parentBodyId: 'earth',
+  orbit: {
+    semiMajorAxisAu: 0.0025695552897999907,
+    eccentricity: 0.0554,
+    inclinationDeg: 5.16,
+    longitudeOfAscendingNodeDeg: 125.08,
+    argumentOfPeriapsisDeg: 318.15,
+    meanAnomalyAtEpochDeg: 135.27,
+    epochJd: 2451545,
+  },
+  rates: {
+    meanMotionDegPerDay: 13.176358,
+    longitudeOfAscendingNodeDegPerDay: -0.052990660396105185,
+    argumentOfPeriapsisDegPerDay: 0.164353223839846,
+  },
+  rotationalElements: {
+    poleRaDeg: [269.9949, 0.0031, 0],
+    poleDecDeg: [66.5392, 0.013, 0],
+    primeMeridianDeg: [38.3213, 13.17635815, -1.4e-12],
+    terms: [
+      { angleDeg: [125.045, -1935.5364525], ra: -3.8787, dec: 1.5419, pm: 3.561 },
+      { angleDeg: [250.089, -3871.072905], ra: -0.1204, dec: 0.0239, pm: 0.1208 },
+      { angleDeg: [260.008, 475263.3328725], ra: 0.07, dec: -0.0278, pm: -0.0642 },
+      { angleDeg: [176.625, 487269.629985], ra: -0.0172, dec: 0.0068, pm: 0.0158 },
+      { angleDeg: [357.529, 35999.0509575], ra: 0, dec: 0, pm: 0.0252 },
+    ],
+  },
 };
 const BODIES = [EARTH, MOON];
 const JUNE_1_2025_NOON_UTC = 2460828.0;
@@ -31,7 +84,10 @@ function subSolarPoint(body: BodyRecord, jdUtc: number): { eastDeg: number; latD
   const sun = new THREE.Vector3();
   expect(bodyPageView(body, BODIES, jdUtc, SUN_AZIMUTH, sphere.quaternion, sun)).toBe(true);
   sphere.updateMatrixWorld();
-  const hit = new THREE.Raycaster(sun.clone().multiplyScalar(4), sun.clone().negate()).intersectObject(sphere)[0];
+  const hit = new THREE.Raycaster(
+    sun.clone().multiplyScalar(4),
+    sun.clone().negate(),
+  ).intersectObject(sphere)[0];
   return { eastDeg: (hit.uv!.x - 0.5) * 360, latDeg: (hit.uv!.y - 0.5) * 180 };
 }
 
@@ -42,7 +98,9 @@ describe('bodyPageView', () => {
     // minutes before, when the light arriving then left the Sun; its latitude is geodetic, on the
     // flattened Earth, where the sphere's is geocentric: 0.14 degrees apart at this latitude.
     const horizons = subSolarPoint(EARTH, JUNE_1_2025_NOON_UTC - 8.43351424 / 1440);
-    const geodetic = (Math.atan(Math.tan((horizons.latDeg * Math.PI) / 180) / (1 - 1 / 298.257) ** 2) * 180) / Math.PI;
+    const geodetic =
+      (Math.atan(Math.tan((horizons.latDeg * Math.PI) / 180) / (1 - 1 / 298.257) ** 2) * 180) /
+      Math.PI;
     expect(Math.abs(horizons.eastDeg - 1.579501)).toBeLessThan(0.1);
     expect(Math.abs(geodetic - 22.260426)).toBeLessThan(0.05);
   });
@@ -51,8 +109,13 @@ describe('bodyPageView', () => {
     // Horizons' sub-solar longitude from the Sun (observer quantity 14, TIME_TYPE=UT), Earth taken
     // one light-time back: 1.0510 E on JD 2086455 and 1.5606 E on JD 1721600. The IAU's W, taken at
     // UT + 69.184 s as it was, drew them 2.3 and 4.6 degrees west of that (2.0 and 4.3 at UT itself).
-    for (const [jdUt, lightMinutes, eastDeg] of [[2086455, 8.45437443, 1.05101], [1721600, 8.45020842, 1.560644]]) {
-      expect(Math.abs(subSolarPoint(EARTH, jdUt - lightMinutes / 1440).eastDeg - eastDeg)).toBeLessThan(0.15);
+    for (const [jdUt, lightMinutes, eastDeg] of [
+      [2086455, 8.45437443, 1.05101],
+      [1721600, 8.45020842, 1.560644],
+    ]) {
+      expect(
+        Math.abs(subSolarPoint(EARTH, jdUt - lightMinutes / 1440).eastDeg - eastDeg),
+      ).toBeLessThan(0.15);
     }
   });
 
@@ -71,9 +134,17 @@ describe('bodyPageView', () => {
       const planet = new THREE.Quaternion();
       const sun = new THREE.Vector3();
       bodyPageView(EARTH, BODIES, jdUt, SUN_AZIMUTH, planet, sun);
-      const place = eclipticToEquatorial(positionAtEpoch(meanElementsAt(EARTH.orbit, EARTH.rates, tdbFromUtc(jdUt))));
-      const expected = new THREE.Vector3(-place.x, -place.y, -place.z).normalize().applyQuaternion(bodyOrientation(EARTH.rotationalElements!, jdUt, undefined, true).invert());
-      expect(sun.clone().applyQuaternion(planet.clone().invert()).angleTo(expected)).toBeLessThan(1e-9);
+      const place = eclipticToEquatorial(
+        positionAtEpoch(meanElementsAt(EARTH.orbit, EARTH.rates, tdbFromUtc(jdUt))),
+      );
+      const expected = new THREE.Vector3(-place.x, -place.y, -place.z)
+        .normalize()
+        .applyQuaternion(
+          bodyOrientation(EARTH.rotationalElements!, jdUt, undefined, true).invert(),
+        );
+      expect(sun.clone().applyQuaternion(planet.clone().invert()).angleTo(expected)).toBeLessThan(
+        1e-9,
+      );
     }
   });
 
@@ -82,7 +153,9 @@ describe('bodyPageView', () => {
     const sun = new THREE.Vector3();
     for (const hours of [0, 6, 12]) {
       bodyPageView(EARTH, BODIES, JUNE_1_2025_NOON_UTC + hours / 24, SUN_AZIMUTH, planet, sun);
-      expect(new THREE.Vector3(0, 1, 0).applyQuaternion(planet).angleTo(new THREE.Vector3(0, 1, 0))).toBeLessThan(1e-9);
+      expect(
+        new THREE.Vector3(0, 1, 0).applyQuaternion(planet).angleTo(new THREE.Vector3(0, 1, 0)),
+      ).toBeLessThan(1e-9);
       expect(Math.atan2(sun.x, sun.z)).toBeCloseTo(SUN_AZIMUTH, 9);
     }
   });
@@ -92,7 +165,16 @@ describe('bodyPageView', () => {
     const before = planet.clone();
     const sun = new THREE.Vector3(4, 3, 5);
 
-    expect(bodyPageView({ ...EARTH, rotationalElements: undefined }, BODIES, JUNE_1_2025_NOON_UTC, SUN_AZIMUTH, planet, sun)).toBe(false);
+    expect(
+      bodyPageView(
+        { ...EARTH, rotationalElements: undefined },
+        BODIES,
+        JUNE_1_2025_NOON_UTC,
+        SUN_AZIMUTH,
+        planet,
+        sun,
+      ),
+    ).toBe(false);
     expect(planet.equals(before)).toBe(true);
     expect(sun.toArray()).toEqual([4, 3, 5]);
   });

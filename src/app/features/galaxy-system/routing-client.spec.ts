@@ -14,7 +14,7 @@ const STARS: StarRecord[] = Array.from({ length: 6 }, (_, i) => ({
   z: 0,
   magnitude: 5,
   spectralType: 'G2V',
-  colorIndex: 0.6
+  colorIndex: 0.6,
 }));
 const POSITIONS = Float32Array.from(STARS.flatMap((star) => [star.x, star.y, star.z]));
 const index = new StarNeighbourhood(STARS);
@@ -31,7 +31,10 @@ class FakeWorker {
   private readonly listeners: Record<string, Array<(event: { data?: unknown }) => void>> = {};
   terminated = false;
 
-  postMessage(message: RoutingRequest | { kind: 'catalogue' }, transfer: Transferable[] = []): void {
+  postMessage(
+    message: RoutingRequest | { kind: 'catalogue' },
+    transfer: Transferable[] = [],
+  ): void {
     this.sent.push(message);
     this.transferred.push(...(transfer as ArrayBufferLike[]));
   }
@@ -73,7 +76,12 @@ describe('RoutingClient without a worker', () => {
   it('answers a route from the index it was given', async () => {
     const client = new RoutingClient(STARS, POSITIONS, index);
 
-    await expect(client.route(100, 104, 1.5, 8)).resolves.toEqual({ route: routeBetween(index, 100, 104, 1.5).route, neededRangePc: null, gaveUp: false, least: true });
+    await expect(client.route(100, 104, 1.5, 8)).resolves.toEqual({
+      route: routeBetween(index, 100, 104, 1.5).route,
+      neededRangePc: null,
+      gaveUp: false,
+      least: true,
+    });
     client.dispose();
   });
 
@@ -90,7 +98,9 @@ describe('RoutingClient without a worker', () => {
   it('answers the graph as segments', async () => {
     const client = new RoutingClient(STARS, POSITIONS, index);
 
-    expect(Array.from(await client.links(1.5, ALL))).toEqual(Array.from(jumpLinkSegments(index, 1.5)));
+    expect(Array.from(await client.links(1.5, ALL))).toEqual(
+      Array.from(jumpLinkSegments(index, 1.5)),
+    );
     client.dispose();
   });
 
@@ -98,7 +108,10 @@ describe('RoutingClient without a worker', () => {
     const client = new RoutingClient(STARS, POSITIONS, index);
 
     // Stars at x = 0 to 4 a parsec apart: from a centre at 3.9, one and a half parsecs is the link 3-4 alone.
-    const segments = await client.links(1.5, ALL, { centre: { x: 3.9, y: 0, z: 0 }, lengthPc: 1.5 });
+    const segments = await client.links(1.5, ALL, {
+      centre: { x: 3.9, y: 0, z: 0 },
+      lengthPc: 1.5,
+    });
 
     expect(Array.from(segments)).toEqual([3, 0, 0, 4, 0, 0]);
     client.dispose();
@@ -108,7 +121,9 @@ describe('RoutingClient without a worker', () => {
     const client = new RoutingClient(STARS, POSITIONS, index);
 
     // Stars at x = 0, 1 and 3: only the first two are within 1.5 pc of each other.
-    expect(Array.from(await client.links(1.5, Uint32Array.of(0, 1, 3)))).toEqual([0, 0, 0, 1, 0, 0]);
+    expect(Array.from(await client.links(1.5, Uint32Array.of(0, 1, 3)))).toEqual([
+      0, 0, 0, 1, 0, 0,
+    ]);
     client.dispose();
   });
 
@@ -153,13 +168,31 @@ describe('RoutingClient with a worker', () => {
     await expect(first).resolves.toHaveLength(6);
 
     const routeRequest = worker.requests[1];
-    worker.answer({ kind: 'route', requestId: routeRequest.requestId, route: null, neededRangePc: 4, gaveUp: false, least: true });
-    await expect(route).resolves.toEqual({ route: null, neededRangePc: 4, gaveUp: false, least: true });
+    worker.answer({
+      kind: 'route',
+      requestId: routeRequest.requestId,
+      route: null,
+      neededRangePc: 4,
+      gaveUp: false,
+      least: true,
+    });
+    await expect(route).resolves.toEqual({
+      route: null,
+      neededRangePc: 4,
+      gaveUp: false,
+      least: true,
+    });
     await flush();
 
-    expect(worker.requests.map((request) => (request.kind === 'links' ? request.rangePc : request.kind))).toEqual([5, 'route', 8]);
+    expect(
+      worker.requests.map((request) => (request.kind === 'links' ? request.rangePc : request.kind)),
+    ).toEqual([5, 'route', 8]);
     const lastGraph = worker.requests[2];
-    worker.answer({ kind: 'links', requestId: lastGraph.requestId, segments: new Float32Array(12) });
+    worker.answer({
+      kind: 'links',
+      requestId: lastGraph.requestId,
+      segments: new Float32Array(12),
+    });
     await expect(latest).resolves.toHaveLength(12);
     client.dispose();
   });
@@ -171,14 +204,33 @@ describe('RoutingClient with a worker', () => {
     const widerRange = client.route(100, 104, 2.5, 8);
 
     expect(worker.requests).toHaveLength(1);
-    worker.answer({ kind: 'route', requestId: worker.requests[0].requestId, route: null, neededRangePc: 4, gaveUp: false, least: true });
+    worker.answer({
+      kind: 'route',
+      requestId: worker.requests[0].requestId,
+      route: null,
+      neededRangePc: 4,
+      gaveUp: false,
+      least: true,
+    });
 
     expect(await again).toEqual(await once);
     await flush();
     // The same two stars at another range is another question.
     expect(worker.requests.map((request) => request.rangePc)).toEqual([1.5, 2.5]);
-    worker.answer({ kind: 'route', requestId: worker.requests[1].requestId, route: null, neededRangePc: null, gaveUp: false, least: true });
-    await expect(widerRange).resolves.toEqual({ route: null, neededRangePc: null, gaveUp: false, least: true });
+    worker.answer({
+      kind: 'route',
+      requestId: worker.requests[1].requestId,
+      route: null,
+      neededRangePc: null,
+      gaveUp: false,
+      least: true,
+    });
+    await expect(widerRange).resolves.toEqual({
+      route: null,
+      neededRangePc: null,
+      gaveUp: false,
+      least: true,
+    });
     client.dispose();
   });
 
@@ -192,14 +244,24 @@ describe('RoutingClient with a worker', () => {
     const again = client.links(5, drawn);
     const sameAsBuilding = client.links(3, drawn);
 
-    worker.answer({ kind: 'links', requestId: worker.requests[0].requestId, segments: new Float32Array(6) });
+    worker.answer({
+      kind: 'links',
+      requestId: worker.requests[0].requestId,
+      segments: new Float32Array(6),
+    });
     await expect(building).resolves.toHaveLength(6);
     await expect(sameAsBuilding).resolves.toHaveLength(6);
     await flush();
-    worker.answer({ kind: 'links', requestId: worker.requests[1].requestId, segments: new Float32Array(12) });
+    worker.answer({
+      kind: 'links',
+      requestId: worker.requests[1].requestId,
+      segments: new Float32Array(12),
+    });
     await expect(waiting).resolves.toHaveLength(12);
     await expect(again).resolves.toHaveLength(12);
-    expect(worker.requests.map((request) => request.kind === 'links' && request.rangePc)).toEqual([3, 5]);
+    expect(worker.requests.map((request) => request.kind === 'links' && request.rangePc)).toEqual([
+      3, 5,
+    ]);
     client.dispose();
   });
 
@@ -210,18 +272,37 @@ describe('RoutingClient with a worker', () => {
     void client.links(3, near);
     const second = client.links(3, far);
 
-    worker.answer({ kind: 'links', requestId: worker.requests[0].requestId, segments: new Float32Array(6) });
+    worker.answer({
+      kind: 'links',
+      requestId: worker.requests[0].requestId,
+      segments: new Float32Array(6),
+    });
     await flush();
 
-    expect(worker.requests.map((request) => request.kind === 'links' && Array.from(request.drawn))).toEqual([[0, 1, 2], [3, 4, 5]]);
-    worker.answer({ kind: 'links', requestId: worker.requests[1].requestId, segments: new Float32Array(12) });
+    expect(
+      worker.requests.map((request) => request.kind === 'links' && Array.from(request.drawn)),
+    ).toEqual([
+      [0, 1, 2],
+      [3, 4, 5],
+    ]);
+    worker.answer({
+      kind: 'links',
+      requestId: worker.requests[1].requestId,
+      segments: new Float32Array(12),
+    });
     await expect(second).resolves.toHaveLength(12);
     // The same list at a different budget is a different graph.
     void client.links(3, far, { centre: { x: 1, y: 0, z: 0 }, lengthPc: 10 });
     void client.links(3, far, { centre: { x: 1, y: 0, z: 0 }, lengthPc: 20 });
-    worker.answer({ kind: 'links', requestId: worker.requests[2].requestId, segments: new Float32Array(0) });
+    worker.answer({
+      kind: 'links',
+      requestId: worker.requests[2].requestId,
+      segments: new Float32Array(0),
+    });
     await flush();
-    expect(worker.requests.map((request) => request.kind === 'links' && request.budget?.lengthPc)).toEqual([undefined, undefined, 10, 20]);
+    expect(
+      worker.requests.map((request) => request.kind === 'links' && request.budget?.lengthPc),
+    ).toEqual([undefined, undefined, 10, 20]);
     // The star field goes on drawing and picking from these lists, so they are copied, not moved.
     expect(worker.transferred).not.toContain(near.buffer);
     expect(worker.transferred).not.toContain(far.buffer);
@@ -232,9 +313,21 @@ describe('RoutingClient with a worker', () => {
     const { client, worker } = clientWithFake();
     const answer = client.route(100, 105, 1.5, 8);
 
-    worker.answer({ kind: 'route', requestId: worker.requests[0].requestId, route: null, neededRangePc: null, gaveUp: true, least: false });
+    worker.answer({
+      kind: 'route',
+      requestId: worker.requests[0].requestId,
+      route: null,
+      neededRangePc: null,
+      gaveUp: true,
+      least: false,
+    });
 
-    await expect(answer).resolves.toEqual({ route: null, neededRangePc: null, gaveUp: true, least: false });
+    await expect(answer).resolves.toEqual({
+      route: null,
+      neededRangePc: null,
+      gaveUp: true,
+      least: false,
+    });
     client.dispose();
   });
 
@@ -243,12 +336,20 @@ describe('RoutingClient with a worker', () => {
     const failing = client.route(100, 104, 1.5, 8).catch((error: unknown) => error);
     const next = client.links(3, ALL);
 
-    worker.answer({ kind: 'failed', requestId: worker.requests[0].requestId, message: 'out of memory' });
+    worker.answer({
+      kind: 'failed',
+      requestId: worker.requests[0].requestId,
+      message: 'out of memory',
+    });
 
     expect(((await failing) as Error).message).toBe('out of memory');
     await flush();
     expect(worker.requests.map((request) => request.kind)).toEqual(['route', 'links']);
-    worker.answer({ kind: 'links', requestId: worker.requests[1].requestId, segments: new Float32Array(0) });
+    worker.answer({
+      kind: 'links',
+      requestId: worker.requests[1].requestId,
+      segments: new Float32Array(0),
+    });
     await expect(next).resolves.toHaveLength(0);
     client.dispose();
   });
@@ -260,7 +361,12 @@ describe('RoutingClient with a worker', () => {
 
     worker.fail();
 
-    await expect(route).resolves.toEqual({ route: routeBetween(index, 100, 104, 1.5).route, neededRangePc: null, gaveUp: false, least: true });
+    await expect(route).resolves.toEqual({
+      route: routeBetween(index, 100, 104, 1.5).route,
+      neededRangePc: null,
+      gaveUp: false,
+      least: true,
+    });
     expect(Array.from(await graph)).toEqual([0, 0, 0, 1, 0, 0]);
     await expect(client.route(100, 105, 1.5, 8)).resolves.toMatchObject({ route: null });
     expect(worker.terminated).toBe(true);

@@ -13,7 +13,11 @@ import { DEFAULT_HUD_DISPLAY, HudDisplay, HudDockComponent } from './hud-dock.co
 // the dock before this one installs its matchMedia.
 const viewport = vi.hoisted(() => {
   const state = { wide: true };
-  window.matchMedia = (() => ({ get matches() { return state.wide; } })) as unknown as typeof window.matchMedia;
+  window.matchMedia = (() => ({
+    get matches() {
+      return state.wide;
+    },
+  })) as unknown as typeof window.matchMedia;
   return state;
 });
 
@@ -41,7 +45,9 @@ describe('HudDockComponent', () => {
   }
 
   function tab(name: string): HTMLButtonElement {
-    const found = [...host().querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((t) => t.textContent?.trim() === name);
+    const found = [...host().querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
+      (t) => t.textContent?.trim() === name,
+    );
     if (!found) {
       throw new Error(`no "${name}" tab`);
     }
@@ -52,7 +58,10 @@ describe('HudDockComponent', () => {
     fixture.componentRef.setInput('eyebrow', 'Galactic Scale');
     fixture.componentRef.setInput('title', 'Milky Way');
     fixture.componentRef.setInput('subtitle', 'Barred spiral');
-    fixture.componentRef.setInput('readouts', [{ label: 'Arms', value: '5' }, { label: 'Luminosity', value: '1 L☉', derived: true }]);
+    fixture.componentRef.setInput('readouts', [
+      { label: 'Arms', value: '5' },
+      { label: 'Luminosity', value: '1 L☉', derived: true },
+    ]);
     fixture.componentRef.setInput('note', 'Illustrative model.');
     fixture.componentRef.setInput('range', '21.5 kpc');
   }
@@ -63,8 +72,8 @@ describe('HudDockComponent', () => {
       imports: [HudDockComponent],
       providers: [
         { provide: DataLoaderService, useClass: EmptyDataLoaderService },
-        { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true) } }
-      ]
+        { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true) } },
+      ],
     }).compileComponents();
     fixture = TestBed.createComponent(HudDockComponent);
   });
@@ -105,10 +114,21 @@ describe('HudDockComponent', () => {
 
     expect(tab('Readout').getAttribute('aria-selected')).toBe('true');
     const text = host().textContent ?? '';
-    for (const expected of ['Galactic Scale', 'Milky Way', 'Barred spiral', 'Arms', '5', 'Illustrative model.', 'Derived, not catalogued', '21.5 kpc']) {
+    for (const expected of [
+      'Galactic Scale',
+      'Milky Way',
+      'Barred spiral',
+      'Arms',
+      '5',
+      'Illustrative model.',
+      'Derived, not catalogued',
+      '21.5 kpc',
+    ]) {
       expect(text).toContain(expected);
     }
-    expect(host().querySelector('[data-testid="hud-title"]')?.textContent?.trim()).toBe('Milky Way');
+    expect(host().querySelector('[data-testid="hud-title"]')?.textContent?.trim()).toBe(
+      'Milky Way',
+    );
   });
 
   it('leaves out the optional lines it was given nothing for', () => {
@@ -152,7 +172,9 @@ describe('HudDockComponent', () => {
     const emitted: HudDisplay[] = [];
     fixture.componentInstance.displayChange.subscribe((display) => emitted.push(display));
 
-    const orbits = [...host().querySelectorAll<HTMLButtonElement>('[aria-pressed]')].find((b) => b.textContent?.includes('Orbits'));
+    const orbits = [...host().querySelectorAll<HTMLButtonElement>('[aria-pressed]')].find((b) =>
+      b.textContent?.includes('Orbits'),
+    );
     orbits?.click();
 
     expect(emitted).toEqual([{ ...DEFAULT_HUD_DISPLAY, orbits: false }]);
@@ -162,8 +184,20 @@ describe('HudDockComponent', () => {
     fixture.componentRef.setInput('display', { ...DEFAULT_HUD_DISPLAY, grid: false });
     fixture.componentRef.setInput('defaultTab', 'display');
     fixture.detectChanges();
-    const pressed = [...host().querySelectorAll('[aria-pressed]')].map((b) => `${b.textContent?.trim()}=${b.getAttribute('aria-pressed')}`);
-    expect(pressed).toEqual(['Labels=true', 'Orbits=true', 'Grid=false', 'Deep sky=true', 'Sky=true', 'Systems=true', 'Jump links=false', 'Plan view=false', 'Backwards=false']);
+    const pressed = [...host().querySelectorAll('[aria-pressed]')].map(
+      (b) => `${b.textContent?.trim()}=${b.getAttribute('aria-pressed')}`,
+    );
+    expect(pressed).toEqual([
+      'Labels=true',
+      'Orbits=true',
+      'Grid=false',
+      'Deep sky=true',
+      'Sky=true',
+      'Systems=true',
+      'Jump links=false',
+      'Plan view=false',
+      'Backwards=false',
+    ]);
   });
 
   it('says how to keep a place, rather than showing an empty list', () => {
@@ -181,7 +215,9 @@ describe('HudDockComponent', () => {
     fixture.componentRef.setInput('defaultTab', 'bookmarks');
     fixture.detectChanges();
 
-    const rows = [...host().querySelectorAll('#dock-panel-bookmarks li')].map((li) => li.textContent?.replace(/\s+/g, ' ').trim());
+    const rows = [...host().querySelectorAll('#dock-panel-bookmarks li')].map((li) =>
+      li.textContent?.replace(/\s+/g, ' ').trim(),
+    );
     expect(rows[0]).toContain('Earth');
     expect(rows[0]).toContain('Body');
     expect(rows[1]).toContain('Sirius');
@@ -229,7 +265,9 @@ describe('HudDockComponent', () => {
     fixture.detectChanges();
 
     expect(bookmarks.has('star', 7)).toBe(true);
-    expect(host().querySelector('[aria-label="Forget Sirius"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect(host().querySelector('[aria-label="Forget Sirius"]')?.getAttribute('aria-pressed')).toBe(
+      'true',
+    );
   });
 
   it('keeps the one system whose catalogue id is zero, which truthiness would have lost', () => {
@@ -278,11 +316,18 @@ describe('HudDockComponent', () => {
   it('will not plot from a departure that was typed but never chosen', () => {
     setReadout();
     fixture.componentRef.setInput('routing', true);
-    fixture.componentRef.setInput('currentStar', { id: 3, name: "Barnard's Star", subtitle: '1.8 pc' });
+    fixture.componentRef.setInput('currentStar', {
+      id: 3,
+      name: "Barnard's Star",
+      subtitle: '1.8 pc',
+    });
     fixture.componentRef.setInput('routeOptions', [{ id: 7, name: 'Sirius', subtitle: '2.6 pc' }]);
     fixture.componentRef.setInput('defaultTab', 'routes');
     fixture.detectChanges();
-    const plot = () => [...host().querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('Plot route'))!;
+    const plot = () =>
+      [...host().querySelectorAll<HTMLButtonElement>('button')].find((button) =>
+        button.textContent?.includes('Plot route'),
+      )!;
     const type = (field: string, value: string) => {
       const input = host().querySelector<HTMLInputElement>(`#route-${field}`)!;
       input.value = value;
@@ -311,9 +356,16 @@ describe('HudDockComponent', () => {
 
     // The offer beside a refusal is the same request by another route, so it is held to the same
     // test: moving the range with nothing to plot leaves the panel contradicting itself.
-    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: 1.8, gaveUp: false, least: true });
+    fixture.componentRef.setInput('routeResult', {
+      stars: [],
+      totalPc: 0,
+      neededRangePc: 1.8,
+      gaveUp: false,
+      least: true,
+    });
     fixture.detectChanges();
-    const offer = () => host().querySelector<HTMLButtonElement>('[data-testid="route-summary"] button')!;
+    const offer = () =>
+      host().querySelector<HTMLButtonElement>('[data-testid="route-summary"] button')!;
     expect(offer().disabled).toBe(false);
 
     type('from', 'Sol');
@@ -328,35 +380,67 @@ describe('HudDockComponent', () => {
     fixture.detectChanges();
 
     // The wipe clips its panel for 380 ms, which swallows clicks on entries that are already there.
-    expect(host().querySelector('#dock-panel-routes')?.classList.contains('hud-acquire')).toBe(false);
+    expect(host().querySelector('#dock-panel-routes')?.classList.contains('hud-acquire')).toBe(
+      false,
+    );
     tab('Display').click();
     fixture.detectChanges();
-    expect(host().querySelector('#dock-panel-display')?.classList.contains('hud-acquire')).toBe(true);
+    expect(host().querySelector('#dock-panel-display')?.classList.contains('hud-acquire')).toBe(
+      true,
+    );
   });
 
   it('says the search gave up rather than that there is no route, when that is what happened', () => {
     fixture.componentRef.setInput('routing', true);
     fixture.componentRef.setInput('defaultTab', 'routes');
-    const summary = () => host().querySelector('[data-testid="route-summary"]')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+    const summary = () =>
+      host()
+        .querySelector('[data-testid="route-summary"]')
+        ?.textContent?.replace(/\s+/g, ' ')
+        .trim() ?? '';
 
-    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: null, gaveUp: true, least: false });
+    fixture.componentRef.setInput('routeResult', {
+      stars: [],
+      totalPc: 0,
+      neededRangePc: null,
+      gaveUp: true,
+      least: false,
+    });
     fixture.detectChanges();
     expect(summary()).toBe('Too many stars to search at this range.');
 
     // Having looked everywhere the range reaches is a different answer, and one that can be stated.
-    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: null, gaveUp: false, least: true });
+    fixture.componentRef.setInput('routeResult', {
+      stars: [],
+      totalPc: 0,
+      neededRangePc: null,
+      gaveUp: false,
+      least: true,
+    });
     fixture.detectChanges();
     expect(summary()).toContain('No chain of jumps up to');
 
     // A range a chain was found at is worth offering — but the search that gave up at the range
     // asked for still gave up, and saying "no route" beside the offer is saying it did not.
-    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: 6.4, gaveUp: true, least: false });
+    fixture.componentRef.setInput('routeResult', {
+      stars: [],
+      totalPc: 0,
+      neededRangePc: 6.4,
+      gaveUp: true,
+      least: false,
+    });
     fixture.detectChanges();
     expect(summary()).toBe('Too many stars to search at this range. 6.40 pc would reach.');
 
     // The other way round: the range asked for was searched to exhaustion and the wider search was
     // the one that gave up. There is no route at this range, and nothing further can be claimed.
-    fixture.componentRef.setInput('routeResult', { stars: [], totalPc: 0, neededRangePc: null, gaveUp: false, least: false });
+    fixture.componentRef.setInput('routeResult', {
+      stars: [],
+      totalPc: 0,
+      neededRangePc: null,
+      gaveUp: false,
+      least: false,
+    });
     fixture.detectChanges();
     expect(summary()).toBe('No route at this range.');
   });
@@ -402,11 +486,15 @@ describe('HudDockComponent', () => {
     afterEach(() => vi.unstubAllEnvs());
 
     function button(name: string): HTMLButtonElement {
-      return [...host().querySelectorAll<HTMLButtonElement>('#dock-panel-display button')].find((b) => b.textContent?.trim() === name)!;
+      return [...host().querySelectorAll<HTMLButtonElement>('#dock-panel-display button')].find(
+        (b) => b.textContent?.trim() === name,
+      )!;
     }
 
     function radio(name: string): HTMLInputElement {
-      return [...host().querySelectorAll('#dock-panel-display label')].find((l) => l.textContent?.trim() === name)!.querySelector('input')!;
+      return [...host().querySelectorAll('#dock-panel-display label')]
+        .find((l) => l.textContent?.trim() === name)!
+        .querySelector('input')!;
     }
 
     it('runs the same rates backwards, and keeps the direction when the rate changes', () => {
@@ -433,10 +521,14 @@ describe('HudDockComponent', () => {
 
       expect(field.type).toBe('datetime-local');
       expect(field.value).toBe(time.date().toISOString().slice(0, 16));
-      expect(host().querySelector('label[for="clock-date"]')?.textContent?.trim()).toBe('Date (UTC)');
+      expect(host().querySelector('label[for="clock-date"]')?.textContent?.trim()).toBe(
+        'Date (UTC)',
+      );
       expect(field.min).toBe('0001-01-01T00:00');
       expect(field.max).toBe('3000-01-01T00:00');
-      expect(host().querySelector(`#${field.getAttribute('aria-describedby')}`)?.textContent).toContain('AD 1 to AD 3000');
+      expect(
+        host().querySelector(`#${field.getAttribute('aria-describedby')}`)?.textContent,
+      ).toContain('AD 1 to AD 3000');
     });
 
     it('jumps the clock to the date submitted, read as UTC', () => {
@@ -455,7 +547,9 @@ describe('HudDockComponent', () => {
       button('Back to now').click();
       fixture.detectChanges();
       expect(time.atNow()).toBe(true);
-      expect(host().querySelector<HTMLInputElement>('#clock-date')!.value).toBe(time.date().toISOString().slice(0, 16));
+      expect(host().querySelector<HTMLInputElement>('#clock-date')!.value).toBe(
+        time.date().toISOString().slice(0, 16),
+      );
     });
 
     it('folds the sheet away on a phone once a date is set, so the system it covered can be seen', () => {
@@ -495,10 +589,14 @@ describe('HudDockComponent', () => {
       // Its own scrollbar, where the browser draws one, thin and dark: a desktop's default was a
       // light bar 15 px tall across the dock.
       expect(tabs.contains('scheme-dark') && tabs.contains('[scrollbar-width:thin]')).toBe(true);
-      expect(host().querySelector('[data-testid="hud-date"]')!.classList.contains('shrink-0')).toBe(true);
+      expect(host().querySelector('[data-testid="hud-date"]')!.classList.contains('shrink-0')).toBe(
+        true,
+      );
       // The range keeps its width where it is shown, or '417 AU' wraps and the row grows 20 px; on a
       // phone it is not shown, where at the present it took the Display tab out of sight.
-      const range = [...host().querySelectorAll('p')].find((p) => p.textContent?.includes('Range'))!.classList;
+      const range = [...host().querySelectorAll('p')].find((p) =>
+        p.textContent?.includes('Range'),
+      )!.classList;
       expect(range.contains('shrink-0') && range.contains('max-sm:hidden')).toBe(true);
     });
 

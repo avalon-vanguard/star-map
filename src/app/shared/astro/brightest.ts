@@ -48,7 +48,9 @@ export interface BrightnessIndex {
   readonly ids: Float64Array;
 }
 
-export function brightnessIndex<T extends BrightnessRanked & Positioned & { readonly id: number }>(stars: readonly T[]): BrightnessIndex {
+export function brightnessIndex<T extends BrightnessRanked & Positioned & { readonly id: number }>(
+  stars: readonly T[],
+): BrightnessIndex {
   const order = brightnessOrder(stars);
   const positions = new Float64Array(order.length * 3);
   const ids = new Float64Array(order.length);
@@ -72,7 +74,7 @@ export function* brightestWithin<T extends BrightnessRanked & Positioned & { rea
   index: BrightnessIndex,
   centre: Positioned,
   radiusPc: number,
-  alwaysId: number | null
+  alwaysId: number | null,
 ): Generator<T> {
   const { order, positions, ids } = index;
   const radiusSq = radiusPc * radiusPc;

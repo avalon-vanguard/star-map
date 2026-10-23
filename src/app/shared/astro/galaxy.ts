@@ -74,11 +74,61 @@ export interface SpiralArm {
 }
 
 export const MILKY_WAY_ARMS: readonly SpiralArm[] = [
-  { name: 'Norma', referenceRadiusPc: 4460, referenceAzimuthDeg: 18, pitchAngleDeg: 1, fromAzimuthDeg: -20, toAzimuthDeg: 200, labelAzimuthDeg: 120, widthPc: 500, weight: 0.7 },
-  { name: 'Scutum–Centaurus', referenceRadiusPc: 4910, referenceAzimuthDeg: 23, pitchAngleDeg: 12.1, fromAzimuthDeg: -30, toAzimuthDeg: 290, labelAzimuthDeg: 70, widthPc: 700, weight: 1 },
-  { name: 'Sagittarius–Carina', referenceRadiusPc: 6040, referenceAzimuthDeg: 24, pitchAngleDeg: 17.1, fromAzimuthDeg: -40, toAzimuthDeg: 230, labelAzimuthDeg: -20, widthPc: 650, weight: 0.95 },
-  { name: 'Perseus', referenceRadiusPc: 8870, referenceAzimuthDeg: 40, pitchAngleDeg: 10.3, fromAzimuthDeg: -60, toAzimuthDeg: 220, labelAzimuthDeg: 90, widthPc: 700, weight: 1 },
-  { name: 'Outer', referenceRadiusPc: 12240, referenceAzimuthDeg: 18, pitchAngleDeg: 3, fromAzimuthDeg: -60, toAzimuthDeg: 200, labelAzimuthDeg: 30, widthPc: 800, weight: 0.55 }
+  {
+    name: 'Norma',
+    referenceRadiusPc: 4460,
+    referenceAzimuthDeg: 18,
+    pitchAngleDeg: 1,
+    fromAzimuthDeg: -20,
+    toAzimuthDeg: 200,
+    labelAzimuthDeg: 120,
+    widthPc: 500,
+    weight: 0.7,
+  },
+  {
+    name: 'Scutum–Centaurus',
+    referenceRadiusPc: 4910,
+    referenceAzimuthDeg: 23,
+    pitchAngleDeg: 12.1,
+    fromAzimuthDeg: -30,
+    toAzimuthDeg: 290,
+    labelAzimuthDeg: 70,
+    widthPc: 700,
+    weight: 1,
+  },
+  {
+    name: 'Sagittarius–Carina',
+    referenceRadiusPc: 6040,
+    referenceAzimuthDeg: 24,
+    pitchAngleDeg: 17.1,
+    fromAzimuthDeg: -40,
+    toAzimuthDeg: 230,
+    labelAzimuthDeg: -20,
+    widthPc: 650,
+    weight: 0.95,
+  },
+  {
+    name: 'Perseus',
+    referenceRadiusPc: 8870,
+    referenceAzimuthDeg: 40,
+    pitchAngleDeg: 10.3,
+    fromAzimuthDeg: -60,
+    toAzimuthDeg: 220,
+    labelAzimuthDeg: 90,
+    widthPc: 700,
+    weight: 1,
+  },
+  {
+    name: 'Outer',
+    referenceRadiusPc: 12240,
+    referenceAzimuthDeg: 18,
+    pitchAngleDeg: 3,
+    fromAzimuthDeg: -60,
+    toAzimuthDeg: 200,
+    labelAzimuthDeg: 30,
+    widthPc: 800,
+    weight: 0.55,
+  },
 ];
 
 /**
@@ -94,7 +144,7 @@ export const ORION_SPUR: SpiralArm = {
   toAzimuthDeg: 45,
   labelAzimuthDeg: 20,
   widthPc: 400,
-  weight: 0.45
+  weight: 0.45,
 };
 
 /**
@@ -103,7 +153,12 @@ export const ORION_SPUR: SpiralArm = {
  * outer end — so callers trace it only over the arm's own azimuth range.
  */
 export function armRadiusPc(arm: SpiralArm, betaDeg: number): number {
-  return arm.referenceRadiusPc * Math.exp(-(betaDeg - arm.referenceAzimuthDeg) * DEG_TO_RAD * Math.tan(arm.pitchAngleDeg * DEG_TO_RAD));
+  return (
+    arm.referenceRadiusPc *
+    Math.exp(
+      -(betaDeg - arm.referenceAzimuthDeg) * DEG_TO_RAD * Math.tan(arm.pitchAngleDeg * DEG_TO_RAD),
+    )
+  );
 }
 
 /**
@@ -115,12 +170,16 @@ export function armRadiusPc(arm: SpiralArm, betaDeg: number): number {
  * `heightPc = 0` comes out at `z = -SUN_HEIGHT_ABOVE_MIDPLANE_PC`, since the Sun sits a little
  * above the plane it orbits in.
  */
-export function galactocentricToHeliocentricGalactic(radiusPc: number, azimuthDeg: number, heightPc: number): CartesianCoordinates {
+export function galactocentricToHeliocentricGalactic(
+  radiusPc: number,
+  azimuthDeg: number,
+  heightPc: number,
+): CartesianCoordinates {
   const beta = azimuthDeg * DEG_TO_RAD;
   return {
     x: SUN_GALACTOCENTRIC_RADIUS_PC - radiusPc * Math.cos(beta),
     y: radiusPc * Math.sin(beta),
-    z: heightPc - SUN_HEIGHT_ABOVE_MIDPLANE_PC
+    z: heightPc - SUN_HEIGHT_ABOVE_MIDPLANE_PC,
   };
 }
 
@@ -141,8 +200,16 @@ function cross(a: CartesianCoordinates, b: CartesianCoordinates): CartesianCoord
  * direction is re-orthogonalised against it, which keeps the result an exact rotation — a basis
  * that is a fraction of an arcsecond off square would shear the whole model.
  */
-const GALACTIC_POLE_EQUATORIAL = raDegDecDistanceToXyz(NORTH_GALACTIC_POLE_RA_DEG, NORTH_GALACTIC_POLE_DEC_DEG, 1);
-const GALACTIC_CENTRE_EQUATORIAL = raDegDecDistanceToXyz(GALACTIC_CENTRE_RA_DEG, GALACTIC_CENTRE_DEC_DEG, 1);
+const GALACTIC_POLE_EQUATORIAL = raDegDecDistanceToXyz(
+  NORTH_GALACTIC_POLE_RA_DEG,
+  NORTH_GALACTIC_POLE_DEC_DEG,
+  1,
+);
+const GALACTIC_CENTRE_EQUATORIAL = raDegDecDistanceToXyz(
+  GALACTIC_CENTRE_RA_DEG,
+  GALACTIC_CENTRE_DEC_DEG,
+  1,
+);
 const GALACTIC_Z = normalize(GALACTIC_POLE_EQUATORIAL);
 const GALACTIC_Y = normalize(cross(GALACTIC_Z, GALACTIC_CENTRE_EQUATORIAL));
 const GALACTIC_X = cross(GALACTIC_Y, GALACTIC_Z);
@@ -150,7 +217,7 @@ const GALACTIC_X = cross(GALACTIC_Y, GALACTIC_Z);
 export const GALACTIC_BASIS_EQUATORIAL = {
   x: GALACTIC_X,
   y: GALACTIC_Y,
-  z: GALACTIC_Z
+  z: GALACTIC_Z,
 } as const;
 
 /** Rotates a heliocentric galactic vector into the scene's equatorial frame. */
@@ -158,7 +225,7 @@ export function galacticToEquatorial(v: CartesianCoordinates): CartesianCoordina
   return {
     x: GALACTIC_X.x * v.x + GALACTIC_Y.x * v.y + GALACTIC_Z.x * v.z,
     y: GALACTIC_X.y * v.x + GALACTIC_Y.y * v.y + GALACTIC_Z.y * v.z,
-    z: GALACTIC_X.z * v.x + GALACTIC_Y.z * v.y + GALACTIC_Z.z * v.z
+    z: GALACTIC_X.z * v.x + GALACTIC_Y.z * v.y + GALACTIC_Z.z * v.z,
   };
 }
 
@@ -167,7 +234,7 @@ export function equatorialToGalactic(v: CartesianCoordinates): CartesianCoordina
   return {
     x: GALACTIC_X.x * v.x + GALACTIC_X.y * v.y + GALACTIC_X.z * v.z,
     y: GALACTIC_Y.x * v.x + GALACTIC_Y.y * v.y + GALACTIC_Y.z * v.z,
-    z: GALACTIC_Z.x * v.x + GALACTIC_Z.y * v.y + GALACTIC_Z.z * v.z
+    z: GALACTIC_Z.x * v.x + GALACTIC_Z.y * v.y + GALACTIC_Z.z * v.z,
   };
 }
 
@@ -198,18 +265,20 @@ export const GALACTIC_LANDMARKS: readonly GalacticLandmark[] = [
     name: `${arm.name} Arm`,
     kind: 'Spiral Arm',
     radiusPc: armRadiusPc(arm, arm.labelAzimuthDeg),
-    azimuthDeg: arm.labelAzimuthDeg
+    azimuthDeg: arm.labelAzimuthDeg,
   })),
   {
     id: 'arm-orion-spur',
     name: 'Orion Spur',
     kind: 'Spur',
     radiusPc: armRadiusPc(ORION_SPUR, ORION_SPUR.labelAzimuthDeg),
-    azimuthDeg: ORION_SPUR.labelAzimuthDeg
-  }
+    azimuthDeg: ORION_SPUR.labelAzimuthDeg,
+  },
 ];
 
 /** A landmark's position in the scene's equatorial frame, in parsecs from the Sun. */
 export function landmarkPositionPc(landmark: GalacticLandmark): CartesianCoordinates {
-  return galacticToEquatorial(galactocentricToHeliocentricGalactic(landmark.radiusPc, landmark.azimuthDeg, 0));
+  return galacticToEquatorial(
+    galactocentricToHeliocentricGalactic(landmark.radiusPc, landmark.azimuthDeg, 0),
+  );
 }

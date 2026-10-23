@@ -33,7 +33,9 @@ describe('PolarGridPlane', () => {
   const grid = new PolarGridPlane({ ringRadii: rings, spokeCount: spokes, emphasisRadii: [50] });
 
   it('draws every ring segment and every spoke', () => {
-    expect(grid.object.geometry.getAttribute('position').count).toBe(rings.length * SEGMENTS_PER_RING * 2 + spokes * 2);
+    expect(grid.object.geometry.getAttribute('position').count).toBe(
+      rings.length * SEGMENTS_PER_RING * 2 + spokes * 2,
+    );
   });
 
   it('starts hidden, so a view that never zooms out never draws it', () => {
@@ -74,12 +76,14 @@ describe('PolarGridPlane', () => {
     const galacticGrid = new PolarGridPlane({
       ringRadii: [2500, 8178],
       spokeCount: 4,
-      centre: new THREE.Vector3(centre.x, centre.y, centre.z)
+      centre: new THREE.Vector3(centre.x, centre.y, centre.z),
     });
     galacticGrid.object.updateMatrixWorld(true);
 
     const normal = galacticNormal();
-    const world = vertexAt(galacticGrid.object.geometry, 0).applyMatrix4(galacticGrid.object.matrixWorld);
+    const world = vertexAt(galacticGrid.object.geometry, 0).applyMatrix4(
+      galacticGrid.object.matrixWorld,
+    );
     // The centre is one Sun-height below the Sun's own plane, and the grid follows it there.
     expect(world.dot(normal)).toBeCloseTo(-SUN_HEIGHT_ABOVE_MIDPLANE_PC, 4);
 
@@ -89,13 +93,18 @@ describe('PolarGridPlane', () => {
   it('lies in whatever plane it is oriented into, for a system read against its own', () => {
     // The system view passes the frame its orbital elements were measured in, which has nothing
     // to do with the Galaxy's plane.
-    const orientation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+    const orientation = new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(1, 0, 0),
+      Math.PI / 2,
+    );
     const systemGrid = new PolarGridPlane({ ringRadii: [1, 2, 3], spokeCount: 6, orientation });
     systemGrid.object.updateMatrixWorld(true);
 
     const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(orientation);
     for (const index of [0, 200, systemGrid.object.geometry.getAttribute('position').count - 1]) {
-      const world = vertexAt(systemGrid.object.geometry, index).applyMatrix4(systemGrid.object.matrixWorld);
+      const world = vertexAt(systemGrid.object.geometry, index).applyMatrix4(
+        systemGrid.object.matrixWorld,
+      );
       expect(world.dot(normal)).toBeCloseTo(0, 6);
     }
     // ...and it is genuinely a different plane from the default.
@@ -116,7 +125,8 @@ describe('PolarGridPlane', () => {
     // Vertices are written ring by ring, in the order they were listed: 10 pc first, 50 pc last.
     const innerBrightness = colors.getX(0) + colors.getY(0) + colors.getZ(0);
     const emphasisIndex = 2 * SEGMENTS_PER_RING * 2;
-    const emphasisBrightness = colors.getX(emphasisIndex) + colors.getY(emphasisIndex) + colors.getZ(emphasisIndex);
+    const emphasisBrightness =
+      colors.getX(emphasisIndex) + colors.getY(emphasisIndex) + colors.getZ(emphasisIndex);
     expect(emphasisBrightness).toBeGreaterThan(innerBrightness);
   });
 });
@@ -165,7 +175,12 @@ describe('TetherField', () => {
 
   it('drops points past its capacity rather than overrunning the buffer', () => {
     const field = new TetherField(2);
-    const points = [new THREE.Vector3(1, 0, 5), new THREE.Vector3(2, 0, 5), new THREE.Vector3(3, 0, 5), new THREE.Vector3(4, 0, 5)];
+    const points = [
+      new THREE.Vector3(1, 0, 5),
+      new THREE.Vector3(2, 0, 5),
+      new THREE.Vector3(3, 0, 5),
+      new THREE.Vector3(4, 0, 5),
+    ];
     expect(() => field.setTargets(points)).not.toThrow();
     expect(field.object.geometry.drawRange.count).toBe(4);
     expect(field.object.geometry.getAttribute('position').count).toBe(4);

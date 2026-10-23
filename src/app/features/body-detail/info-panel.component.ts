@@ -23,7 +23,9 @@ import { ReadoutSectionsComponent } from './readout-sections.component';
   imports: [BookmarkIconComponent, ChevronIconComponent, ReadoutSectionsComponent],
   template: `
     <!-- Top-right, clear of the dock along the bottom; nothing else shares the top edge here. -->
-    <div class="hud-brackets hud-acquire hud-surface absolute top-4 right-4 w-80 max-w-[calc(100%-2rem)] font-body text-text">
+    <div
+      class="hud-brackets hud-acquire hud-surface absolute top-4 right-4 w-80 max-w-[calc(100%-2rem)] font-body text-text"
+    >
       <button
         type="button"
         (click)="goBack()"
@@ -37,8 +39,14 @@ import { ReadoutSectionsComponent } from './readout-sections.component';
         <div class="min-w-0 flex-1">
           <!-- Wrapped, not truncated: a designation's last digits are the ones that tell it from its
                neighbours, and an ellipsis took exactly those off "2MASS J21252752-8138278 b". -->
-          <h1 class="text-lg leading-tight font-bold tracking-[0.04em] wrap-break-word text-text uppercase">{{ body().name }}</h1>
-          <p class="type-eyebrow mt-1 wrap-break-word text-accent">{{ readouts().kindLabel }} · {{ body().hostStarName }}</p>
+          <h1
+            class="text-lg leading-tight font-bold tracking-[0.04em] wrap-break-word text-text uppercase"
+          >
+            {{ body().name }}
+          </h1>
+          <p class="type-eyebrow mt-1 wrap-break-word text-accent">
+            {{ readouts().kindLabel }} · {{ body().hostStarName }}
+          </p>
         </div>
         <button
           type="button"
@@ -46,7 +54,9 @@ import { ReadoutSectionsComponent } from './readout-sections.component';
           [attr.aria-pressed]="bookmarks.has('body', body().id)"
           (click)="bookmarks.toggle({ kind: 'body', id: body().id, name: body().name })"
           class="shrink-0 p-1 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
-          [class]="bookmarks.has('body', body().id) ? 'text-accent' : 'text-muted hover:text-accent'"
+          [class]="
+            bookmarks.has('body', body().id) ? 'text-accent' : 'text-muted hover:text-accent'
+          "
         >
           <app-bookmark-icon class="h-3.5 w-3.5" [kept]="bookmarks.has('body', body().id)" />
         </button>
@@ -81,7 +91,13 @@ import { ReadoutSectionsComponent } from './readout-sections.component';
             }
             @case ('unavailable') {
               Wikipedia could not be reached.
-              <button type="button" (click)="loadArticle()" class="text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent focus-visible:outline-1 focus-visible:outline-accent">Try again</button>
+              <button
+                type="button"
+                (click)="loadArticle()"
+                class="text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent focus-visible:outline-1 focus-visible:outline-accent"
+              >
+                Try again
+              </button>
             }
           }
         </p>
@@ -95,7 +111,7 @@ import { ReadoutSectionsComponent } from './readout-sections.component';
         </button>
       }
     </div>
-  `
+  `,
 })
 export class InfoPanelComponent {
   readonly body = input.required<BodyDetailViewModel>();
@@ -125,7 +141,10 @@ export class InfoPanelComponent {
    */
   async loadArticle(): Promise<void> {
     this.aboutState.set('loading');
-    const result = await this.articles.lookup(this.body().name, this.readouts().kindLabel.toLowerCase());
+    const result = await this.articles.lookup(
+      this.body().name,
+      this.readouts().kindLabel.toLowerCase(),
+    );
     if (result.status === 'found') {
       this.article.set(result.article);
       this.aboutState.set('idle');

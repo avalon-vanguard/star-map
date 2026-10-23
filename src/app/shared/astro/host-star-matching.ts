@@ -32,8 +32,13 @@ export interface HostStarQuery {
  * parallax `sy_plx`; `NaN` with neither. mu2 Sco has no `sy_dist` and a 6.31 mas parallax, which
  * finds Pipirima (HIP 82545) 0.4″ from the archive's direction; left blank, its planet had no star.
  */
-export function archiveDistancePc(distancePc: number | undefined, parallaxMas: number | undefined): number {
-  return distancePc ?? (parallaxMas !== undefined && parallaxMas > 0 ? 1000 / parallaxMas : Number.NaN);
+export function archiveDistancePc(
+  distancePc: number | undefined,
+  parallaxMas: number | undefined,
+): number {
+  return (
+    distancePc ?? (parallaxMas !== undefined && parallaxMas > 0 ? 1000 / parallaxMas : Number.NaN)
+  );
 }
 
 function distancesAgree(a: number, b: number): boolean {
@@ -124,7 +129,7 @@ function knownMotion(masPerYear: number | undefined): number {
 export function resolveHostStarId(
   query: HostStarQuery,
   stars: readonly StarRecord[],
-  nameIndex: Map<string, StarRecord> = buildStarNameIndex(stars)
+  nameIndex: Map<string, StarRecord> = buildStarNameIndex(stars),
 ): number | null {
   const byName = nameIndex.get(normalizeStarName(query.hostname));
   if (byName) {
@@ -151,11 +156,14 @@ export function resolveHostStarId(
     // star would pass the direction test and the last one in array order would win.
     knownMotion(query.pmRaMasPerYear),
     knownMotion(query.pmDecMasPerYear),
-    CATALOGUE_EPOCH - ARCHIVE_EPOCH
+    CATALOGUE_EPOCH - ARCHIVE_EPOCH,
   );
   const carried = raDegDecDistanceToXyz(carriedBack.raDeg, carriedBack.decDeg, 1);
 
-  const parallaxPc = query.parallaxMas !== undefined && query.parallaxMas > 0 ? 1000 / query.parallaxMas : Number.NaN;
+  const parallaxPc =
+    query.parallaxMas !== undefined && query.parallaxMas > 0
+      ? 1000 / query.parallaxMas
+      : Number.NaN;
   const minCosine = Math.cos(Math.min(Math.PI, HOST_TRANSVERSE_TOLERANCE_PC / query.distancePc));
   let best: StarRecord | null = null;
   let bestCosine = -2;
@@ -168,12 +176,15 @@ export function resolveHostStarId(
     const cosine =
       Math.max(
         star.x * published.x + star.y * published.y + star.z * published.z,
-        star.x * carried.x + star.y * carried.y + star.z * carried.z
+        star.x * carried.x + star.y * carried.y + star.z * carried.z,
       ) / starDistance;
     if (cosine < minCosine || cosine <= bestCosine) {
       continue;
     }
-    if (!distancesAgree(query.distancePc, starDistance) && !(parallaxPc > 0 && distancesAgree(parallaxPc, starDistance))) {
+    if (
+      !distancesAgree(query.distancePc, starDistance) &&
+      !(parallaxPc > 0 && distancesAgree(parallaxPc, starDistance))
+    ) {
       continue;
     }
     best = star;

@@ -3,7 +3,9 @@ import { expect, test } from '@playwright/test';
 import { backButtonLocator, clickCanvasUntilSystemEntered } from './support/wait-for-back-button';
 
 test.describe('Camera-flight transitions (click-to-select)', () => {
-  test('clicking the star at the view center flies into its system, and the back button flies back out to the galaxy overview', async ({ page }) => {
+  test('clicking the star at the view center flies into its system, and the back button flies back out to the galaxy overview', async ({
+    page,
+  }) => {
     // A software-rendered bootstrap, a click-until-selected poll of up to 15 seconds, and two
     // multi-second camera flights, all while the other specs share the same CPU. The default
     // per-test budget covers that only just, and stopped covering it once a second flight-heavy

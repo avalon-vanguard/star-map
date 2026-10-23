@@ -40,7 +40,9 @@ describe('SystemObjectCardComponent', () => {
 
   /** The label/value pairs under one of the two headings, in order. */
   function block(host: HTMLElement, heading: 'Measured' | 'Derived'): string[] {
-    const headings = [...host.querySelectorAll('p')].filter((p) => p.textContent?.trim() === heading);
+    const headings = [...host.querySelectorAll('p')].filter(
+      (p) => p.textContent?.trim() === heading,
+    );
     const list = headings[0]?.nextElementSibling;
     return list ? [...list.querySelectorAll('dt')].map((dt) => dt.textContent?.trim() ?? '') : [];
   }
@@ -84,7 +86,11 @@ describe('SystemObjectCardComponent', () => {
   });
 
   it('wraps a long designation rather than cutting off the digits that tell it apart', () => {
-    const host = render({ ...earth, name: '2MASS J21252752-8138278 b', hostStarName: '2MASS J21252752-8138278' });
+    const host = render({
+      ...earth,
+      name: '2MASS J21252752-8138278 b',
+      hostStarName: '2MASS J21252752-8138278',
+    });
     const name = host.querySelector('[data-testid="object-card-name"]')!;
     expect(name.textContent?.trim()).toBe('2MASS J21252752-8138278 b');
     for (const line of [name, name.nextElementSibling!]) {
@@ -121,7 +127,9 @@ describe('SystemObjectCardComponent', () => {
     fixture.componentInstance.dismissed.subscribe(() => (dismissed += 1));
 
     host.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!.click();
-    [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('Full view'))!.click();
+    [...host.querySelectorAll('button')]
+      .find((button) => button.textContent?.includes('Full view'))!
+      .click();
 
     expect({ opened, dismissed }).toEqual({ opened: 1, dismissed: 1 });
   });

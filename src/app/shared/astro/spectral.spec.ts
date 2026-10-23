@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import { dwarfSequenceAtColor, dwarfSequenceAtTemperature, dwarfSequenceAtType, isGiant, parseSpectralClass, spectralClassification, SPECTRAL_CLASSES, spectralTypeFromColor, spectralTypeToColorIndex, temperatureToColorIndex } from './spectral';
+import {
+  dwarfSequenceAtColor,
+  dwarfSequenceAtTemperature,
+  dwarfSequenceAtType,
+  isGiant,
+  parseSpectralClass,
+  spectralClassification,
+  SPECTRAL_CLASSES,
+  spectralTypeFromColor,
+  spectralTypeToColorIndex,
+  temperatureToColorIndex,
+} from './spectral';
 
 describe('parseSpectralClass', () => {
   it('reads a clean class and subclass', () => {
@@ -48,13 +59,34 @@ describe('parseSpectralClass', () => {
 
 describe('isGiant', () => {
   it('reads luminosity classes I to III off the primary, the giant and supergiant prefixes, and carbon and S stars', () => {
-    for (const type of ['M1Ib + B2.5V', 'K5III', 'M2II-IIIvar', 'C7Iab', 'K0IIIb', 'gK0', 'cM2', 'N5', 'Ce+', 'S57:']) {
+    for (const type of [
+      'M1Ib + B2.5V',
+      'K5III',
+      'M2II-IIIvar',
+      'C7Iab',
+      'K0IIIb',
+      'gK0',
+      'cM2',
+      'N5',
+      'Ce+',
+      'S57:',
+    ]) {
       expect(isGiant(type), type).toBe(true);
     }
   });
 
   it('leaves dwarfs, subgiants, a dwarf with a giant companion and the unclassified alone', () => {
-    for (const type of ['G2V', 'B2IV', 'F0IVn', 'M5Ve', 'K1V + M3III', 'g-k', 'Unknown', 'DA', '']) {
+    for (const type of [
+      'G2V',
+      'B2IV',
+      'F0IVn',
+      'M5Ve',
+      'K1V + M3III',
+      'g-k',
+      'Unknown',
+      'DA',
+      '',
+    ]) {
       expect(isGiant(type), type).toBe(false);
     }
   });
@@ -72,7 +104,9 @@ describe('spectralTypeToColorIndex', () => {
   });
 
   it('increases monotonically from hot to cool across the sequence', () => {
-    const values = SPECTRAL_CLASSES.map((spectralClass) => spectralTypeToColorIndex(spectralClass)!);
+    const values = SPECTRAL_CLASSES.map((spectralClass) =>
+      spectralTypeToColorIndex(spectralClass)!,
+    );
     expect([...values].sort((a, b) => a - b)).toEqual(values);
   });
 
@@ -107,7 +141,10 @@ describe('temperatureToColorIndex', () => {
 
   it('reads back as the temperature it came from, so the correction is the one at that temperature', () => {
     for (const temperatureK of [31400, 12000, 7000, 5772, 4000, 3500, 3157, 2566, 2420]) {
-      expect(dwarfSequenceAtColor(temperatureToColorIndex(temperatureK))!.temperatureK).toBeCloseTo(temperatureK, 6);
+      expect(dwarfSequenceAtColor(temperatureToColorIndex(temperatureK))!.temperatureK).toBeCloseTo(
+        temperatureK,
+        6,
+      );
     }
   });
 
@@ -148,15 +185,22 @@ describe('spectralTypeFromColor', () => {
 
 describe('spectralClassification', () => {
   it("gives the catalogue's type, else the colour's marked as an estimate, else nothing", () => {
-    expect(spectralClassification({ spectralType: 'M5Ve', colorIndex: 1.807, colorSystem: 'B-V' })).toBe('M5Ve');
-    expect(spectralClassification({ spectralType: 'Unknown', colorIndex: 4.902, colorSystem: 'BP-RP' })).toBe('~M8');
+    expect(
+      spectralClassification({ spectralType: 'M5Ve', colorIndex: 1.807, colorSystem: 'B-V' }),
+    ).toBe('M5Ve');
+    expect(
+      spectralClassification({ spectralType: 'Unknown', colorIndex: 4.902, colorSystem: 'BP-RP' }),
+    ).toBe('~M8');
     expect(spectralClassification({ spectralType: 'Unknown', colorIndex: null })).toBe('');
   });
 });
 
 describe('dwarfSequenceAtColor', () => {
   it("puts the Sun's colour in either system at the Sun's temperature and correction", () => {
-    for (const [colour, system] of [[0.65, 'B-V'], [0.823, 'BP-RP']] as const) {
+    for (const [colour, system] of [
+      [0.65, 'B-V'],
+      [0.823, 'BP-RP'],
+    ] as const) {
       const point = dwarfSequenceAtColor(colour, system)!;
       expect(point.temperatureK).toBeCloseTo(5770, 0);
       expect(point.bolometricCorrectionV).toBeCloseTo(-0.085, 3);
@@ -179,9 +223,24 @@ describe('dwarfSequenceAtColor', () => {
   });
 
   it('reads the row at the end a colour is past, when asked to', () => {
-    expect(dwarfSequenceAtColor(2.2, 'B-V', true)).toEqual({ bMinusV: 2.16, temperatureK: 2420, bolometricCorrectionV: -5.78, gMinusV: -3.09 });
-    expect(dwarfSequenceAtColor(5.3, 'BP-RP', true)).toEqual({ bMinusV: 2.16, temperatureK: 2420, bolometricCorrectionV: -5.78, gMinusV: -3.09 });
-    expect(dwarfSequenceAtColor(-0.4, 'B-V', true)).toEqual({ bMinusV: -0.301, temperatureK: 31400, bolometricCorrectionV: -2.99, gMinusV: null });
+    expect(dwarfSequenceAtColor(2.2, 'B-V', true)).toEqual({
+      bMinusV: 2.16,
+      temperatureK: 2420,
+      bolometricCorrectionV: -5.78,
+      gMinusV: -3.09,
+    });
+    expect(dwarfSequenceAtColor(5.3, 'BP-RP', true)).toEqual({
+      bMinusV: 2.16,
+      temperatureK: 2420,
+      bolometricCorrectionV: -5.78,
+      gMinusV: -3.09,
+    });
+    expect(dwarfSequenceAtColor(-0.4, 'B-V', true)).toEqual({
+      bMinusV: -0.301,
+      temperatureK: 31400,
+      bolometricCorrectionV: -2.99,
+      gMinusV: null,
+    });
     expect(dwarfSequenceAtColor(null, 'B-V', true)).toBeNull();
   });
 
@@ -190,14 +249,22 @@ describe('dwarfSequenceAtColor', () => {
     const point = dwarfSequenceAtColor(-0.15, 'BP-RP', true)!;
     expect(point.temperatureK).toBeCloseTo(15369, 6);
     expect(point.bolometricCorrectionV).toBeCloseTo(-1.13 - 0.21 * (869 / 1200), 6);
-    expect(dwarfSequenceAtColor(-0.13, 'BP-RP', true)!.temperatureK).toBeCloseTo(15369 - 4669 * (2 / 3), 6);
+    expect(dwarfSequenceAtColor(-0.13, 'BP-RP', true)!.temperatureK).toBeCloseTo(
+      15369 - 4669 * (2 / 3),
+      6,
+    );
     expect(dwarfSequenceAtColor(-0.6, 'BP-RP', true)!.temperatureK).toBeCloseTo(28585, 6);
   });
 });
 
 describe('dwarfSequenceAtType', () => {
   it("reads an O type off Mamajek's O rows, which carry no colour, and any other off its own row", () => {
-    expect(dwarfSequenceAtType('O7.5Iab:')).toEqual({ bMinusV: null, temperatureK: 36100, bolometricCorrectionV: -3.33, gMinusV: null });
+    expect(dwarfSequenceAtType('O7.5Iab:')).toEqual({
+      bMinusV: null,
+      temperatureK: 36100,
+      bolometricCorrectionV: -3.33,
+      gMinusV: null,
+    });
     expect(dwarfSequenceAtType('B8Ia')!.temperatureK).toBe(12300);
     expect(dwarfSequenceAtType('O9.7')!.temperatureK).toBeCloseTo(31900 - 500 * (0.2 / 0.5), 6);
     expect(dwarfSequenceAtType('M9')!.temperatureK).toBe(2420);
@@ -207,7 +274,12 @@ describe('dwarfSequenceAtType', () => {
 
 describe('dwarfSequenceAtTemperature', () => {
   it("is a type's own row at its temperature, between two rows between them, and the end row past either end", () => {
-    expect(dwarfSequenceAtTemperature(5770)).toEqual({ bMinusV: 0.65, temperatureK: 5770, bolometricCorrectionV: -0.085, gMinusV: -0.165 });
+    expect(dwarfSequenceAtTemperature(5770)).toEqual({
+      bMinusV: 0.65,
+      temperatureK: 5770,
+      bolometricCorrectionV: -0.085,
+      gMinusV: -0.165,
+    });
     expect(dwarfSequenceAtTemperature(3615).bolometricCorrectionV).toBeCloseTo(-1.51, 6);
     expect(dwarfSequenceAtTemperature(50000).temperatureK).toBe(31400);
     expect(dwarfSequenceAtTemperature(1000).temperatureK).toBe(2420);

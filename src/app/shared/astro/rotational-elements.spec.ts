@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { meanElementsAt } from './kepler';
-import { orbitalTermsOfPrimeMeridian, orientationAt, parsePckRotationalElements } from './rotational-elements';
+import {
+  orbitalTermsOfPrimeMeridian,
+  orientationAt,
+  parsePckRotationalElements,
+} from './rotational-elements';
 import { MeanElementRates, OrbitalElements, RotationalElements } from '../models/body.model';
 
 // Excerpts of pck00011.tpc as NAIF publishes it: prose, then data blocks.
@@ -65,30 +69,45 @@ const KERNEL = String.raw`KPL/PCK
 describe('parsePckRotationalElements', () => {
   it('reads a pole and a prime meridian from the data blocks, not from the prose around them', () => {
     expect(parsePckRotationalElements(KERNEL, 399)).toEqual({
-      elements: { poleRaDeg: [0, -0.641, 0], poleDecDeg: [90, -0.557, 0], primeMeridianDeg: [190.147, 360.9856235, 0] },
-      skippedDeg: []
+      elements: {
+        poleRaDeg: [0, -0.641, 0],
+        poleDecDeg: [90, -0.557, 0],
+        primeMeridianDeg: [190.147, 360.9856235, 0],
+      },
+      skippedDeg: [],
     });
   });
 
   it('reads the exponent the Fortran way, as the Moon’s quadratic is written', () => {
-    expect(parsePckRotationalElements(KERNEL, 301)!.elements.primeMeridianDeg).toEqual([38.3213, 13.17635815, -1.4e-12]);
+    expect(parsePckRotationalElements(KERNEL, 301)!.elements.primeMeridianDeg).toEqual([
+      38.3213, 13.17635815, -1.4e-12,
+    ]);
   });
 
   it('pairs each periodic term with its system’s angle', () => {
-    expect(parsePckRotationalElements(KERNEL, 899)!.elements.terms).toEqual([{ angleDeg: [357.85, 52.316], ra: 0.7, dec: -0.51, pm: -0.48 }]);
+    expect(parsePckRotationalElements(KERNEL, 899)!.elements.terms).toEqual([
+      { angleDeg: [357.85, 52.316], ra: 0.7, dec: -0.51, pm: -0.48 },
+    ]);
   });
 
   it('reads angles to the degree the system states, Phobos’s quadratic among them', () => {
     expect(parsePckRotationalElements(KERNEL, 401)!.elements.terms).toEqual([
-      { angleDeg: [190.72646643, 15917.10818695, 0], ra: -1.78428399, dec: -1.07516537, pm: 1.42421769 },
-      { angleDeg: [189.6327156, 41215158.1842005, 12.711923222], ra: 0, dec: 0, pm: -1.143 }
+      {
+        angleDeg: [190.72646643, 15917.10818695, 0],
+        ra: -1.78428399,
+        dec: -1.07516537,
+        pm: 1.42421769,
+      },
+      { angleDeg: [189.6327156, 41215158.1842005, 12.711923222], ra: 0, dec: 0, pm: -1.143 },
     ]);
   });
 
   it('leaves out a term under a hundredth of a degree, and says how large it was', () => {
     const mercury = parsePckRotationalElements(KERNEL, 199)!;
 
-    expect(mercury.elements.terms).toEqual([{ angleDeg: [174.7910857, 149472.53587500003], ra: 0, dec: 0, pm: 0.01067257 }]);
+    expect(mercury.elements.terms).toEqual([
+      { angleDeg: [174.7910857, 149472.53587500003], ra: 0, dec: 0, pm: 0.01067257 },
+    ]);
     expect(mercury.skippedDeg).toEqual([0.00112309]);
   });
 
@@ -109,7 +128,10 @@ describe('orientationAt', () => {
     const century = orientationAt(earth, J2000 + 36525);
     expect(century.poleRaDeg).toBeCloseTo(-0.641, 12);
     expect(century.poleDecDeg).toBeCloseTo(90 - 0.557, 12);
-    expect(orientationAt(earth, J2000 + 1).primeMeridianDeg).toBeCloseTo(190.147 + 360.9856235 - 360, 9);
+    expect(orientationAt(earth, J2000 + 1).primeMeridianDeg).toBeCloseTo(
+      190.147 + 360.9856235 - 360,
+      9,
+    );
   });
 
   it('adds a term as a sine to the right ascension and the meridian and a cosine to the declination', () => {
@@ -120,7 +142,10 @@ describe('orientationAt', () => {
 
     expect(drawn.poleRaDeg).toBeCloseTo(299.36 + 0.7 * Math.sin(angle), 12);
     expect(drawn.poleDecDeg).toBeCloseTo(43.46 - 0.51 * Math.cos(angle), 12);
-    expect(drawn.primeMeridianDeg).toBeCloseTo((249.978 + 541.1397757 * days - 0.48 * Math.sin(angle)) % 360, 6);
+    expect(drawn.primeMeridianDeg).toBeCloseTo(
+      (249.978 + 541.1397757 * days - 0.48 * Math.sin(angle)) % 360,
+      6,
+    );
   });
 
   it('carries the quadratic in the meridian and in the angle, which is how Phobos falls inward', () => {
@@ -128,9 +153,17 @@ describe('orientationAt', () => {
     const days = 36525;
     const first = (190.72646643 + 15917.10818695) * (Math.PI / 180);
     const second = (189.6327156 + 41215158.1842005 + 12.711923222) * (Math.PI / 180);
-    const expected = 35.1877444 + 1128.84475928 * days + 9.536137031212154e-9 * days * days + 1.42421769 * Math.sin(first) - 1.143 * Math.sin(second);
+    const expected =
+      35.1877444 +
+      1128.84475928 * days +
+      9.536137031212154e-9 * days * days +
+      1.42421769 * Math.sin(first) -
+      1.143 * Math.sin(second);
 
-    expect(orientationAt(phobos, J2000 + days).primeMeridianDeg).toBeCloseTo(((expected % 360) + 360) % 360, 5);
+    expect(orientationAt(phobos, J2000 + days).primeMeridianDeg).toBeCloseTo(
+      ((expected % 360) + 360) % 360,
+      5,
+    );
   });
 });
 
@@ -144,13 +177,13 @@ describe('orbitalTermsOfPrimeMeridian', () => {
     primeMeridianDeg: [333.46, 381.994555, 0],
     terms: [
       { angleDeg: [177.4, -36505.5], ra: 13.56, dec: -1.53, pm: -13.48 },
-      { angleDeg: [316.45, 506.2], ra: 0, dec: 0, pm: -44.85 }
-    ]
+      { angleDeg: [316.45, 506.2], ra: 0, dec: 0, pm: -44.85 },
+    ],
   };
   const PHOBOS: RotationalElements = {
     poleRaDeg: [317.67071657, -0.10844326, 0],
     poleDecDeg: [52.88627266, -0.06134706, 0],
-    primeMeridianDeg: [35.1877444, 1128.84475928, 9.536137031212154e-9]
+    primeMeridianDeg: [35.1877444, 1128.84475928, 9.536137031212154e-9],
   };
   const orbit = (epochJd: number): OrbitalElements => ({
     semiMajorAxisAu: 0.001,
@@ -159,24 +192,43 @@ describe('orbitalTermsOfPrimeMeridian', () => {
     longitudeOfAscendingNodeDeg: 170,
     argumentOfPeriapsisDeg: 60,
     meanAnomalyAtEpochDeg: 10,
-    epochJd
+    epochJd,
   });
 
   /** The moon's mean longitude less W, which a locked moon holds still whatever the date. */
-  function lead(elements: RotationalElements, epochJd: number, angleRate: number | undefined, jd: number): number {
-    const { meanAnomalyTerms, meanMotionDegPerDay, meanAnomalyDeg } = orbitalTermsOfPrimeMeridian(elements, epochJd, angleRate);
+  function lead(
+    elements: RotationalElements,
+    epochJd: number,
+    angleRate: number | undefined,
+    jd: number,
+  ): number {
+    const { meanAnomalyTerms, meanMotionDegPerDay, meanAnomalyDeg } = orbitalTermsOfPrimeMeridian(
+      elements,
+      epochJd,
+      angleRate,
+    );
     const start = orbit(epochJd);
     const rates: MeanElementRates = {
       meanMotionDegPerDay: elements.primeMeridianDeg[1] + meanMotionDegPerDay,
       longitudeOfAscendingNodeDegPerDay: -1,
       argumentOfPeriapsisDegPerDay: 2,
-      meanAnomalyTerms
+      meanAnomalyTerms,
     };
-    const moved = meanElementsAt({ ...start, meanAnomalyAtEpochDeg: start.meanAnomalyAtEpochDeg + meanAnomalyDeg }, rates, jd);
-    const longitude = moved.longitudeOfAscendingNodeDeg + moved.argumentOfPeriapsisDeg + moved.meanAnomalyAtEpochDeg;
+    const moved = meanElementsAt(
+      { ...start, meanAnomalyAtEpochDeg: start.meanAnomalyAtEpochDeg + meanAnomalyDeg },
+      rates,
+      jd,
+    );
+    const longitude =
+      moved.longitudeOfAscendingNodeDeg +
+      moved.argumentOfPeriapsisDeg +
+      moved.meanAnomalyAtEpochDeg;
     // W with the pole's nodding term left out: that one is the pole's, not the orbit's.
-    const w = orientationAt({ ...elements, terms: elements.terms?.filter((term) => term.angleDeg[1] === angleRate) }, jd).primeMeridianDeg;
-    return (((longitude - w) % 360) + 540) % 360 - 180;
+    const w = orientationAt(
+      { ...elements, terms: elements.terms?.filter((term) => term.angleDeg[1] === angleRate) },
+      jd,
+    ).primeMeridianDeg;
+    return ((((longitude - w) % 360) + 540) % 360) - 180;
   }
 
   it('moves Mimas along its orbit by the libration its W carries, over the 71 years it takes', () => {

@@ -1,5 +1,11 @@
 import { OrbitalElements } from '../../../src/app/shared/models/body.model';
-import { extractGmKm3PerS2, extractObliquityDeg, extractRadiusKm, extractRotationPeriodHours, isTidallyLocked } from '../../../src/app/shared/astro/horizons-page';
+import {
+  extractGmKm3PerS2,
+  extractObliquityDeg,
+  extractRadiusKm,
+  extractRotationPeriodHours,
+  isTidallyLocked,
+} from '../../../src/app/shared/astro/horizons-page';
 import { fetchTextCached } from './http';
 
 const HORIZONS_URL = 'https://ssd.jpl.nasa.gov/api/horizons.api';
@@ -53,7 +59,7 @@ export async function fetchHorizonsBody(query: HorizonsQuery): Promise<HorizonsR
     rotationPeriodHours: extractRotationPeriodHours(text),
     obliquityDeg: extractObliquityDeg(text),
     tidallyLocked: isTidallyLocked(text),
-    gmKm3PerS2: extractGmKm3PerS2(text)
+    gmKm3PerS2: extractGmKm3PerS2(text),
   };
 }
 
@@ -82,7 +88,7 @@ function extractOrbitalElements(text: string): OrbitalElements {
     longitudeOfAscendingNodeDeg,
     argumentOfPeriapsisDeg,
     meanAnomalyAtEpochDeg,
-    epochJd
+    epochJd,
   };
 }
 
@@ -110,7 +116,12 @@ export interface TrackPoint {
  * Where Horizons has a body, from its centre, every `stepDays` from 1950 to 2100: the ephemeris the
  * mean elements are checked against over the whole span, where one date saw a moon at its best.
  */
-export async function fetchHorizonsTrack(command: string, center: string, stepDays: number, cacheKey: string): Promise<TrackPoint[]> {
+export async function fetchHorizonsTrack(
+  command: string,
+  center: string,
+  stepDays: number,
+  cacheKey: string,
+): Promise<TrackPoint[]> {
   const url =
     `${HORIZONS_URL}?format=text&COMMAND='${encodeURIComponent(command)}'&OBJ_DATA='NO'&MAKE_EPHEM='YES'` +
     `&EPHEM_TYPE='VECTORS'&CENTER='${center}'&START_TIME='${TRACK_START_YEAR}-01-01'&STOP_TIME='${TRACK_STOP_YEAR}-01-01'` +
@@ -119,7 +130,9 @@ export async function fetchHorizonsTrack(command: string, center: string, stepDa
   const startIndex = text.indexOf('$$SOE');
   const endIndex = text.indexOf('$$EOE');
   if (startIndex === -1 || endIndex === -1) {
-    throw new Error(`Horizons gave no vectors for ${command} from ${center}: ${text.slice(0, 300)}`);
+    throw new Error(
+      `Horizons gave no vectors for ${command} from ${center}: ${text.slice(0, 300)}`,
+    );
   }
   return text
     .slice(startIndex + '$$SOE'.length, endIndex)

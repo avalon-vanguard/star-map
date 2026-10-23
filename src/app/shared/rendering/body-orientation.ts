@@ -1,7 +1,11 @@
 import * as THREE from 'three/webgpu';
 
 import { tdbFromUtc } from '../astro/constants';
-import { CartesianCoordinates, eclipticToEquatorial, laplacePlaneToEquatorial } from '../astro/coordinates';
+import {
+  CartesianCoordinates,
+  eclipticToEquatorial,
+  laplacePlaneToEquatorial,
+} from '../astro/coordinates';
 import { meanElementsAt, positionAtEpoch } from '../astro/kepler';
 import { orientationAt } from '../astro/rotational-elements';
 import { BodyRecord, RotationalElements } from '../models/body.model';
@@ -28,7 +32,10 @@ const Z_AXIS = new THREE.Vector3(0, 0, 1);
  *
  * The derived surfaces have no meridian of their own, and take the same convention.
  */
-export const MAP_TO_BODY = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+export const MAP_TO_BODY = new THREE.Quaternion().setFromAxisAngle(
+  new THREE.Vector3(1, 0, 0),
+  Math.PI / 2,
+);
 
 const scratchMatrix = new THREE.Matrix4();
 const scratchAxes = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
@@ -39,9 +46,15 @@ const scratchTurn = new THREE.Quaternion();
  * equator rises through the ICRF equator into the ICRF: the frame the IAU counts W in, and the
  * one JPL refers a moon's Laplace plane to — so both go through {@link laplacePlaneToEquatorial}.
  */
-export function poleFrame(pole: { raDeg: number; decDeg: number }, target = new THREE.Quaternion()): THREE.Quaternion {
+export function poleFrame(
+  pole: { raDeg: number; decDeg: number },
+  target = new THREE.Quaternion(),
+): THREE.Quaternion {
   const [x, y, z] = scratchAxes.map((axis, index) => {
-    const turned = laplacePlaneToEquatorial({ x: index === 0 ? 1 : 0, y: index === 1 ? 1 : 0, z: index === 2 ? 1 : 0 }, pole);
+    const turned = laplacePlaneToEquatorial(
+      { x: index === 0 ? 1 : 0, y: index === 1 ? 1 : 0, z: index === 2 ? 1 : 0 },
+      pole,
+    );
     return axis.set(turned.x, turned.y, turned.z);
   });
   return target.setFromRotationMatrix(scratchMatrix.makeBasis(x, y, z));
@@ -62,24 +75,41 @@ export function poleFrame(pole: { raDeg: number; decDeg: number }, target = new 
  * AD 1000 and 4.5 to 4.6 over AD 1 (2.0, and 4.2 to 4.3, at UT itself). Taken at TDB, it would
  * have turned ΔT further, 44 degrees at AD 1.
  */
-export function bodyOrientation(elements: RotationalElements, jdUtc: number, target = new THREE.Quaternion(), followsUt = false): THREE.Quaternion {
+export function bodyOrientation(
+  elements: RotationalElements,
+  jdUtc: number,
+  target = new THREE.Quaternion(),
+  followsUt = false,
+): THREE.Quaternion {
   const { poleRaDeg, poleDecDeg, primeMeridianDeg } = orientationAt(elements, tdbFromUtc(jdUtc));
-  const turnDeg = followsUt ? 360 * (0.779057273264 + 1.0027378119113546 * (jdUtc - 2451545)) - 90 - poleRaDeg : primeMeridianDeg;
+  const turnDeg = followsUt
+    ? 360 * (0.779057273264 + 1.0027378119113546 * (jdUtc - 2451545)) - 90 - poleRaDeg
+    : primeMeridianDeg;
   return poleFrame({ raDeg: poleRaDeg, decDeg: poleDecDeg }, target)
     .multiply(scratchTurn.setFromAxisAngle(Z_AXIS, turnDeg * DEG_TO_RAD))
     .multiply(MAP_TO_BODY);
 }
 
 /** Where a body is from the Sun at a date, in the ICRF, AU: a moon's planet's place plus its own. */
-function heliocentricPosition(body: BodyRecord, bodies: readonly BodyRecord[], jdUtc: number): CartesianCoordinates {
+function heliocentricPosition(
+  body: BodyRecord,
+  bodies: readonly BodyRecord[],
+  jdUtc: number,
+): CartesianCoordinates {
   const jdTdb = tdbFromUtc(jdUtc);
   const own = positionAtEpoch(meanElementsAt(body.orbit, body.rates, jdTdb));
-  const parent = body.parentBodyId ? bodies.find((candidate) => candidate.id === body.parentBodyId) : undefined;
+  const parent = body.parentBodyId
+    ? bodies.find((candidate) => candidate.id === body.parentBodyId)
+    : undefined;
   if (!parent) {
     return eclipticToEquatorial(own);
   }
-  const offset = body.laplacePole ? laplacePlaneToEquatorial(own, body.laplacePole) : eclipticToEquatorial(own);
-  const centre = eclipticToEquatorial(positionAtEpoch(meanElementsAt(parent.orbit, parent.rates, jdTdb)));
+  const offset = body.laplacePole
+    ? laplacePlaneToEquatorial(own, body.laplacePole)
+    : eclipticToEquatorial(own);
+  const centre = eclipticToEquatorial(
+    positionAtEpoch(meanElementsAt(parent.orbit, parent.rates, jdTdb)),
+  );
   return { x: centre.x + offset.x, y: centre.y + offset.y, z: centre.z + offset.z };
 }
 
@@ -98,18 +128,30 @@ const scratchBody = new THREE.Quaternion();
  * Sets `planet` to the sphere's rotation and `sun` to the unit direction of the Sun in the page's
  * frame. Returns false, touching neither, for a body without elements.
  */
-export function bodyPageView(body: BodyRecord, bodies: readonly BodyRecord[], jdUtc: number, sunAzimuthRad: number, planet: THREE.Quaternion, sun: THREE.Vector3): boolean {
+export function bodyPageView(
+  body: BodyRecord,
+  bodies: readonly BodyRecord[],
+  jdUtc: number,
+  sunAzimuthRad: number,
+  planet: THREE.Quaternion,
+  sun: THREE.Vector3,
+): boolean {
   const elements = body.rotationalElements;
   if (!elements) {
     return false;
   }
   const { poleRaDeg, poleDecDeg } = orientationAt(elements, tdbFromUtc(jdUtc));
   // From the ICRF into the body's frame with its pole on +Y, before the turn about that pole.
-  const toPage = poleFrame({ raDeg: poleRaDeg, decDeg: poleDecDeg }, scratchPage).multiply(MAP_TO_BODY).invert();
+  const toPage = poleFrame({ raDeg: poleRaDeg, decDeg: poleDecDeg }, scratchPage)
+    .multiply(MAP_TO_BODY)
+    .invert();
   const position = heliocentricPosition(body, bodies, jdUtc);
   sun.set(-position.x, -position.y, -position.z).normalize().applyQuaternion(toPage);
   const turn = scratchPageTurn.setFromAxisAngle(Y_AXIS, sunAzimuthRad - Math.atan2(sun.x, sun.z));
   sun.applyQuaternion(turn);
-  planet.copy(turn).multiply(toPage).multiply(bodyOrientation(elements, jdUtc, scratchBody, body.id === 'earth'));
+  planet
+    .copy(turn)
+    .multiply(toPage)
+    .multiply(bodyOrientation(elements, jdUtc, scratchBody, body.id === 'earth'));
   return true;
 }

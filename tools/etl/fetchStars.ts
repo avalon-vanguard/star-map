@@ -1,9 +1,22 @@
 import { writeFileSync } from 'node:fs';
 
-import { foldByIdentity, hipparcosDistancePc, HYG_UNKNOWN_DISTANCE_PC, mergeStarCatalogues, NAKED_EYE_MAGNITUDE, placementDistancePc } from '../../src/app/shared/astro/star-merge';
+import {
+  foldByIdentity,
+  hipparcosDistancePc,
+  HYG_UNKNOWN_DISTANCE_PC,
+  mergeStarCatalogues,
+  NAKED_EYE_MAGNITUDE,
+  placementDistancePc,
+} from '../../src/app/shared/astro/star-merge';
 import { encodeStarCatalog } from '../../src/app/shared/models/star-catalog';
 import { StarRecord, SUN_STAR_ID } from '../../src/app/shared/models/star.model';
-import { BrightGaiaSource, fetchBrightGaiaSources, fetchGaiaDistancesByHip, fetchHipparcosParallaxErrors, GaiaAnswerError } from './sources/gaia';
+import {
+  BrightGaiaSource,
+  fetchBrightGaiaSources,
+  fetchGaiaDistancesByHip,
+  fetchHipparcosParallaxErrors,
+  GaiaAnswerError,
+} from './sources/gaia';
 import { positionalSources } from './sources/registry';
 import { fetchGaiaDesignationsByGj, fetchGaiaDesignationsByHd } from './sources/simbad';
 import { PARALLAX_PRECISION_MAS } from './sources/star-sources';
@@ -11,7 +24,8 @@ import { parseCsvObjects, parseOptionalNumber } from './lib/csv';
 import { fetchTextCached } from './lib/http';
 import { dataPath, ensureDataDir } from './lib/paths';
 
-const HYG_CSV_URL = 'https://raw.githubusercontent.com/astronexus/HYG-Database/main/hyg/CURRENT/hygdata_v41.csv';
+const HYG_CSV_URL =
+  'https://raw.githubusercontent.com/astronexus/HYG-Database/main/hyg/CURRENT/hygdata_v41.csv';
 
 /**
  * Stand-in magnitude for a star with no photometry. Faint rather than 0, because 0 would mean
@@ -88,7 +102,14 @@ export async function fetchStars(): Promise<StarRecord[]> {
   const brightGaia = await fetchBrightGaiaSources();
   const brightByDesignation = new Map(brightGaia.map((source) => [source.designation, source]));
   const nakedEyeDesignations = await fetchGaiaDesignationsByHd(
-    rows.filter((row) => row['hd'] && Number(row['dist']) >= HYG_UNKNOWN_DISTANCE_PC && (parseOptionalNumber(row['mag']) ?? Infinity) <= NAKED_EYE_MAGNITUDE).map((row) => row['hd'])
+    rows
+      .filter(
+        (row) =>
+          row['hd'] &&
+          Number(row['dist']) >= HYG_UNKNOWN_DISTANCE_PC &&
+          (parseOptionalNumber(row['mag']) ?? Infinity) <= NAKED_EYE_MAGNITUDE,
+      )
+      .map((row) => row['hd']),
   );
 
   const stars: StarRecord[] = [];
@@ -100,7 +121,18 @@ export async function fetchStars(): Promise<StarRecord[]> {
     const id = Number(row['id']);
 
     if (id === SUN_STAR_ID) {
-      stars.push({ id, name: 'Sol', x: 0, y: 0, z: 0, magnitude: parseOptionalNumber(row['mag']) ?? UNKNOWN_MAGNITUDE, magnitudeBand: 'V', spectralType: row['spect'] || 'G2V', colorIndex: parseOptionalNumber(row['ci']) ?? null, colorSystem: 'B-V' });
+      stars.push({
+        id,
+        name: 'Sol',
+        x: 0,
+        y: 0,
+        z: 0,
+        magnitude: parseOptionalNumber(row['mag']) ?? UNKNOWN_MAGNITUDE,
+        magnitudeBand: 'V',
+        spectralType: row['spect'] || 'G2V',
+        colorIndex: parseOptionalNumber(row['ci']) ?? null,
+        colorSystem: 'B-V',
+      });
       continue;
     }
 
@@ -111,18 +143,34 @@ export async function fetchStars(): Promise<StarRecord[]> {
     const magnitude = magnitudeV ?? UNKNOWN_MAGNITUDE;
     const unplaced = hipparcosPc === undefined && magnitude <= NAKED_EYE_MAGNITUDE;
     const crossMatched = row['hip'] ? gaiaByHip.get(Number(row['hip'])) : undefined;
-    const positional = crossMatched === undefined && unplaced ? brightCounterpart(row, magnitude, brightGaia) : undefined;
+    const positional =
+      crossMatched === undefined && unplaced
+        ? brightCounterpart(row, magnitude, brightGaia)
+        : undefined;
     // Where HYG's position leads to no bright source, the one SIMBAD names it as: HD 45951, whose
     // declination HYG has 31.7′ out. Within a magnitude of HYG's V, as by position: θ¹ Ori A
     // (HD 37020) has V 4.98 and O7 in HYG, Hipparcos's entry for it and a companion together, and
     // its own source G 6.63 (SIMBAD: V 6.73, B0V). Placed, it was drawn brighter than θ¹ Ori C and
     // counted as naked-eye; at 378 pc and its own magnitude the map does not keep it.
-    const named = crossMatched === undefined && positional === undefined && unplaced ? brightByDesignation.get(nakedEyeDesignations.get(`HD ${row['hd']}`) ?? '') : undefined;
-    const byIdentity = named && Math.abs(named.magnitudeG - magnitude) <= BRIGHT_COUNTERPART_MAGNITUDES ? named : undefined;
+    const named =
+      crossMatched === undefined && positional === undefined && unplaced
+        ? brightByDesignation.get(nakedEyeDesignations.get(`HD ${row['hd']}`) ?? '')
+        : undefined;
+    const byIdentity =
+      named && Math.abs(named.magnitudeG - magnitude) <= BRIGHT_COUNTERPART_MAGNITUDES
+        ? named
+        : undefined;
     const gaia = crossMatched ?? positional ?? byIdentity;
     const gaiaPc = gaia?.distancePc;
     const hipparcosError = hipparcos?.relativeError;
-    const distancePc = placementDistancePc(hipparcosPc, gaiaPc, magnitude, DISTANCE_CUTOFF_PC, hipparcosError, gaia?.relativeError);
+    const distancePc = placementDistancePc(
+      hipparcosPc,
+      gaiaPc,
+      magnitude,
+      DISTANCE_CUTOFF_PC,
+      hipparcosError,
+      gaia?.relativeError,
+    );
     if (distancePc === null) {
       continue;
     }
@@ -139,7 +187,9 @@ export async function fetchStars(): Promise<StarRecord[]> {
     // Only their direction is used. They sit at HYG's own distance, or at its 100 000 pc
     // placeholder where it has none, and are carried along that direction to the one chosen above —
     // Gaia's, for a star found by its identity, where HYG's may be the thing that is wrong.
-    const [x, y, z] = byIdentity ? [byIdentity.direction.x, byIdentity.direction.y, byIdentity.direction.z] : [Number(row['x']), Number(row['y']), Number(row['z'])];
+    const [x, y, z] = byIdentity
+      ? [byIdentity.direction.x, byIdentity.direction.y, byIdentity.direction.z]
+      : [Number(row['x']), Number(row['y']), Number(row['z'])];
     const length = Math.hypot(x, y, z);
     if (![x, y, z].every(Number.isFinite) || length === 0) {
       continue;
@@ -176,15 +226,23 @@ export async function fetchStars(): Promise<StarRecord[]> {
       // Only for the Gliese-only rows, whose positions are what the merge needs the motion to see
       // past. A Hipparcos position is good to under an arcsecond; given its motion too, 15 stars
       // took their co-moving companion's Gaia entry, and the companion was kept twice.
-      ...(row['hip'] ? {} : { pmRaMasYr: parseOptionalNumber(row['pmra']), pmDecMasYr: parseOptionalNumber(row['pmdec']) })
+      ...(row['hip']
+        ? {}
+        : {
+            pmRaMasYr: parseOptionalNumber(row['pmra']),
+            pmDecMasYr: parseOptionalNumber(row['pmdec']),
+          }),
     });
   }
 
   console.log(
-    `  kept ${stars.length} stars (of ${rows.length} in the catalog): ${atGaiaDistance} at Gaia's distance, ${pastCutoff} of them past ${DISTANCE_CUTOFF_PC} pc; ${identified} naked-eye stars placed by the Gaia source SIMBAD names them as.`
+    `  kept ${stars.length} stars (of ${rows.length} in the catalog): ${atGaiaDistance} at Gaia's distance, ${pastCutoff} of them past ${DISTANCE_CUTOFF_PC} pc; ${identified} naked-eye stars placed by the Gaia source SIMBAD names them as.`,
   );
 
-  const { stars: merged, folded } = foldByIdentity(await mergeWithOtherSources(stars), await glieseGaiaDesignations(rows));
+  const { stars: merged, folded } = foldByIdentity(
+    await mergeWithOtherSources(stars),
+    await glieseGaiaDesignations(rows),
+  );
   console.log(`  ${folded} Gliese entries folded into the Gaia source SIMBAD names them as.`);
   merged.sort((a, b) => a.id - b.id);
   return merged;
@@ -200,14 +258,22 @@ const BRIGHT_COUNTERPART_MAGNITUDES = 1;
  * has it, the rest within 1.1″. At 15″, θ¹ Ori (HIP 26220) took the source of θ¹ Ori C, 12.9″ away
  * and already on the map.
  */
-function brightCounterpart(row: Record<string, string>, magnitudeV: number, sources: readonly BrightGaiaSource[]): { distancePc: number; relativeError: number } | undefined {
+function brightCounterpart(
+  row: Record<string, string>,
+  magnitudeV: number,
+  sources: readonly BrightGaiaSource[],
+): { distancePc: number; relativeError: number } | undefined {
   const [x, y, z] = [Number(row['x']), Number(row['y']), Number(row['z'])];
   const length = Math.hypot(x, y, z);
   let best: BrightGaiaSource | undefined;
   let bestCosine = Math.cos(BRIGHT_COUNTERPART_TOLERANCE_RAD);
   for (const source of sources) {
-    const cosine = (x * source.direction.x + y * source.direction.y + z * source.direction.z) / length;
-    if (cosine >= bestCosine && Math.abs(source.magnitudeG - magnitudeV) <= BRIGHT_COUNTERPART_MAGNITUDES) {
+    const cosine =
+      (x * source.direction.x + y * source.direction.y + z * source.direction.z) / length;
+    if (
+      cosine >= bestCosine &&
+      Math.abs(source.magnitudeG - magnitudeV) <= BRIGHT_COUNTERPART_MAGNITUDES
+    ) {
       best = source;
       bestCosine = cosine;
     }
@@ -217,7 +283,10 @@ function brightCounterpart(row: Record<string, string>, magnitudeV: number, sour
 
 /** HYG's Gliese designation as SIMBAD writes it: "Gl 734B" is "GJ 734 B". */
 function simbadGliese(gl: string): string {
-  return gl.trim().replace(/^Gl\s+/, 'GJ ').replace(/^(GJ \d+(?:\.\d+)?)\s*([A-Z]+)$/, '$1 $2');
+  return gl
+    .trim()
+    .replace(/^Gl\s+/, 'GJ ')
+    .replace(/^(GJ \d+(?:\.\d+)?)\s*([A-Z]+)$/, '$1 $2');
 }
 
 /**
@@ -233,7 +302,9 @@ const MIN_GLIESE_IDENTITIES = 3_200;
  * merge folds its Gliese-only rows by, and what build.ts checks it did. `rows` are HYG's, read
  * again from the cache when not given.
  */
-export async function glieseGaiaDesignations(rows?: Record<string, string>[]): Promise<Map<number, string>> {
+export async function glieseGaiaDesignations(
+  rows?: Record<string, string>[],
+): Promise<Map<number, string>> {
   const hyg = rows ?? parseCsvObjects(await fetchTextCached(HYG_CSV_URL, 'hygdata_v41.csv'));
   const byGj = await fetchGaiaDesignationsByGj();
   const designations = new Map<number, string>();
@@ -244,7 +315,9 @@ export async function glieseGaiaDesignations(rows?: Record<string, string>[]): P
     }
   }
   if (designations.size < MIN_GLIESE_IDENTITIES) {
-    throw new Error(`Only ${designations.size} HYG stars with a Gliese number were matched to SIMBAD's (at least ${MIN_GLIESE_IDENTITIES} expected) — HYG's designations are no longer written as SIMBAD writes them.`);
+    throw new Error(
+      `Only ${designations.size} HYG stars with a Gliese number were matched to SIMBAD's (at least ${MIN_GLIESE_IDENTITIES} expected) — HYG's designations are no longer written as SIMBAD writes them.`,
+    );
   }
   return designations;
 }
@@ -264,14 +337,16 @@ async function mergeWithOtherSources(hygStars: StarRecord[]): Promise<StarRecord
     return hygStars;
   }
 
-  const candidates = [{ sourceId: 'hyg', parallaxPrecisionMas: PARALLAX_PRECISION_MAS['hyg'], stars: hygStars }];
+  const candidates = [
+    { sourceId: 'hyg', parallaxPrecisionMas: PARALLAX_PRECISION_MAS['hyg'], stars: hygStars },
+  ];
 
   for (const source of others) {
     try {
       candidates.push({
         sourceId: source.id,
         parallaxPrecisionMas: PARALLAX_PRECISION_MAS[source.id] ?? 1,
-        stars: await source.fetch!()
+        stars: await source.fetch!(),
       });
     } catch (error) {
       // An answer that cannot be worked with is not an outage: skipping it would write a
@@ -288,7 +363,9 @@ async function mergeWithOtherSources(hygStars: StarRecord[]): Promise<StarRecord
   }
 
   const { stars, summary } = mergeStarCatalogues(candidates);
-  console.log(`  merged ${summary.total} stars from ${candidates.length} catalogues (${summary.duplicates} entries folded into a better-measured one):`);
+  console.log(
+    `  merged ${summary.total} stars from ${candidates.length} catalogues (${summary.duplicates} entries folded into a better-measured one):`,
+  );
   for (const [sourceId, count] of Object.entries(summary.bySource)) {
     console.log(`    ${sourceId}: ${count}`);
   }
@@ -309,8 +386,10 @@ export function writeStarAssets(stars: StarRecord[]): void {
 
 // On its own it writes what the ETL would, hosts included; imported late, since fetchExoplanets imports this module.
 if (require.main === module) {
-  import('./fetchExoplanets').then(({ fetchExoplanets }) => fetchExoplanets()).catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
+  import('./fetchExoplanets')
+    .then(({ fetchExoplanets }) => fetchExoplanets())
+    .catch((error) => {
+      console.error(error);
+      process.exitCode = 1;
+    });
 }

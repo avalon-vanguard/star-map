@@ -7,7 +7,13 @@
  * answers them in place where one does not.
  */
 
-import { jumpLinkSegments, LinkBudget, minimumRangeBetween, Route, routeBetween } from './jump-links';
+import {
+  jumpLinkSegments,
+  LinkBudget,
+  minimumRangeBetween,
+  Route,
+  routeBetween,
+} from './jump-links';
 import { StarNeighbourhood } from './star-neighbourhood';
 
 /** The catalogue, sent once: ids, and positions packed three to a star in the same order. */
@@ -18,12 +24,25 @@ export interface RoutingCatalogue {
 }
 
 export type RoutingRequest =
-  | { readonly kind: 'route'; readonly requestId: number; readonly fromId: number; readonly toId: number; readonly rangePc: number; readonly ceilingPc: number }
+  | {
+      readonly kind: 'route';
+      readonly requestId: number;
+      readonly fromId: number;
+      readonly toId: number;
+      readonly rangePc: number;
+      readonly ceilingPc: number;
+    }
   /**
    * `drawn` is the stars the map is drawing, as positions in the catalogue that was sent: only they
    * are linked. `budget`, where given, keeps only the links nearest the view that fit its length.
    */
-  | { readonly kind: 'links'; readonly requestId: number; readonly rangePc: number; readonly drawn: Uint32Array; readonly budget?: LinkBudget };
+  | {
+      readonly kind: 'links';
+      readonly requestId: number;
+      readonly rangePc: number;
+      readonly drawn: Uint32Array;
+      readonly budget?: LinkBudget;
+    };
 
 export type RoutingResponse =
   /**
@@ -47,7 +66,14 @@ export type RoutingResponse =
 
 /** A spatial index over a catalogue sent as a {@link RoutingCatalogue}. */
 export function indexCatalogue({ ids, positions }: RoutingCatalogue): StarNeighbourhood {
-  return new StarNeighbourhood(Array.from(ids, (id, i) => ({ id, x: positions[i * 3], y: positions[i * 3 + 1], z: positions[i * 3 + 2] })));
+  return new StarNeighbourhood(
+    Array.from(ids, (id, i) => ({
+      id,
+      x: positions[i * 3],
+      y: positions[i * 3 + 1],
+      z: positions[i * 3 + 2],
+    })),
+  );
 }
 
 /**
@@ -59,16 +85,37 @@ export function answerRouting(index: StarNeighbourhood, request: RoutingRequest)
   if (request.kind === 'links') {
     // An index of its own over the drawn stars, in cells as wide as the range, so each cell is
     // paired with its immediate neighbours only: 14 cells a cell at 8 pc rather than 63.
-    const drawn = new StarNeighbourhood(Array.from(request.drawn, (at) => index.pointAt(at)), request.rangePc);
-    return { kind: 'links', requestId: request.requestId, segments: jumpLinkSegments(drawn, request.rangePc, request.budget) };
+    const drawn = new StarNeighbourhood(
+      Array.from(request.drawn, (at) => index.pointAt(at)),
+      request.rangePc,
+    );
+    return {
+      kind: 'links',
+      requestId: request.requestId,
+      segments: jumpLinkSegments(drawn, request.rangePc, request.budget),
+    };
   }
   const { route, gaveUp } = routeBetween(index, request.fromId, request.toId, request.rangePc);
   // At the ceiling the question has just been asked: the range search would repeat it, identically
   // and at the same cost, before bisecting below it.
   if (route || request.rangePc >= request.ceilingPc) {
     // Asked at the ceiling, the one search answers both questions.
-    return { kind: 'route', requestId: request.requestId, route, neededRangePc: null, gaveUp: !route && gaveUp, least: !gaveUp };
+    return {
+      kind: 'route',
+      requestId: request.requestId,
+      route,
+      neededRangePc: null,
+      gaveUp: !route && gaveUp,
+      least: !gaveUp,
+    };
   }
   const needed = minimumRangeBetween(index, request.fromId, request.toId, request.ceilingPc);
-  return { kind: 'route', requestId: request.requestId, route: null, neededRangePc: needed.rangePc, gaveUp, least: needed.least };
+  return {
+    kind: 'route',
+    requestId: request.requestId,
+    route: null,
+    neededRangePc: needed.rangePc,
+    gaveUp,
+    least: needed.least,
+  };
 }

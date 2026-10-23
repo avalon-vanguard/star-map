@@ -10,10 +10,18 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block', 'aria-hidden': 'true' },
   template: `
-    <svg class="h-full w-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <svg
+      class="h-full w-full"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
       <path [attr.d]="direction() === 'left' ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'" />
     </svg>
-  `
+  `,
 })
 export class ChevronIconComponent {
   readonly direction = input<'left' | 'right'>('left');

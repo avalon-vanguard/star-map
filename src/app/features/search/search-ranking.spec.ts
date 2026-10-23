@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildSearchIndex, rankSearchResults, scoreSearchMatch, SearchEntry } from './search-ranking';
+import {
+  buildSearchIndex,
+  rankSearchResults,
+  scoreSearchMatch,
+  SearchEntry,
+} from './search-ranking';
 
 function star(name: string): SearchEntry {
   return { kind: 'star', name, subtitle: 'G2V', starId: name.length };
@@ -77,18 +82,38 @@ describe('rankSearchResults', () => {
   });
 
   it('puts the host star ahead of its own planets', () => {
-    const entries = [exoplanet('Proxima Cen b'), exoplanet('Proxima Cen d'), star('Proxima Centauri')];
+    const entries = [
+      exoplanet('Proxima Cen b'),
+      exoplanet('Proxima Cen d'),
+      star('Proxima Centauri'),
+    ];
     expect(rank(entries, 'Proxima')[0]).toBe('Proxima Centauri');
   });
 
   it("lists a host's own planets ahead of the systems whose names run on from its own", () => {
-    const entries = [star('K2-18'), star('K2-180'), star('K2-181'), exoplanet('K2-18 b'), exoplanet('K2-18 c')];
+    const entries = [
+      star('K2-18'),
+      star('K2-180'),
+      star('K2-181'),
+      exoplanet('K2-18 b'),
+      exoplanet('K2-18 c'),
+    ];
     expect(rank(entries, 'K2-18')).toEqual(['K2-18', 'K2-18 b', 'K2-18 c', 'K2-180', 'K2-181']);
   });
 
   it('breaks remaining ties by name length, then alphabetically', () => {
-    const entries = [exoplanet('Kepler-1292 b'), exoplanet('Kepler-9 c'), exoplanet('Kepler-9 b'), exoplanet('Kepler-15 b')];
-    expect(rank(entries, 'Kepler')).toEqual(['Kepler-9 b', 'Kepler-9 c', 'Kepler-15 b', 'Kepler-1292 b']);
+    const entries = [
+      exoplanet('Kepler-1292 b'),
+      exoplanet('Kepler-9 c'),
+      exoplanet('Kepler-9 b'),
+      exoplanet('Kepler-15 b'),
+    ];
+    expect(rank(entries, 'Kepler')).toEqual([
+      'Kepler-9 b',
+      'Kepler-9 c',
+      'Kepler-15 b',
+      'Kepler-1292 b',
+    ]);
   });
 
   it('is independent of the order entries were indexed in', () => {

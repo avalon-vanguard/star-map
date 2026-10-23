@@ -21,6 +21,10 @@ addEventListener('message', ({ data }: MessageEvent<RoutingCatalogue | RoutingRe
     const response = answerRouting(index!, data);
     postMessage(response, response.kind === 'links' ? [response.segments.buffer] : []);
   } catch (error) {
-    postMessage({ kind: 'failed', requestId: data.requestId, message: error instanceof Error ? error.message : String(error) });
+    postMessage({
+      kind: 'failed',
+      requestId: data.requestId,
+      message: error instanceof Error ? error.message : String(error),
+    });
   }
 });

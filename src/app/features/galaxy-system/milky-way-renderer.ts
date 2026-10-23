@@ -16,8 +16,17 @@ export const GALAXY_FADE_FAR_PC = 2500;
 /** A unit quad centred on the origin — the billboard every particle is drawn on. */
 function createQuadGeometry(instanceCount: number): THREE.InstancedBufferGeometry {
   const geometry = new THREE.InstancedBufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]), 3));
-  geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2));
+  geometry.setAttribute(
+    'position',
+    new THREE.BufferAttribute(
+      new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]),
+      3,
+    ),
+  );
+  geometry.setAttribute(
+    'uv',
+    new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2),
+  );
   geometry.setIndex([0, 1, 2, 0, 2, 3]);
   geometry.instanceCount = instanceCount;
   return geometry;
@@ -60,7 +69,7 @@ export class MilkyWayRenderer {
       transparent: true,
       depthWrite: false,
       depthTest: false,
-      blending: THREE.AdditiveBlending
+      blending: THREE.AdditiveBlending,
     });
     this.material.positionNode = instancedBufferAttribute(positionAttribute, 'vec3');
     this.material.scaleNode = instancedBufferAttribute(sizeAttribute, 'float');
@@ -69,7 +78,9 @@ export class MilkyWayRenderer {
     // a star read as a bright point makes a cloud read as a solid ball.
     const radius = uv().sub(vec2(0.5)).length();
     const falloff = smoothstep(0.0, 0.5, radius).oneMinus().pow(1.6);
-    this.material.opacityNode = falloff.mul(instancedBufferAttribute(alphaAttribute, 'float')).mul(this.fade);
+    this.material.opacityNode = falloff
+      .mul(instancedBufferAttribute(alphaAttribute, 'float'))
+      .mul(this.fade);
 
     this.object = new THREE.Mesh(this.geometry, this.material);
     // The quad's own bounds sit at the origin and say nothing about where the instances are.
@@ -99,7 +110,14 @@ export class MilkyWayRenderer {
   labelPoints(): readonly LabeledPoint[] {
     return GALACTIC_LANDMARKS.map((landmark) => {
       const position = landmarkPositionPc(landmark);
-      return { id: `galactic:${landmark.id}`, name: landmark.name, kind: landmark.kind, x: position.x, y: position.y, z: position.z };
+      return {
+        id: `galactic:${landmark.id}`,
+        name: landmark.name,
+        kind: landmark.kind,
+        x: position.x,
+        y: position.y,
+        z: position.z,
+      };
     });
   }
 

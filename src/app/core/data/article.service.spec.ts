@@ -10,9 +10,9 @@ function summary(overrides: Record<string, unknown> = {}): Response {
       titles: { normalized: 'Titan (moon)' },
       extract: 'Titan is the largest moon of Saturn.',
       content_urls: { desktop: { page: 'https://en.wikipedia.org/wiki/Titan_(moon)' } },
-      ...overrides
+      ...overrides,
     }),
-    { status: 200 }
+    { status: 200 },
   );
 }
 
@@ -36,7 +36,9 @@ function languagesAsked(fetchMock: ReturnType<typeof vi.fn>): string[] {
 }
 
 function titlesAsked(fetchMock: ReturnType<typeof vi.fn>): string[] {
-  return fetchMock.mock.calls.map((call) => decodeURIComponent(String(call[0]).split('/summary/')[1]));
+  return fetchMock.mock.calls.map((call) =>
+    decodeURIComponent(String(call[0]).split('/summary/')[1]),
+  );
 }
 
 describe('ArticleService', () => {
@@ -63,8 +65,8 @@ describe('ArticleService', () => {
         title: 'Titan (moon)',
         extract: 'Titan is the largest moon of Saturn.',
         url: 'https://en.wikipedia.org/wiki/Titan_(moon)',
-        language: 'en'
-      }
+        language: 'en',
+      },
     });
   });
 
@@ -87,7 +89,9 @@ describe('ArticleService', () => {
   });
 
   it('names the kind when the plain name lands on a list of other things', async () => {
-    fetchMock.mockResolvedValueOnce(summary({ type: 'disambiguation' })).mockResolvedValueOnce(summary());
+    fetchMock
+      .mockResolvedValueOnce(summary({ type: 'disambiguation' }))
+      .mockResolvedValueOnce(summary());
 
     const result = await service().lookup('Titan', 'moon');
 

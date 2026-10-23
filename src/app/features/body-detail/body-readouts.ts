@@ -1,5 +1,12 @@
 import { PLANET_CLASS_LABELS } from '../../shared/astro/planet-appearance';
-import { formatAu, formatDensity, formatMassEarth, formatPeriod, formatRadiusKm, formatTemperature } from '../../shared/format/quantity';
+import {
+  formatAu,
+  formatDensity,
+  formatMassEarth,
+  formatPeriod,
+  formatRadiusKm,
+  formatTemperature,
+} from '../../shared/format/quantity';
 import { Readout } from '../../shared/models/readout';
 import { BodyDetailViewModel } from './body-detail.model';
 
@@ -7,7 +14,7 @@ export const KIND_LABELS: Readonly<Record<BodyDetailViewModel['kind'], string>> 
   planet: 'Planet',
   moon: 'Moon',
   dwarf: 'Dwarf planet',
-  exoplanet: 'Exoplanet'
+  exoplanet: 'Exoplanet',
 };
 
 export interface BodyReadouts {
@@ -32,10 +39,16 @@ export function bodyReadouts(body: BodyDetailViewModel): BodyReadouts {
   const measured: Readout[] = [];
   if (body.radiusKm !== undefined) {
     // A triaxial body is drawn as the sphere of its volume; a radius alone would hide its shape.
-    measured.push({ label: body.semiAxesKm ? 'Mean radius' : 'Radius', value: formatRadiusKm(body.radiusKm) });
+    measured.push({
+      label: body.semiAxesKm ? 'Mean radius' : 'Radius',
+      value: formatRadiusKm(body.radiusKm),
+    });
   }
   if (body.semiAxesKm) {
-    measured.push({ label: 'Semi-axes', value: `${body.semiAxesKm.map((axis) => axis.toLocaleString('en-GB')).join(' × ')} km` });
+    measured.push({
+      label: 'Semi-axes',
+      value: `${body.semiAxesKm.map((axis) => axis.toLocaleString('en-GB')).join(' × ')} km`,
+    });
   }
   if (body.massEarth !== undefined) {
     measured.push({ label: 'Mass', value: formatMassEarth(body.massEarth) });
@@ -49,7 +62,10 @@ export function bodyReadouts(body: BodyDetailViewModel): BodyReadouts {
   if (body.orbit.inclinationDeg !== undefined) {
     // Its size: Standish fits Earth's as -0.00054 degrees, which is the same orbit as +0.00054 with
     // the node half a turn round, and printed as it stands read "-0.00°".
-    measured.push({ label: 'Inclination', value: `${Math.abs(body.orbit.inclinationDeg).toFixed(2)}°` });
+    measured.push({
+      label: 'Inclination',
+      value: `${Math.abs(body.orbit.inclinationDeg).toFixed(2)}°`,
+    });
   }
   // The period sits under whichever heading its provenance calls for. Same number, same field —
   // a published period is an observation and a computed one is not.
@@ -60,18 +76,28 @@ export function bodyReadouts(body: BodyDetailViewModel): BodyReadouts {
     measured.push({ label: 'Discovered', value: `${body.discoveryYear}` });
   }
 
-  const derived: Readout[] = [{ label: 'Class', value: PLANET_CLASS_LABELS[body.appearance.planetClass] }];
+  const derived: Readout[] = [
+    { label: 'Class', value: PLANET_CLASS_LABELS[body.appearance.planetClass] },
+  ];
   if (body.orbitalPeriodDays !== undefined && body.orbitalPeriodSource === 'derived') {
     derived.push({ label: 'Period', value: formatPeriod(body.orbitalPeriodDays) });
   }
   if (body.appearance.equilibriumTemperatureK !== null) {
-    derived.push({ label: 'Equilibrium temp.', value: formatTemperature(body.appearance.equilibriumTemperatureK) });
+    derived.push({
+      label: 'Equilibrium temp.',
+      value: formatTemperature(body.appearance.equilibriumTemperatureK),
+    });
   }
   if (body.appearance.bulkDensityGramsPerCm3 !== null) {
-    derived.push({ label: 'Bulk density', value: formatDensity(body.appearance.bulkDensityGramsPerCm3) });
+    derived.push({
+      label: 'Bulk density',
+      value: formatDensity(body.appearance.bulkDensityGramsPerCm3),
+    });
   }
 
-  const provenance = body.orbitSource ? `${provenanceFor(body)} Orbit: ${body.orbitSource}.` : provenanceFor(body);
+  const provenance = body.orbitSource
+    ? `${provenanceFor(body)} Orbit: ${body.orbitSource}.`
+    : provenanceFor(body);
   return { kindLabel: KIND_LABELS[body.kind], measured, derived, provenance };
 }
 

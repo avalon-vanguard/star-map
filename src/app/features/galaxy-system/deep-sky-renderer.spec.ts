@@ -2,7 +2,14 @@ import * as THREE from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 
 import { DeepSkyRecord } from '../../shared/models/deepsky.model';
-import { backdropPosition, backdropSpriteSizePc, BACKDROP_RADIUS_PC, brightnessBandIndex, deepSkyLabelPoints, DeepSkyRenderer } from './deep-sky-renderer';
+import {
+  backdropPosition,
+  backdropSpriteSizePc,
+  BACKDROP_RADIUS_PC,
+  brightnessBandIndex,
+  deepSkyLabelPoints,
+  DeepSkyRenderer,
+} from './deep-sky-renderer';
 
 function record(overrides: Partial<DeepSkyRecord> = {}): DeepSkyRecord {
   return {
@@ -18,7 +25,7 @@ function record(overrides: Partial<DeepSkyRecord> = {}): DeepSkyRecord {
     distanceMethod: null,
     constellation: 'And',
     messier: 'M31',
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -96,7 +103,11 @@ describe('brightnessBandIndex', () => {
 });
 
 describe('deepSkyLabelPoints', () => {
-  const records = [record({ id: 'a', name: 'A' }), record({ id: 'b', name: 'B' }), record({ id: 'c', name: 'C' })];
+  const records = [
+    record({ id: 'a', name: 'A' }),
+    record({ id: 'b', name: 'B' }),
+    record({ id: 'c', name: 'C' }),
+  ];
 
   it('takes a prefix of the (magnitude-sorted) records', () => {
     expect(deepSkyLabelPoints(records, 2).map((point) => point.id)).toEqual(['a', 'b']);
@@ -139,7 +150,7 @@ describe('DeepSkyRenderer', () => {
   it('shares one material across objects of the same kind and brightness', () => {
     const renderer = new DeepSkyRenderer([
       record({ id: 'a', kind: 'galaxy', magnitude: 3 }),
-      record({ id: 'b', kind: 'galaxy', magnitude: 4 })
+      record({ id: 'b', kind: 'galaxy', magnitude: 4 }),
     ]);
     const [first, second] = renderer.object.children as THREE.Sprite[];
 
@@ -151,9 +162,11 @@ describe('DeepSkyRenderer', () => {
     const renderer = new DeepSkyRenderer([
       record({ id: 'a', kind: 'galaxy', magnitude: 3 }),
       record({ id: 'b', kind: 'nebula', magnitude: 3 }),
-      record({ id: 'c', kind: 'cluster', magnitude: 3 })
+      record({ id: 'c', kind: 'cluster', magnitude: 3 }),
     ]);
-    const materials = new Set((renderer.object.children as THREE.Sprite[]).map((sprite) => sprite.material));
+    const materials = new Set(
+      (renderer.object.children as THREE.Sprite[]).map((sprite) => sprite.material),
+    );
 
     expect(materials.size).toBe(3);
     renderer.dispose();
@@ -162,7 +175,7 @@ describe('DeepSkyRenderer', () => {
   it('gives different brightness bands different materials', () => {
     const renderer = new DeepSkyRenderer([
       record({ id: 'a', kind: 'galaxy', magnitude: 3 }),
-      record({ id: 'b', kind: 'galaxy', magnitude: 9 })
+      record({ id: 'b', kind: 'galaxy', magnitude: 9 }),
     ]);
     const [bright, faint] = renderer.object.children as THREE.Sprite[];
 
@@ -173,10 +186,16 @@ describe('DeepSkyRenderer', () => {
 
   it('keeps the material count bounded no matter how many objects there are', () => {
     const many = Array.from({ length: 200 }, (_, index) =>
-      record({ id: `obj-${index}`, kind: (['galaxy', 'nebula', 'cluster'] as const)[index % 3], magnitude: index % 12 })
+      record({
+        id: `obj-${index}`,
+        kind: (['galaxy', 'nebula', 'cluster'] as const)[index % 3],
+        magnitude: index % 12,
+      }),
     );
     const renderer = new DeepSkyRenderer(many);
-    const materials = new Set((renderer.object.children as THREE.Sprite[]).map((sprite) => sprite.material));
+    const materials = new Set(
+      (renderer.object.children as THREE.Sprite[]).map((sprite) => sprite.material),
+    );
 
     expect(renderer.object.children).toHaveLength(200);
     // Three kinds x three brightness bands.
@@ -191,7 +210,10 @@ describe('DeepSkyRenderer', () => {
   });
 
   it('disposes its materials and empties the group', () => {
-    const renderer = new DeepSkyRenderer([record({ id: 'a' }), record({ id: 'b', kind: 'nebula' })]);
+    const renderer = new DeepSkyRenderer([
+      record({ id: 'a' }),
+      record({ id: 'b', kind: 'nebula' }),
+    ]);
     const materials = (renderer.object.children as THREE.Sprite[]).map((sprite) => sprite.material);
     const disposed = materials.map((material) => {
       let seen = false;

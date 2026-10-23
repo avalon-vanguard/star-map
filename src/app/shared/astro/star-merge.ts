@@ -99,11 +99,16 @@ const MIN_HIPPARCOS_PARALLAX_OVER_ERROR = 2.5;
  * above it: 41 naked-eye stars were left off the map as having no distance, HD 74180 at
  * 0.67 ± 0.16 mas and Mu Cep at 0.55 ± 0.20 among them, while Alnilam at 1.65 ± 0.45 was drawn.
  */
-export function hipparcosDistancePc(hygPc: number, parallax?: { parallaxMas: number; relativeError: number }): number | undefined {
+export function hipparcosDistancePc(
+  hygPc: number,
+  parallax?: { parallaxMas: number; relativeError: number },
+): number | undefined {
   if (Number.isFinite(hygPc) && hygPc > 0 && hygPc < HYG_UNKNOWN_DISTANCE_PC) {
     return hygPc;
   }
-  return parallax && parallax.relativeError <= 1 / MIN_HIPPARCOS_PARALLAX_OVER_ERROR ? 1000 / parallax.parallaxMas : undefined;
+  return parallax && parallax.relativeError <= 1 / MIN_HIPPARCOS_PARALLAX_OVER_ERROR
+    ? 1000 / parallax.parallaxMas
+    : undefined;
 }
 
 /** The faintest star, in V, the naked eye sees under a dark sky: the traditional limit of 6.5. */
@@ -134,14 +139,21 @@ export function placementDistancePc(
   magnitude: number,
   cutoffPc: number,
   hipparcosError?: number,
-  gaiaError?: number
+  gaiaError?: number,
 ): number | null {
-  const hipparcosBetter = hipparcosPc !== undefined && hipparcosError !== undefined && gaiaError !== undefined && hipparcosError < gaiaError;
+  const hipparcosBetter =
+    hipparcosPc !== undefined &&
+    hipparcosError !== undefined &&
+    gaiaError !== undefined &&
+    hipparcosError < gaiaError;
   const best = hipparcosBetter ? hipparcosPc : (gaiaPc ?? hipparcosPc);
   if (best === undefined) {
     return null;
   }
-  const inside = magnitude <= NAKED_EYE_MAGNITUDE || best <= cutoffPc || (hipparcosPc !== undefined && hipparcosPc <= cutoffPc);
+  const inside =
+    magnitude <= NAKED_EYE_MAGNITUDE ||
+    best <= cutoffPc ||
+    (hipparcosPc !== undefined && hipparcosPc <= cutoffPc);
   return inside ? best : null;
 }
 
@@ -189,7 +201,10 @@ function cellKey(raDeg: number, decDeg: number): string {
 
 function skyAngles(star: StarRecord): { raDeg: number; decDeg: number } {
   const [x, y, z] = direction(star);
-  return { raDeg: (Math.atan2(y, x) / DEG_TO_RAD + 360) % 360, decDeg: Math.asin(Math.max(-1, Math.min(1, z))) / DEG_TO_RAD };
+  return {
+    raDeg: (Math.atan2(y, x) / DEG_TO_RAD + 360) % 360,
+    decDeg: Math.asin(Math.max(-1, Math.min(1, z))) / DEG_TO_RAD,
+  };
 }
 
 function neighbouringCells(raDeg: number, decDeg: number): string[] {
@@ -211,10 +226,18 @@ export function directionCosine(a: StarRecord, b: StarRecord): number {
 
 /** Whether both entries have a proper motion and `entry`'s is within tolerance of `kept`'s. */
 function movesWith(kept: StarRecord, entry: StarRecord): boolean {
-  if (kept.pmRaMasYr === undefined || kept.pmDecMasYr === undefined || entry.pmRaMasYr === undefined || entry.pmDecMasYr === undefined) {
+  if (
+    kept.pmRaMasYr === undefined ||
+    kept.pmDecMasYr === undefined ||
+    entry.pmRaMasYr === undefined ||
+    entry.pmDecMasYr === undefined
+  ) {
     return false;
   }
-  const difference = Math.hypot(entry.pmRaMasYr - kept.pmRaMasYr, entry.pmDecMasYr - kept.pmDecMasYr);
+  const difference = Math.hypot(
+    entry.pmRaMasYr - kept.pmRaMasYr,
+    entry.pmDecMasYr - kept.pmDecMasYr,
+  );
   return difference < MERGE_PROPER_MOTION_TOLERANCE * Math.hypot(kept.pmRaMasYr, kept.pmDecMasYr);
 }
 
@@ -235,7 +258,9 @@ export function isSameStar(kept: StarRecord, entry: StarRecord): boolean {
 
   const separationDeg = Math.acos(directionCosine(kept, entry)) / DEG_TO_RAD;
   const comoving = movesWith(kept, entry);
-  if (separationDeg > (comoving ? MERGE_COMOVING_ANGULAR_TOLERANCE_DEG : MERGE_ANGULAR_TOLERANCE_DEG)) {
+  if (
+    separationDeg > (comoving ? MERGE_COMOVING_ANGULAR_TOLERANCE_DEG : MERGE_ANGULAR_TOLERANCE_DEG)
+  ) {
     return false;
   }
   const fainterBy = entry.magnitude - kept.magnitude;
@@ -267,8 +292,15 @@ export function isSameStar(kept: StarRecord, entry: StarRecord): boolean {
  * HD 45951, HD 45291 and HD 124953, three naked-eye giants Gaia measures at BP−RP 1.25, 1.19 and
  * 0.37, and each card showed no colour at all.
  */
-function combine(kept: StarRecord, other: StarRecord, described = isDesignation(kept) && !isDesignation(other) ? other : kept): StarRecord {
-  const otherBetter = other.distanceError !== undefined && kept.distanceError !== undefined && other.distanceError < kept.distanceError;
+function combine(
+  kept: StarRecord,
+  other: StarRecord,
+  described = isDesignation(kept) && !isDesignation(other) ? other : kept,
+): StarRecord {
+  const otherBetter =
+    other.distanceError !== undefined &&
+    kept.distanceError !== undefined &&
+    other.distanceError < kept.distanceError;
   const placed = otherBetter ? other : kept;
   const scale = otherBetter ? distanceOf(other) / distanceOf(kept) : 1;
   const gaiaDesignation = kept.gaiaDesignation ?? other.gaiaDesignation;
@@ -283,7 +315,7 @@ function combine(kept: StarRecord, other: StarRecord, described = isDesignation(
     source: kept.source,
     distanceError: placed.distanceError,
     distanceFromGaia: placed.distanceFromGaia,
-    ...(gaiaDesignation === undefined ? {} : { gaiaDesignation })
+    ...(gaiaDesignation === undefined ? {} : { gaiaDesignation }),
   };
 }
 
@@ -302,7 +334,10 @@ export const IDENTITY_FOLD_MAGNITUDE_TOLERANCE = 0.5;
  * settles whatever HYG's V says; where a HYG star already describes it, only if the two V agree.
  */
 export function foldsInto(target: StarRecord, entry: StarRecord): boolean {
-  return isDesignation(target) || Math.abs(target.magnitude - entry.magnitude) <= IDENTITY_FOLD_MAGNITUDE_TOLERANCE;
+  return (
+    isDesignation(target) ||
+    Math.abs(target.magnitude - entry.magnitude) <= IDENTITY_FOLD_MAGNITUDE_TOLERANCE
+  );
 }
 
 /**
@@ -329,7 +364,10 @@ export function foldsInto(target: StarRecord, entry: StarRecord): boolean {
  * A and HD 65277 (Gl 293.1A) the others; each HYG star SIMBAD puts elsewhere loses its entry,
  * having no source of its own on the map to carry it.
  */
-export function foldByIdentity(stars: readonly StarRecord[], gaiaDesignationById: ReadonlyMap<number, string>): { stars: StarRecord[]; folded: number } {
+export function foldByIdentity(
+  stars: readonly StarRecord[],
+  gaiaDesignationById: ReadonlyMap<number, string>,
+): { stars: StarRecord[]; folded: number } {
   const byDesignation = new Map<string, number>();
   stars.forEach((star, index) => {
     if (star.gaiaDesignation !== undefined) {
@@ -339,7 +377,10 @@ export function foldByIdentity(stars: readonly StarRecord[], gaiaDesignationById
   const result = [...stars];
   const folded = new Set<number>();
   stars.forEach((star, index) => {
-    const designation = star.source === 'hyg' && star.distanceError === undefined ? gaiaDesignationById.get(star.id) : undefined;
+    const designation =
+      star.source === 'hyg' && star.distanceError === undefined
+        ? gaiaDesignationById.get(star.id)
+        : undefined;
     const target = designation === undefined ? undefined : byDesignation.get(designation);
     if (target === undefined || !foldsInto(result[target], star)) {
       return;
@@ -349,7 +390,11 @@ export function foldByIdentity(stars: readonly StarRecord[], gaiaDesignationById
     // Where the Gliese row is the star, its colour too, or none: not the one of the star SIMBAD puts elsewhere.
     result[target] =
       describer !== undefined && describer !== designation
-        ? { ...combine(result[target], star, star), colorIndex: star.colorIndex, colorSystem: star.colorSystem }
+        ? {
+            ...combine(result[target], star, star),
+            colorIndex: star.colorIndex,
+            colorSystem: star.colorSystem,
+          }
         : { ...combine(result[target], star), magnitude, magnitudeBand, colorIndex, colorSystem };
     // One star each: a second Gliese row naming the same source is another star SIMBAD has not split.
     byDesignation.delete(designation!);
@@ -368,7 +413,10 @@ export function foldByIdentity(stars: readonly StarRecord[], gaiaDesignationById
  * within the tolerance are two stars, typically a double that Gaia resolves and Hipparcos did
  * not. Where only one source reaches, the star is still there.
  */
-export function mergeStarCatalogues(candidates: readonly MergeCandidate[]): { stars: StarRecord[]; summary: MergeSummary } {
+export function mergeStarCatalogues(candidates: readonly MergeCandidate[]): {
+  stars: StarRecord[];
+  summary: MergeSummary;
+} {
   const ordered = [...candidates].sort((a, b) => a.parallaxPrecisionMas - b.parallaxPrecisionMas);
   const merged: StarRecord[] = [];
   const grid = new Map<string, number[]>();
@@ -390,7 +438,11 @@ export function mergeStarCatalogues(candidates: readonly MergeCandidate[]): { st
       for (const key of neighbouringCells(raDeg, decDeg)) {
         for (const index of grid.get(key) ?? []) {
           const existing = merged[index];
-          if (existing.source === entry.source || taken.has(`${index}/${entry.source}`) || !isSameStar(existing, entry)) {
+          if (
+            existing.source === entry.source ||
+            taken.has(`${index}/${entry.source}`) ||
+            !isSameStar(existing, entry)
+          ) {
             continue;
           }
           const cosine = directionCosine(existing, entry);

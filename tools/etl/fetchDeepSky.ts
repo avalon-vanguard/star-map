@@ -1,19 +1,25 @@
 import { writeFileSync } from 'node:fs';
 
 import { parseSexagesimal, raDecToUnitVector } from '../../src/app/shared/astro/coordinates';
-import { classifyOpenNgcType, estimateDeepSkyDistancePc, isNotableDeepSkyObject } from '../../src/app/shared/astro/deep-sky';
+import {
+  classifyOpenNgcType,
+  estimateDeepSkyDistancePc,
+  isNotableDeepSkyObject,
+} from '../../src/app/shared/astro/deep-sky';
 import { DeepSkyRecord } from '../../src/app/shared/models/deepsky.model';
 import { parseCsvObjects } from './lib/csv';
 import { fetchTextCached } from './lib/http';
 import { dataPath, ensureDataDir } from './lib/paths';
 
-const OPENNGC_CSV_URL = 'https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv';
+const OPENNGC_CSV_URL =
+  'https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv';
 /**
  * OpenNGC's second file, with the same columns, for the objects no NGC or IC number covers:
  * the Pleiades, the Hyades, the Large Magellanic Cloud, the Horsehead, the Coalsack. Without
  * it the brightest deep-sky object in the sky is missing while the Small Cloud is drawn.
  */
-const OPENNGC_ADDENDUM_CSV_URL = 'https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/addendum.csv';
+const OPENNGC_ADDENDUM_CSV_URL =
+  'https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/addendum.csv';
 /** OpenNGC publishes semicolon-separated files, not comma-separated. */
 const OPENNGC_DELIMITER = ';';
 
@@ -57,7 +63,11 @@ function primaryCommonName(value: string | undefined): string | null {
  * Display name, most recognisable first: a common name ("Andromeda Galaxy") beats a Messier
  * number ("M31"), which beats the raw catalog designation ("NGC0224").
  */
-function resolveName(commonName: string | null, messier: string | null, designation: string): string {
+function resolveName(
+  commonName: string | null,
+  messier: string | null,
+  designation: string,
+): string {
   return commonName ?? messier ?? designation;
 }
 
@@ -72,7 +82,10 @@ export async function fetchDeepSky(): Promise<DeepSkyRecord[]> {
   console.log('Fetching OpenNGC deep-sky catalog...');
   const rows = [
     ...parseCsvObjects(await fetchTextCached(OPENNGC_CSV_URL, 'openngc.csv'), OPENNGC_DELIMITER),
-    ...parseCsvObjects(await fetchTextCached(OPENNGC_ADDENDUM_CSV_URL, 'openngc-addendum.csv'), OPENNGC_DELIMITER)
+    ...parseCsvObjects(
+      await fetchTextCached(OPENNGC_ADDENDUM_CSV_URL, 'openngc-addendum.csv'),
+      OPENNGC_DELIMITER,
+    ),
   ];
 
   const records: DeepSkyRecord[] = [];
@@ -113,7 +126,7 @@ export async function fetchDeepSky(): Promise<DeepSkyRecord[]> {
     const distance = estimateDeepSkyDistancePc({
       kind,
       redshift: numericField(row['Redshift']),
-      parallaxMas: numericField(row['Pax'])
+      parallaxMas: numericField(row['Pax']),
     });
 
     records.push({
@@ -128,7 +141,7 @@ export async function fetchDeepSky(): Promise<DeepSkyRecord[]> {
       distancePc: distance?.distancePc ?? null,
       distanceMethod: distance?.method ?? null,
       constellation: textField(row['Const']) ?? 'Unknown',
-      messier
+      messier,
     });
   }
 
@@ -137,14 +150,20 @@ export async function fetchDeepSky(): Promise<DeepSkyRecord[]> {
   // The tie-break compares code points rather than localeCompare: locale collation depends on
   // the ICU build of whichever Node runs the ETL, and a scheduled re-run must not reorder the
   // file just because the runner's ICU disagrees with the machine that wrote it last.
-  records.sort((a, b) => (a.magnitude ?? Infinity) - (b.magnitude ?? Infinity) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  records.sort(
+    (a, b) =>
+      (a.magnitude ?? Infinity) - (b.magnitude ?? Infinity) ||
+      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  );
 
   ensureDataDir();
   writeFileSync(dataPath('deepsky.json'), JSON.stringify(records));
 
   const withDistance = records.filter((record) => record.distancePc !== null).length;
   console.log(`  kept ${records.length} deep-sky objects (of ${rows.length} catalog rows).`);
-  console.log(`  skipped: ${skippedUnclassified} not deep-sky, ${skippedNotNotable} too faint, ${skippedUnpositioned} unusable coordinates.`);
+  console.log(
+    `  skipped: ${skippedUnclassified} not deep-sky, ${skippedNotNotable} too faint, ${skippedUnpositioned} unusable coordinates.`,
+  );
   console.log(`  ${withDistance}/${records.length} have a derivable distance.`);
 
   return records;

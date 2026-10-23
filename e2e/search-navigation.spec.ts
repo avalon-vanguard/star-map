@@ -4,7 +4,9 @@ import { openSearch } from './support/open-search';
 import { backButtonLocator } from './support/wait-for-back-button';
 
 test.describe('Search-driven navigation', () => {
-  test('selecting a star result flies into that system and shows the back-to-galaxy control', async ({ page }) => {
+  test('selecting a star result flies into that system and shows the back-to-galaxy control', async ({
+    page,
+  }) => {
     await page.goto('/?stars=4000');
     const searchInput = await openSearch(page);
     await searchInput.fill('Proxima Centauri');
@@ -15,12 +17,17 @@ test.describe('Search-driven navigation', () => {
 
     // Selecting a result hands the dock straight back to the readout (before the flight even
     // starts): the thing to look at is now the scene, and the search panel folds away with it.
-    await expect(page.getByRole('tab', { name: 'Readout' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: 'Readout' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     await expect(searchInput).toHaveCount(0);
     await expect(backButtonLocator(page)).toBeVisible({ timeout: 15_000 });
   });
 
-  test('selecting a body result navigates straight to its detail route and shows real NASA data', async ({ page }) => {
+  test('selecting a body result navigates straight to its detail route and shows real NASA data', async ({
+    page,
+  }) => {
     await page.goto('/?stars=4000');
     const searchInput = await openSearch(page);
     await searchInput.fill('Earth');
@@ -37,7 +44,9 @@ test.describe('Search-driven navigation', () => {
     await expect(page.getByText('Radius')).toBeVisible();
   });
 
-  test('typing fewer than two characters shows no results, and Escape clears the query', async ({ page }) => {
+  test('typing fewer than two characters shows no results, and Escape clears the query', async ({
+    page,
+  }) => {
     await page.goto('/?stars=4000');
     const searchInput = await openSearch(page);
 

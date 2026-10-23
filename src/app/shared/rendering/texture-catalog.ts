@@ -51,7 +51,7 @@ const BODY_TEXTURE_PATHS: Record<string, string> = {
   triton: 'assets/textures/bodies/triton.jpg',
   ceres: 'assets/textures/bodies/ceres.jpg',
   pluto: 'assets/textures/bodies/pluto.jpg',
-  charon: 'assets/textures/bodies/charon.jpg'
+  charon: 'assets/textures/bodies/charon.jpg',
 };
 
 /**
@@ -77,7 +77,7 @@ const ATMOSPHERE_BY_ID: Record<string, THREE.ColorRepresentation> = {
   saturn: 0xe0d2a8,
   uranus: 0x9fe8e8,
   neptune: 0x5b7fff,
-  titan: 0xf0b25c
+  titan: 0xf0b25c,
 };
 
 export function bodyTexturePath(id: string): string | undefined {
@@ -131,7 +131,7 @@ export function saturnRing(planetRadiusKm: number, drawnRadius: number): THREE.M
     side: THREE.DoubleSide,
     depthWrite: false,
     roughness: 1,
-    metalness: 0
+    metalness: 0,
   });
   return new THREE.Mesh(geometry, material);
 }
@@ -151,11 +151,8 @@ export function loadCachedTexture(path: string): THREE.Texture {
     return cached;
   }
 
-  const texture = textureLoader.load(
-    path,
-    undefined,
-    undefined,
-    (error) => console.error(`Failed to load texture "${path}".`, error)
+  const texture = textureLoader.load(path, undefined, undefined, (error) =>
+    console.error(`Failed to load texture "${path}".`, error),
   );
   texture.colorSpace = THREE.SRGBColorSpace;
   loadedTextures.set(path, texture);

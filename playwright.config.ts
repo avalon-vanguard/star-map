@@ -27,13 +27,13 @@ export default defineConfig({
   timeout: process.env.CI ? 90_000 : 30_000,
   use: {
     baseURL: 'http://localhost:4300',
-    trace: 'on-first-retry'
+    trace: 'on-first-retry',
   },
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] }
-    }
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
   webServer: {
     // Uses a dedicated port (rather than the Angular CLI's conventional 4200) so this never
@@ -44,6 +44,6 @@ export default defineConfig({
     command: `npm run start -- --port=4300${process.env.CI ? ' --configuration=production' : ''}`,
     url: 'http://localhost:4300',
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000
-  }
+    timeout: 120_000,
+  },
 });

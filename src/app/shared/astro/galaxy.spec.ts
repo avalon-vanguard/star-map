@@ -15,7 +15,7 @@ import {
   MILKY_WAY_ARMS,
   ORION_SPUR,
   SUN_GALACTOCENTRIC_RADIUS_PC,
-  SUN_HEIGHT_ABOVE_MIDPLANE_PC
+  SUN_HEIGHT_ABOVE_MIDPLANE_PC,
 } from './galaxy';
 
 const RAD_TO_DEG = 180 / Math.PI;
@@ -58,7 +58,7 @@ describe('galacticToEquatorial', () => {
     for (const point of [
       { x: 1, y: 0, z: 0 },
       { x: 0, y: 0, z: 1 },
-      { x: -8178, y: 4200, z: -75 }
+      { x: -8178, y: 4200, z: -75 },
     ]) {
       const round = equatorialToGalactic(galacticToEquatorial(point));
       expect(round.x).toBeCloseTo(point.x, 8);
@@ -87,7 +87,11 @@ describe('galacticToEquatorial', () => {
 
 describe('galactocentricToHeliocentricGalactic', () => {
   it('places the Sun at the origin, at its own radius and zero azimuth', () => {
-    const sun = galactocentricToHeliocentricGalactic(SUN_GALACTOCENTRIC_RADIUS_PC, 0, SUN_HEIGHT_ABOVE_MIDPLANE_PC);
+    const sun = galactocentricToHeliocentricGalactic(
+      SUN_GALACTOCENTRIC_RADIUS_PC,
+      0,
+      SUN_HEIGHT_ABOVE_MIDPLANE_PC,
+    );
     expect(sun.x).toBeCloseTo(0, 9);
     expect(sun.y).toBeCloseTo(0, 9);
     expect(sun.z).toBeCloseTo(0, 9);
@@ -114,7 +118,10 @@ describe('galactocentricToHeliocentricGalactic', () => {
 
 describe('galacticCentrePositionPc', () => {
   it('is the Sun-centre distance away, in the equatorial frame', () => {
-    expect(length(galacticCentrePositionPc())).toBeCloseTo(Math.hypot(SUN_GALACTOCENTRIC_RADIUS_PC, SUN_HEIGHT_ABOVE_MIDPLANE_PC), 6);
+    expect(length(galacticCentrePositionPc())).toBeCloseTo(
+      Math.hypot(SUN_GALACTOCENTRIC_RADIUS_PC, SUN_HEIGHT_ABOVE_MIDPLANE_PC),
+      6,
+    );
   });
 
   it('lands within a tenth of a degree of the catalogued direction of Sagittarius A*', () => {
@@ -186,7 +193,10 @@ describe('GALACTIC_LANDMARKS', () => {
     const position = landmarkPositionPc(sol);
     // The Sun is the origin of the scene's coordinates, give or take its height above the plane,
     // which the landmark deliberately drops so the label sits on the map rather than off it.
-    expect(Math.hypot(position.x, position.y, position.z)).toBeCloseTo(SUN_HEIGHT_ABOVE_MIDPLANE_PC, 6);
+    expect(Math.hypot(position.x, position.y, position.z)).toBeCloseTo(
+      SUN_HEIGHT_ABOVE_MIDPLANE_PC,
+      6,
+    );
   });
 
   it('keeps every landmark inside the modelled disc', () => {

@@ -1,87 +1,130 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Star Map — the real solar neighbourhood in 3D</title>
-  <!-- Overwritten at build time with the deploy's subpath (`ng build --base-href`). The app's
+  <head>
+    <meta charset="utf-8" />
+    <title>Star Map — the real solar neighbourhood in 3D</title>
+    <!-- Overwritten at build time with the deploy's subpath (`ng build --base-href`). The app's
        data fetches are relative, so this is what they resolve against. -->
-  <base href="/">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="An interactive 3D star map built from real astronomical data: 68,388 catalogued stars out to 250 parsecs, planets on their measured orbits, and the NASA figures behind every body.">
-  <!-- Matches --color-void, so the browser chrome does not flash white around a black sky. -->
-  <meta name="theme-color" content="#04060c">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="An interactive 3D star map built from real astronomical data: 68,388 catalogued stars out to 250 parsecs, planets on their measured orbits, and the NASA figures behind every body."
+    />
+    <!-- Matches --color-void, so the browser chrome does not flash white around a black sky. -->
+    <meta name="theme-color" content="#04060c" />
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
 
-  <!-- Link previews. These URLs must be absolute — a scraper resolves them against nothing — so
+    <!-- Link previews. These URLs must be absolute — a scraper resolves them against nothing — so
        unlike everything else here they do not follow <base> and name the deployment outright. -->
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://projects.avalonvanguard.com/star-map/">
-  <meta property="og:title" content="Star Map — the real solar neighbourhood in 3D">
-  <meta property="og:description" content="68,388 catalogued stars out to 250 parsecs, planets on their measured orbits, and the NASA figures behind every body.">
-  <meta property="og:image" content="https://projects.avalonvanguard.com/star-map/social-preview.jpg">
-  <meta property="og:image:alt" content="The Milky Way's bar, bulge and five spiral arms, with the Sun marked on the Orion Spur">
-  <meta name="twitter:card" content="summary_large_image">
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://projects.avalonvanguard.com/star-map/" />
+    <meta property="og:title" content="Star Map — the real solar neighbourhood in 3D" />
+    <meta
+      property="og:description"
+      content="68,388 catalogued stars out to 250 parsecs, planets on their measured orbits, and the NASA figures behind every body."
+    />
+    <meta
+      property="og:image"
+      content="https://projects.avalonvanguard.com/star-map/social-preview.jpg"
+    />
+    <meta
+      property="og:image:alt"
+      content="The Milky Way's bar, bulge and five spiral arms, with the Sun marked on the Orion Spur"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
 
-  <!-- The launch screen. Inline, so it paints before the bundle and the stylesheet arrive; the
+    <!-- The launch screen. Inline, so it paints before the bundle and the stylesheet arrive; the
        scenes take it away once their first frame is up (shared/ui/boot-loader.ts). The colours are
        the theme's --color-void, --color-accent and --color-muted, repeated because styles.css is
        not loaded yet. -->
-  <style>
-    #boot-loader {
-      position: fixed;
-      inset: 0;
-      z-index: 50;
-      display: grid;
-      place-content: center;
-      justify-items: center;
-      gap: 20px;
-      background: #04060c;
-      color: #90a6bd;
-      font: 500 10px/1.4 "JetBrains Mono", ui-monospace, monospace;
-      letter-spacing: 0.24em;
-      text-transform: uppercase;
-      /* Never in the way: the dock is already usable underneath while the catalogue loads. */
-      pointer-events: none;
-      transition: opacity 400ms ease-out;
-    }
-    #boot-loader p { margin: 0; }
-    #boot-loader.boot-loader--done { opacity: 0; }
-    #boot-loader .boot-orbit {
-      position: relative;
-      width: 56px;
-      height: 56px;
-      border: 1px solid rgb(77 215 255 / 0.25);
-      border-radius: 50%;
-      animation: boot-orbit 2.4s linear infinite;
-    }
-    /* The star at the centre and the body circling it. */
-    #boot-loader .boot-orbit::before,
-    #boot-loader .boot-orbit::after {
-      content: "";
-      position: absolute;
-      border-radius: 50%;
-      background: #4dd7ff;
-    }
-    #boot-loader .boot-orbit::before { inset: 24px; box-shadow: 0 0 8px #4dd7ff; }
-    #boot-loader .boot-orbit::after { width: 6px; height: 6px; top: -3.5px; left: 24.5px; }
-    #boot-loader.boot-loader--failed { color: #4dd7ff; }
-    #boot-loader.boot-loader--failed .boot-orbit { animation: none; opacity: 0.4; }
-    @keyframes boot-orbit { to { transform: rotate(1turn); } }
-    @media (prefers-reduced-motion: reduce) {
-      #boot-loader .boot-orbit { animation: none; }
-      #boot-loader { transition: none; }
-    }
-  </style>
-</head>
-<body>
-  <div id="boot-loader" role="status">
-    <div class="boot-orbit" aria-hidden="true"></div>
-    <p>Loading the catalogue</p>
-  </div>
-  <app-root></app-root>
-</body>
+    <style>
+      #boot-loader {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 20px;
+        background: #04060c;
+        color: #90a6bd;
+        font:
+          500 10px/1.4 'JetBrains Mono',
+          ui-monospace,
+          monospace;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        /* Never in the way: the dock is already usable underneath while the catalogue loads. */
+        pointer-events: none;
+        transition: opacity 400ms ease-out;
+      }
+      #boot-loader p {
+        margin: 0;
+      }
+      #boot-loader.boot-loader--done {
+        opacity: 0;
+      }
+      #boot-loader .boot-orbit {
+        position: relative;
+        width: 56px;
+        height: 56px;
+        border: 1px solid rgb(77 215 255 / 0.25);
+        border-radius: 50%;
+        animation: boot-orbit 2.4s linear infinite;
+      }
+      /* The star at the centre and the body circling it. */
+      #boot-loader .boot-orbit::before,
+      #boot-loader .boot-orbit::after {
+        content: '';
+        position: absolute;
+        border-radius: 50%;
+        background: #4dd7ff;
+      }
+      #boot-loader .boot-orbit::before {
+        inset: 24px;
+        box-shadow: 0 0 8px #4dd7ff;
+      }
+      #boot-loader .boot-orbit::after {
+        width: 6px;
+        height: 6px;
+        top: -3.5px;
+        left: 24.5px;
+      }
+      #boot-loader.boot-loader--failed {
+        color: #4dd7ff;
+      }
+      #boot-loader.boot-loader--failed .boot-orbit {
+        animation: none;
+        opacity: 0.4;
+      }
+      @keyframes boot-orbit {
+        to {
+          transform: rotate(1turn);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #boot-loader .boot-orbit {
+          animation: none;
+        }
+        #boot-loader {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="boot-loader" role="status">
+      <div class="boot-orbit" aria-hidden="true"></div>
+      <p>Loading the catalogue</p>
+    </div>
+    <app-root></app-root>
+  </body>
 </html>

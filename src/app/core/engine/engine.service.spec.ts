@@ -9,9 +9,16 @@ import { EngineService } from './engine.service';
  * renderer is created, the two cameras are placed by hand, and what is asserted is the
  * arithmetic that keeps them showing the same thing.
  */
-function engineWithCameras(): { engine: EngineService; perspective: THREE.PerspectiveCamera; orthographic: THREE.OrthographicCamera } {
+function engineWithCameras(): {
+  engine: EngineService;
+  perspective: THREE.PerspectiveCamera;
+  orthographic: THREE.OrthographicCamera;
+} {
   const zone = { runOutsideAngular: (fn: () => unknown) => fn() } as unknown as NgZone;
-  const engine = runInInjectionContext(Injector.create({ providers: [{ provide: NgZone, useValue: zone }] }), () => new EngineService());
+  const engine = runInInjectionContext(
+    Injector.create({ providers: [{ provide: NgZone, useValue: zone }] }),
+    () => new EngineService(),
+  );
   const perspective = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 1000);
   const orthographic = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
   // The two cameras are private, because nothing outside should choose between them by hand.
@@ -46,7 +53,10 @@ describe('EngineService projection', () => {
     expect(engine.getCamera()).toBe(orthographic);
     expect(engine.visibleHalfHeight(200)).toBeCloseTo(perspectiveHalfHeight(perspective, 200), 6);
     // And as wide as the frame is, not as wide as it is tall.
-    expect(orthographic.right - orthographic.left).toBeCloseTo((orthographic.top - orthographic.bottom) * perspective.aspect, 6);
+    expect(orthographic.right - orthographic.left).toBeCloseTo(
+      (orthographic.top - orthographic.bottom) * perspective.aspect,
+      6,
+    );
   });
 
   it('carries the pose across, so the swap changes the projection and not the view', () => {

@@ -7,7 +7,12 @@ import { BodyRecord, OrbitalElements } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
 import { StarRecord, SUN_STAR_ID } from '../../shared/models/star.model';
 import { bodyReadouts } from './body-readouts';
-import { buildBodyViewModel, luminosityOf, publishedTemperaturesK, starSurfaceOf } from './body-view-model';
+import {
+  buildBodyViewModel,
+  luminosityOf,
+  publishedTemperaturesK,
+  starSurfaceOf,
+} from './body-view-model';
 
 const orbit = (overrides: Partial<OrbitalElements> = {}): OrbitalElements => ({
   semiMajorAxisAu: 1,
@@ -39,7 +44,11 @@ const earth: BodyRecord = {
   radiusKm: 6371,
   orbit: orbit(),
   // Standish's mean longitude rate, 35 999.373 degrees a century.
-  rates: { meanMotionDegPerDay: 35999.37306329 / 36525, longitudeOfAscendingNodeDegPerDay: 0, argumentOfPeriapsisDegPerDay: 0 },
+  rates: {
+    meanMotionDegPerDay: 35999.37306329 / 36525,
+    longitudeOfAscendingNodeDegPerDay: 0,
+    argumentOfPeriapsisDegPerDay: 0,
+  },
   orbitSource: 'JPL approximate mean elements (Standish), fit for 3000 BC to AD 3000',
 };
 const luna: BodyRecord = {
@@ -51,7 +60,11 @@ const luna: BodyRecord = {
   parentBodyId: 'earth',
   orbit: orbit({ semiMajorAxisAu: 0.00257 }),
   // JPL SSD's sidereal mean motion for the Moon.
-  rates: { meanMotionDegPerDay: 13.176358, longitudeOfAscendingNodeDegPerDay: -0.05299, argumentOfPeriapsisDegPerDay: 0.16435 },
+  rates: {
+    meanMotionDegPerDay: 13.176358,
+    longitudeOfAscendingNodeDegPerDay: -0.05299,
+    argumentOfPeriapsisDegPerDay: 0.16435,
+  },
   orbitSource: 'JPL SSD satellite mean elements, epoch 2000 Jan 1',
 };
 
@@ -74,29 +87,48 @@ describe('buildBodyViewModel', () => {
   it('prints the size of an inclination fitted below zero, as the same orbit with its node turned half round', () => {
     const tilted: BodyRecord = { ...earth, orbit: orbit({ inclinationDeg: -0.00054346 }) };
     const model = buildBodyViewModel('earth', { ...catalogues, bodies: [tilted] })!;
-    expect(bodyReadouts(model).measured.find((row) => row.label === 'Inclination')?.value).toBe('0.00°');
+    expect(bodyReadouts(model).measured.find((row) => row.label === 'Inclination')?.value).toBe(
+      '0.00°',
+    );
   });
 
   it('prints the eccentricity measured for a moon whose orbit keeps an older one', () => {
-    const hyperion: BodyRecord = { ...luna, id: 'hyperion', orbit: orbit({ eccentricity: 0.0232 }), measuredEccentricity: 0.105 };
+    const hyperion: BodyRecord = {
+      ...luna,
+      id: 'hyperion',
+      orbit: orbit({ eccentricity: 0.0232 }),
+      measuredEccentricity: 0.105,
+    };
     const model = buildBodyViewModel('hyperion', { ...catalogues, bodies: [earth, hyperion] })!;
-    expect(bodyReadouts(model).measured.find((row) => row.label === 'Eccentricity')?.value).toBe('0.105');
+    expect(bodyReadouts(model).measured.find((row) => row.label === 'Eccentricity')?.value).toBe(
+      '0.105',
+    );
   });
 
   it('gives a triaxial body its semi-axes beside its mean radius, not a radius alone', () => {
     // As shipped: Haumea's shape (Ortiz et al. 2017) travels from the ETL's spec to its card.
-    const shipped: BodyRecord[] = JSON.parse(readFileSync(`${process.cwd()}/src/assets/data/bodies.json`, 'utf8'));
+    const shipped: BodyRecord[] = JSON.parse(
+      readFileSync(`${process.cwd()}/src/assets/data/bodies.json`, 'utf8'),
+    );
     const haumea = shipped.find((body) => body.id === 'haumea')!;
-    const measured = bodyReadouts(buildBodyViewModel('haumea', { ...catalogues, bodies: [earth, haumea] })!).measured;
+    const measured = bodyReadouts(
+      buildBodyViewModel('haumea', { ...catalogues, bodies: [earth, haumea] })!,
+    ).measured;
     expect(measured.find((row) => row.label === 'Mean radius')?.value).toBe('798 km');
     expect(measured.find((row) => row.label === 'Semi-axes')?.value).toBe('1,161 × 852 × 513 km');
     expect(measured.find((row) => row.label === 'Radius')).toBeUndefined();
     // Every other body keeps its one radius.
-    expect(bodyReadouts(buildBodyViewModel('earth', catalogues)!).measured.find((row) => row.label === 'Radius')?.value).toBe('6,371 km');
+    expect(
+      bodyReadouts(buildBodyViewModel('earth', catalogues)!).measured.find(
+        (row) => row.label === 'Radius',
+      )?.value,
+    ).toBe('6,371 km');
   });
 
   it('says where the orbit comes from, in the card’s provenance', () => {
-    expect(bodyReadouts(buildBodyViewModel('luna', catalogues)!).provenance).toContain('Orbit: JPL SSD satellite mean elements, epoch 2000 Jan 1.');
+    expect(bodyReadouts(buildBodyViewModel('luna', catalogues)!).provenance).toContain(
+      'Orbit: JPL SSD satellite mean elements, epoch 2000 Jan 1.',
+    );
   });
 
   it('says a moon without a map is illustrated, without saying it was never imaged', () => {
@@ -107,16 +139,35 @@ describe('buildBodyViewModel', () => {
   });
 
   it('says an exoplanet the archive does not flag as imaged has no image', () => {
-    const exoplanet: ExoplanetRecord = { id: 'x', hostStarId: SUN_STAR_ID, hostStarName: 'Sol', name: 'X b', orbit: { semiMajorAxisAu: 0.05 } };
+    const exoplanet: ExoplanetRecord = {
+      id: 'x',
+      hostStarId: SUN_STAR_ID,
+      hostStarName: 'Sol',
+      name: 'X b',
+      orbit: { semiMajorAxisAu: 0.05 },
+    };
     const model = buildBodyViewModel('x', { bodies: [], exoplanets: [exoplanet], stars: [sun] })!;
-    expect(bodyReadouts(model).provenance).toContain('Not an observation — no image of this world exists.');
+    expect(bodyReadouts(model).provenance).toContain(
+      'Not an observation — no image of this world exists.',
+    );
   });
 
   it('says a directly imaged exoplanet was seen as a point of light, not that no image of it exists', () => {
     // HR 8799 b: photographed beside its star at Gemini and Keck (Marois et al. 2008).
-    const exoplanet: ExoplanetRecord = { id: 'HR 8799 b', hostStarId: SUN_STAR_ID, hostStarName: 'HR 8799', name: 'HR 8799 b', imaged: true, orbit: { semiMajorAxisAu: 68 } };
-    const provenance = bodyReadouts(buildBodyViewModel('HR 8799 b', { bodies: [], exoplanets: [exoplanet], stars: [sun] })!).provenance;
-    expect(provenance).toContain('Not an observation — it has been imaged only as a point of light beside its star, and no map of it is used here.');
+    const exoplanet: ExoplanetRecord = {
+      id: 'HR 8799 b',
+      hostStarId: SUN_STAR_ID,
+      hostStarName: 'HR 8799',
+      name: 'HR 8799 b',
+      imaged: true,
+      orbit: { semiMajorAxisAu: 68 },
+    };
+    const provenance = bodyReadouts(
+      buildBodyViewModel('HR 8799 b', { bodies: [], exoplanets: [exoplanet], stars: [sun] })!,
+    ).provenance;
+    expect(provenance).toContain(
+      'Not an observation — it has been imaged only as a point of light beside its star, and no map of it is used here.',
+    );
     expect(provenance).not.toContain('no image of this world exists');
   });
 
@@ -161,12 +212,31 @@ describe('buildBodyViewModel', () => {
 
 describe('luminosityOf', () => {
   // KMT-2016-BLG-1107L as the ETL adds it from the archive: no V, no G, so the stand-in 15.
-  const lens: StarRecord = { id: 1070000536, name: 'KMT-2016-BLG-1107L', x: 6651, y: 0, z: 0, magnitude: 15, spectralType: 'Unknown', colorIndex: null, source: 'exoplanet-archive' };
-  const lensB: ExoplanetRecord = { id: 'lens-b', hostStarId: lens.id, hostStarName: lens.name, name: 'KMT-2016-BLG-1107L b', orbit: { semiMajorAxisAu: 0.342 } };
+  const lens: StarRecord = {
+    id: 1070000536,
+    name: 'KMT-2016-BLG-1107L',
+    x: 6651,
+    y: 0,
+    z: 0,
+    magnitude: 15,
+    spectralType: 'Unknown',
+    colorIndex: null,
+    source: 'exoplanet-archive',
+  };
+  const lensB: ExoplanetRecord = {
+    id: 'lens-b',
+    hostStarId: lens.id,
+    hostStarName: lens.name,
+    name: 'KMT-2016-BLG-1107L b',
+    orbit: { semiMajorAxisAu: 0.342 },
+  };
 
   it('has none from a magnitude no survey measured, and gives its planets no temperature from it', () => {
     expect(luminosityOf(lens)).toBeNull();
-    expect(buildBodyViewModel('lens-b', { bodies: [], exoplanets: [lensB], stars: [lens] })?.appearance.equilibriumTemperatureK).toBeNull();
+    expect(
+      buildBodyViewModel('lens-b', { bodies: [], exoplanets: [lensB], stars: [lens] })?.appearance
+        .equilibriumTemperatureK,
+    ).toBeNull();
     // The same figure measured in V is a star, 37 L☉ at that distance.
     expect(luminosityOf({ ...lens, magnitudeBand: 'V' })).toBeCloseTo(36.8, 0);
   });
@@ -178,25 +248,77 @@ describe('luminosityOf', () => {
 
 describe('starSurfaceOf', () => {
   // Proxima Centauri as HYG describes it, and one of its planets' archive rows.
-  const proxima: StarRecord = { id: 70666, name: 'Proxima Centauri', x: 1.2959, y: 0, z: 0, magnitude: 11.01, magnitudeBand: 'V', spectralType: 'M5Ve', colorIndex: 1.807, colorSystem: 'B-V' };
-  const proximaB: ExoplanetRecord = { id: 'proxima-cen-b', hostStarId: 70666, hostStarName: 'Proxima Cen', name: 'Proxima Cen b', orbit: { semiMajorAxisAu: 0.0485 } };
+  const proxima: StarRecord = {
+    id: 70666,
+    name: 'Proxima Centauri',
+    x: 1.2959,
+    y: 0,
+    z: 0,
+    magnitude: 11.01,
+    magnitudeBand: 'V',
+    spectralType: 'M5Ve',
+    colorIndex: 1.807,
+    colorSystem: 'B-V',
+  };
+  const proximaB: ExoplanetRecord = {
+    id: 'proxima-cen-b',
+    hostStarId: 70666,
+    hostStarName: 'Proxima Cen',
+    name: 'Proxima Cen b',
+    orbit: { semiMajorAxisAu: 0.0485 },
+  };
 
   it("is the Sun's own for the Sun, and not derived", () => {
-    expect(starSurfaceOf(sun, [])).toEqual({ radiusSolar: 1, radiusDerived: false, temperatureK: 5772, luminositySolar: 1, luminosityDerived: false });
+    expect(starSurfaceOf(sun, [])).toEqual({
+      radiusSolar: 1,
+      radiusDerived: false,
+      temperatureK: 5772,
+      luminositySolar: 1,
+      luminosityDerived: false,
+    });
   });
 
   it("takes a host's radius, temperature and luminosity from the archive", () => {
-    const surface = starSurfaceOf(proxima, [{ ...proximaB, hostStarRadiusSolar: 0.141, hostStarTemperatureK: 2900, hostStarLuminositySolar: 0.00151 }]);
-    expect(surface).toEqual({ radiusSolar: 0.141, radiusDerived: false, temperatureK: 2900, luminositySolar: 0.00151, luminosityDerived: false });
+    const surface = starSurfaceOf(proxima, [
+      {
+        ...proximaB,
+        hostStarRadiusSolar: 0.141,
+        hostStarTemperatureK: 2900,
+        hostStarLuminositySolar: 0.00151,
+      },
+    ]);
+    expect(surface).toEqual({
+      radiusSolar: 0.141,
+      radiusDerived: false,
+      temperatureK: 2900,
+      luminositySolar: 0.00151,
+      luminosityDerived: false,
+    });
   });
 
   it('warms a planet by the luminosity the archive gives its host, on its own page as in its system', () => {
     // 8.9×10⁻⁴ L☉ from Proxima's V and B−V, which put b at 200 K; the archive's 1.51×10⁻³ at 228 K.
     const b = { ...proximaB, hostStarLuminositySolar: 0.00151 };
-    const catalogues = { bodies: [], exoplanets: [b, { ...proximaB, id: 'proxima-cen-d', name: 'Proxima Cen d', orbit: { semiMajorAxisAu: 0.02881 } }], stars: [proxima] };
-    expect(buildBodyViewModel('proxima-cen-b', catalogues)?.appearance.equilibriumTemperatureK).toBeCloseTo(228, 0);
+    const catalogues = {
+      bodies: [],
+      exoplanets: [
+        b,
+        {
+          ...proximaB,
+          id: 'proxima-cen-d',
+          name: 'Proxima Cen d',
+          orbit: { semiMajorAxisAu: 0.02881 },
+        },
+      ],
+      stars: [proxima],
+    };
+    expect(
+      buildBodyViewModel('proxima-cen-b', catalogues)?.appearance.equilibriumTemperatureK,
+    ).toBeCloseTo(228, 0);
     // d's own row gives none; its host's luminosity is still the archive's, from b's.
-    expect(buildBodyViewModel('proxima-cen-d', catalogues)?.appearance.equilibriumTemperatureK).toBeCloseTo(296, 0);
+    expect(
+      buildBodyViewModel('proxima-cen-d', catalogues)?.appearance.equilibriumTemperatureK,
+    ).toBeCloseTo(296, 0);
   });
 
   it("gives the star field the temperature the disc is drawn at, where a host's planets give it different ones", () => {
@@ -209,7 +331,9 @@ describe('starSurfaceOf', () => {
     ];
     const other = { ...proximaB, id: 'other', hostStarId: 1, hostStarTemperatureK: 5000 };
     expect(starSurfaceOf(proxima, rows).temperatureK).toBe(4094);
-    expect(publishedTemperaturesK([...rows, other]).get(proxima.id)).toBe(starSurfaceOf(proxima, rows).temperatureK);
+    expect(publishedTemperaturesK([...rows, other]).get(proxima.id)).toBe(
+      starSurfaceOf(proxima, rows).temperatureK,
+    );
   });
 
   it('derives both otherwise, and says the radius is derived', () => {
@@ -224,7 +348,9 @@ describe('starSurfaceOf', () => {
   });
 
   it('has no radius for a star with neither a colour nor a type', () => {
-    expect(starSurfaceOf({ ...proxima, colorIndex: null, spectralType: 'Unknown' }, []).radiusSolar).toBeNull();
+    expect(
+      starSurfaceOf({ ...proxima, colorIndex: null, spectralType: 'Unknown' }, []).radiusSolar,
+    ).toBeNull();
   });
 
   it('has none from a magnitude no survey measured', () => {

@@ -2,12 +2,38 @@ import { describe, expect, it } from 'vitest';
 
 import { raDegDecDistanceToXyz } from './coordinates';
 import { StarRecord } from '../models/star.model';
-import { directionCosine, foldByIdentity, hipparcosDistancePc, HYG_UNKNOWN_DISTANCE_PC, isSameStar, MERGE_ANGULAR_TOLERANCE_DEG, mergeStarCatalogues, NAKED_EYE_MAGNITUDE, placementDistancePc } from './star-merge';
+import {
+  directionCosine,
+  foldByIdentity,
+  hipparcosDistancePc,
+  HYG_UNKNOWN_DISTANCE_PC,
+  isSameStar,
+  MERGE_ANGULAR_TOLERANCE_DEG,
+  mergeStarCatalogues,
+  NAKED_EYE_MAGNITUDE,
+  placementDistancePc,
+} from './star-merge';
 
 /** A star at a given sky position and distance, which is how catalogues actually report them. */
-function at(id: number, raDeg: number, decDeg: number, distancePc: number, overrides: Partial<StarRecord> = {}): StarRecord {
+function at(
+  id: number,
+  raDeg: number,
+  decDeg: number,
+  distancePc: number,
+  overrides: Partial<StarRecord> = {},
+): StarRecord {
   const { x, y, z } = raDegDecDistanceToXyz(raDeg, decDeg, distancePc);
-  return { id, name: `star-${id}`, x, y, z, magnitude: 5, spectralType: 'G2V', colorIndex: 0.6, ...overrides };
+  return {
+    id,
+    name: `star-${id}`,
+    x,
+    y,
+    z,
+    magnitude: 5,
+    spectralType: 'G2V',
+    colorIndex: 0.6,
+    ...overrides,
+  };
 }
 
 const HIPPARCOS = { sourceId: 'hyg', parallaxPrecisionMas: 1 };
@@ -25,8 +51,12 @@ describe('isSameStar', () => {
 
   it('matches within the angular tolerance and not beyond it', () => {
     const toleranceArcsec = MERGE_ANGULAR_TOLERANCE_DEG * 3600;
-    expect(isSameStar(at(1, 200, 10, 100), at(2, 200 + arcsecOfRa(0.9 * toleranceArcsec, 10), 10, 100))).toBe(true);
-    expect(isSameStar(at(1, 200, 10, 100), at(2, 200 + arcsecOfRa(1.1 * toleranceArcsec, 10), 10, 100))).toBe(false);
+    expect(
+      isSameStar(at(1, 200, 10, 100), at(2, 200 + arcsecOfRa(0.9 * toleranceArcsec, 10), 10, 100)),
+    ).toBe(true);
+    expect(
+      isSameStar(at(1, 200, 10, 100), at(2, 200 + arcsecOfRa(1.1 * toleranceArcsec, 10), 10, 100)),
+    ).toBe(false);
   });
 
   it('tolerates the distance disagreement two parallaxes actually have', () => {
@@ -38,8 +68,15 @@ describe('isSameStar', () => {
   it('keeps a bright primary out of the entry of its faint companion', () => {
     // Gaia has no Sirius — it saturates — but has Sirius B, 6″ away at the same distance and ten
     // magnitudes fainter. Direction and distance say "same star"; the brightness says otherwise.
-    const siriusB = at(1, 101.2875, -16.7161, 2.67, { name: 'Gaia DR3 2947050466531873024', magnitude: 8.5, source: 'gaia' });
-    const sirius = at(32263, 101.2875 + arcsecOfRa(6.1, -16.7161), -16.7161, 2.637, { name: 'Sirius', magnitude: -1.44 });
+    const siriusB = at(1, 101.2875, -16.7161, 2.67, {
+      name: 'Gaia DR3 2947050466531873024',
+      magnitude: 8.5,
+      source: 'gaia',
+    });
+    const sirius = at(32263, 101.2875 + arcsecOfRa(6.1, -16.7161), -16.7161, 2.637, {
+      name: 'Sirius',
+      magnitude: -1.44,
+    });
     expect(isSameStar(siriusB, sirius)).toBe(false);
     expect(isSameStar(siriusB, { ...sirius, magnitude: 8.6 })).toBe(true);
   });
@@ -48,10 +85,28 @@ describe('isSameStar', () => {
     // Wolf 359 is V 13.45 in HYG and G 11.0 in Gaia — the same star, 5″ apart on a Gliese
     // position. Almach is V 2.1 and sits 10″ from γ² And, G 4.9: Gaia has no Almach, and its
     // name must not land on the companion.
-    const wolf359 = at(1, 164.1, 7.0, 2.41, { name: 'Gaia DR3 3864972938605115520', magnitude: 11.0, source: 'gaia' });
-    expect(isSameStar(wolf359, at(118720, 164.1 + arcsecOfRa(5, 7), 7.0, 2.39, { name: 'Wolf 359', magnitude: 13.45 }))).toBe(true);
-    const gamma2And = at(2, 30.97, 42.33, 50, { name: 'Gaia DR3 346231302441905920', magnitude: 4.9, source: 'gaia' });
-    expect(isSameStar(gamma2And, at(9640, 30.97 + arcsecOfRa(9.9, 42.33), 42.33, 50, { name: 'Almach', magnitude: 2.1 }))).toBe(false);
+    const wolf359 = at(1, 164.1, 7.0, 2.41, {
+      name: 'Gaia DR3 3864972938605115520',
+      magnitude: 11.0,
+      source: 'gaia',
+    });
+    expect(
+      isSameStar(
+        wolf359,
+        at(118720, 164.1 + arcsecOfRa(5, 7), 7.0, 2.39, { name: 'Wolf 359', magnitude: 13.45 }),
+      ),
+    ).toBe(true);
+    const gamma2And = at(2, 30.97, 42.33, 50, {
+      name: 'Gaia DR3 346231302441905920',
+      magnitude: 4.9,
+      source: 'gaia',
+    });
+    expect(
+      isSameStar(
+        gamma2And,
+        at(9640, 30.97 + arcsecOfRa(9.9, 42.33), 42.33, 50, { name: 'Almach', magnitude: 2.1 }),
+      ),
+    ).toBe(false);
   });
 
   it('does not match two different stars that happen to be at the same distance', () => {
@@ -63,8 +118,15 @@ describe('isSameStar', () => {
     // 3.7 pc by Hipparcos, 62.8 by Gaia, 2.3″ apart. A coincidence of direction that close is
     // never chance at this depth; the parallax is what is wrong.
     const gaia = at(1, 1.72, -8.9, 239.4, { name: 'Gaia DR3 395581679270412160', source: 'gaia' });
-    expect(isSameStar(gaia, at(213, 1.72 + arcsecOfRa(0.1, -8.9), -8.9, 143.7, { name: 'HD 225021' }))).toBe(true);
-    expect(isSameStar(at(2, 253.6, -38.1, 62.8, { source: 'gaia' }), at(82724, 253.6 + arcsecOfRa(2.3, -38.1), -38.1, 3.7))).toBe(true);
+    expect(
+      isSameStar(gaia, at(213, 1.72 + arcsecOfRa(0.1, -8.9), -8.9, 143.7, { name: 'HD 225021' })),
+    ).toBe(true);
+    expect(
+      isSameStar(
+        at(2, 253.6, -38.1, 62.8, { source: 'gaia' }),
+        at(82724, 253.6 + arcsecOfRa(2.3, -38.1), -38.1, 3.7),
+      ),
+    ).toBe(true);
   });
 
   it('past those three arcseconds, does not match along a line of sight when the distances conflict', () => {
@@ -75,42 +137,125 @@ describe('isSameStar', () => {
   it('still hears the brightness inside those three arcseconds', () => {
     // Ashlesha (ε Hya, V 3.38) has a companion 2.7″ away that Gaia does carry, three magnitudes
     // fainter, while it does not carry Ashlesha. Direction alone would put the name on the companion.
-    const companion = at(1, 131.69, 6.42, 40, { name: 'Gaia DR3 1', magnitude: 6.7, source: 'gaia' });
-    expect(isSameStar(companion, at(43109, 131.69 + arcsecOfRa(2.7, 6.42), 6.42, 40, { name: 'Ashlesha', magnitude: 3.38 }))).toBe(false);
+    const companion = at(1, 131.69, 6.42, 40, {
+      name: 'Gaia DR3 1',
+      magnitude: 6.7,
+      source: 'gaia',
+    });
+    expect(
+      isSameStar(
+        companion,
+        at(43109, 131.69 + arcsecOfRa(2.7, 6.42), 6.42, 40, { name: 'Ashlesha', magnitude: 3.38 }),
+      ),
+    ).toBe(false);
   });
 
   // GJ 1035 and GJ 3052 as HYG has them from Gliese, against their Gaia entries: 21″ away at
   // about the same distance, and 6.6″ away at half Gaia's distance. Their motions agree to 2 and 3 %.
   it('matches a Gliese entry to the Gaia entry moving with it, a minute of arc away or at another distance', () => {
-    const gj1035 = at(1, 19.9245, 84.1612, 14.4, { magnitude: 13.1, source: 'gaia', pmRaMasYr: -981.9, pmDecMasYr: 475.6 });
-    const gliese1035 = at(118058, 19.9245 + arcsecOfRa(21.2, 84.1612), 84.1612, 13.7, { name: 'GJ 1035', magnitude: 14.77, pmRaMasYr: -978.0, pmDecMasYr: 458.1 });
+    const gj1035 = at(1, 19.9245, 84.1612, 14.4, {
+      magnitude: 13.1,
+      source: 'gaia',
+      pmRaMasYr: -981.9,
+      pmDecMasYr: 475.6,
+    });
+    const gliese1035 = at(118058, 19.9245 + arcsecOfRa(21.2, 84.1612), 84.1612, 13.7, {
+      name: 'GJ 1035',
+      magnitude: 14.77,
+      pmRaMasYr: -978.0,
+      pmDecMasYr: 458.1,
+    });
     expect(isSameStar(gj1035, gliese1035)).toBe(true);
-    expect(isSameStar(gj1035, { ...gliese1035, pmRaMasYr: undefined, pmDecMasYr: undefined })).toBe(false);
+    expect(isSameStar(gj1035, { ...gliese1035, pmRaMasYr: undefined, pmDecMasYr: undefined })).toBe(
+      false,
+    );
 
-    const gj3052 = at(2, 11.0897, 9.1262, 25.0, { magnitude: 12.6, source: 'gaia', pmRaMasYr: 813.1, pmDecMasYr: -2.6 });
-    const gliese3052 = at(118014, 11.0897 + arcsecOfRa(6.6, 9.1262), 9.1262, 12.3, { name: 'GJ 3052', magnitude: 13.8, pmRaMasYr: 799.7, pmDecMasYr: -20.9 });
+    const gj3052 = at(2, 11.0897, 9.1262, 25.0, {
+      magnitude: 12.6,
+      source: 'gaia',
+      pmRaMasYr: 813.1,
+      pmDecMasYr: -2.6,
+    });
+    const gliese3052 = at(118014, 11.0897 + arcsecOfRa(6.6, 9.1262), 9.1262, 12.3, {
+      name: 'GJ 3052',
+      magnitude: 13.8,
+      pmRaMasYr: 799.7,
+      pmDecMasYr: -20.9,
+    });
     expect(isSameStar(gj3052, gliese3052)).toBe(true);
   });
 
   it("matches LHS 288's Gliese entry to its Gaia entry, a minute and a half away", () => {
-    const lhs288 = at(1000388933, 161.08846863703002, -61.20979834516761, 4.8316, { magnitude: 11.859, source: 'gaia', pmRaMasYr: -346.21, pmDecMasYr: 1611.1 });
-    const gliese3618 = at(118704, 161.13112906780827, -61.1935811389294, 4.4883, { name: 'GJ 3618', magnitude: 13.92, pmRaMasYr: -340.24, pmDecMasYr: 1614.54 });
-    expect(Math.acos(directionCosine(lhs288, gliese3618)) * (180 / Math.PI) * 3600).toBeCloseTo(94, 0);
+    const lhs288 = at(1000388933, 161.08846863703002, -61.20979834516761, 4.8316, {
+      magnitude: 11.859,
+      source: 'gaia',
+      pmRaMasYr: -346.21,
+      pmDecMasYr: 1611.1,
+    });
+    const gliese3618 = at(118704, 161.13112906780827, -61.1935811389294, 4.4883, {
+      name: 'GJ 3618',
+      magnitude: 13.92,
+      pmRaMasYr: -340.24,
+      pmDecMasYr: 1614.54,
+    });
+    expect(Math.acos(directionCosine(lhs288, gliese3618)) * (180 / Math.PI) * 3600).toBeCloseTo(
+      94,
+      0,
+    );
     expect(isSameStar(lhs288, gliese3618)).toBe(true);
   });
 
   it('does not match two entries moving differently past fifteen arcseconds, nor co-moving ones past 160″', () => {
-    const kept = at(1, 120, 30, 10, { magnitude: 12, source: 'gaia', pmRaMasYr: 1000, pmDecMasYr: 0 });
-    expect(isSameStar(kept, at(2, 120 + arcsecOfRa(20, 30), 30, 10, { magnitude: 13, pmRaMasYr: 750, pmDecMasYr: 0 }))).toBe(false);
-    expect(isSameStar(kept, at(2, 120 + arcsecOfRa(20, 30), 30, 10, { magnitude: 13, pmRaMasYr: 850, pmDecMasYr: 0 }))).toBe(true);
-    expect(isSameStar(kept, at(2, 120 + arcsecOfRa(155, 30), 30, 10, { magnitude: 13, pmRaMasYr: 1000, pmDecMasYr: 0 }))).toBe(true);
-    expect(isSameStar(kept, at(2, 120 + arcsecOfRa(165, 30), 30, 10, { magnitude: 13, pmRaMasYr: 1000, pmDecMasYr: 0 }))).toBe(false);
+    const kept = at(1, 120, 30, 10, {
+      magnitude: 12,
+      source: 'gaia',
+      pmRaMasYr: 1000,
+      pmDecMasYr: 0,
+    });
+    expect(
+      isSameStar(
+        kept,
+        at(2, 120 + arcsecOfRa(20, 30), 30, 10, { magnitude: 13, pmRaMasYr: 750, pmDecMasYr: 0 }),
+      ),
+    ).toBe(false);
+    expect(
+      isSameStar(
+        kept,
+        at(2, 120 + arcsecOfRa(20, 30), 30, 10, { magnitude: 13, pmRaMasYr: 850, pmDecMasYr: 0 }),
+      ),
+    ).toBe(true);
+    expect(
+      isSameStar(
+        kept,
+        at(2, 120 + arcsecOfRa(155, 30), 30, 10, { magnitude: 13, pmRaMasYr: 1000, pmDecMasYr: 0 }),
+      ),
+    ).toBe(true);
+    expect(
+      isSameStar(
+        kept,
+        at(2, 120 + arcsecOfRa(165, 30), 30, 10, { magnitude: 13, pmRaMasYr: 1000, pmDecMasYr: 0 }),
+      ),
+    ).toBe(false);
   });
 
   it("keeps a co-moving primary out of its companion's entry", () => {
     // A binary shares its motion, so only the brightness tells GJ 9160 from its companion 13.5″ away.
-    const companion = at(1, 69.54, -14.3, 24.4, { magnitude: 15.1, source: 'gaia', pmRaMasYr: -78.5, pmDecMasYr: -150.8 });
-    expect(isSameStar(companion, at(2, 69.54 + arcsecOfRa(13.5, -14.3), -14.3, 24.4, { magnitude: 7.3, pmRaMasYr: -78.5, pmDecMasYr: -150.8 }))).toBe(false);
+    const companion = at(1, 69.54, -14.3, 24.4, {
+      magnitude: 15.1,
+      source: 'gaia',
+      pmRaMasYr: -78.5,
+      pmDecMasYr: -150.8,
+    });
+    expect(
+      isSameStar(
+        companion,
+        at(2, 69.54 + arcsecOfRa(13.5, -14.3), -14.3, 24.4, {
+          magnitude: 7.3,
+          pmRaMasYr: -78.5,
+          pmDecMasYr: -150.8,
+        }),
+      ),
+    ).toBe(false);
   });
 
   it('matches on direction rather than on 3D proximity', () => {
@@ -123,7 +268,16 @@ describe('isSameStar', () => {
   });
 
   it('treats two stars at the origin as the same, and one at the origin as unlike any other', () => {
-    const origin: StarRecord = { id: 0, name: 'Sol', x: 0, y: 0, z: 0, magnitude: -26.7, spectralType: 'G2V', colorIndex: 0.65 };
+    const origin: StarRecord = {
+      id: 0,
+      name: 'Sol',
+      x: 0,
+      y: 0,
+      z: 0,
+      magnitude: -26.7,
+      spectralType: 'G2V',
+      colorIndex: 0.65,
+    };
     expect(isSameStar(origin, { ...origin, id: 1 })).toBe(true);
     expect(isSameStar(origin, at(2, 45, 20, 10))).toBe(false);
   });
@@ -143,7 +297,7 @@ describe('mergeStarCatalogues', () => {
     const shared = { raDeg: 101.28, decDeg: -16.71 };
     const { stars, summary } = mergeStarCatalogues([
       { ...HIPPARCOS, stars: [at(1, shared.raDeg, shared.decDeg, 2.7)] },
-      { ...GAIA, stars: [at(2, shared.raDeg, shared.decDeg, 2.64)] }
+      { ...GAIA, stars: [at(2, shared.raDeg, shared.decDeg, 2.64)] },
     ]);
 
     expect(stars).toHaveLength(1);
@@ -157,9 +311,23 @@ describe('mergeStarCatalogues', () => {
     // calls it by a nineteen-digit number; HYG knows its name, its spectral type and its V
     // magnitude. Keeping one row whole loses half of that either way. The id follows the
     // description, so a star HYG knows keeps its HYG id from one refresh to the next.
-    const hyg = at(70666, 217.4289, -62.6795, 1.2959, { name: 'Proxima Centauri', spectralType: 'M5Ve', magnitude: 11.01, colorIndex: 1.807 });
-    const gaia = at(1000064182, 217.4289, -62.6795, 1.302, { name: 'Gaia DR3 5853498713190525696', spectralType: 'Unknown', magnitude: 8.985, colorIndex: 3.805, source: 'gaia' });
-    const { stars, summary } = mergeStarCatalogues([{ ...HIPPARCOS, stars: [hyg] }, { ...GAIA, stars: [gaia] }]);
+    const hyg = at(70666, 217.4289, -62.6795, 1.2959, {
+      name: 'Proxima Centauri',
+      spectralType: 'M5Ve',
+      magnitude: 11.01,
+      colorIndex: 1.807,
+    });
+    const gaia = at(1000064182, 217.4289, -62.6795, 1.302, {
+      name: 'Gaia DR3 5853498713190525696',
+      spectralType: 'Unknown',
+      magnitude: 8.985,
+      colorIndex: 3.805,
+      source: 'gaia',
+    });
+    const { stars, summary } = mergeStarCatalogues([
+      { ...HIPPARCOS, stars: [hyg] },
+      { ...GAIA, stars: [gaia] },
+    ]);
 
     expect(stars).toEqual([{ ...hyg, x: gaia.x, y: gaia.y, z: gaia.z, source: 'gaia' }]);
     expect(summary.duplicates).toBe(1);
@@ -175,7 +343,7 @@ describe('mergeStarCatalogues', () => {
       colorIndex: 1.807,
       colorSystem: 'B-V',
       distanceError: 0.00135,
-      distanceFromGaia: false
+      distanceFromGaia: false,
     });
     const gaia = at(1000064182, 217.4289, -62.6795, 1.302, {
       name: 'Gaia DR3 5853498713190525696',
@@ -185,36 +353,89 @@ describe('mergeStarCatalogues', () => {
       colorSystem: 'BP-RP',
       distanceError: 0.000065,
       distanceFromGaia: true,
-      source: 'gaia'
+      source: 'gaia',
     });
-    const [merged] = mergeStarCatalogues([{ ...HIPPARCOS, stars: [hyg] }, { ...GAIA, stars: [gaia] }]).stars;
+    const [merged] = mergeStarCatalogues([
+      { ...HIPPARCOS, stars: [hyg] },
+      { ...GAIA, stars: [gaia] },
+    ]).stars;
 
-    expect(merged).toMatchObject({ magnitude: 11.01, magnitudeBand: 'V', colorIndex: 1.807, colorSystem: 'B-V', distanceError: 0.000065, distanceFromGaia: true });
+    expect(merged).toMatchObject({
+      magnitude: 11.01,
+      magnitudeBand: 'V',
+      colorIndex: 1.807,
+      colorSystem: 'B-V',
+      distanceError: 0.000065,
+      distanceFromGaia: true,
+    });
   });
 
   it("keeps Gaia's colour where the description has none", () => {
     // HD 45951: HYG gives V 6.20 and K2III but no B−V; Gaia DR3 3369454521490604416 has BP−RP 1.248.
-    const hyg = at(119622, 97.79164, 16.93863, 112, { name: 'HD 45951', magnitude: 6.2, magnitudeBand: 'V', spectralType: 'K2III', colorIndex: null });
-    const gaia = at(1000004369, 97.79164, 16.93863, 112, { name: 'Gaia DR3 3369454521490604416', magnitude: 5.898, magnitudeBand: 'G', colorIndex: 1.248, colorSystem: 'BP-RP', source: 'gaia' });
-    const [merged] = mergeStarCatalogues([{ ...HIPPARCOS, stars: [hyg] }, { ...GAIA, stars: [gaia] }]).stars;
+    const hyg = at(119622, 97.79164, 16.93863, 112, {
+      name: 'HD 45951',
+      magnitude: 6.2,
+      magnitudeBand: 'V',
+      spectralType: 'K2III',
+      colorIndex: null,
+    });
+    const gaia = at(1000004369, 97.79164, 16.93863, 112, {
+      name: 'Gaia DR3 3369454521490604416',
+      magnitude: 5.898,
+      magnitudeBand: 'G',
+      colorIndex: 1.248,
+      colorSystem: 'BP-RP',
+      source: 'gaia',
+    });
+    const [merged] = mergeStarCatalogues([
+      { ...HIPPARCOS, stars: [hyg] },
+      { ...GAIA, stars: [gaia] },
+    ]).stars;
 
-    expect(merged).toMatchObject({ name: 'HD 45951', magnitude: 6.2, magnitudeBand: 'V', colorIndex: 1.248, colorSystem: 'BP-RP' });
+    expect(merged).toMatchObject({
+      name: 'HD 45951',
+      magnitude: 6.2,
+      magnitudeBand: 'V',
+      colorIndex: 1.248,
+      colorSystem: 'BP-RP',
+    });
   });
 
   it("takes a Hipparcos distance more precise than the Gaia entry it folds into, along Gaia's direction", () => {
     // Schedar: 71.0 pc ±3.5 % in Gaia, which saturates on it, and 70.0 pc ±1.0 % in Hipparcos.
-    const hyg = at(3179, 10.1268, 56.5373, 70.0, { name: 'Schedar', magnitude: 2.24, distanceError: 0.0105, distanceFromGaia: false });
-    const gaia = at(1000000100, 10.1268 + arcsecOfRa(0.2, 56.5373), 56.5373, 71.0, { name: 'Gaia DR3 425040000962559616', magnitude: 1.94, distanceError: 0.035, distanceFromGaia: true, source: 'gaia' });
-    const [merged] = mergeStarCatalogues([{ ...HIPPARCOS, stars: [hyg] }, { ...GAIA, stars: [gaia] }]).stars;
+    const hyg = at(3179, 10.1268, 56.5373, 70.0, {
+      name: 'Schedar',
+      magnitude: 2.24,
+      distanceError: 0.0105,
+      distanceFromGaia: false,
+    });
+    const gaia = at(1000000100, 10.1268 + arcsecOfRa(0.2, 56.5373), 56.5373, 71.0, {
+      name: 'Gaia DR3 425040000962559616',
+      magnitude: 1.94,
+      distanceError: 0.035,
+      distanceFromGaia: true,
+      source: 'gaia',
+    });
+    const [merged] = mergeStarCatalogues([
+      { ...HIPPARCOS, stars: [hyg] },
+      { ...GAIA, stars: [gaia] },
+    ]).stars;
     expect(Math.hypot(merged.x, merged.y, merged.z)).toBeCloseTo(70.0, 9);
     expect(directionCosine(merged, gaia)).toBeCloseTo(1, 12);
-    expect(merged).toMatchObject({ name: 'Schedar', distanceError: 0.0105, distanceFromGaia: false, source: 'gaia' });
+    expect(merged).toMatchObject({
+      name: 'Schedar',
+      distanceError: 0.0105,
+      distanceFromGaia: false,
+      source: 'gaia',
+    });
   });
 
   it('keeps two entries of one source apart, however close they are', () => {
     // Gaia resolves doubles Hipparcos saw as one star: two source ids 0.8″ apart are two stars,
     // and only *another* catalogue can claim to have already listed either of them.
-    const { stars, summary } = mergeStarCatalogues([{ ...GAIA, stars: [at(1, 10, 10, 100), at(2, 10 + arcsecOfRa(0.8, 10), 10, 100)] }]);
+    const { stars, summary } = mergeStarCatalogues([
+      { ...GAIA, stars: [at(1, 10, 10, 100), at(2, 10 + arcsecOfRa(0.8, 10), 10, 100)] },
+    ]);
     expect(stars).toHaveLength(2);
     expect(summary.duplicates).toBe(0);
   });
@@ -229,11 +450,23 @@ describe('mergeStarCatalogues', () => {
     const b = at(118080, 10 + arcsecOfRa(0.8, 10), 10, 2.63, { name: 'Gl 65B' });
     const position = (star: StarRecord) => [star.x, star.y, star.z];
 
-    const nearest = mergeStarCatalogues([{ ...HIPPARCOS, stars: [b, a] }, { ...GAIA, stars: [gaiaA, gaiaB] }]);
-    expect(nearest.stars.map((star) => [star.name, ...position(star)])).toEqual([['Gl 65A', ...position(gaiaA)], ['Gl 65B', ...position(gaiaB)]]);
+    const nearest = mergeStarCatalogues([
+      { ...HIPPARCOS, stars: [b, a] },
+      { ...GAIA, stars: [gaiaA, gaiaB] },
+    ]);
+    expect(nearest.stars.map((star) => [star.name, ...position(star)])).toEqual([
+      ['Gl 65A', ...position(gaiaA)],
+      ['Gl 65B', ...position(gaiaB)],
+    ]);
 
-    const onePlace = mergeStarCatalogues([{ ...HIPPARCOS, stars: [a, { ...b, x: a.x, y: a.y, z: a.z }] }, { ...GAIA, stars: [gaiaA, gaiaB] }]);
-    expect(onePlace.stars.map((star) => [star.name, ...position(star)])).toEqual([['Gl 65A', ...position(gaiaA)], ['Gl 65B', ...position(gaiaB)]]);
+    const onePlace = mergeStarCatalogues([
+      { ...HIPPARCOS, stars: [a, { ...b, x: a.x, y: a.y, z: a.z }] },
+      { ...GAIA, stars: [gaiaA, gaiaB] },
+    ]);
+    expect(onePlace.stars.map((star) => [star.name, ...position(star)])).toEqual([
+      ['Gl 65A', ...position(gaiaA)],
+      ['Gl 65B', ...position(gaiaB)],
+    ]);
   });
 
   it('keeps a star the better catalogue does not reach', () => {
@@ -241,7 +474,7 @@ describe('mergeStarCatalogues', () => {
     // everything, and a bright star it omits should not vanish from the map.
     const { stars } = mergeStarCatalogues([
       { ...HIPPARCOS, stars: [at(1, 10, 10, 100)] },
-      { ...GAIA, stars: [at(2, 200, -30, 50)] }
+      { ...GAIA, stars: [at(2, 200, -30, 50)] },
     ]);
 
     expect(stars.map((star) => star.id).sort()).toEqual([1, 2]);
@@ -251,7 +484,7 @@ describe('mergeStarCatalogues', () => {
   it('records where every star came from', () => {
     const { stars, summary } = mergeStarCatalogues([
       { ...HIPPARCOS, stars: [at(1, 10, 10, 100), at(3, 20, 10, 100)] },
-      { ...GAIA, stars: [at(2, 200, -30, 50)] }
+      { ...GAIA, stars: [at(2, 200, -30, 50)] },
     ]);
 
     expect(summary.bySource).toEqual({ hyg: 2, gaia: 1 });
@@ -261,14 +494,22 @@ describe('mergeStarCatalogues', () => {
   it('does not depend on the order the catalogues were given in', () => {
     const shared = [at(1, 30, 5, 80)];
     const better = [at(2, 30, 5, 79)];
-    const forwards = mergeStarCatalogues([{ ...HIPPARCOS, stars: shared }, { ...GAIA, stars: better }]);
-    const backwards = mergeStarCatalogues([{ ...GAIA, stars: better }, { ...HIPPARCOS, stars: shared }]);
+    const forwards = mergeStarCatalogues([
+      { ...HIPPARCOS, stars: shared },
+      { ...GAIA, stars: better },
+    ]);
+    const backwards = mergeStarCatalogues([
+      { ...GAIA, stars: better },
+      { ...HIPPARCOS, stars: shared },
+    ]);
 
     expect(forwards.stars.map((s) => s.id)).toEqual(backwards.stars.map((s) => s.id));
   });
 
   it('leaves a star that already names its source alone', () => {
-    const { stars } = mergeStarCatalogues([{ ...GAIA, stars: [at(1, 10, 10, 100, { source: 'gaia-dr4' })] }]);
+    const { stars } = mergeStarCatalogues([
+      { ...GAIA, stars: [at(1, 10, 10, 100, { source: 'gaia-dr4' })] },
+    ]);
     expect(stars[0].source).toBe('gaia-dr4');
   });
 
@@ -279,11 +520,11 @@ describe('mergeStarCatalogues', () => {
       [0, 0],
       [0.5, 0.5],
       [359.999, -0.0001],
-      [180, 89.9]
+      [180, 89.9],
     ]) {
       const { stars } = mergeStarCatalogues([
         { ...HIPPARCOS, stars: [at(1, raDeg, decDeg, 100)] },
-        { ...GAIA, stars: [at(2, raDeg, decDeg, 100)] }
+        { ...GAIA, stars: [at(2, raDeg, decDeg, 100)] },
       ]);
       expect(stars).toHaveLength(1);
     }
@@ -291,13 +532,15 @@ describe('mergeStarCatalogues', () => {
     // And the one edge the grid has to wrap: 3.6″ apart, either side of 0h.
     const { stars } = mergeStarCatalogues([
       { ...HIPPARCOS, stars: [at(1, 359.9995, 0, 100)] },
-      { ...GAIA, stars: [at(2, 0.0005, 0, 100)] }
+      { ...GAIA, stars: [at(2, 0.0005, 0, 100)] },
     ]);
     expect(stars).toHaveLength(1);
   });
 
   it('handles a single catalogue as a plain pass-through', () => {
-    const { stars, summary } = mergeStarCatalogues([{ ...HIPPARCOS, stars: [at(1, 10, 10, 100), at(2, 20, 20, 100)] }]);
+    const { stars, summary } = mergeStarCatalogues([
+      { ...HIPPARCOS, stars: [at(1, 10, 10, 100), at(2, 20, 20, 100)] },
+    ]);
     expect(stars).toHaveLength(2);
     expect(summary.duplicates).toBe(0);
   });
@@ -309,9 +552,14 @@ describe('mergeStarCatalogues', () => {
   it('scales to catalogues large enough to matter', () => {
     // The reason for the sky grid: the naive pairwise merge is quadratic, and these surveys are
     // the size where that stops being an academic point.
-    const many = Array.from({ length: 20000 }, (_, i) => at(i, (i * 0.017) % 360, ((i * 0.031) % 160) - 80, 100));
+    const many = Array.from({ length: 20000 }, (_, i) =>
+      at(i, (i * 0.017) % 360, ((i * 0.031) % 160) - 80, 100),
+    );
     const started = Date.now();
-    const { stars } = mergeStarCatalogues([{ ...HIPPARCOS, stars: many }, { ...GAIA, stars: many.map((s) => ({ ...s, id: s.id + 100000 })) }]);
+    const { stars } = mergeStarCatalogues([
+      { ...HIPPARCOS, stars: many },
+      { ...GAIA, stars: many.map((s) => ({ ...s, id: s.id + 100000 })) },
+    ]);
 
     expect(stars).toHaveLength(20000);
     expect(Date.now() - started).toBeLessThan(10000);
@@ -321,7 +569,14 @@ describe('mergeStarCatalogues', () => {
 describe('foldByIdentity', () => {
   // GJ 4285 as HYG has it, at its Gliese photometric distance and V, with no colour, and the Gaia
   // source SIMBAD names as the same star, L 119-44, 50.6″ away: G 13.05 and BP−RP 2.74, which give V 14.4.
-  const gliese = at(119513, 339.5, -65.84, 6.8, { name: 'GJ 4285', source: 'hyg', magnitude: 11.45, magnitudeBand: 'V', spectralType: 'm', colorIndex: null });
+  const gliese = at(119513, 339.5, -65.84, 6.8, {
+    name: 'GJ 4285',
+    source: 'hyg',
+    magnitude: 11.45,
+    magnitudeBand: 'V',
+    spectralType: 'm',
+    colorIndex: null,
+  });
   const gaia = at(1050005263, 339.5 + arcsecOfRa(50.6, -65.84), -65.84, 28.25, {
     name: 'Gaia DR3 6392188629658709888',
     gaiaDesignation: 'Gaia DR3 6392188629658709888',
@@ -331,7 +586,7 @@ describe('foldByIdentity', () => {
     colorIndex: 2.74,
     colorSystem: 'BP-RP',
     distanceError: 0.0004,
-    distanceFromGaia: true
+    distanceFromGaia: true,
   });
   const identities = new Map([[gliese.id, gaia.gaiaDesignation!]]);
 
@@ -340,8 +595,20 @@ describe('foldByIdentity', () => {
     const { stars, folded } = foldByIdentity([gliese, gaia], identities);
     expect(folded).toBe(1);
     expect(stars).toHaveLength(1);
-    expect(stars[0]).toMatchObject({ id: gliese.id, name: 'GJ 4285', spectralType: 'm', source: 'gaia', distanceError: 0.0004, distanceFromGaia: true });
-    expect(stars[0]).toMatchObject({ magnitude: 13.05, magnitudeBand: 'G', colorIndex: 2.74, colorSystem: 'BP-RP' });
+    expect(stars[0]).toMatchObject({
+      id: gliese.id,
+      name: 'GJ 4285',
+      spectralType: 'm',
+      source: 'gaia',
+      distanceError: 0.0004,
+      distanceFromGaia: true,
+    });
+    expect(stars[0]).toMatchObject({
+      magnitude: 13.05,
+      magnitudeBand: 'G',
+      colorIndex: 2.74,
+      colorSystem: 'BP-RP',
+    });
     expect(Math.hypot(stars[0].x, stars[0].y, stars[0].z)).toBeCloseTo(28.25, 9);
     expect(directionCosine(stars[0], gaia)).toBeCloseTo(1, 12);
   });
@@ -349,55 +616,147 @@ describe('foldByIdentity', () => {
   it('folds one into a Gaia entry a HYG star of the same brightness already describes, and keeps that star', () => {
     // HYG lists GJ 251 twice: HD 265866, a Hipparcos row merged with its Gaia source, and Gl 251,
     // 10.9″ away at a Gliese distance of 5.76 pc, which SIMBAD names as the same source.
-    const hd265866 = at(33139, 103.7, 33.27, 5.58, { name: 'HD 265866', source: 'hyg', magnitude: 9.89, magnitudeBand: 'V', spectralType: 'M3', colorIndex: 1.6, colorSystem: 'B-V', distanceError: 0.004 });
-    const source = at(1000033139, 103.7, 33.27, 5.585, { name: 'Gaia DR3 939072613334579328', gaiaDesignation: 'Gaia DR3 939072613334579328', source: 'gaia', magnitude: 8.9, magnitudeBand: 'G', distanceError: 0.0002 });
-    const gl251 = at(118447, 103.7 + arcsecOfRa(10.9, 33.27), 33.27, 5.76, { name: 'Gl 251', source: 'hyg', magnitude: 10.01, magnitudeBand: 'V', spectralType: 'M4', colorIndex: null });
-    const { stars: merged } = mergeStarCatalogues([{ ...HIPPARCOS, stars: [hd265866] }, { ...GAIA, stars: [source] }]);
-    const { stars, folded } = foldByIdentity([...merged, gl251], new Map([[gl251.id, source.gaiaDesignation!]]));
+    const hd265866 = at(33139, 103.7, 33.27, 5.58, {
+      name: 'HD 265866',
+      source: 'hyg',
+      magnitude: 9.89,
+      magnitudeBand: 'V',
+      spectralType: 'M3',
+      colorIndex: 1.6,
+      colorSystem: 'B-V',
+      distanceError: 0.004,
+    });
+    const source = at(1000033139, 103.7, 33.27, 5.585, {
+      name: 'Gaia DR3 939072613334579328',
+      gaiaDesignation: 'Gaia DR3 939072613334579328',
+      source: 'gaia',
+      magnitude: 8.9,
+      magnitudeBand: 'G',
+      distanceError: 0.0002,
+    });
+    const gl251 = at(118447, 103.7 + arcsecOfRa(10.9, 33.27), 33.27, 5.76, {
+      name: 'Gl 251',
+      source: 'hyg',
+      magnitude: 10.01,
+      magnitudeBand: 'V',
+      spectralType: 'M4',
+      colorIndex: null,
+    });
+    const { stars: merged } = mergeStarCatalogues([
+      { ...HIPPARCOS, stars: [hd265866] },
+      { ...GAIA, stars: [source] },
+    ]);
+    const { stars, folded } = foldByIdentity(
+      [...merged, gl251],
+      new Map([[gl251.id, source.gaiaDesignation!]]),
+    );
     expect(folded).toBe(1);
     expect(stars).toHaveLength(1);
-    expect(stars[0]).toMatchObject({ id: 33139, name: 'HD 265866', magnitude: 9.89, magnitudeBand: 'V', colorIndex: 1.6, source: 'gaia' });
+    expect(stars[0]).toMatchObject({
+      id: 33139,
+      name: 'HD 265866',
+      magnitude: 9.89,
+      magnitudeBand: 'V',
+      colorIndex: 1.6,
+      source: 'gaia',
+    });
   });
 
   it('describes the entry by the Gliese row where SIMBAD names the HYG star already there as another source', () => {
     // HYG hangs "Gl 905.2A", M5, on HIP 117059; SIMBAD has HIP 117059 as LAWD 93, Gl 905.2B, a DA
     // white dwarf at 53.76 mas, and Gl 905.2A as G 130-6, a source 3′ away with no parallax.
-    const hip117059 = at(116690, 355.96134, 32.54631, 17.13, { name: 'Gl 905.2A', source: 'hyg', magnitude: 13.11, magnitudeBand: 'V', spectralType: 'M5', colorIndex: 1.55, colorSystem: 'B-V', distanceError: 0.1 });
-    const lawd93 = at(1000116690, 355.96134, 32.54631, 18.6, { name: 'Gaia DR3 2871730307948650368', gaiaDesignation: 'Gaia DR3 2871730307948650368', source: 'gaia', magnitude: 12.97, magnitudeBand: 'G', colorIndex: -0.04, colorSystem: 'BP-RP', distanceError: 0.0006 });
-    const gl905b = at(119589, 355.96134 + arcsecOfRa(8, 32.54631), 32.54631, 16.64, { name: 'Gl 905.2B', source: 'hyg', magnitude: 12.9, magnitudeBand: 'V', spectralType: 'DA4', colorIndex: 0.15, colorSystem: 'B-V' });
-    const { stars: merged } = mergeStarCatalogues([{ ...HIPPARCOS, stars: [hip117059] }, { ...GAIA, stars: [lawd93] }]);
+    const hip117059 = at(116690, 355.96134, 32.54631, 17.13, {
+      name: 'Gl 905.2A',
+      source: 'hyg',
+      magnitude: 13.11,
+      magnitudeBand: 'V',
+      spectralType: 'M5',
+      colorIndex: 1.55,
+      colorSystem: 'B-V',
+      distanceError: 0.1,
+    });
+    const lawd93 = at(1000116690, 355.96134, 32.54631, 18.6, {
+      name: 'Gaia DR3 2871730307948650368',
+      gaiaDesignation: 'Gaia DR3 2871730307948650368',
+      source: 'gaia',
+      magnitude: 12.97,
+      magnitudeBand: 'G',
+      colorIndex: -0.04,
+      colorSystem: 'BP-RP',
+      distanceError: 0.0006,
+    });
+    const gl905b = at(119589, 355.96134 + arcsecOfRa(8, 32.54631), 32.54631, 16.64, {
+      name: 'Gl 905.2B',
+      source: 'hyg',
+      magnitude: 12.9,
+      magnitudeBand: 'V',
+      spectralType: 'DA4',
+      colorIndex: 0.15,
+      colorSystem: 'B-V',
+    });
+    const { stars: merged } = mergeStarCatalogues([
+      { ...HIPPARCOS, stars: [hip117059] },
+      { ...GAIA, stars: [lawd93] },
+    ]);
     const identities = new Map([
       [hip117059.id, 'Gaia DR3 2871730758921709952'],
-      [gl905b.id, lawd93.gaiaDesignation!]
+      [gl905b.id, lawd93.gaiaDesignation!],
     ]);
     const { stars, folded } = foldByIdentity([...merged, gl905b], identities);
     expect(folded).toBe(1);
     expect(stars).toHaveLength(1);
-    expect(stars[0]).toMatchObject({ id: 119589, name: 'Gl 905.2B', spectralType: 'DA4', magnitude: 12.9, colorIndex: 0.15, source: 'gaia' });
+    expect(stars[0]).toMatchObject({
+      id: 119589,
+      name: 'Gl 905.2B',
+      spectralType: 'DA4',
+      magnitude: 12.9,
+      colorIndex: 0.15,
+      source: 'gaia',
+    });
     expect(Math.hypot(stars[0].x, stars[0].y, stars[0].z)).toBeCloseTo(18.6, 9);
     // Nor the M5's B−V where the row has no colour of its own (Gl 225.2C, beside HD 40887's).
-    expect(foldByIdentity([...merged, { ...gl905b, colorIndex: null }], identities).stars[0].colorIndex).toBeNull();
+    expect(
+      foldByIdentity([...merged, { ...gl905b, colorIndex: null }], identities).stars[0].colorIndex,
+    ).toBeNull();
   });
 
   it('leaves a star with a Hipparcos error alone, and one of another brightness than the HYG star already there', () => {
     expect(foldByIdentity([{ ...gliese, distanceError: 0.05 }, gaia], identities).folded).toBe(0);
     // A companion SIMBAD gives its primary's source: two magnitudes apart.
-    expect(foldByIdentity([gliese, { ...gaia, name: 'L 119-44', magnitude: 13.45 }], identities).folded).toBe(0);
-    expect(foldByIdentity([gliese, { ...gaia, name: 'L 119-44', magnitude: 11.85 }], identities).folded).toBe(1);
+    expect(
+      foldByIdentity([gliese, { ...gaia, name: 'L 119-44', magnitude: 13.45 }], identities).folded,
+    ).toBe(0);
+    expect(
+      foldByIdentity([gliese, { ...gaia, name: 'L 119-44', magnitude: 11.85 }], identities).folded,
+    ).toBe(1);
     expect(foldByIdentity([gliese, gaia], new Map()).folded).toBe(0);
   });
 });
 
 describe('hipparcosDistancePc', () => {
   it("takes HYG's distance where it gives one", () => {
-    expect(hipparcosDistancePc(606.06, { parallaxMas: 1.65, relativeError: 0.45 / 1.65 })).toBe(606.06);
+    expect(hipparcosDistancePc(606.06, { parallaxMas: 1.65, relativeError: 0.45 / 1.65 })).toBe(
+      606.06,
+    );
   });
 
-  it("places a star HYG gives no distance for by its parallax, if the parallax is 2.5 times its error", () => {
+  it('places a star HYG gives no distance for by its parallax, if the parallax is 2.5 times its error', () => {
     // HD 74180 at 0.67 ± 0.16 mas and Mu Cep at 0.55 ± 0.20; a parallax at 1.5 times its error stays out.
-    expect(hipparcosDistancePc(HYG_UNKNOWN_DISTANCE_PC, { parallaxMas: 0.67, relativeError: 0.16 / 0.67 })).toBeCloseTo(1492.5, 1);
-    expect(hipparcosDistancePc(HYG_UNKNOWN_DISTANCE_PC, { parallaxMas: 0.55, relativeError: 0.2 / 0.55 })).toBeCloseTo(1818.2, 1);
-    expect(hipparcosDistancePc(HYG_UNKNOWN_DISTANCE_PC, { parallaxMas: 0.3, relativeError: 0.2 / 0.3 })).toBeUndefined();
+    expect(
+      hipparcosDistancePc(HYG_UNKNOWN_DISTANCE_PC, {
+        parallaxMas: 0.67,
+        relativeError: 0.16 / 0.67,
+      }),
+    ).toBeCloseTo(1492.5, 1);
+    expect(
+      hipparcosDistancePc(HYG_UNKNOWN_DISTANCE_PC, {
+        parallaxMas: 0.55,
+        relativeError: 0.2 / 0.55,
+      }),
+    ).toBeCloseTo(1818.2, 1);
+    expect(
+      hipparcosDistancePc(HYG_UNKNOWN_DISTANCE_PC, { parallaxMas: 0.3, relativeError: 0.2 / 0.3 }),
+    ).toBeUndefined();
     expect(hipparcosDistancePc(HYG_UNKNOWN_DISTANCE_PC)).toBeUndefined();
   });
 });

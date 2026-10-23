@@ -121,7 +121,8 @@ class Frontier {
           break;
         }
         const right = left + 1;
-        const child = right < count && this.priorities[right] < this.priorities[left] ? right : left;
+        const child =
+          right < count && this.priorities[right] < this.priorities[left] ? right : left;
         if (this.priorities[child] >= lastPriority) {
           break;
         }
@@ -168,13 +169,19 @@ function rebuild(cameFrom: Map<number, number>, fromId: number, toId: number): n
  * "No route" and "no chain" are not the same answer: a search that spends {@link MAX_VISITED}
  * reports that it gave up, so nothing downstream reads it as proof that no chain exists.
  */
-export function routeBetween(index: StarNeighbourhood, fromId: number, toId: number, rangePc: number): RouteSearch {
+export function routeBetween(
+  index: StarNeighbourhood,
+  fromId: number,
+  toId: number,
+  rangePc: number,
+): RouteSearch {
   const origin = index.point(fromId);
   const destination = index.point(toId);
   if (fromId === toId || rangePc <= 0 || !origin || !destination) {
     return { route: null, gaveUp: false };
   }
-  const straightLineOn = (x: number, y: number, z: number) => Math.hypot(destination.x - x, destination.y - y, destination.z - z);
+  const straightLineOn = (x: number, y: number, z: number) =>
+    Math.hypot(destination.x - x, destination.y - y, destination.z - z);
 
   const travelled = new Map<number, number>([[fromId, 0]]);
   const cameFrom = new Map<number, number>();
@@ -254,7 +261,12 @@ export function routeBetween(index: StarNeighbourhood, fromId: number, toId: num
  * could offer is the ceiling's, which is the control's maximum, for crossings that work well below
  * it. See {@link MAX_RANGE_GIVE_UPS}.
  */
-export function minimumRangeBetween(index: StarNeighbourhood, fromId: number, toId: number, ceilingPc: number): RangeSearch {
+export function minimumRangeBetween(
+  index: StarNeighbourhood,
+  fromId: number,
+  toId: number,
+  ceilingPc: number,
+): RangeSearch {
   const widest = routeBetween(index, fromId, toId, ceilingPc);
   if (!widest.route) {
     return { rangePc: null, least: !widest.gaveUp };
@@ -267,7 +279,10 @@ export function minimumRangeBetween(index: StarNeighbourhood, fromId: number, to
   // own to answer with, and that figure sends the control to its maximum for a crossing that works
   // well below — 8.00 pc for a star that routes at 6. So it is allowed more probes there, not
   // unlimited ones: the panel is waiting on this.
-  while (reachable - unreachable > RANGE_RESOLUTION_PC && giveUps < (reachable === ceilingHopPc ? MAX_UNEARNED_GIVE_UPS : MAX_RANGE_GIVE_UPS)) {
+  while (
+    reachable - unreachable > RANGE_RESOLUTION_PC &&
+    giveUps < (reachable === ceilingHopPc ? MAX_UNEARNED_GIVE_UPS : MAX_RANGE_GIVE_UPS)
+  ) {
     const range = (unreachable + reachable) / 2;
     const { route, gaveUp } = routeBetween(index, fromId, toId, range);
     if (route) {
@@ -307,7 +322,11 @@ const DISTANCE_BANDS = 4096;
  * than collected as link objects first, since at 8 pc the drawn stars alone have hundreds of
  * thousands of links, and the whole catalogue 3.7 million.
  */
-export function jumpLinkSegments(index: StarNeighbourhood, rangePc: number, budget?: LinkBudget): Float32Array {
+export function jumpLinkSegments(
+  index: StarNeighbourhood,
+  rangePc: number,
+  budget?: LinkBudget,
+): Float32Array {
   let vertices = new Float32Array(6 * 4096);
   let length = 0;
   index.forEachPairWithin(rangePc, (a, b) => {

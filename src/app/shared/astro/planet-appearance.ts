@@ -81,7 +81,10 @@ const VOLATILE_MAX_DENSITY = 3;
  * between a ball of iron, a ball of rock, a ball of water and a ball of hydrogen, and it comes
  * straight out of two published numbers with no modelling in between.
  */
-export function bulkDensityGramsPerCm3(massEarth: number | undefined, radiusEarth: number | undefined): number | null {
+export function bulkDensityGramsPerCm3(
+  massEarth: number | undefined,
+  radiusEarth: number | undefined,
+): number | null {
   if (!massEarth || !radiusEarth || massEarth <= 0 || radiusEarth <= 0) {
     return null;
   }
@@ -108,12 +111,16 @@ const CMB_TEMPERATURE_K = 2.7255;
 export function equilibriumTemperatureK(
   luminositySolar: number | null | undefined,
   semiMajorAxisAu: number | undefined,
-  bondAlbedo: number = DEFAULT_BOND_ALBEDO
+  bondAlbedo: number = DEFAULT_BOND_ALBEDO,
 ): number | null {
   if (!luminositySolar || !semiMajorAxisAu || luminositySolar <= 0 || semiMajorAxisAu <= 0) {
     return null;
   }
-  const starlit = SOLAR_EQUILIBRIUM_TEMPERATURE_K * Math.pow(luminositySolar, 0.25) * Math.pow(semiMajorAxisAu, -0.5) * Math.pow(1 - bondAlbedo, 0.25);
+  const starlit =
+    SOLAR_EQUILIBRIUM_TEMPERATURE_K *
+    Math.pow(luminositySolar, 0.25) *
+    Math.pow(semiMajorAxisAu, -0.5) *
+    Math.pow(1 - bondAlbedo, 0.25);
   return Math.pow(starlit ** 4 + CMB_TEMPERATURE_K ** 4, 0.25);
 }
 
@@ -121,7 +128,17 @@ export function equilibriumTemperatureK(
  * The kinds of world this app distinguishes. Chosen to be the classes that actually look
  * different from each other, and that the available measurements can actually separate.
  */
-export type PlanetClass = 'lava' | 'scorched' | 'iron' | 'rocky' | 'temperate' | 'icy' | 'subNeptune' | 'iceGiant' | 'gasGiant' | 'hotGasGiant';
+export type PlanetClass =
+  | 'lava'
+  | 'scorched'
+  | 'iron'
+  | 'rocky'
+  | 'temperate'
+  | 'icy'
+  | 'subNeptune'
+  | 'iceGiant'
+  | 'gasGiant'
+  | 'hotGasGiant';
 
 export interface PlanetMeasurements {
   radiusEarth?: number;
@@ -166,7 +183,11 @@ export function classifyPlanet(measurements: PlanetMeasurements): PlanetClass {
   if (temperature !== null && temperature >= LAVA_MIN_K) {
     return 'lava';
   }
-  if (density !== null && density <= VOLATILE_MAX_DENSITY && (temperature === null || temperature < TEMPERATE_MAX_K)) {
+  if (
+    density !== null &&
+    density <= VOLATILE_MAX_DENSITY &&
+    (temperature === null || temperature < TEMPERATE_MAX_K)
+  ) {
     return 'icy';
   }
   if (temperature === null) {
@@ -178,7 +199,8 @@ export function classifyPlanet(measurements: PlanetMeasurements): PlanetClass {
   if (temperature < TEMPERATE_MIN_K) {
     return 'icy';
   }
-  const bigEnoughForAnAtmosphere = radiusEarth === undefined || radiusEarth >= TEMPERATE_MIN_RADIUS_EARTH;
+  const bigEnoughForAnAtmosphere =
+    radiusEarth === undefined || radiusEarth >= TEMPERATE_MIN_RADIUS_EARTH;
   return temperature <= TEMPERATE_MAX_K && bigEnoughForAnAtmosphere ? 'temperate' : 'rocky';
 }
 
@@ -187,7 +209,10 @@ export function classifyPlanet(measurements: PlanetMeasurements): PlanetClass {
  * where only that is. Radius is preferred: it is what the classes are actually defined by, and
  * mass alone leaves a dense super-Earth and a puffy sub-Neptune indistinguishable.
  */
-function sizeFamily(radiusEarth: number | undefined, massEarth: number | undefined): 'rocky' | 'subNeptune' | 'iceGiant' | 'gasGiant' {
+function sizeFamily(
+  radiusEarth: number | undefined,
+  massEarth: number | undefined,
+): 'rocky' | 'subNeptune' | 'iceGiant' | 'gasGiant' {
   if (radiusEarth !== undefined && radiusEarth > 0) {
     if (radiusEarth >= GAS_GIANT_MIN_RADIUS_EARTH) {
       return 'gasGiant';
@@ -219,7 +244,7 @@ export const PLANET_CLASS_LABELS: Readonly<Record<PlanetClass, string>> = {
   subNeptune: 'Sub-Neptune',
   iceGiant: 'Ice giant',
   gasGiant: 'Gas giant',
-  hotGasGiant: 'Hot gas giant'
+  hotGasGiant: 'Hot gas giant',
 };
 
 /** An RGB triple in 0-1, the form the texture generator and Three.js both want. */
@@ -248,25 +273,95 @@ export interface PlanetPalette {
 const PALETTES: Readonly<Record<PlanetClass, PlanetPalette>> = {
   // Basalt darkened almost to black, cut by exposed magma. Real molten silicate at 1500 K glows
   // a dull orange-red, not the yellow-white of a much hotter furnace.
-  lava: { low: [0.09, 0.06, 0.06], mid: [0.24, 0.13, 0.1], high: [0.95, 0.35, 0.12], cap: [0.32, 0.12, 0.08], structure: 'terrain', contrast: 0.95 },
+  lava: {
+    low: [0.09, 0.06, 0.06],
+    mid: [0.24, 0.13, 0.1],
+    high: [0.95, 0.35, 0.12],
+    cap: [0.32, 0.12, 0.08],
+    structure: 'terrain',
+    contrast: 0.95,
+  },
   // Baked rock with the volatiles long gone: Mercury's colour, which is what is left behind.
-  scorched: { low: [0.24, 0.2, 0.18], mid: [0.42, 0.36, 0.31], high: [0.6, 0.53, 0.46], cap: [0.45, 0.4, 0.36], structure: 'terrain', contrast: 0.8 },
+  scorched: {
+    low: [0.24, 0.2, 0.18],
+    mid: [0.42, 0.36, 0.31],
+    high: [0.6, 0.53, 0.46],
+    cap: [0.45, 0.4, 0.36],
+    structure: 'terrain',
+    contrast: 0.8,
+  },
   // A world dense enough to be mostly metal reads darker and greyer than silicate rock.
-  iron: { low: [0.16, 0.15, 0.16], mid: [0.33, 0.31, 0.32], high: [0.52, 0.5, 0.53], cap: [0.4, 0.39, 0.41], structure: 'terrain', contrast: 0.7 },
-  rocky: { low: [0.25, 0.21, 0.18], mid: [0.45, 0.38, 0.31], high: [0.66, 0.58, 0.48], cap: [0.78, 0.78, 0.8], structure: 'terrain', contrast: 0.7 },
+  iron: {
+    low: [0.16, 0.15, 0.16],
+    mid: [0.33, 0.31, 0.32],
+    high: [0.52, 0.5, 0.53],
+    cap: [0.4, 0.39, 0.41],
+    structure: 'terrain',
+    contrast: 0.7,
+  },
+  rocky: {
+    low: [0.25, 0.21, 0.18],
+    mid: [0.45, 0.38, 0.31],
+    high: [0.66, 0.58, 0.48],
+    cap: [0.78, 0.78, 0.8],
+    structure: 'terrain',
+    contrast: 0.7,
+  },
   // Where water can be liquid. Deliberately restrained: this is a temperature, not a detection.
-  temperate: { low: [0.12, 0.2, 0.32], mid: [0.3, 0.36, 0.36], high: [0.55, 0.52, 0.42], cap: [0.9, 0.93, 0.96], structure: 'terrain', contrast: 0.6 },
-  icy: { low: [0.55, 0.62, 0.7], mid: [0.75, 0.81, 0.86], high: [0.92, 0.95, 0.98], cap: [0.97, 0.98, 1.0], structure: 'terrain', contrast: 0.45 },
+  temperate: {
+    low: [0.12, 0.2, 0.32],
+    mid: [0.3, 0.36, 0.36],
+    high: [0.55, 0.52, 0.42],
+    cap: [0.9, 0.93, 0.96],
+    structure: 'terrain',
+    contrast: 0.6,
+  },
+  icy: {
+    low: [0.55, 0.62, 0.7],
+    mid: [0.75, 0.81, 0.86],
+    high: [0.92, 0.95, 0.98],
+    cap: [0.97, 0.98, 1.0],
+    structure: 'terrain',
+    contrast: 0.45,
+  },
   // The commonest planet found and the one with no solar-system example. A thick hydrogen haze
   // over an unseen interior, so: banded, but with almost no contrast to band.
-  subNeptune: { low: [0.42, 0.47, 0.5], mid: [0.58, 0.63, 0.64], high: [0.72, 0.76, 0.75], cap: [0.62, 0.67, 0.68], structure: 'banded', contrast: 0.22 },
+  subNeptune: {
+    low: [0.42, 0.47, 0.5],
+    mid: [0.58, 0.63, 0.64],
+    high: [0.72, 0.76, 0.75],
+    cap: [0.62, 0.67, 0.68],
+    structure: 'banded',
+    contrast: 0.22,
+  },
   // Methane absorbs red light; what comes back out is the blue-green of Uranus and Neptune.
-  iceGiant: { low: [0.13, 0.32, 0.55], mid: [0.24, 0.5, 0.72], high: [0.55, 0.78, 0.88], cap: [0.35, 0.6, 0.78], structure: 'banded', contrast: 0.45 },
+  iceGiant: {
+    low: [0.13, 0.32, 0.55],
+    mid: [0.24, 0.5, 0.72],
+    high: [0.55, 0.78, 0.88],
+    cap: [0.35, 0.6, 0.78],
+    structure: 'banded',
+    contrast: 0.45,
+  },
   // Ammonia cloud tops over ochre organics: the Jupiter/Saturn palette.
-  gasGiant: { low: [0.45, 0.32, 0.22], mid: [0.72, 0.6, 0.44], high: [0.92, 0.87, 0.76], cap: [0.6, 0.52, 0.42], structure: 'banded', contrast: 0.7 },
+  gasGiant: {
+    low: [0.45, 0.32, 0.22],
+    mid: [0.72, 0.6, 0.44],
+    high: [0.92, 0.87, 0.76],
+    cap: [0.6, 0.52, 0.42],
+    structure: 'banded',
+    contrast: 0.7,
+  },
   // Too hot for ammonia or water clouds; silicate and alkali-metal cloud decks over a glowing
   // interior, which is why hot Jupiters are modelled as deep red rather than as bright ones.
-  hotGasGiant: { low: [0.28, 0.08, 0.07], mid: [0.55, 0.18, 0.12], high: [0.85, 0.42, 0.2], cap: [0.4, 0.14, 0.1], structure: 'banded', contrast: 0.6 }
+  hotGasGiant: {
+    low: [0.28, 0.08, 0.07],
+    mid: [0.55, 0.18, 0.12],
+    high: [0.85, 0.42, 0.2],
+    cap: [0.4, 0.14, 0.1],
+    structure: 'banded',
+    contrast: 0.6,
+  },
 };
 
 export function paletteFor(planetClass: PlanetClass): PlanetPalette {
@@ -281,7 +376,10 @@ export function paletteFor(planetClass: PlanetClass): PlanetPalette {
  * grow as a world cools. They are absent above the point where water cannot be stable anywhere
  * and cover the whole globe below the point where it cannot melt anywhere.
  */
-export function polarCapExtentDeg(planetClass: PlanetClass, temperatureK: number | null | undefined): number | null {
+export function polarCapExtentDeg(
+  planetClass: PlanetClass,
+  temperatureK: number | null | undefined,
+): number | null {
   if (temperatureK === null || temperatureK === undefined) {
     return null;
   }
@@ -334,7 +432,11 @@ export function planetAppearance(input: {
   hostLuminositySolar?: number | null;
 }): PlanetAppearance {
   const temperature = equilibriumTemperatureK(input.hostLuminositySolar, input.semiMajorAxisAu);
-  const planetClass = classifyPlanet({ radiusEarth: input.radiusEarth, massEarth: input.massEarth, equilibriumTemperatureK: temperature });
+  const planetClass = classifyPlanet({
+    radiusEarth: input.radiusEarth,
+    massEarth: input.massEarth,
+    equilibriumTemperatureK: temperature,
+  });
 
   return {
     planetClass,
@@ -342,6 +444,6 @@ export function planetAppearance(input: {
     equilibriumTemperatureK: temperature,
     bulkDensityGramsPerCm3: bulkDensityGramsPerCm3(input.massEarth, input.radiusEarth),
     polarCapExtentDeg: polarCapExtentDeg(planetClass, temperature),
-    seed: seedFromId(input.id)
+    seed: seedFromId(input.id),
   };
 }

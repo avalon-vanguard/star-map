@@ -17,7 +17,7 @@ interface LadderStep {
 const LADDER: readonly { level: ViewLevel; label: string }[] = [
   { level: 'galactic', label: 'Milky Way' },
   { level: 'galaxy', label: 'Solar Neighbourhood' },
-  { level: 'system', label: 'System' }
+  { level: 'system', label: 'System' },
 ];
 
 /**
@@ -43,7 +43,10 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
     @if (showReticle()) {
       <!-- The same circle-and-ticks reticle the search field wears, scaled up: one lock mark
            for the whole instrument, whether it is holding a query or a body. -->
-      <app-reticle-icon class="absolute top-1/2 left-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 text-accent/70" [strokeWidth]="1" />
+      <app-reticle-icon
+        class="absolute top-1/2 left-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 text-accent/70"
+        [strokeWidth]="1"
+      />
     }
 
     <!-- Top rail: which scale the view is at, and what it is holding. Both sit on one line
@@ -51,7 +54,10 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
          Below sm each step is padded 8 px a side, not 16: the rail is then 317 px wide on one
          line, where at 365 px it ran under the frame's corner on a 390 px phone and broke onto a
          second line on a 360 px one, 4 px into the scale bar under it. -->
-    <nav aria-label="Map scale" class="hud-brackets hud-surface pointer-events-auto absolute top-6 left-6 flex items-stretch divide-x divide-border/40">
+    <nav
+      aria-label="Map scale"
+      class="hud-brackets hud-surface pointer-events-auto absolute top-6 left-6 flex items-stretch divide-x divide-border/40"
+    >
       @for (step of ladder(); track step.level) {
         @if (step.reachable) {
           <button
@@ -76,9 +82,17 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
     @if (scale(); as bar) {
       <!-- The map's scale bar, under the rail that names the scale: a round length, measured at the
            depth the view is centred on, since under perspective every depth has its own. -->
-      <div data-testid="hud-scale" role="img" [attr.aria-label]="'Scale: ' + bar.label" class="absolute top-16 left-6 flex flex-col items-start gap-1">
+      <div
+        data-testid="hud-scale"
+        role="img"
+        [attr.aria-label]="'Scale: ' + bar.label"
+        class="absolute top-16 left-6 flex flex-col items-start gap-1"
+      >
         <span class="type-label text-muted tabular-nums">{{ bar.label }}</span>
-        <span class="block h-1.5 border-x border-b border-accent/70" [style.width.px]="bar.widthPx"></span>
+        <span
+          class="block h-1.5 border-x border-b border-accent/70"
+          [style.width.px]="bar.widthPx"
+        ></span>
       </div>
     }
 
@@ -88,14 +102,22 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
            instead, at the left, held inside the frame and wrapped rather than cut. It used to be
            hidden there, and the readout that names the same thing folds away on a phone once a
            search result is picked: after a pick on a phone the star's name was nowhere on screen. -->
-      <div class="absolute top-24 left-6 max-w-[calc(100%-3rem)] lg:top-6 lg:left-1/2 lg:max-w-none lg:-translate-x-1/2">
-        <div data-testid="hud-banner" class="hud-brackets hud-acquire hud-surface flex items-center gap-2.5 px-6 py-1.5">
+      <div
+        class="absolute top-24 left-6 max-w-[calc(100%-3rem)] lg:top-6 lg:left-1/2 lg:max-w-none lg:-translate-x-1/2"
+      >
+        <div
+          data-testid="hud-banner"
+          class="hud-brackets hud-acquire hud-surface flex items-center gap-2.5 px-6 py-1.5"
+        >
           <app-reticle-icon class="h-3 w-3 shrink-0 text-accent" />
-          <span class="min-w-0 text-[11px] tracking-[0.3em] wrap-break-word text-accent uppercase">{{ title() }}</span>
+          <span
+            class="min-w-0 text-[11px] tracking-[0.3em] wrap-break-word text-accent uppercase"
+            >{{ title() }}</span
+          >
         </div>
       </div>
     }
-  `
+  `,
 })
 export class StarmapHudComponent {
   readonly level = input.required<ViewLevel>();
@@ -114,7 +136,7 @@ export class StarmapHudComponent {
       state: index < activeIndex ? 'above' : index === activeIndex ? 'current' : 'below',
       // Every scale is somewhere the camera can be sent except the current one and the system
       // level, which needs a star picked first — there is no "the system" without a selection.
-      reachable: index !== activeIndex && step.level !== 'system'
+      reachable: index !== activeIndex && step.level !== 'system',
     }));
   });
 }

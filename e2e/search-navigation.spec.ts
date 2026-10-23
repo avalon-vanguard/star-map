@@ -4,7 +4,9 @@ import { openSearch } from './support/open-search';
 import { backButtonLocator } from './support/wait-for-back-button';
 
 test.describe('Search-driven navigation', () => {
-  test('selecting a star result flies into that system and shows the back-to-galaxy control', async ({ page }) => {
+  test('selecting a star result flies into that system and shows the back-to-galaxy control', async ({
+    page,
+  }) => {
     await page.goto('/?stars=4000');
     const searchInput = await openSearch(page);
     await searchInput.fill('Proxima Centauri');
@@ -15,12 +17,17 @@ test.describe('Search-driven navigation', () => {
 
     // Selecting a result hands the dock straight back to the readout (before the flight even
     // starts): the thing to look at is now the scene, and the search panel folds away with it.
-    await expect(page.getByRole('tab', { name: 'Readout' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: 'Readout' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     await expect(searchInput).toHaveCount(0);
     await expect(backButtonLocator(page)).toBeVisible({ timeout: 15_000 });
   });
 
-  test('Enter in the field flies to the first result, and the arrows reach the list and come back', async ({ page }) => {
+  test('Enter in the field flies to the first result, and the arrows reach the list and come back', async ({
+    page,
+  }) => {
     await page.goto('/?stars=4000');
     const searchInput = await openSearch(page);
     await searchInput.fill('Sirius');
@@ -40,7 +47,9 @@ test.describe('Search-driven navigation', () => {
     await expect(backButtonLocator(page)).toBeVisible({ timeout: 15_000 });
   });
 
-  test('the system flown into is in the URL, so a reload lands in it and Back retraces it', async ({ page }) => {
+  test('the system flown into is in the URL, so a reload lands in it and Back retraces it', async ({
+    page,
+  }) => {
     // Two searched flights, a reload and two Back flights, on the software rasterizer.
     test.setTimeout(90_000);
     await page.goto('/?stars=4000');
@@ -48,7 +57,10 @@ test.describe('Search-driven navigation', () => {
 
     for (const name of ['Sirius', 'Proxima Centauri']) {
       await (await openSearch(page)).fill(name);
-      await page.getByRole('option', { name: new RegExp(`^${name}`) }).first().click();
+      await page
+        .getByRole('option', { name: new RegExp(`^${name}`) })
+        .first()
+        .click();
       await expect(title).toHaveText(name, { timeout: 30_000 });
     }
     // ?stars= survives beside the star, as every write merges into what the URL already holds.
@@ -66,7 +78,9 @@ test.describe('Search-driven navigation', () => {
     await expect(backButtonLocator(page)).toHaveCount(0, { timeout: 30_000 });
   });
 
-  test('a link to a star the catalogue does not hold opens on the neighbourhood, without an error', async ({ page }) => {
+  test('a link to a star the catalogue does not hold opens on the neighbourhood, without an error', async ({
+    page,
+  }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto('/?stars=4000&star=999999999');
@@ -77,7 +91,9 @@ test.describe('Search-driven navigation', () => {
     expect(errors).toEqual([]);
   });
 
-  test('selecting a body result navigates straight to its detail route and shows real NASA data', async ({ page }) => {
+  test('selecting a body result navigates straight to its detail route and shows real NASA data', async ({
+    page,
+  }) => {
     await page.goto('/?stars=4000');
     const searchInput = await openSearch(page);
     await searchInput.fill('Earth');
@@ -104,11 +120,16 @@ test.describe('Search-driven navigation', () => {
     await expect(page.getByTestId('hud-title')).toHaveText('Local Stars', { timeout: 30_000 });
   });
 
-  for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 740 }]) {
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 360, height: 740 },
+  ]) {
     test.describe(`on a ${viewport.width}x${viewport.height} phone`, () => {
       test.use({ viewport, isMobile: true, hasTouch: true });
 
-      test('every tab is whole on the strip, the page does not scroll sideways, and a star picked from Search is named on screen', async ({ page }) => {
+      test('every tab is whole on the strip, the page does not scroll sideways, and a star picked from Search is named on screen', async ({
+        page,
+      }) => {
         await page.goto('/?stars=4000');
         await expect(page.getByRole('tab')).toHaveCount(5);
         const strip = (await page.getByRole('tablist', { name: 'Dock' }).boundingBox())!;
@@ -118,22 +139,31 @@ test.describe('Search-driven navigation', () => {
           expect(box.x + box.width).toBeLessThanOrEqual(strip.x + strip.width + 0.5);
         }
         // One line: on two, the rail ran into the scale bar under it.
-        expect((await page.getByRole('navigation', { name: 'Map scale' }).boundingBox())!.height).toBeLessThan(40);
+        expect(
+          (await page.getByRole('navigation', { name: 'Map scale' }).boundingBox())!.height,
+        ).toBeLessThan(40);
 
         await page.getByRole('tab', { name: 'Search' }).tap();
         await page.getByPlaceholder('Search stars, planets, exoplanets…').fill('Sirius');
-        await page.getByRole('option', { name: /^Sirius/ }).first().tap();
+        await page
+          .getByRole('option', { name: /^Sirius/ })
+          .first()
+          .tap();
         await expect(backButtonLocator(page)).toBeVisible({ timeout: 30_000 });
         // The sheet folds away on a phone, title and all: the nameplate is what names the star.
         await expect(page.getByTestId('hud-title')).toHaveCount(0);
         await expect(page.getByTestId('hud-banner')).toBeVisible();
         await expect(page.getByTestId('hud-banner')).toHaveText('Sirius');
-        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          viewport.width,
+        );
       });
     });
   }
 
-  test('typing fewer than two characters shows no results, and Escape clears the query', async ({ page }) => {
+  test('typing fewer than two characters shows no results, and Escape clears the query', async ({
+    page,
+  }) => {
     await page.goto('/?stars=4000');
     const searchInput = await openSearch(page);
 

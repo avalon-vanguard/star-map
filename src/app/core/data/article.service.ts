@@ -15,7 +15,10 @@ export interface Article {
  * facts and the panel says so: "nothing written about this" and "could not ask" are not the
  * same, and only one of them is about the world.
  */
-export type ArticleLookup = { readonly status: 'found'; readonly article: Article } | { readonly status: 'none' } | { readonly status: 'unavailable' };
+export type ArticleLookup =
+  | { readonly status: 'found'; readonly article: Article }
+  | { readonly status: 'none' }
+  | { readonly status: 'unavailable' };
 
 const FALLBACK_LANGUAGE = 'en';
 
@@ -69,7 +72,7 @@ export class ArticleService {
     const attempts: { language: string; title: string }[] = [
       ...(language === FALLBACK_LANGUAGE ? [] : [{ language, title: name }]),
       { language: FALLBACK_LANGUAGE, title: name },
-      ...(qualifier ? [{ language: FALLBACK_LANGUAGE, title: `${name} (${qualifier})` }] : [])
+      ...(qualifier ? [{ language: FALLBACK_LANGUAGE, title: `${name} (${qualifier})` }] : []),
     ];
 
     let reachedWikipedia = false;
@@ -88,7 +91,9 @@ export class ArticleService {
 
     // Not cached when Wikipedia could not be reached: that is a fact about the network this
     // minute, and the next press should be allowed to ask again.
-    const outcome: ArticleLookup = reachedWikipedia ? { status: 'none' } : { status: 'unavailable' };
+    const outcome: ArticleLookup = reachedWikipedia
+      ? { status: 'none' }
+      : { status: 'unavailable' };
     if (reachedWikipedia) {
       this.cache.set(key, outcome);
     }
@@ -100,10 +105,15 @@ export class ArticleService {
    * disambiguation, which is a list of things this is not. `'unreachable'` where it did not
    * answer at all, including the rate limit it returns to anyone who asks too fast.
    */
-  private async fetchSummary(language: string, title: string): Promise<Article | null | 'unreachable'> {
+  private async fetchSummary(
+    language: string,
+    title: string,
+  ): Promise<Article | null | 'unreachable'> {
     let response: Response;
     try {
-      response = await fetch(summaryUrl(language, title), { headers: { Accept: 'application/json' } });
+      response = await fetch(summaryUrl(language, title), {
+        headers: { Accept: 'application/json' },
+      });
     } catch {
       return 'unreachable';
     }
@@ -128,8 +138,10 @@ export class ArticleService {
       return {
         title: body.titles?.normalized ?? title,
         extract,
-        url: body.content_urls?.desktop?.page ?? `https://${language}.wikipedia.org/wiki/${encodeURIComponent(title)}`,
-        language
+        url:
+          body.content_urls?.desktop?.page ??
+          `https://${language}.wikipedia.org/wiki/${encodeURIComponent(title)}`,
+        language,
       };
     } catch {
       return 'unreachable';

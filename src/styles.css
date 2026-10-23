@@ -116,7 +116,11 @@ body {
 /* Darkens the edges of the frame so the map reads as a lit display rather than a flat page. */
 .hud-vignette {
   pointer-events: none;
-  background: radial-gradient(ellipse at center, transparent 45%, color-mix(in srgb, var(--color-void) 72%, transparent) 100%);
+  background: radial-gradient(
+    ellipse at center,
+    transparent 45%,
+    color-mix(in srgb, var(--color-void) 72%, transparent) 100%
+  );
 }
 
 /* Star name labels rendered by CSS2DRenderer (see StarLabelOverlay). These live outside

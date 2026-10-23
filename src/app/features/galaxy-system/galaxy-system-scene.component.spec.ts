@@ -40,18 +40,76 @@ import { LabeledPoint, StarLabelOverlay } from './star-label-overlay';
   disconnect(): void {}
 };
 
-const SUN: StarRecord = { id: 0, name: 'Sol', x: 0, y: 0, z: 0, magnitude: -26.7, spectralType: 'G2V', colorIndex: 0.656 };
-const ALPHA_CENTAURI: StarRecord = { id: 1, name: 'Alpha Centauri', x: 1.34, y: 0, z: 0, magnitude: 4.4, spectralType: 'G2V', colorIndex: 0.7 };
+const SUN: StarRecord = {
+  id: 0,
+  name: 'Sol',
+  x: 0,
+  y: 0,
+  z: 0,
+  magnitude: -26.7,
+  spectralType: 'G2V',
+  colorIndex: 0.656,
+};
+const ALPHA_CENTAURI: StarRecord = {
+  id: 1,
+  name: 'Alpha Centauri',
+  x: 1.34,
+  y: 0,
+  z: 0,
+  magnitude: 4.4,
+  spectralType: 'G2V',
+  colorIndex: 0.7,
+};
 // Its id deliberately differs from its place in STARS, so a lookup by id cannot pass for one by index.
-const PROXIMA: StarRecord = { id: 42, name: 'Proxima Centauri', x: 0, y: 1.3, z: 0, magnitude: 11.1, spectralType: 'M5V', colorIndex: 1.8 };
+const PROXIMA: StarRecord = {
+  id: 42,
+  name: 'Proxima Centauri',
+  x: 0,
+  y: 1.3,
+  z: 0,
+  magnitude: 11.1,
+  spectralType: 'M5V',
+  colorIndex: 1.8,
+};
 
 // A supergiant nothing publishes a radius for, and a white dwarf with neither a colour nor a type
 // the parser reads, for what the system view draws each star at; last, so the indices above hold.
-const ANTARES: StarRecord = { id: 80519, name: 'Antares', x: -58.54, y: -140.31, z: -75.57, magnitude: 1.06, magnitudeBand: 'V', spectralType: 'M1Ib + B2.5V', colorIndex: 1.865, colorSystem: 'B-V' };
-const PROCYON_B: StarRecord = { id: 37279, name: 'Gl 280B', x: -1.08, y: 3.19, z: 0.34, magnitude: 10.7, magnitudeBand: 'V', spectralType: 'DA', colorIndex: null };
+const ANTARES: StarRecord = {
+  id: 80519,
+  name: 'Antares',
+  x: -58.54,
+  y: -140.31,
+  z: -75.57,
+  magnitude: 1.06,
+  magnitudeBand: 'V',
+  spectralType: 'M1Ib + B2.5V',
+  colorIndex: 1.865,
+  colorSystem: 'B-V',
+};
+const PROCYON_B: StarRecord = {
+  id: 37279,
+  name: 'Gl 280B',
+  x: -1.08,
+  y: 3.19,
+  z: 0.34,
+  magnitude: 10.7,
+  magnitudeBand: 'V',
+  spectralType: 'DA',
+  colorIndex: null,
+};
 
 // A host only the archive places, at the stand-in magnitude, with no type and no colour.
-const LENS: StarRecord = { id: 1070000536, name: 'KMT-2016-BLG-1107L', x: 6651, y: 0, z: 0, magnitude: 15, spectralType: 'Unknown', colorIndex: null, source: 'exoplanet-archive' };
+const LENS: StarRecord = {
+  id: 1070000536,
+  name: 'KMT-2016-BLG-1107L',
+  x: 6651,
+  y: 0,
+  z: 0,
+  magnitude: 15,
+  spectralType: 'Unknown',
+  colorIndex: null,
+  source: 'exoplanet-archive',
+};
 
 const STARS: StarRecord[] = [SUN, ALPHA_CENTAURI, PROXIMA, ANTARES, PROCYON_B, LENS];
 const STAR_POSITIONS = new Float32Array(STARS.flatMap((star) => [star.x, star.y, star.z]));
@@ -65,11 +123,17 @@ const PROXIMA_B: ExoplanetRecord = {
   hostStarRadiusSolar: 0.141,
   hostStarTemperatureK: 2900,
   hostStarLuminositySolar: 0.00151,
-  orbit: { semiMajorAxisAu: 0.0485, eccentricity: 0.02 }
+  orbit: { semiMajorAxisAu: 0.0485, eccentricity: 0.02 },
 };
 
 // A microlensing planet, whose host the archive places 6.7 kpc out.
-const LENS_B: ExoplanetRecord = { id: 'KMT-2016-BLG-1107L b', hostStarId: LENS.id, hostStarName: 'KMT-2016-BLG-1107L', name: 'KMT-2016-BLG-1107L b', orbit: {} };
+const LENS_B: ExoplanetRecord = {
+  id: 'KMT-2016-BLG-1107L b',
+  hostStarId: LENS.id,
+  hostStarName: 'KMT-2016-BLG-1107L',
+  name: 'KMT-2016-BLG-1107L b',
+  orbit: {},
+};
 
 const DEEP_SKY_OBJECT: DeepSkyRecord = {
   id: 'NGC0224',
@@ -83,7 +147,7 @@ const DEEP_SKY_OBJECT: DeepSkyRecord = {
   distancePc: null,
   distanceMethod: null,
   constellation: 'And',
-  messier: 'M31'
+  messier: 'M31',
 };
 
 const EARTH: BodyRecord = {
@@ -99,9 +163,10 @@ const EARTH: BodyRecord = {
     longitudeOfAscendingNodeDeg: 0,
     argumentOfPeriapsisDeg: 0,
     meanAnomalyAtEpochDeg: 0,
-    epochJd: 2451545.0
+    epochJd: 2451545.0,
   },
-  rates: keplerRates(1, GM_SUN_AU3_PER_DAY2), orbitSource: 'test'
+  rates: keplerRates(1, GM_SUN_AU3_PER_DAY2),
+  orbitSource: 'test',
 };
 
 /** Minimal stand-in for `EngineService` that skips real WebGPU/WebGL initialization entirely,
@@ -146,7 +211,8 @@ class FakeEngineService {
   }
 
   frameOrthographic(distanceToTarget: number): void {
-    const halfHeight = Math.max(distanceToTarget, 1e-6) * Math.tan((this.camera.fov * Math.PI) / 360);
+    const halfHeight =
+      Math.max(distanceToTarget, 1e-6) * Math.tan((this.camera.fov * Math.PI) / 360);
     this.orthographic.top = halfHeight;
     this.orthographic.bottom = -halfHeight;
     this.orthographic.left = -halfHeight * this.camera.aspect;
@@ -216,7 +282,11 @@ async function flushAsync(turns = 8): Promise<void> {
 /** Advances the fake render loop (and therefore any in-flight `CameraRigController` tween)
  *  by repeatedly ticking a small fixed step, flushing microtasks between frames so any
  *  `onComplete` callback's own side effects (e.g. starting the next leg of the flight) run. */
-async function advanceFrames(engine: FakeEngineService, totalSeconds: number, stepSeconds = 0.05): Promise<void> {
+async function advanceFrames(
+  engine: FakeEngineService,
+  totalSeconds: number,
+  stepSeconds = 0.05,
+): Promise<void> {
   let elapsed = 0;
   while (elapsed < totalSeconds) {
     engine.tick(stepSeconds);
@@ -240,9 +310,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
         // A real router over a mocked location, so the URL the scene writes can be read back and Back pressed.
         provideRouter([]),
         provideLocationMocks(),
-      ]
+      ],
     }).overrideComponent(GalaxySystemSceneComponent, {
-      set: { providers: [{ provide: EngineService, useValue: engine }] }
+      set: { providers: [{ provide: EngineService, useValue: engine }] },
     });
 
     navigationStore = TestBed.inject(NavigationStore);
@@ -252,13 +322,21 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
   });
 
   it('rings the systems inside the survey edge, and puts them first in the draw budget, not a host kiloparsecs out', () => {
-    const scene = fixture.componentInstance as unknown as { hostRings: { count: number }; hostStars: Uint8Array };
+    const scene = fixture.componentInstance as unknown as {
+      hostRings: { count: number };
+      hostStars: Uint8Array;
+    };
     expect(scene.hostRings.count).toBe(2);
-    expect([...scene.hostStars]).toEqual(STARS.map((star) => (star === SUN || star === PROXIMA ? 1 : 0)));
+    expect([...scene.hostStars]).toEqual(
+      STARS.map((star) => (star === SUN || star === PROXIMA ? 1 : 0)),
+    );
   });
 
   it('starts in the galaxy view with the system group hidden', () => {
-    const component = fixture.componentInstance as unknown as { galaxyGroup: THREE.Group; systemGroup: THREE.Group };
+    const component = fixture.componentInstance as unknown as {
+      galaxyGroup: THREE.Group;
+      systemGroup: THREE.Group;
+    };
     expect(component.galaxyGroup.visible).toBe(true);
     expect(component.systemGroup.visible).toBe(false);
     expect(navigationStore.viewLevel()).toBe('galaxy');
@@ -316,7 +394,10 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       await choose(SUN.id);
       await choose(PROXIMA.id);
       // Pushed, not replaced: one history entry per system.
-      expect(location.urlChanges.slice(opened)).toEqual(['/?stars=4000&star=0', '/?stars=4000&star=42']);
+      expect(location.urlChanges.slice(opened)).toEqual([
+        '/?stars=4000&star=0',
+        '/?stars=4000&star=42',
+      ]);
 
       await back();
       expect(navigationStore.selectedStarId()).toBe(SUN.id);
@@ -373,7 +454,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
   });
 
   it('chooses the drawn stars again once the view centre has moved, and not for a small drift', async () => {
-    const component = fixture.componentInstance as unknown as { controls: { target: THREE.Vector3 } };
+    const component = fixture.componentInstance as unknown as {
+      controls: { target: THREE.Vector3 };
+    };
     const refocus = vi.spyOn(StarFieldRenderer.prototype, 'refocus');
     // The first pass always chooses; what is under test is the move after it.
     await advanceFrames(engine, 0.3);
@@ -391,7 +474,10 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
   });
 
   describe('the drawn stars, chosen for what the camera shows', () => {
-    type ViewScene = { controls: { target: THREE.Vector3; update(): void }; display: { update(change: (display: HudDisplay) => HudDisplay): void } };
+    type ViewScene = {
+      controls: { target: THREE.Vector3; update(): void };
+      display: { update(change: (display: HudDisplay) => HudDisplay): void };
+    };
     let refocus: MockInstance<StarFieldRenderer['refocus']>;
 
     beforeEach(() => {
@@ -403,7 +489,10 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     function orbit(component: ViewScene, degrees: number): void {
       const camera = engine.getCamera();
       const target = component.controls.target;
-      camera.position.sub(target).applyAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(degrees)).add(target);
+      camera.position
+        .sub(target)
+        .applyAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(degrees))
+        .add(target);
       component.controls.update();
     }
 
@@ -454,7 +543,11 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     it('chooses again once a zoom has changed the frame by half the margin, and not for less', async () => {
       const component = fixture.componentInstance as unknown as ViewScene;
       const camera = engine.getCamera();
-      const dolly = (factor: number) => camera.position.sub(component.controls.target).multiplyScalar(factor).add(component.controls.target);
+      const dolly = (factor: number) =>
+        camera.position
+          .sub(component.controls.target)
+          .multiplyScalar(factor)
+          .add(component.controls.target);
       await advanceFrames(engine, 0.3);
 
       dolly(0.95);
@@ -514,7 +607,10 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     });
 
     it('keeps up with a flight frame by frame, from the frame it comes back into parsec space', async () => {
-      const component = fixture.componentInstance as unknown as ViewScene & { galaxyGroup: THREE.Group; rig: { isAnimating: boolean } };
+      const component = fixture.componentInstance as unknown as ViewScene & {
+        galaxyGroup: THREE.Group;
+        rig: { isAnimating: boolean };
+      };
       navigationStore.selectStar(SUN.id);
       await flushAsync();
       await advanceFrames(engine, 2.5);
@@ -577,7 +673,10 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       // Centred on a point 200 pc out along the galactic plane — where the rings are — seen from
       // 20 pc above it. The rings have to reach it, and one of them has to cross the frame.
       const normal = galacticNormal();
-      const centre = new THREE.Vector3(1, 0, 0).projectOnPlane(normal).normalize().multiplyScalar(200);
+      const centre = new THREE.Vector3(1, 0, 0)
+        .projectOnPlane(normal)
+        .normalize()
+        .multiplyScalar(200);
       component.controls.target.copy(centre);
       camera.position.copy(centre).addScaledVector(normal, 20);
       component.controls.update();
@@ -604,14 +703,20 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       // The same 200 pc out along the plane, but lifted 150 pc above it: 250 pc from the Sun as the
       // crow flies, and still 200 pc out among the rings, which is the distance they are drawn at.
       const normal = galacticNormal();
-      const centre = new THREE.Vector3(1, 0, 0).projectOnPlane(normal).normalize().multiplyScalar(200).addScaledVector(normal, 150);
+      const centre = new THREE.Vector3(1, 0, 0)
+        .projectOnPlane(normal)
+        .normalize()
+        .multiplyScalar(200)
+        .addScaledVector(normal, 150);
       component.controls.target.copy(centre);
       camera.position.copy(centre).addScaledVector(normal, 20);
       component.controls.update();
       await advanceFrames(engine, 0.3);
 
       const halfHeight = engine.visibleHalfHeight(20);
-      expect([...component.localGridRadii].some((radius) => Math.abs(radius - 200) < halfHeight)).toBe(true);
+      expect(
+        [...component.localGridRadii].some((radius) => Math.abs(radius - 200) < halfHeight),
+      ).toBe(true);
     });
 
     it('leaves the rings alone while the grid is not drawn', async () => {
@@ -633,7 +738,11 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
     it('drops a ring label that a star name has taken, or that is off screen, and keeps the ladder otherwise', () => {
       const component = fixture.componentInstance as unknown as {
-        ringLabelsInTheClear(candidates: readonly LabeledPoint[], camera: THREE.Camera, stars: readonly LabeledPoint[]): LabeledPoint[];
+        ringLabelsInTheClear(
+          candidates: readonly LabeledPoint[],
+          camera: THREE.Camera,
+          stars: readonly LabeledPoint[],
+        ): LabeledPoint[];
       };
       const camera = engine.getCamera();
       camera.updateMatrixWorld(true);
@@ -646,19 +755,28 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       const ladder: LabeledPoint[] = [
         { id: 'ring-50', name: '50 pc', x: near.x, y: near.y, z: near.z },
         { id: 'ring-100', name: '100 pc', x: nextRungUp.x, y: nextRungUp.y, z: nextRungUp.z },
-        { id: 'ring-150', name: '150 pc', x: offScreen.x, y: offScreen.y, z: offScreen.z }
+        { id: 'ring-150', name: '150 pc', x: offScreen.x, y: offScreen.y, z: offScreen.z },
       ];
 
       // A ladder of rings stays whole, though its rungs are closer than two star names would be.
-      expect(component.ringLabelsInTheClear(ladder, camera, []).map((label) => label.id)).toEqual(['ring-50', 'ring-100']);
+      expect(component.ringLabelsInTheClear(ladder, camera, []).map((label) => label.id)).toEqual([
+        'ring-50',
+        'ring-100',
+      ]);
       // A star's name is worth more than a distance.
       const star: LabeledPoint = { id: 7, name: 'Sirius', x: near.x, y: near.y, z: near.z };
-      expect(component.ringLabelsInTheClear(ladder, camera, [star]).map((label) => label.id)).toEqual(['ring-100']);
+      expect(
+        component.ringLabelsInTheClear(ladder, camera, [star]).map((label) => label.id),
+      ).toEqual(['ring-100']);
     });
 
     it('stays out of the text of a name, not just off its point', () => {
       const component = fixture.componentInstance as unknown as {
-        ringLabelsInTheClear(candidates: readonly LabeledPoint[], camera: THREE.Camera, stars: readonly LabeledPoint[]): LabeledPoint[];
+        ringLabelsInTheClear(
+          candidates: readonly LabeledPoint[],
+          camera: THREE.Camera,
+          stars: readonly LabeledPoint[],
+        ): LabeledPoint[];
         viewportAspect(): number;
       };
       const camera = engine.getCamera();
@@ -670,30 +788,60 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       const ring = at(0.125, -0.123);
       const rung: LabeledPoint = { id: 'ring-50', name: '50 pc', x: ring.x, y: ring.y, z: ring.z };
       const beside = at(0.06, -0.12);
-      const rightHand: LabeledPoint = { id: 7, name: 'Alpha Centauri', side: 'right', x: beside.x, y: beside.y, z: beside.z };
+      const rightHand: LabeledPoint = {
+        id: 7,
+        name: 'Alpha Centauri',
+        side: 'right',
+        x: beside.x,
+        y: beside.y,
+        z: beside.z,
+      };
 
       expect(component.ringLabelsInTheClear([rung], camera, [rightHand])).toEqual([]);
       // The same name hanging the other way leaves that space empty, and the rung with it.
-      expect(component.ringLabelsInTheClear([rung], camera, [{ ...rightHand, side: 'left' }])).toEqual([rung]);
+      expect(
+        component.ringLabelsInTheClear([rung], camera, [{ ...rightHand, side: 'left' }]),
+      ).toEqual([rung]);
       // But not the point itself: a rung 0.04 right of it, where no text is, still crowds the name.
       const onThePoint = at(0.1, -0.12);
       expect(
-        component.ringLabelsInTheClear([{ ...rung, x: onThePoint.x, y: onThePoint.y, z: onThePoint.z }], camera, [{ ...rightHand, side: 'left' }]),
+        component.ringLabelsInTheClear(
+          [{ ...rung, x: onThePoint.x, y: onThePoint.y, z: onThePoint.z }],
+          camera,
+          [{ ...rightHand, side: 'left' }],
+        ),
       ).toEqual([]);
 
       // And a rung to the left of a name keeps its place: "50 pc" is a third of a star name's
       // width, so it ends well before the name starts, whatever the anchors' spacing suggests.
       const centred = at(0, 0);
-      const spanning: LabeledPoint = { id: 8, name: 'Alnitak', side: 'right', x: centred.x, y: centred.y, z: centred.z };
+      const spanning: LabeledPoint = {
+        id: 8,
+        name: 'Alnitak',
+        side: 'right',
+        x: centred.x,
+        y: centred.y,
+        z: centred.z,
+      };
       const toTheLeft = at(-0.25, 0.02);
-      const clearRung: LabeledPoint = { id: 'ring-100', name: '100 pc', x: toTheLeft.x, y: toTheLeft.y, z: toTheLeft.z };
+      const clearRung: LabeledPoint = {
+        id: 'ring-100',
+        name: '100 pc',
+        x: toTheLeft.x,
+        y: toTheLeft.y,
+        z: toTheLeft.z,
+      };
 
       expect(component.ringLabelsInTheClear([clearRung], camera, [spanning])).toEqual([clearRung]);
     });
 
     it('drops a rung whose distance would print on the one kept before it, where the ladder foreshortens', () => {
       const component = fixture.componentInstance as unknown as {
-        ringLabelsInTheClear(candidates: readonly LabeledPoint[], camera: THREE.Camera, stars: readonly LabeledPoint[]): LabeledPoint[];
+        ringLabelsInTheClear(
+          candidates: readonly LabeledPoint[],
+          camera: THREE.Camera,
+          stars: readonly LabeledPoint[],
+        ): LabeledPoint[];
         viewportAspect(): number;
       };
       const camera = engine.getCamera();
@@ -702,11 +850,17 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       // Looking along the ladder's bearing, low over the plane: the rungs step 0.12 across and
       // barely up, closer than the 0.23 a distance's text reaches.
       const ladder = [0, 1, 2, 3, 4, 5].map((step): LabeledPoint => {
-        const point = new THREE.Vector3((-0.6 + step * 0.12) / aspect, 0.005 * step, 0.5).unproject(camera);
+        const point = new THREE.Vector3((-0.6 + step * 0.12) / aspect, 0.005 * step, 0.5).unproject(
+          camera,
+        );
         return { id: `ring-${step}`, name: `${step} pc`, x: point.x, y: point.y, z: point.z };
       });
 
-      expect(component.ringLabelsInTheClear(ladder, camera, []).map((label) => label.id)).toEqual(['ring-0', 'ring-2', 'ring-4']);
+      expect(component.ringLabelsInTheClear(ladder, camera, []).map((label) => label.id)).toEqual([
+        'ring-0',
+        'ring-2',
+        'ring-4',
+      ]);
 
       // Straight up, 0.04 apart: a distance is one line, so one clears the next; a rung with
       // "Survey edge" under its distance is two, and does not.
@@ -714,14 +868,27 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
         const point = new THREE.Vector3(0, y, 0.5).unproject(camera);
         return { id, name: id, ...(kind ? { kind } : {}), x: point.x, y: point.y, z: point.z };
       };
-      expect(component.ringLabelsInTheClear([rung('a', 0), rung('b', 0.04)], camera, []).map((label) => label.id)).toEqual(['a', 'b']);
-      expect(component.ringLabelsInTheClear([rung('a', 0), rung('b', 0.04, 'Survey edge')], camera, []).map((label) => label.id)).toEqual(['a']);
+      expect(
+        component
+          .ringLabelsInTheClear([rung('a', 0), rung('b', 0.04)], camera, [])
+          .map((label) => label.id),
+      ).toEqual(['a', 'b']);
+      expect(
+        component
+          .ringLabelsInTheClear([rung('a', 0), rung('b', 0.04, 'Survey edge')], camera, [])
+          .map((label) => label.id),
+      ).toEqual(['a']);
     });
 
     it('places the ring labels with the star names rather than over them', async () => {
       const component = fixture.componentInstance as unknown as GridScene;
       const update = vi.spyOn(StarLabelOverlay.prototype, 'update');
-      const cleared = vi.spyOn(GalaxySystemSceneComponent.prototype as unknown as { ringLabelsInTheClear: (...args: unknown[]) => LabeledPoint[] }, 'ringLabelsInTheClear');
+      const cleared = vi.spyOn(
+        GalaxySystemSceneComponent.prototype as unknown as {
+          ringLabelsInTheClear: (...args: unknown[]) => LabeledPoint[];
+        },
+        'ringLabelsInTheClear',
+      );
       const camera = engine.getCamera();
       camera.position.set(0, 4, 10);
       component.controls.target.set(0, 0, 0);
@@ -745,14 +912,26 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       // Where Sol's name would print: 0.15 right of its point, past the 0.12 two names keep
       // between their points and inside its text.
       const sol = new THREE.Vector3(SUN.x, SUN.y, SUN.z).project(camera);
-      const point = (dx: number, dy: number) => new THREE.Vector3(sol.x + dx, sol.y + dy, sol.z).unproject(camera);
+      const point = (dx: number, dy: number) =>
+        new THREE.Vector3(sol.x + dx, sol.y + dy, sol.z).unproject(camera);
       const rung = (radius: number, dy: number, kind?: string): LabeledPoint => {
         const at = point(0.15, dy);
-        return { id: `ring-${radius}`, name: `${radius} pc`, ...(kind ? { kind } : {}), tone: 'ghost', x: at.x, y: at.y, z: at.z };
+        return {
+          id: `ring-${radius}`,
+          name: `${radius} pc`,
+          ...(kind ? { kind } : {}),
+          tone: 'ghost',
+          x: at.x,
+          y: at.y,
+          z: at.z,
+        };
       };
       // The rung before it in the ladder prints into it, and a deep-sky name would sit on its point.
       const ladder = vi
-        .spyOn(GalaxySystemSceneComponent.prototype as unknown as { ringLabels: () => LabeledPoint[] }, 'ringLabels')
+        .spyOn(
+          GalaxySystemSceneComponent.prototype as unknown as { ringLabels: () => LabeledPoint[] },
+          'ringLabels',
+        )
         .mockReturnValue([rung(200, -0.02), rung(250, 0, 'Survey edge')]);
       const nebula = point(0.2, 0);
       (fixture.componentInstance as unknown as { deepSkyLabels: LabeledPoint[] }).deepSkyLabels = [
@@ -787,12 +966,27 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       const sol = new THREE.Vector3(SUN.x, SUN.y, SUN.z).project(camera);
       const at = new THREE.Vector3(sol.x + 0.15 / aspect, sol.y, sol.z).unproject(camera);
       const ladder = vi
-        .spyOn(GalaxySystemSceneComponent.prototype as unknown as { ringLabels: () => LabeledPoint[] }, 'ringLabels')
-        .mockReturnValue([{ id: `ring-250`, name: '250 pc', kind: 'Survey edge', tone: 'ghost', x: at.x, y: at.y, z: at.z }]);
+        .spyOn(
+          GalaxySystemSceneComponent.prototype as unknown as { ringLabels: () => LabeledPoint[] },
+          'ringLabels',
+        )
+        .mockReturnValue([
+          {
+            id: `ring-250`,
+            name: '250 pc',
+            kind: 'Survey edge',
+            tone: 'ghost',
+            x: at.x,
+            y: at.y,
+            z: at.z,
+          },
+        ]);
       const px = (x: number, y: number) => [(x + aspect) * 450, (1 - y) * 450];
       const [left, top] = px(sol.x * aspect + 0.32, sol.y + 0.05);
       const [right, bottom] = px(sol.x * aspect + 0.4, sol.y - 0.05);
-      (fixture.nativeElement as HTMLElement).querySelector('[role="tabpanel"]')!.getBoundingClientRect = () => new DOMRect(left, top, right - left, bottom - top);
+      (fixture.nativeElement as HTMLElement).querySelector(
+        '[role="tabpanel"]',
+      )!.getBoundingClientRect = () => new DOMRect(left, top, right - left, bottom - top);
       await advanceFrames(engine, 0.3);
 
       const labels = (update.mock.calls.at(-1)?.[0] ?? []) as LabeledPoint[];
@@ -804,11 +998,22 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
   });
 
   it('keeps the stars of a plotted route drawn, and the selected star', async () => {
-    const component = fixture.componentInstance as unknown as { routeResult: { set(value: unknown): void } };
+    const component = fixture.componentInstance as unknown as {
+      routeResult: { set(value: unknown): void };
+    };
     const refocus = vi.spyOn(StarFieldRenderer.prototype, 'refocus');
     await advanceFrames(engine, 0.3);
 
-    component.routeResult.set({ stars: [{ id: SUN.id, name: 'Sol' }, { id: PROXIMA.id, name: 'Proxima Centauri' }], totalPc: 1.3, neededRangePc: null, gaveUp: false, least: true });
+    component.routeResult.set({
+      stars: [
+        { id: SUN.id, name: 'Sol' },
+        { id: PROXIMA.id, name: 'Proxima Centauri' },
+      ],
+      totalPc: 1.3,
+      neededRangePc: null,
+      gaveUp: false,
+      least: true,
+    });
     await advanceFrames(engine, 0.3);
 
     // As catalogue indices: the Sun is the first entry of STARS, Proxima the third.
@@ -818,7 +1023,11 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
   describe('the jump-link graph', () => {
     type LinkScene = {
-      routing: { links(rangePc: number, drawn: Uint32Array, budget?: LinkBudget): Promise<Float32Array>; route(): Promise<never>; dispose(): void };
+      routing: {
+        links(rangePc: number, drawn: Uint32Array, budget?: LinkBudget): Promise<Float32Array>;
+        route(): Promise<never>;
+        dispose(): void;
+      };
       display: { update(change: (display: { jumpLinks: boolean }) => unknown): void };
       jumpRangePc: { set(rangePc: number): void };
       routeResult: { set(value: unknown): void };
@@ -830,7 +1039,11 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
     function linkScene(links: LinkScene['routing']['links']): LinkScene {
       const component = fixture.componentInstance as unknown as LinkScene;
-      component.routing = { links, route: () => new Promise<never>(() => undefined), dispose: () => undefined };
+      component.routing = {
+        links,
+        route: () => new Promise<never>(() => undefined),
+        dispose: () => undefined,
+      };
       component.display.update((display) => ({ ...display, jumpLinks: true }));
       TestBed.tick();
       return component;
@@ -844,7 +1057,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     }
 
     it('links the stars being drawn, and asks again once a new set of them holds still', async () => {
-      const links = vi.fn<LinkScene['routing']['links']>(() => Promise.resolve(new Float32Array(0)));
+      const links = vi.fn<LinkScene['routing']['links']>(() =>
+        Promise.resolve(new Float32Array(0)),
+      );
       const component = linkScene(links);
       await settle();
       expect(links).toHaveBeenCalledTimes(1);
@@ -858,15 +1073,27 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(links.mock.calls[1][1]).not.toBe(links.mock.calls[0][1]);
 
       // A route re-chooses the drawn stars around its pins, and here they come out the same: no new graph.
-      component.routeResult.set({ stars: [{ id: SUN.id, name: 'Sol' }], totalPc: 0, neededRangePc: null, gaveUp: false, least: true });
+      component.routeResult.set({
+        stars: [{ id: SUN.id, name: 'Sol' }],
+        totalPc: 0,
+        neededRangePc: null,
+        gaveUp: false,
+        least: true,
+      });
       await advanceFrames(engine, 0.3);
       await settle();
       expect(links).toHaveBeenCalledTimes(2);
     });
 
     it('asks for as much of the graph as a million pixels of line make, around where the view is centred', async () => {
-      const links = vi.fn<LinkScene['routing']['links']>(() => Promise.resolve(new Float32Array(0)));
-      Object.defineProperty((fixture.nativeElement as HTMLElement).querySelector('canvas')!, 'clientHeight', { value: 1080 });
+      const links = vi.fn<LinkScene['routing']['links']>(() =>
+        Promise.resolve(new Float32Array(0)),
+      );
+      Object.defineProperty(
+        (fixture.nativeElement as HTMLElement).querySelector('canvas')!,
+        'clientHeight',
+        { value: 1080 },
+      );
       // A screen scaled to 200%: 1080 CSS pixels are 2160 drawn ones, and the lines are drawn in those.
       engine.pixelRatio = 2;
       linkScene(links);
@@ -881,15 +1108,24 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
     it('asks again once the view has zoomed past the budget it asked with, though the drawn stars are the same', async () => {
       // All three stars fit the star budget, so the drawn set never changes: only the budget can.
-      const links = vi.fn<LinkScene['routing']['links']>(() => Promise.resolve(new Float32Array(0)));
-      Object.defineProperty((fixture.nativeElement as HTMLElement).querySelector('canvas')!, 'clientHeight', { value: 1080 });
+      const links = vi.fn<LinkScene['routing']['links']>(() =>
+        Promise.resolve(new Float32Array(0)),
+      );
+      Object.defineProperty(
+        (fixture.nativeElement as HTMLElement).querySelector('canvas')!,
+        'clientHeight',
+        { value: 1080 },
+      );
       const component = linkScene(links);
       await advanceFrames(engine, 0.3);
       await settle();
       const asked = links.mock.calls.length;
 
       const camera = engine.getCamera();
-      camera.position.sub(component.controls.target).multiplyScalar(0.5).add(component.controls.target);
+      camera.position
+        .sub(component.controls.target)
+        .multiplyScalar(0.5)
+        .add(component.controls.target);
       await advanceFrames(engine, 0.3);
       await settle();
 
@@ -898,7 +1134,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     });
 
     it('asks for no graph from inside a system, where distances are in astronomical units', async () => {
-      const links = vi.fn<LinkScene['routing']['links']>(() => Promise.resolve(new Float32Array(0)));
+      const links = vi.fn<LinkScene['routing']['links']>(() =>
+        Promise.resolve(new Float32Array(0)),
+      );
       navigationStore.selectStar(SUN.id);
       await flushAsync();
       await advanceFrames(engine, 2.5);
@@ -912,9 +1150,14 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     it('keeps what it asked for when an older request it replaced is rejected', async () => {
       // Off and on again while a graph is still waiting: the waiting one is replaced, and its
       // rejection must not be taken for the request that replaced it.
-      const pending: Array<{ resolve: (segments: Float32Array) => void; reject: (error: Error) => void }> = [];
+      const pending: Array<{
+        resolve: (segments: Float32Array) => void;
+        reject: (error: Error) => void;
+      }> = [];
       const setSegments = vi.spyOn(JumpLinkRenderer.prototype, 'setSegments');
-      const component = linkScene(() => new Promise<Float32Array>((resolve, reject) => pending.push({ resolve, reject })));
+      const component = linkScene(
+        () => new Promise<Float32Array>((resolve, reject) => pending.push({ resolve, reject })),
+      );
       await settle();
       component.display.update((display) => ({ ...display, jumpLinks: false }));
       TestBed.tick();
@@ -935,7 +1178,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     });
 
     it('gives a view on the move a new graph at least every quarter second, rather than waiting for it to stop', async () => {
-      const links = vi.fn<LinkScene['routing']['links']>(() => Promise.resolve(new Float32Array(0)));
+      const links = vi.fn<LinkScene['routing']['links']>(() =>
+        Promise.resolve(new Float32Array(0)),
+      );
       const component = linkScene(links);
       await settle();
 
@@ -951,7 +1196,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     it('draws a late graph for the range still asked for, and not one for a range left behind', async () => {
       const answers: Array<(segments: Float32Array) => void> = [];
       const setSegments = vi.spyOn(JumpLinkRenderer.prototype, 'setSegments');
-      const component = linkScene(() => new Promise<Float32Array>((resolve) => answers.push(resolve)));
+      const component = linkScene(
+        () => new Promise<Float32Array>((resolve) => answers.push(resolve)),
+      );
       await settle();
       await changeDrawnStars(component, 40);
       await settle();
@@ -980,7 +1227,12 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
   });
 
   it('shows the answer to the latest route asked for, whatever order the answers arrive in', async () => {
-    type Answer = { route: { stars: number[]; totalPc: number; longestHopPc: number } | null; neededRangePc: number | null; gaveUp: boolean; least: boolean };
+    type Answer = {
+      route: { stars: number[]; totalPc: number; longestHopPc: number } | null;
+      neededRangePc: number | null;
+      gaveUp: boolean;
+      least: boolean;
+    };
     const answers: Array<(answer: Answer) => void> = [];
     const component = fixture.componentInstance as unknown as {
       routing: { route(): Promise<Answer>; links(): Promise<Float32Array>; dispose(): void };
@@ -991,16 +1243,26 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     component.routing = {
       route: () => new Promise<Answer>((resolve) => answers.push(resolve)),
       links: () => Promise.resolve(new Float32Array(0)),
-      dispose: () => undefined
+      dispose: () => undefined,
     };
 
     component.onRouteRequested({ fromId: SUN.id, toId: ALPHA_CENTAURI.id, rangePc: 2 });
     component.onRouteRequested({ fromId: SUN.id, toId: PROXIMA.id, rangePc: 2 });
     expect(component.routePending()).toBe(true);
 
-    answers[1]({ route: { stars: [SUN.id, PROXIMA.id], totalPc: 1.3, longestHopPc: 1.3 }, neededRangePc: null, gaveUp: false, least: true });
+    answers[1]({
+      route: { stars: [SUN.id, PROXIMA.id], totalPc: 1.3, longestHopPc: 1.3 },
+      neededRangePc: null,
+      gaveUp: false,
+      least: true,
+    });
     await flushAsync();
-    answers[0]({ route: { stars: [SUN.id, ALPHA_CENTAURI.id], totalPc: 1.34, longestHopPc: 1.34 }, neededRangePc: null, gaveUp: false, least: true });
+    answers[0]({
+      route: { stars: [SUN.id, ALPHA_CENTAURI.id], totalPc: 1.34, longestHopPc: 1.34 },
+      neededRangePc: null,
+      gaveUp: false,
+      least: true,
+    });
     await flushAsync();
 
     expect(component.routeResult()?.stars.map((star) => star.id)).toEqual([SUN.id, PROXIMA.id]);
@@ -1020,7 +1282,11 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       onRouteRequested(request: { fromId: number; toId: number; rangePc: number }): void;
     };
     const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    component.routing = { route: () => Promise.reject(new Error('worker gone')), links: () => Promise.resolve(new Float32Array(0)), dispose: () => undefined };
+    component.routing = {
+      route: () => Promise.reject(new Error('worker gone')),
+      links: () => Promise.resolve(new Float32Array(0)),
+      dispose: () => undefined,
+    };
 
     component.onRouteRequested({ fromId: SUN.id, toId: PROXIMA.id, rangePc: 2 });
     await flushAsync();
@@ -1034,7 +1300,11 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     // Near the Sun a label candidate past the fifteenth can sit at the far end of the catalogue's
     // brightness order, so asking for one more than is used can cost a walk of the whole order.
     const component = fixture.componentInstance as unknown as {
-      spreadLabels(candidates: Iterable<{ id: number; name: string; x: number; y: number; z: number }>, camera: THREE.Camera, keepId: null): unknown[];
+      spreadLabels(
+        candidates: Iterable<{ id: number; name: string; x: number; y: number; z: number }>,
+        camera: THREE.Camera,
+        keepId: null,
+      ): unknown[];
     };
     const camera = engine.getCamera();
     camera.updateMatrixWorld(true);
@@ -1045,8 +1315,16 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
         for (let column = 0; column < 5; column++) {
           pulled++;
           // A name's reach apart and clear of the right edge, so every one of them is placed.
-          const point = new THREE.Vector3(-0.9 + column * 0.35, -0.8 + row * 0.4, 0.5).unproject(camera);
-          yield { id: row * 5 + column, name: `label-${pulled}`, x: point.x, y: point.y, z: point.z };
+          const point = new THREE.Vector3(-0.9 + column * 0.35, -0.8 + row * 0.4, 0.5).unproject(
+            camera,
+          );
+          yield {
+            id: row * 5 + column,
+            name: `label-${pulled}`,
+            x: point.x,
+            y: point.y,
+            z: point.z,
+          };
         }
       }
     };
@@ -1057,8 +1335,17 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
   describe('where a name is printed', () => {
     type Spreading = {
-      spreadLabels(candidates: Iterable<LabeledPoint>, camera: THREE.Camera, keepId: number | string | null, placed?: readonly LabeledPoint[]): LabeledPoint[];
-      ringLabelsInTheClear(candidates: readonly LabeledPoint[], camera: THREE.Camera, names: readonly LabeledPoint[]): LabeledPoint[];
+      spreadLabels(
+        candidates: Iterable<LabeledPoint>,
+        camera: THREE.Camera,
+        keepId: number | string | null,
+        placed?: readonly LabeledPoint[],
+      ): LabeledPoint[];
+      ringLabelsInTheClear(
+        candidates: readonly LabeledPoint[],
+        camera: THREE.Camera,
+        names: readonly LabeledPoint[],
+      ): LabeledPoint[];
       cardBodyId: string | null;
     };
     let component: Spreading;
@@ -1103,18 +1390,26 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
         ),
       ).toEqual(['1:right', '2:right', '4:left', '5:right']);
       // A name only right-hung ones sit left of used to print into: 1's text runs through it.
-      expect(component.spreadLabels([at(6, 0.2, 0)], camera, null, [{ ...at(1, 0, 0), side: 'right' }])).toEqual([]);
+      expect(
+        component.spreadLabels([at(6, 0.2, 0)], camera, null, [{ ...at(1, 0, 0), side: 'right' }]),
+      ).toEqual([]);
     });
 
     it('keeps the selection’s name though neither side is clear, and hangs the card’s body left or not at all', () => {
       // 3 again, boxed in on both sides, but the star about to be flown to.
-      expect(sides(component.spreadLabels([at(1, 0, 0), at(2, 0.5, 0), at(3, 0.25, 0)], camera, 3))).toEqual(['1:right', '2:right', '3:right']);
+      expect(
+        sides(component.spreadLabels([at(1, 0, 0), at(2, 0.5, 0), at(3, 0.25, 0)], camera, 3)),
+      ).toEqual(['1:right', '2:right', '3:right']);
 
       // The leader to the card leaves the body's right: left with the right clear, and nowhere
       // once something takes its left.
       component.cardBodyId = 'earth';
-      expect(sides(component.spreadLabels([at('earth', 0, 0)], camera, null))).toEqual(['earth:left']);
-      expect(component.spreadLabels([at('earth', 0, 0)], camera, null, [at(1, -0.2, 0)])).toEqual([]);
+      expect(sides(component.spreadLabels([at('earth', 0, 0)], camera, null))).toEqual([
+        'earth:left',
+      ]);
+      expect(component.spreadLabels([at('earth', 0, 0)], camera, null, [at(1, -0.2, 0)])).toEqual(
+        [],
+      );
     });
 
     it('keeps a name out from under the HUD and inside the frame', async () => {
@@ -1133,7 +1428,8 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       // Read on the next label pass.
       await advanceFrames(engine, 0.3);
       // From pixels on the canvas.
-      const px = (id: number, x: number, y: number) => at(id, (2 * x) / 900 - 1600 / 900, 1 - (2 * y) / 900);
+      const px = (id: number, x: number, y: number) =>
+        at(id, (2 * x) / 900 - 1600 / 900, 1 - (2 * y) / 900);
 
       const placed = component.spreadLabels(
         [
@@ -1153,27 +1449,56 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       // Near the left edge, with its right taken: the left would run off the frame, so nowhere.
       expect(component.spreadLabels([px(10, 5, 300)], camera, null, [px(11, 80, 300)])).toEqual([]);
       // A distance on a ring as much as a name.
-      expect(component.ringLabelsInTheClear([px(7, 200, 700), px(8, 1000, 300)], camera, []).map((label) => label.id)).toEqual([8]);
+      expect(
+        component
+          .ringLabelsInTheClear([px(7, 200, 700), px(8, 1000, 300)], camera, [])
+          .map((label) => label.id),
+      ).toEqual([8]);
     });
 
     it('measures a name by its own text where that reaches further than the least reach', () => {
       // 0.35 inside the right edge: room for the 0.3 every name is given, not for a neighbour's
       // name and distance, which reach 214 px from the point, 0.48 of the frame at 900 px.
       const nearEdge = at('neighbour:70890', 1600 / 900 - 0.35, 0);
-      const neighbour: LabeledPoint = { ...nearEdge, name: 'Proxima Centauri', distance: '1.30 pc', tone: 'ghost' };
-      expect(component.spreadLabels([neighbour], camera, null).map((label) => label.side)).toEqual(['left']);
-      expect(component.spreadLabels([{ ...nearEdge, name: 'Sirius' }], camera, null).map((label) => label.side)).toEqual(['right']);
+      const neighbour: LabeledPoint = {
+        ...nearEdge,
+        name: 'Proxima Centauri',
+        distance: '1.30 pc',
+        tone: 'ghost',
+      };
+      expect(component.spreadLabels([neighbour], camera, null).map((label) => label.side)).toEqual([
+        'left',
+      ]);
+      expect(
+        component
+          .spreadLabels([{ ...nearEdge, name: 'Sirius' }], camera, null)
+          .map((label) => label.side),
+      ).toEqual(['right']);
     });
   });
 
   describe('on a 1280x720 canvas', () => {
     type Spreading = {
-      spreadLabels(candidates: Iterable<LabeledPoint>, camera: THREE.Camera, keepId: null): LabeledPoint[];
-      ringLabelsInTheClear(candidates: readonly LabeledPoint[], camera: THREE.Camera, names: readonly LabeledPoint[]): LabeledPoint[];
+      spreadLabels(
+        candidates: Iterable<LabeledPoint>,
+        camera: THREE.Camera,
+        keepId: null,
+      ): LabeledPoint[];
+      ringLabelsInTheClear(
+        candidates: readonly LabeledPoint[],
+        camera: THREE.Camera,
+        names: readonly LabeledPoint[],
+      ): LabeledPoint[];
     };
     let component: Spreading;
     let camera: THREE.Camera;
-    let at: (id: number | string, name: string, x: number, y: number, kind?: string) => LabeledPoint;
+    let at: (
+      id: number | string,
+      name: string,
+      x: number,
+      y: number,
+      kind?: string,
+    ) => LabeledPoint;
 
     beforeEach(() => {
       const canvas = (fixture.nativeElement as HTMLElement).querySelector('canvas')!;
@@ -1192,20 +1517,48 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       const ids = (labels: LabeledPoint[]) => labels.map((label) => label.id);
       // Two lines are 22.65 px, 0.063 of the frame here: 0.062 up clears the least row, 0.06, and
       // still prints into the name below. Its left runs into that name too.
-      expect(ids(component.spreadLabels([at(1, 'Sirius', 0, 0, 'Star'), at(2, 'Vega', 0.15, 0.062, 'Star')], camera, null))).toEqual([1]);
+      expect(
+        ids(
+          component.spreadLabels(
+            [at(1, 'Sirius', 0, 0, 'Star'), at(2, 'Vega', 0.15, 0.062, 'Star')],
+            camera,
+            null,
+          ),
+        ),
+      ).toEqual([1]);
       // A distance is one line, 12.65 px, 0.035 here, against half the least row, 0.03.
-      expect(ids(component.ringLabelsInTheClear([at('ring-12', '12 pc', 0, 0), at('ring-14', '14 pc', 0, 0.032)], camera, []))).toEqual(['ring-12']);
+      expect(
+        ids(
+          component.ringLabelsInTheClear(
+            [at('ring-12', '12 pc', 0, 0), at('ring-14', '14 pc', 0, 0.032)],
+            camera,
+            [],
+          ),
+        ),
+      ).toEqual(['ring-12']);
       // "Groombridge 34" reaches 125 px, 0.35 here: a rung 0.32 along is past the least reach and
       // still under the name.
-      expect(component.ringLabelsInTheClear([at('ring-16', '16 pc', 0.32, 0)], camera, [at(3, 'Groombridge 34', 0, 0, 'Star')])).toEqual([]);
+      expect(
+        component.ringLabelsInTheClear([at('ring-16', '16 pc', 0.32, 0)], camera, [
+          at(3, 'Groombridge 34', 0, 0, 'Star'),
+        ]),
+      ).toEqual([]);
     });
 
     it('measures a rung by its kind line where that is wider than its distance', () => {
       // "Survey edge" is 99 px, 0.276 here, past the 0.23 every rung is given; "250 pc" is 65.
       // A name 0.25 along, 90 px, is under the one and clear of the other.
       const name = at(1, 'Sirius', 0.25, 0, 'Star');
-      expect(component.ringLabelsInTheClear([at('ring-250', '250 pc', 0, 0, 'Survey edge')], camera, [name])).toEqual([]);
-      expect(component.ringLabelsInTheClear([at('ring-250', '250 pc', 0, 0)], camera, [name]).map((label) => label.id)).toEqual(['ring-250']);
+      expect(
+        component.ringLabelsInTheClear([at('ring-250', '250 pc', 0, 0, 'Survey edge')], camera, [
+          name,
+        ]),
+      ).toEqual([]);
+      expect(
+        component
+          .ringLabelsInTheClear([at('ring-250', '250 pc', 0, 0)], camera, [name])
+          .map((label) => label.id),
+      ).toEqual(['ring-250']);
     });
   });
 
@@ -1214,32 +1567,68 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       const canvas = (fixture.nativeElement as HTMLElement).querySelector('canvas')!;
       Object.defineProperty(canvas, 'clientWidth', { value: 390 });
       Object.defineProperty(canvas, 'clientHeight', { value: 844 });
-      const component = fixture.componentInstance as unknown as { spreadLabels(candidates: Iterable<LabeledPoint>, camera: THREE.Camera, keepId: null): LabeledPoint[] };
+      const component = fixture.componentInstance as unknown as {
+        spreadLabels(
+          candidates: Iterable<LabeledPoint>,
+          camera: THREE.Camera,
+          keepId: null,
+        ): LabeledPoint[];
+      };
       const camera = engine.getCamera();
       camera.updateMatrixWorld(true);
       const centre = new THREE.Vector3(0, 0, 0.5).unproject(camera);
-      const neighbour = (id: number, name: string, distance: string): LabeledPoint => ({ id: `neighbour:${id}`, name, distance, tone: 'ghost', selectStarId: id, x: centre.x, y: centre.y, z: centre.z });
-      const form = (labels: LabeledPoint[]) => labels.map((label) => `${label.side}:${label.stacked ?? false}`);
+      const neighbour = (id: number, name: string, distance: string): LabeledPoint => ({
+        id: `neighbour:${id}`,
+        name,
+        distance,
+        tone: 'ghost',
+        selectStarId: id,
+        x: centre.x,
+        y: centre.y,
+        z: centre.z,
+      });
+      const form = (labels: LabeledPoint[]) =>
+        labels.map((label) => `${label.side}:${label.stacked ?? false}`);
 
       // "Barnard's Star · 1.83 pc" is 199.5 px, 0.47 of the frame either way from the middle of a
       // frame 0.46 wide on each side; "Barnard's Star" over "1.83 pc" is 125 px.
-      expect(form(component.spreadLabels([neighbour(2, "Barnard's Star", '1.83 pc')], camera, null))).toEqual(['right:true']);
+      expect(
+        form(component.spreadLabels([neighbour(2, "Barnard's Star", '1.83 pc')], camera, null)),
+      ).toEqual(['right:true']);
       // One that fits on one line keeps it.
-      expect(form(component.spreadLabels([neighbour(3, 'Sol', '1.30 pc')], camera, null))).toEqual(['right:false']);
+      expect(form(component.spreadLabels([neighbour(3, 'Sol', '1.30 pc')], camera, null))).toEqual([
+        'right:false',
+      ]);
     });
   });
 
   it('places the deep-sky names after the star names and around them, outside their count', async () => {
     type Spread = { spreadLabels: (...args: unknown[]) => LabeledPoint[] };
-    const spread = vi.spyOn(GalaxySystemSceneComponent.prototype as unknown as Spread, 'spreadLabels');
-    const rings = vi.spyOn(GalaxySystemSceneComponent.prototype as unknown as { ringLabelsInTheClear: (...args: unknown[]) => LabeledPoint[] }, 'ringLabelsInTheClear');
+    const spread = vi.spyOn(
+      GalaxySystemSceneComponent.prototype as unknown as Spread,
+      'spreadLabels',
+    );
+    const rings = vi.spyOn(
+      GalaxySystemSceneComponent.prototype as unknown as {
+        ringLabelsInTheClear: (...args: unknown[]) => LabeledPoint[];
+      },
+      'ringLabelsInTheClear',
+    );
     // No ladder: at this pose the 250 pc rung, placed before the names, takes Sol's place.
-    const ladder = vi.spyOn(GalaxySystemSceneComponent.prototype as unknown as { ringLabels: () => LabeledPoint[] }, 'ringLabels').mockReturnValue([]);
+    const ladder = vi
+      .spyOn(
+        GalaxySystemSceneComponent.prototype as unknown as { ringLabels: () => LabeledPoint[] },
+        'ringLabels',
+      )
+      .mockReturnValue([]);
     const update = vi.spyOn(StarLabelOverlay.prototype, 'update');
     // A deep-sky object in the open, where the test's one (Andromeda, straight up) is not.
     const camera = engine.getCamera();
     camera.updateMatrixWorld(true);
-    const toward = new THREE.Vector3(0.5, -0.5, 0.5).unproject(camera).sub(camera.position).normalize();
+    const toward = new THREE.Vector3(0.5, -0.5, 0.5)
+      .unproject(camera)
+      .sub(camera.position)
+      .normalize();
     const open = camera.position.clone().addScaledVector(toward, camera.position.length());
     (fixture.componentInstance as unknown as { deepSkyLabels: LabeledPoint[] }).deepSkyLabels = [
       { id: 'M42', name: 'Orion Nebula', kind: 'Nebula', x: open.x, y: open.y, z: open.z },
@@ -1247,11 +1636,15 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     await advanceFrames(engine, 0.3);
 
     // The last pass: the stars, then the deep-sky objects around what the stars took.
-    const [stars, backdrop] = spread.mock.results.slice(-2).map((result) => result.value as LabeledPoint[]);
+    const [stars, backdrop] = spread.mock.results
+      .slice(-2)
+      .map((result) => result.value as LabeledPoint[]);
     expect(stars.length).toBeGreaterThan(0);
     expect(spread.mock.calls.at(-1)?.[3]).toEqual(expect.arrayContaining(stars));
     const shown = (update.mock.calls.at(-1)?.[0] ?? []) as LabeledPoint[];
-    expect(shown.filter((label) => typeof label.id === 'string' && !label.id.startsWith('ring-'))).toEqual(backdrop);
+    expect(
+      shown.filter((label) => typeof label.id === 'string' && !label.id.startsWith('ring-')),
+    ).toEqual(backdrop);
     // The ring distances keep out of both, a deep-sky name as much as a star's.
     expect(backdrop.length).toBeGreaterThan(0);
     expect(rings.mock.calls.at(-1)?.[2]).toEqual(expect.arrayContaining([...stars, ...backdrop]));
@@ -1265,7 +1658,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     const update = vi.spyOn(StarLabelOverlay.prototype, 'update');
     await advanceFrames(engine, 0.3);
 
-    const stars = ((update.mock.calls.at(-1)?.[0] ?? []) as LabeledPoint[]).filter((label) => typeof label.id === 'number');
+    const stars = ((update.mock.calls.at(-1)?.[0] ?? []) as LabeledPoint[]).filter(
+      (label) => typeof label.id === 'number',
+    );
     expect(stars.length).toBeGreaterThan(0);
     expect(stars.every((label) => label.selectStarId === label.id)).toBe(true);
     update.mockRestore();
@@ -1278,7 +1673,10 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     // Approach leg (parsec space) + settle leg (AU space) with margin.
     await advanceFrames(engine, 2.5);
 
-    const component = fixture.componentInstance as unknown as { galaxyGroup: THREE.Group; systemGroup: THREE.Group };
+    const component = fixture.componentInstance as unknown as {
+      galaxyGroup: THREE.Group;
+      systemGroup: THREE.Group;
+    };
     expect(component.galaxyGroup.visible).toBe(false);
     expect(component.systemGroup.visible).toBe(true);
     expect(engine.getCamera().near).toBeCloseTo(0.002, 9);
@@ -1293,22 +1691,32 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
     const labels = update.mock.calls.flatMap(([points]) => points as LabeledPoint[]);
     const proxima = labels.filter((label) => label.id === `neighbour:${PROXIMA.id}`).at(-1);
-    expect(proxima).toMatchObject({ name: 'Proxima Centauri', distance: '1.30 pc', tone: 'ghost', selectStarId: PROXIMA.id });
+    expect(proxima).toMatchObject({
+      name: 'Proxima Centauri',
+      distance: '1.30 pc',
+      tone: 'ghost',
+      selectStarId: PROXIMA.id,
+    });
     expect(proxima?.kind).toBeUndefined();
     update.mockRestore();
   });
 
   it('says where a system’s orbits come from, and for the Sun how long they hold', async () => {
-    const note = (): string => (fixture.componentInstance as unknown as { hudNote: () => string }).hudNote();
+    const note = (): string =>
+      (fixture.componentInstance as unknown as { hudNote: () => string }).hudNote();
     navigationStore.selectStar(SUN.id);
     await flushAsync();
     await advanceFrames(engine, 2.5);
-    expect(note()).toMatch(/^Orbits propagated from JPL mean elements, the planets’ fit for 3000 BC to AD 3000 and the moons’ checked from 1950 to 2100, and the SBDB’s osculating ones for Ceres, Eris, Haumea and Makemake, checked over the same span, to now, \d{4}-\d\d-\d\d \d\d:\d\d UTC\.$/);
+    expect(note()).toMatch(
+      /^Orbits propagated from JPL mean elements, the planets’ fit for 3000 BC to AD 3000 and the moons’ checked from 1950 to 2100, and the SBDB’s osculating ones for Ceres, Eris, Haumea and Makemake, checked over the same span, to now, \d{4}-\d\d-\d\d \d\d:\d\d UTC\.$/,
+    );
 
     navigationStore.selectStar(ALPHA_CENTAURI.id);
     await flushAsync();
     await advanceFrames(engine, 5);
-    expect(note()).toMatch(/^Orbits propagated from published elements to now, \d{4}-\d\d-\d\d \d\d:\d\d UTC\.$/);
+    expect(note()).toMatch(
+      /^Orbits propagated from published elements to now, \d{4}-\d\d-\d\d \d\d:\d\d UTC\.$/,
+    );
   });
 
   it('turns the Sun about its IAU pole, once in 25.38 days', async () => {
@@ -1318,23 +1726,33 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     navigationStore.selectStar(SUN.id);
     await flushAsync();
     await advanceFrames(engine, 2.5);
-    const sun = (): THREE.Object3D => (fixture.componentInstance as unknown as { starMarker: THREE.Object3D }).starMarker;
-    const turned = (local: THREE.Vector3): THREE.Vector3 => local.applyQuaternion(sun().getWorldQuaternion(new THREE.Quaternion()));
+    const sun = (): THREE.Object3D =>
+      (fixture.componentInstance as unknown as { starMarker: THREE.Object3D }).starMarker;
+    const turned = (local: THREE.Vector3): THREE.Vector3 =>
+      local.applyQuaternion(sun().getWorldQuaternion(new THREE.Quaternion()));
 
     // The sphere's +Y, which MAP_TO_BODY carries onto the body's pole, at RA 286.13, Dec 63.87.
     const ra = (286.13 * Math.PI) / 180;
     const dec = (63.87 * Math.PI) / 180;
-    const pole = new THREE.Vector3(Math.cos(dec) * Math.cos(ra), Math.cos(dec) * Math.sin(ra), Math.sin(dec));
+    const pole = new THREE.Vector3(
+      Math.cos(dec) * Math.cos(ra),
+      Math.cos(dec) * Math.sin(ra),
+      Math.sin(dec),
+    );
     expect(turned(new THREE.Vector3(0, 1, 0)).angleTo(pole)).toBeLessThan(1e-6);
 
     const before = turned(new THREE.Vector3(1, 0, 0));
     time.setDate(new Date('2026-01-02T00:00Z'));
     await advanceFrames(engine, 0.1);
-    expect((turned(new THREE.Vector3(1, 0, 0)).angleTo(before) * 180) / Math.PI).toBeCloseTo(14.1844, 3);
+    expect((turned(new THREE.Vector3(1, 0, 0)).angleTo(before) * 180) / Math.PI).toBeCloseTo(
+      14.1844,
+      3,
+    );
   });
 
   it('names the date the system is drawn for once the clock is set to one', async () => {
-    const note = (): string => (fixture.componentInstance as unknown as { hudNote: () => string }).hudNote();
+    const note = (): string =>
+      (fixture.componentInstance as unknown as { hudNote: () => string }).hudNote();
     TestBed.inject(TimeStore).setDate(new Date('2020-12-21T18:00Z'));
     navigationStore.selectStar(SUN.id);
     await flushAsync();
@@ -1344,11 +1762,21 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
   });
 
   describe('with Eris, whose aphelion runs past the grid', () => {
-    type FramedScene = { bodies: BodyRecord[]; controls: { target: THREE.Vector3 }; systemRenderer: SystemOrbitsRenderer; systemGroup: THREE.Group };
+    type FramedScene = {
+      bodies: BodyRecord[];
+      controls: { target: THREE.Vector3 };
+      systemRenderer: SystemOrbitsRenderer;
+      systemGroup: THREE.Group;
+    };
     // Its 67.9 AU axis gives the grid an 80 AU outer ring; at aphelion it is 97.7 AU out.
     const ERIS: BodyRecord = {
-      ...EARTH, id: 'eris', name: 'Eris', kind: 'dwarf', radiusKm: 1163,
-      orbit: { ...EARTH.orbit, semiMajorAxisAu: 67.934, eccentricity: 0.4382 }, rates: keplerRates(67.934, GM_SUN_AU3_PER_DAY2)
+      ...EARTH,
+      id: 'eris',
+      name: 'Eris',
+      kind: 'dwarf',
+      radiusKm: 1163,
+      orbit: { ...EARTH.orbit, semiMajorAxisAu: 67.934, eccentricity: 0.4382 },
+      rates: keplerRates(67.934, GM_SUN_AU3_PER_DAY2),
     };
 
     async function enterTheSun(aspect: number): Promise<FramedScene> {
@@ -1367,17 +1795,32 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(component.systemRenderer.outermostRadiusAu).toBeCloseTo(67.934 * 1.4382, 9);
       // 234.7 AU; framed on the 67.9 AU axis the camera would stand at 163 AU and Eris arrive off screen.
       expect(camera.position.distanceTo(component.controls.target)).toBeCloseTo(
-        systemFramingDistanceAu(component.systemRenderer.outermostRadiusAu, { fovDegrees: camera.fov, aspect: camera.aspect }),
-        6
+        systemFramingDistanceAu(component.systemRenderer.outermostRadiusAu, {
+          fovDegrees: camera.fov,
+          aspect: camera.aspect,
+        }),
+        6,
       );
     });
 
     it('holds Earth to its 3-pixel floor at the arrival framing, where its true radius is far under a pixel', async () => {
-      Object.defineProperty((fixture.nativeElement as HTMLElement).querySelector('canvas')!, 'clientHeight', { value: 1000 });
+      Object.defineProperty(
+        (fixture.nativeElement as HTMLElement).querySelector('canvas')!,
+        'clientHeight',
+        { value: 1000 },
+      );
       const component = await enterTheSun(1.6);
-      const earth = component.systemRenderer.members.find((member) => member.id === 'earth')!.marker as THREE.Mesh;
-      const pixelAu = (2 * engine.visibleHalfHeight(engine.getCamera().position.distanceTo(earth.getWorldPosition(new THREE.Vector3())))) / 1000;
-      expect((earth.scale.x * (earth.geometry as THREE.SphereGeometry).parameters.radius) / pixelAu).toBeCloseTo(3, 3);
+      const earth = component.systemRenderer.members.find((member) => member.id === 'earth')!
+        .marker as THREE.Mesh;
+      const pixelAu =
+        (2 *
+          engine.visibleHalfHeight(
+            engine.getCamera().position.distanceTo(earth.getWorldPosition(new THREE.Vector3())),
+          )) /
+        1000;
+      expect(
+        (earth.scale.x * (earth.geometry as THREE.SphereGeometry).parameters.radius) / pixelAu,
+      ).toBeCloseTo(3, 3);
     });
 
     it('shows Earth’s card on a hover 11 px from its centre, 8 px off its disc, and pins it on a click there', async () => {
@@ -1387,9 +1830,13 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       Object.defineProperty(canvas, 'clientHeight', { value: 1000 });
       canvas.getBoundingClientRect = () => new DOMRect(0, 0, 1600, 1000);
       const component = await enterTheSun(1.6);
-      const earth = component.systemRenderer.members.find((member) => member.id === 'earth')!.marker.getWorldPosition(new THREE.Vector3()).project(engine.getCamera());
+      const earth = component.systemRenderer.members
+        .find((member) => member.id === 'earth')!
+        .marker.getWorldPosition(new THREE.Vector3())
+        .project(engine.getCamera());
       const at = { clientX: ((earth.x + 1) / 2) * 1600 + 11, clientY: ((1 - earth.y) / 2) * 1000 };
-      const card = (): { name: string } | undefined => (component as unknown as { objectCard(): { name: string } | undefined }).objectCard();
+      const card = (): { name: string } | undefined =>
+        (component as unknown as { objectCard(): { name: string } | undefined }).objectCard();
 
       canvas.dispatchEvent(new MouseEvent('pointermove', at));
       expect(card()?.name).toBe('Earth');
@@ -1402,7 +1849,8 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
       // Escape takes the card away before anything in the dock: the panel stays as it was.
       fixture.detectChanges();
-      const dock = fixture.debugElement.query(By.directive(HudDockComponent)).componentInstance as HudDockComponent;
+      const dock = fixture.debugElement.query(By.directive(HudDockComponent))
+        .componentInstance as HudDockComponent;
       const tab = dock.activeTab();
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
       fixture.detectChanges();
@@ -1456,7 +1904,10 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     await flushAsync();
     await advanceFrames(engine, 2.5);
 
-    const component = fixture.componentInstance as unknown as { galaxyGroup: THREE.Group; systemGroup: THREE.Group };
+    const component = fixture.componentInstance as unknown as {
+      galaxyGroup: THREE.Group;
+      systemGroup: THREE.Group;
+    };
     expect(component.galaxyGroup.visible).toBe(true);
     expect(component.systemGroup.visible).toBe(false);
     // Parsec-scale rather than an exact figure: in galaxy space the depth range scales with how
@@ -1531,7 +1982,10 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     // unit-space unwind rather than firing a parsec-scale flight while the scene is in AU.
     await advanceFrames(engine, 6);
 
-    const component = fixture.componentInstance as unknown as { currentStarId: number | null; systemGroup: THREE.Group };
+    const component = fixture.componentInstance as unknown as {
+      currentStarId: number | null;
+      systemGroup: THREE.Group;
+    };
     expect(component.currentStarId).toBeNull();
     expect(component.systemGroup.visible).toBe(false);
     expect(navigationStore.viewLevel()).toBe('galactic');
@@ -1539,10 +1993,15 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
   it('names what the neighbourhood holds, and where the positions of the stars in it come from', async () => {
     await advanceFrames(engine, 0.3);
-    const component = fixture.componentInstance as unknown as { hudSubtitle(): string; hudNote(): string };
+    const component = fixture.componentInstance as unknown as {
+      hudSubtitle(): string;
+      hudNote(): string;
+    };
     expect(component.hudSubtitle()).toBe(catalogueCensus(STARS));
     expect(component.hudNote()).toBe(positionsNote(STARS));
-    expect(component.hudNote()).toContain('1 planet hosts only the NASA Exoplanet Archive places, from its distances');
+    expect(component.hudNote()).toContain(
+      '1 planet hosts only the NASA Exoplanet Archive places, from its distances',
+    );
   });
 
   it('groups the digits of every count it prints, and gives the Sun’s distance from the centre as the range is given', async () => {
@@ -1562,7 +2021,8 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     scene.exoplanets = Array.from({ length: 6_354 }, () => LENS_B);
     scene.enterableSystems = 4_737;
     vi.spyOn(scene.starField, 'drawnCount', 'get').mockReturnValue(70_000);
-    const value = (label: string) => scene.hudReadouts().find((readout) => readout.label === label)?.value;
+    const value = (label: string) =>
+      scene.hudReadouts().find((readout) => readout.label === label)?.value;
 
     scene.updateHud(engine.getCamera());
     expect(value('Stars')).toBe('70,000 / 455,518');
@@ -1609,9 +2069,16 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       component = fixture.componentInstance as unknown as KeyedScene;
     });
 
-    const distance = (): number => engine.getCamera().position.distanceTo(component.controls.target);
+    const distance = (): number =>
+      engine.getCamera().position.distanceTo(component.controls.target);
     function press(on: EventTarget, key: string, init: KeyboardEventInit = {}): KeyboardEvent {
-      const event = new KeyboardEvent('keydown', { key, code: key, bubbles: true, cancelable: true, ...init });
+      const event = new KeyboardEvent('keydown', {
+        key,
+        code: key,
+        bubbles: true,
+        cancelable: true,
+        ...init,
+      });
       on.dispatchEvent(event);
       return event;
     }
@@ -1648,7 +2115,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
       await advanceFrames(engine, 0.3);
       fixture.detectChanges();
-      const zoomOut = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('button[aria-label="Zoom out"]')!;
+      const zoomOut = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+        'button[aria-label="Zoom out"]',
+      )!;
       zoomOut.click();
       expect(distance()).toBeCloseTo(start, 6);
     });
@@ -1680,17 +2149,26 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     }
 
     function expectColour(colour: THREE.Color, [red, green, blue]: readonly number[]): void {
-      expect([colour.r, colour.g, colour.b].map((channel) => channel.toFixed(4))).toEqual([red, green, blue].map((channel) => channel.toFixed(4)));
+      expect([colour.r, colour.g, colour.b].map((channel) => channel.toFixed(4))).toEqual(
+        [red, green, blue].map((channel) => channel.toFixed(4)),
+      );
     }
 
     it('draws a host at the radius and in the colour the archive gives it, lights its planets in its light, and says how bright it is', async () => {
       const scene = await enter(PROXIMA);
       expect(scene.starMarkerGeometry.parameters.radius).toBeCloseTo(0.141 * SUN_RADIUS_AU, 12);
       expectColour(scene.starTint.value, blackbodyColor(2900));
-      const light = scene.systemRenderer.object.children.find((child): child is THREE.PointLight => child instanceof THREE.PointLight)!;
+      const light = scene.systemRenderer.object.children.find(
+        (child): child is THREE.PointLight => child instanceof THREE.PointLight,
+      )!;
       expectColour(light.color, blackbodyColor(2900, SOLAR_EFFECTIVE_TEMPERATURE_K));
-      expect(scene.hudReadouts().find((readout) => readout.label === 'Luminosity')).toEqual({ label: 'Luminosity', value: '0.0015 L☉' });
-      expect(scene.hudReadouts().find((readout) => readout.label === 'Radius')?.value).toBe('0.141 solar radii');
+      expect(scene.hudReadouts().find((readout) => readout.label === 'Luminosity')).toEqual({
+        label: 'Luminosity',
+        value: '0.0015 L☉',
+      });
+      expect(scene.hudReadouts().find((readout) => readout.label === 'Radius')?.value).toBe(
+        '0.141 solar radii',
+      );
     });
 
     it("draws the disc as the Sun's photograph in the star's colour, darkened towards the limb", async () => {
@@ -1698,7 +2176,8 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       // and the photograph, times the limb factor, which is worked out below at a few angles.
       // Checking only that 0.6 was somewhere in the graph passed a limb brighter than the centre.
       const scene = await enter(PROXIMA);
-      const colorNode = (scene as unknown as { starMarkerMaterial: THREE.MeshBasicNodeMaterial }).starMarkerMaterial.colorNode!;
+      const colorNode = (scene as unknown as { starMarkerMaterial: THREE.MeshBasicNodeMaterial })
+        .starMarkerMaterial.colorNode!;
       const nodes = new Set<THREE.Node>();
       const walk = (node: THREE.Node): void => {
         if (!nodes.has(node)) {
@@ -1716,7 +2195,17 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       // The factor the photograph is multiplied by, as the shader computes it where the cosine
       // between the surface normal and the line of sight is `cosine`. Only the operations a limb
       // law is written with are known; anything else fails rather than being guessed at.
-      type Graph = { isConstNode?: boolean; isVarNode?: boolean; value?: number; op?: string; method?: string; node: Graph; aNode: Graph; bNode: Graph; cNode: Graph };
+      type Graph = {
+        isConstNode?: boolean;
+        isVarNode?: boolean;
+        value?: number;
+        op?: string;
+        method?: string;
+        node: Graph;
+        aNode: Graph;
+        bNode: Graph;
+        cNode: Graph;
+      };
       const factorAt = (node: Graph, cosine: number): number => {
         const at = (child: Graph): number => factorAt(child, cosine);
         if (node.isVarNode) {
@@ -1726,17 +2215,26 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
           return node.value!;
         }
         switch (node.op ?? node.method) {
-          case '+': return at(node.aNode) + at(node.bNode);
-          case '-': return at(node.aNode) - at(node.bNode);
-          case '*': return at(node.aNode) * at(node.bNode);
-          case 'oneMinus': return 1 - at(node.aNode);
-          case 'negate': return -at(node.aNode);
-          case 'clamp': return Math.min(at(node.cNode), Math.max(at(node.bNode), at(node.aNode)));
+          case '+':
+            return at(node.aNode) + at(node.bNode);
+          case '-':
+            return at(node.aNode) - at(node.bNode);
+          case '*':
+            return at(node.aNode) * at(node.bNode);
+          case 'oneMinus':
+            return 1 - at(node.aNode);
+          case 'negate':
+            return -at(node.aNode);
+          case 'clamp':
+            return Math.min(at(node.cNode), Math.max(at(node.bNode), at(node.aNode)));
           case 'dot':
             expect(node.aNode).toBe(normalView);
             expect(node.bNode).toBe(positionViewDirection);
             return cosine;
-          default: throw new Error(`the limb factor has an operation the test cannot work out: ${node.op ?? node.method}`);
+          default:
+            throw new Error(
+              `the limb factor has an operation the test cannot work out: ${node.op ?? node.method}`,
+            );
         }
       };
       // The graph is (photograph × tint) × factor, each step held in a variable.
@@ -1752,21 +2250,28 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     it('tints a host in the star field the colour its disc is drawn in, at the temperature the archive gives it', async () => {
       // Proxima's B−V 1.8 reads 3 070 K; its disc is drawn at the archive's 2 900.
       const scene = await enter(PROXIMA);
-      const field = (scene as unknown as { starField: { catalogueColors: Float32Array } }).starField.catalogueColors;
+      const field = (scene as unknown as { starField: { catalogueColors: Float32Array } }).starField
+        .catalogueColors;
       const at = STARS.indexOf(PROXIMA) * 3;
       const disc = scene.starTint.value;
-      expect([field[at], field[at + 1], field[at + 2]].map((channel) => channel.toFixed(4))).toEqual([disc.r, disc.g, disc.b].map((channel) => channel.toFixed(4)));
+      expect(
+        [field[at], field[at + 1], field[at + 2]].map((channel) => channel.toFixed(4)),
+      ).toEqual([disc.r, disc.g, disc.b].map((channel) => channel.toFixed(4)));
     });
 
     it("warms a host's planets by the luminosity the archive gives it, in the system as on their own page", async () => {
       const scene = await enter(PROXIMA);
-      const planet = (scene.systemRenderer as unknown as { members: { id: string; marker: THREE.Mesh }[] }).members.find((member) => member.id === PROXIMA_B.id)!;
+      const planet = (
+        scene.systemRenderer as unknown as { members: { id: string; marker: THREE.Mesh }[] }
+      ).members.find((member) => member.id === PROXIMA_B.id)!;
       // The archive's 1.51×10⁻³ L☉ puts b at 228 K, temperate. The fixture has no measured band, so
       // without it b gets no temperature and another class, as it does in the Sun's light.
       const warmed = appearanceForExoplanet(PROXIMA_B, 0.00151);
       expect(warmed.planetClass).not.toBe(appearanceForExoplanet(PROXIMA_B, null).planetClass);
       expect(warmed.planetClass).not.toBe(appearanceForExoplanet(PROXIMA_B, 1).planetClass);
-      expect((planet.marker.material as THREE.MeshStandardMaterial).map).toBe(planetTexture(warmed, { width: 128, height: 64 }));
+      expect((planet.marker.material as THREE.MeshStandardMaterial).map).toBe(
+        planetTexture(warmed, { width: 128, height: 64 }),
+      );
     });
 
     it('keeps the camera three radii out from a supergiant drawn at the radius its type and brightness give', async () => {
@@ -1779,7 +2284,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(scene.controls.minDistance).toBeCloseTo(closestApproachAu(radius), 9);
       expect(scene.controls.minDistance).toBeGreaterThan(5);
       // Settled where its disc stays inside the ring of its neighbours' names, not pressed up to it.
-      expect(engine.getCamera().position.length()).toBeGreaterThan(1.2 * scene.controls.minDistance);
+      expect(engine.getCamera().position.length()).toBeGreaterThan(
+        1.2 * scene.controls.minDistance,
+      );
     });
 
     it("frames a supergiant on a phone by the canvas's own size, so its neighbours' names stay off its disc", async () => {
@@ -1790,10 +2297,22 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       Object.defineProperty(canvas, 'clientHeight', { value: 844 });
       const scene = await enter(ANTARES);
       const camera = engine.getPerspectiveCamera();
-      const gridOuterRadiusAu = (scene.systemRenderer as unknown as { gridOuterRadiusAu: number }).gridOuterRadiusAu;
+      const gridOuterRadiusAu = (scene.systemRenderer as unknown as { gridOuterRadiusAu: number })
+        .gridOuterRadiusAu;
       const radius = scene.starMarkerGeometry.parameters.radius;
-      const onPhone = systemFramingDistanceAu(gridOuterRadiusAu, { fovDegrees: camera.fov, aspect: camera.aspect, shorterSidePx: 390 }, radius);
-      expect(onPhone).toBeGreaterThan(1.5 * systemFramingDistanceAu(gridOuterRadiusAu, { fovDegrees: camera.fov, aspect: camera.aspect }, radius));
+      const onPhone = systemFramingDistanceAu(
+        gridOuterRadiusAu,
+        { fovDegrees: camera.fov, aspect: camera.aspect, shorterSidePx: 390 },
+        radius,
+      );
+      expect(onPhone).toBeGreaterThan(
+        1.5 *
+          systemFramingDistanceAu(
+            gridOuterRadiusAu,
+            { fovDegrees: camera.fov, aspect: camera.aspect },
+            radius,
+          ),
+      );
       expect(engine.getCamera().position.length()).toBeCloseTo(onPhone, 6);
     });
 
@@ -1804,9 +2323,17 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       Object.defineProperty(canvas, 'clientHeight', { value: 390 });
       const scene = await enter(ANTARES);
       const camera = engine.getPerspectiveCamera();
-      const gridOuterRadiusAu = (scene.systemRenderer as unknown as { gridOuterRadiusAu: number }).gridOuterRadiusAu;
+      const gridOuterRadiusAu = (scene.systemRenderer as unknown as { gridOuterRadiusAu: number })
+        .gridOuterRadiusAu;
       const radius = scene.starMarkerGeometry.parameters.radius;
-      expect(engine.getCamera().position.length()).toBeCloseTo(systemFramingDistanceAu(gridOuterRadiusAu, { fovDegrees: camera.fov, aspect: camera.aspect, shorterSidePx: 390 }, radius), 6);
+      expect(engine.getCamera().position.length()).toBeCloseTo(
+        systemFramingDistanceAu(
+          gridOuterRadiusAu,
+          { fovDegrees: camera.fov, aspect: camera.aspect, shorterSidePx: 390 },
+          radius,
+        ),
+        6,
+      );
     });
 
     it('draws a star nothing gives a size or temperature for as a grey point, not as the Sun', async () => {

@@ -106,7 +106,9 @@ export class StarNeighbourhood {
       return preferred;
     }
     const taken = new Set(preferred.map((neighbour) => neighbour.id));
-    return preferred.concat(this.nearest(id, count - preferred.length, (point) => !taken.has(point.id)));
+    return preferred.concat(
+      this.nearest(id, count - preferred.length, (point) => !taken.has(point.id)),
+    );
   }
 
   /**
@@ -129,7 +131,10 @@ export class StarNeighbourhood {
     for (let ring = 0; ring <= MAX_RING; ring++) {
       // Everything in this ring is at least this far away, so once the results already held are
       // all closer than that, no further ring can improve them.
-      if (found.length >= count && (ring - 1) * this.cellSizePc > found[found.length - 1].distancePc) {
+      if (
+        found.length >= count &&
+        (ring - 1) * this.cellSizePc > found[found.length - 1].distancePc
+      ) {
         break;
       }
 
@@ -138,7 +143,11 @@ export class StarNeighbourhood {
         if (candidate.id === id || (filter && !filter(candidate))) {
           continue;
         }
-        const distancePc = Math.hypot(candidate.x - origin.x, candidate.y - origin.y, candidate.z - origin.z);
+        const distancePc = Math.hypot(
+          candidate.x - origin.x,
+          candidate.y - origin.y,
+          candidate.z - origin.z,
+        );
         if (found.length >= count && distancePc >= found[found.length - 1].distancePc) {
           continue;
         }
@@ -161,7 +170,9 @@ export class StarNeighbourhood {
    */
   within(id: number, radiusPc: number): Neighbour[] {
     const found: Neighbour[] = [];
-    this.forEachWithin(id, radiusPc, (neighbour, distancePc) => found.push({ id: neighbour.id, distancePc }));
+    this.forEachWithin(id, radiusPc, (neighbour, distancePc) =>
+      found.push({ id: neighbour.id, distancePc }),
+    );
     found.sort((a, b) => a.distancePc - b.distancePc);
     return found;
   }
@@ -175,7 +186,11 @@ export class StarNeighbourhood {
    * a range can round it just under the square of the very hop it was read from, and then a
    * range set to a reported distance would not admit that hop again.
    */
-  forEachWithin(id: number, radiusPc: number, visit: (neighbour: StarPoint, distancePc: number) => void): void {
+  forEachWithin(
+    id: number,
+    radiusPc: number,
+    visit: (neighbour: StarPoint, distancePc: number) => void,
+  ): void {
     const origin = this.point(id);
     if (!origin || radiusPc <= 0) {
       return;
@@ -219,7 +234,10 @@ export class StarNeighbourhood {
    * Each cell is paired with itself and with the half of its surrounding cells that lie after it
    * in the scan, which is what makes each pair come up exactly once.
    */
-  forEachPairWithin(radiusPc: number, visit: (a: StarPoint, b: StarPoint, distancePc: number) => void): void {
+  forEachPairWithin(
+    radiusPc: number,
+    visit: (a: StarPoint, b: StarPoint, distancePc: number) => void,
+  ): void {
     if (radiusPc <= 0) {
       return;
     }
@@ -230,7 +248,10 @@ export class StarNeighbourhood {
       for (let dx = 0; dx <= reach; dx++) {
         for (let dy = dx === 0 ? 0 : -reach; dy <= reach; dy++) {
           for (let dz = dx === 0 && dy === 0 ? 0 : -reach; dz <= reach; dz++) {
-            const other = dx === 0 && dy === 0 && dz === 0 ? cell : this.cells.get(cellKey(ix + dx, iy + dy, iz + dz));
+            const other =
+              dx === 0 && dy === 0 && dz === 0
+                ? cell
+                : this.cells.get(cellKey(ix + dx, iy + dy, iz + dz));
             if (!other) {
               continue;
             }
@@ -262,7 +283,11 @@ export class StarNeighbourhood {
   }
 
   private cellFor(x: number, y: number, z: number): [number, number, number] {
-    return [Math.floor(x / this.cellSizePc), Math.floor(y / this.cellSizePc), Math.floor(z / this.cellSizePc)];
+    return [
+      Math.floor(x / this.cellSizePc),
+      Math.floor(y / this.cellSizePc),
+      Math.floor(z / this.cellSizePc),
+    ];
   }
 
   /** Indices in the hollow shell of cells exactly `ring` cells out from the centre one. */
@@ -271,7 +296,8 @@ export class StarNeighbourhood {
       for (let iy = oy - ring; iy <= oy + ring; iy++) {
         for (let iz = oz - ring; iz <= oz + ring; iz++) {
           // Only the shell: everything inside it was searched by a previous, smaller ring.
-          const onShell = Math.abs(ix - ox) === ring || Math.abs(iy - oy) === ring || Math.abs(iz - oz) === ring;
+          const onShell =
+            Math.abs(ix - ox) === ring || Math.abs(iy - oy) === ring || Math.abs(iz - oz) === ring;
           if (!onShell) {
             continue;
           }

@@ -4,9 +4,17 @@ import { readFileSync } from 'node:fs';
 import * as THREE from 'three/webgpu';
 import { describe, expect, it, vi } from 'vitest';
 
-import { DEFAULT_EPOCH_JD, GM_SUN_AU3_PER_DAY2, ttMinusUtSeconds } from '../../shared/astro/constants';
+import {
+  DEFAULT_EPOCH_JD,
+  GM_SUN_AU3_PER_DAY2,
+  ttMinusUtSeconds,
+} from '../../shared/astro/constants';
 import { keplerRates } from '../../shared/astro/kepler';
-import { eclipticToEquatorial, laplacePlaneToEquatorial, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
+import {
+  eclipticToEquatorial,
+  laplacePlaneToEquatorial,
+  OBLIQUITY_J2000_DEG,
+} from '../../shared/astro/coordinates';
 import { orientationAt } from '../../shared/astro/rotational-elements';
 import { BodyRecord } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
@@ -28,7 +36,7 @@ function exoplanet(overrides: Partial<ExoplanetRecord> = {}): ExoplanetRecord {
     hostStarName: 'TRAPPIST-1',
     name: 'TRAPPIST-1 b',
     orbit: { semiMajorAxisAu: TRAPPIST_1B_SEMI_MAJOR_AXIS_AU, eccentricity: 0 },
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -42,7 +50,10 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
   it('completes exactly one orbit over the measured period', () => {
     // The end-to-end check that the period actually reaches the propagator: after one full
     // published period the planet must be back where it started.
-    const renderer = new SystemOrbitsRenderer([], [exoplanet({ periodDays: TRAPPIST_1B_PERIOD_DAYS })]);
+    const renderer = new SystemOrbitsRenderer(
+      [],
+      [exoplanet({ periodDays: TRAPPIST_1B_PERIOD_DAYS })],
+    );
 
     const start = positionAt(renderer, DEFAULT_EPOCH_JD);
     const afterOnePeriod = positionAt(renderer, DEFAULT_EPOCH_JD + TRAPPIST_1B_PERIOD_DAYS);
@@ -57,13 +68,18 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
   it('moves a red dwarf planet more slowly than the old solar-mass assumption did', () => {
     // Assuming a solar-mass host made TRAPPIST-1's planets orbit about 3.3x too fast, so the
     // corrected planet must have travelled less far after the same elapsed time.
-    const corrected = new SystemOrbitsRenderer([], [exoplanet({ periodDays: TRAPPIST_1B_PERIOD_DAYS })]);
+    const corrected = new SystemOrbitsRenderer(
+      [],
+      [exoplanet({ periodDays: TRAPPIST_1B_PERIOD_DAYS })],
+    );
     const assumingSolar = new SystemOrbitsRenderer([], [exoplanet()]);
 
     const elapsed = TRAPPIST_1B_PERIOD_DAYS / 8;
-    const correctedTravel = positionAt(corrected, DEFAULT_EPOCH_JD).distanceTo(positionAt(corrected, DEFAULT_EPOCH_JD + elapsed));
+    const correctedTravel = positionAt(corrected, DEFAULT_EPOCH_JD).distanceTo(
+      positionAt(corrected, DEFAULT_EPOCH_JD + elapsed),
+    );
     const solarTravel = positionAt(assumingSolar, DEFAULT_EPOCH_JD).distanceTo(
-      positionAt(assumingSolar, DEFAULT_EPOCH_JD + elapsed)
+      positionAt(assumingSolar, DEFAULT_EPOCH_JD + elapsed),
     );
 
     expect(correctedTravel).toBeLessThan(solarTravel);
@@ -73,11 +89,18 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
 
   it('uses the host star mass when no period is published', () => {
     const fromMass = new SystemOrbitsRenderer([], [exoplanet({ hostStarMassSolar: 0.0898 })]);
-    const fromPeriod = new SystemOrbitsRenderer([], [exoplanet({ periodDays: TRAPPIST_1B_PERIOD_DAYS })]);
+    const fromPeriod = new SystemOrbitsRenderer(
+      [],
+      [exoplanet({ periodDays: TRAPPIST_1B_PERIOD_DAYS })],
+    );
 
     const elapsed = 0.3;
-    const massTravel = positionAt(fromMass, DEFAULT_EPOCH_JD).distanceTo(positionAt(fromMass, DEFAULT_EPOCH_JD + elapsed));
-    const periodTravel = positionAt(fromPeriod, DEFAULT_EPOCH_JD).distanceTo(positionAt(fromPeriod, DEFAULT_EPOCH_JD + elapsed));
+    const massTravel = positionAt(fromMass, DEFAULT_EPOCH_JD).distanceTo(
+      positionAt(fromMass, DEFAULT_EPOCH_JD + elapsed),
+    );
+    const periodTravel = positionAt(fromPeriod, DEFAULT_EPOCH_JD).distanceTo(
+      positionAt(fromPeriod, DEFAULT_EPOCH_JD + elapsed),
+    );
 
     // The published mass and the period-derived mass agree, so the two must nearly coincide.
     expect(massTravel).toBeCloseTo(periodTravel, 4);
@@ -89,7 +112,10 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
     const renderer = new SystemOrbitsRenderer([], [exoplanet()]);
 
     expect(renderer.members).toHaveLength(1);
-    expect(positionAt(renderer, DEFAULT_EPOCH_JD).length()).toBeCloseTo(TRAPPIST_1B_SEMI_MAJOR_AXIS_AU, 6);
+    expect(positionAt(renderer, DEFAULT_EPOCH_JD).length()).toBeCloseTo(
+      TRAPPIST_1B_SEMI_MAJOR_AXIS_AU,
+      6,
+    );
     renderer.dispose();
   });
 
@@ -104,14 +130,20 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
     // The archive publishes a semi-major axis far more often than an eccentricity. Requiring
     // both dropped 1509 otherwise drawable planets.
     it('draws a planet that has an axis but no eccentricity', () => {
-      const renderer = new SystemOrbitsRenderer([], [exoplanet({ orbit: { semiMajorAxisAu: 0.4 } })]);
+      const renderer = new SystemOrbitsRenderer(
+        [],
+        [exoplanet({ orbit: { semiMajorAxisAu: 0.4 } })],
+      );
 
       expect(renderer.members).toHaveLength(1);
       renderer.dispose();
     });
 
     it('places it on a circle of the right radius', () => {
-      const renderer = new SystemOrbitsRenderer([], [exoplanet({ orbit: { semiMajorAxisAu: 0.4 } })]);
+      const renderer = new SystemOrbitsRenderer(
+        [],
+        [exoplanet({ orbit: { semiMajorAxisAu: 0.4 } })],
+      );
 
       for (const offset of [0, 5, 20, 60]) {
         expect(positionAt(renderer, DEFAULT_EPOCH_JD + offset).length()).toBeCloseTo(0.4, 6);
@@ -122,7 +154,12 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
     it('still honours the measured period', () => {
       const renderer = new SystemOrbitsRenderer(
         [],
-        [exoplanet({ orbit: { semiMajorAxisAu: TRAPPIST_1B_SEMI_MAJOR_AXIS_AU }, periodDays: TRAPPIST_1B_PERIOD_DAYS })]
+        [
+          exoplanet({
+            orbit: { semiMajorAxisAu: TRAPPIST_1B_SEMI_MAJOR_AXIS_AU },
+            periodDays: TRAPPIST_1B_PERIOD_DAYS,
+          }),
+        ],
       );
 
       const start = positionAt(renderer, DEFAULT_EPOCH_JD);
@@ -135,21 +172,35 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
   it('skips an escape trajectory rather than emitting NaN positions', () => {
     // e >= 1 is not an ellipse; propagating it anyway yields NaN, which poisons the geometry's
     // bounding sphere and disables culling for the whole object.
-    const renderer = new SystemOrbitsRenderer([], [exoplanet({ orbit: { semiMajorAxisAu: 1, eccentricity: 1.4 } })]);
+    const renderer = new SystemOrbitsRenderer(
+      [],
+      [exoplanet({ orbit: { semiMajorAxisAu: 1, eccentricity: 1.4 } })],
+    );
 
     expect(renderer.members).toHaveLength(0);
     renderer.dispose();
   });
 
   it('skips a non-positive semi-major axis', () => {
-    const renderer = new SystemOrbitsRenderer([], [exoplanet({ orbit: { semiMajorAxisAu: 0, eccentricity: 0.1 } })]);
+    const renderer = new SystemOrbitsRenderer(
+      [],
+      [exoplanet({ orbit: { semiMajorAxisAu: 0, eccentricity: 0.1 } })],
+    );
 
     expect(renderer.members).toHaveLength(0);
     renderer.dispose();
   });
 
   it('keeps every propagated position finite', () => {
-    const renderer = new SystemOrbitsRenderer([], [exoplanet({ periodDays: TRAPPIST_1B_PERIOD_DAYS, orbit: { semiMajorAxisAu: TRAPPIST_1B_SEMI_MAJOR_AXIS_AU, eccentricity: 0.62 } })]);
+    const renderer = new SystemOrbitsRenderer(
+      [],
+      [
+        exoplanet({
+          periodDays: TRAPPIST_1B_PERIOD_DAYS,
+          orbit: { semiMajorAxisAu: TRAPPIST_1B_SEMI_MAJOR_AXIS_AU, eccentricity: 0.62 },
+        }),
+      ],
+    );
 
     for (const offset of [0, 0.1, 1, 10, 1000]) {
       const { x, y, z } = positionAt(renderer, DEFAULT_EPOCH_JD + offset);
@@ -173,9 +224,10 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
         longitudeOfAscendingNodeDeg: 0,
         argumentOfPeriapsisDeg: 0,
         meanAnomalyAtEpochDeg: 0,
-        epochJd: DEFAULT_EPOCH_JD
+        epochJd: DEFAULT_EPOCH_JD,
       },
-      rates: keplerRates(1, GM_SUN_AU3_PER_DAY2), orbitSource: 'test'
+      rates: keplerRates(1, GM_SUN_AU3_PER_DAY2),
+      orbitSource: 'test',
     };
 
     it('places an ecliptic orbit in the ecliptic plane of the equatorial scene', () => {
@@ -226,7 +278,9 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
       const solar = new SystemOrbitsRenderer([EARTH], []);
       const eclipticPole = eclipticToEquatorial({ x: 0, y: 0, z: 1 });
       const solarNormal = new THREE.Vector3(0, 0, 1).applyQuaternion(solar.referenceFrame);
-      expect(solarNormal.dot(new THREE.Vector3(eclipticPole.x, eclipticPole.y, eclipticPole.z))).toBeCloseTo(1, 9);
+      expect(
+        solarNormal.dot(new THREE.Vector3(eclipticPole.x, eclipticPole.y, eclipticPole.z)),
+      ).toBeCloseTo(1, 9);
       solar.dispose();
 
       const lineOfSight = { x: 0.3, y: -0.5, z: 0.81 };
@@ -246,14 +300,24 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
       name: 'Jupiter',
       kind: 'planet',
       radiusKm: 69911,
-      orbit: { semiMajorAxisAu: 5.2, eccentricity: 0.048, inclinationDeg: 1.3, longitudeOfAscendingNodeDeg: 100, argumentOfPeriapsisDeg: 275, meanAnomalyAtEpochDeg: 20, epochJd: DEFAULT_EPOCH_JD },
+      orbit: {
+        semiMajorAxisAu: 5.2,
+        eccentricity: 0.048,
+        inclinationDeg: 1.3,
+        longitudeOfAscendingNodeDeg: 100,
+        argumentOfPeriapsisDeg: 275,
+        meanAnomalyAtEpochDeg: 20,
+        epochJd: DEFAULT_EPOCH_JD,
+      },
       rates: keplerRates(5.2, GM_SUN_AU3_PER_DAY2),
-      orbitSource: 'test'
+      orbitSource: 'test',
     };
 
     /** The grid and the tethers are the only line objects the renderer adds outside a pivot. */
     function planeObjects(renderer: SystemOrbitsRenderer): THREE.LineSegments[] {
-      return renderer.object.children.filter((child): child is THREE.LineSegments => child instanceof THREE.LineSegments);
+      return renderer.object.children.filter(
+        (child): child is THREE.LineSegments => child instanceof THREE.LineSegments,
+      );
     }
 
     it('lays a grid and tethers in the system plane', () => {
@@ -263,11 +327,16 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
     });
 
     it('drops a tether from every top-level body onto that plane, and follows them', () => {
-      const renderer = new SystemOrbitsRenderer([], [exoplanet({ periodDays: TRAPPIST_1B_PERIOD_DAYS })]);
+      const renderer = new SystemOrbitsRenderer(
+        [],
+        [exoplanet({ periodDays: TRAPPIST_1B_PERIOD_DAYS })],
+      );
       renderer.update(DEFAULT_EPOCH_JD);
 
       // The tether field is the one with an explicit draw range; the grid leaves it at Infinity.
-      const tethers = planeObjects(renderer).find((object) => Number.isFinite(object.geometry.drawRange.count))!;
+      const tethers = planeObjects(renderer).find((object) =>
+        Number.isFinite(object.geometry.drawRange.count),
+      )!;
       const readTop = (): THREE.Vector3 => {
         const position = tethers.geometry.getAttribute('position');
         return new THREE.Vector3(position.getX(0), position.getY(0), position.getZ(0));
@@ -321,9 +390,13 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
       // a plane it was never measured against.
       for (const inclinationDeg of [0, 30, 60, 88.9, 90]) {
         const renderer = new SystemOrbitsRenderer([], [circular(inclinationDeg)], LINE_OF_SIGHT);
-        const angleDeg = (Math.acos(Math.abs(orbitNormal(renderer).dot(LINE_OF_SIGHT))) * 180) / Math.PI;
+        const angleDeg =
+          (Math.acos(Math.abs(orbitNormal(renderer).dot(LINE_OF_SIGHT))) * 180) / Math.PI;
 
-        expect(angleDeg).toBeCloseTo(inclinationDeg <= 90 ? inclinationDeg : 180 - inclinationDeg, 4);
+        expect(angleDeg).toBeCloseTo(
+          inclinationDeg <= 90 ? inclinationDeg : 180 - inclinationDeg,
+          4,
+        );
         renderer.dispose();
       }
     });
@@ -364,7 +437,9 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
       const here = new SystemOrbitsRenderer([], [circular(88.9)], new THREE.Vector3(1, 0, 0));
       const there = new SystemOrbitsRenderer([], [circular(88.9)], new THREE.Vector3(0, 0, 1));
 
-      expect(positionAt(here, DEFAULT_EPOCH_JD).distanceTo(positionAt(there, DEFAULT_EPOCH_JD))).toBeGreaterThan(0.1);
+      expect(
+        positionAt(here, DEFAULT_EPOCH_JD).distanceTo(positionAt(there, DEFAULT_EPOCH_JD)),
+      ).toBeGreaterThan(0.1);
       here.dispose();
       there.dispose();
     });
@@ -373,7 +448,13 @@ describe('SystemOrbitsRenderer exoplanet propagation', () => {
       const withoutHost = new SystemOrbitsRenderer([], [circular(0)]);
       const eclipticPole = eclipticToEquatorial({ x: 0, y: 0, z: 1 });
 
-      expect(Math.abs(orbitNormal(withoutHost).dot(new THREE.Vector3(eclipticPole.x, eclipticPole.y, eclipticPole.z)))).toBeCloseTo(1, 9);
+      expect(
+        Math.abs(
+          orbitNormal(withoutHost).dot(
+            new THREE.Vector3(eclipticPole.x, eclipticPole.y, eclipticPole.z),
+          ),
+        ),
+      ).toBeCloseTo(1, 9);
       withoutHost.dispose();
     });
 
@@ -396,10 +477,19 @@ describe('rotation without IAU elements', () => {
       name: 'Earth',
       kind: 'planet',
       radiusKm: 6371,
-      orbit: { semiMajorAxisAu: 1, eccentricity: 0.0167, inclinationDeg: 0, longitudeOfAscendingNodeDeg: 0, argumentOfPeriapsisDeg: 0, meanAnomalyAtEpochDeg: 0, epochJd: DEFAULT_EPOCH_JD },
-      rates: keplerRates(1, GM_SUN_AU3_PER_DAY2), orbitSource: 'test',
+      orbit: {
+        semiMajorAxisAu: 1,
+        eccentricity: 0.0167,
+        inclinationDeg: 0,
+        longitudeOfAscendingNodeDeg: 0,
+        argumentOfPeriapsisDeg: 0,
+        meanAnomalyAtEpochDeg: 0,
+        epochJd: DEFAULT_EPOCH_JD,
+      },
+      rates: keplerRates(1, GM_SUN_AU3_PER_DAY2),
+      orbitSource: 'test',
       rotationPeriodHours: 23.934,
-      ...overrides
+      ...overrides,
     };
   }
 
@@ -434,7 +524,9 @@ describe('rotation without IAU elements', () => {
     renderer.update(DEFAULT_EPOCH_JD + 0.01);
     const turn = renderer.members[0].marker.quaternion.clone().multiply(start.invert());
     const axis = new THREE.Vector3(turn.x, turn.y, turn.z).multiplyScalar(Math.sign(turn.w));
-    return axis.normalize().dot(new THREE.Vector3(0, 0, 1).applyQuaternion(renderer.referenceFrame));
+    return axis
+      .normalize()
+      .dot(new THREE.Vector3(0, 0, 1).applyQuaternion(renderer.referenceFrame));
   }
 
   it('turns it about its orbit’s normal, backwards for a negative period', () => {
@@ -443,8 +535,13 @@ describe('rotation without IAU elements', () => {
   });
 
   it('turns Nereid, as shipped, once in the 11.594 hours Kepler measured: a sixth of a turn in 1.93 hours', () => {
-    const shipped: BodyRecord[] = JSON.parse(readFileSync(`${process.cwd()}/src/assets/data/bodies.json`, 'utf8'));
-    const renderer = new SystemOrbitsRenderer(shipped.filter((body) => body.id === 'neptune' || body.id === 'nereid'), []);
+    const shipped: BodyRecord[] = JSON.parse(
+      readFileSync(`${process.cwd()}/src/assets/data/bodies.json`, 'utf8'),
+    );
+    const renderer = new SystemOrbitsRenderer(
+      shipped.filter((body) => body.id === 'neptune' || body.id === 'nereid'),
+      [],
+    );
     const nereid = renderer.members.find((member) => member.id === 'nereid')!.marker;
     renderer.update(DEFAULT_EPOCH_JD);
     const start = nereid.quaternion.clone();
@@ -454,7 +551,12 @@ describe('rotation without IAU elements', () => {
 
   it('leaves a body with no published rotation still', () => {
     // Hyperion, which tumbles: an invented period would be a claim.
-    const renderer = new SystemOrbitsRenderer([spinning({ rotationPeriodHours: undefined })], [], undefined, 1);
+    const renderer = new SystemOrbitsRenderer(
+      [spinning({ rotationPeriodHours: undefined })],
+      [],
+      undefined,
+      1,
+    );
     renderer.update(DEFAULT_EPOCH_JD);
     const start = renderer.members[0].marker.quaternion.clone();
     renderer.update(DEFAULT_EPOCH_JD + 40);
@@ -466,9 +568,22 @@ describe('rotation without IAU elements', () => {
 describe('outermostRadiusAu', () => {
   function drawn(axis: number, eccentricity: number): BodyRecord {
     return {
-      id: 'eris', systemStarId: 0, name: 'Eris', kind: 'dwarf', radiusKm: 1163, orbitSource: 'test',
-      orbit: { semiMajorAxisAu: axis, eccentricity, inclinationDeg: 44, longitudeOfAscendingNodeDeg: 36, argumentOfPeriapsisDeg: 151, meanAnomalyAtEpochDeg: 0, epochJd: DEFAULT_EPOCH_JD },
-      rates: keplerRates(axis, GM_SUN_AU3_PER_DAY2)
+      id: 'eris',
+      systemStarId: 0,
+      name: 'Eris',
+      kind: 'dwarf',
+      radiusKm: 1163,
+      orbitSource: 'test',
+      orbit: {
+        semiMajorAxisAu: axis,
+        eccentricity,
+        inclinationDeg: 44,
+        longitudeOfAscendingNodeDeg: 36,
+        argumentOfPeriapsisDeg: 151,
+        meanAnomalyAtEpochDeg: 0,
+        epochJd: DEFAULT_EPOCH_JD,
+      },
+      rates: keplerRates(axis, GM_SUN_AU3_PER_DAY2),
     };
   }
 
@@ -481,7 +596,16 @@ describe('outermostRadiusAu', () => {
   it('reaches an exoplanet’s aphelion too: HD 20782 b’s, 1.66 times its 1.6 AU ring', () => {
     // The most eccentric of the 303 exoplanet systems with an orbit past their ring, counted on
     // exoplanets.json (a = 1.3649 AU, e = 0.95).
-    const renderer = new SystemOrbitsRenderer([], [exoplanet({ id: 'HD 20782 b', name: 'HD 20782 b', orbit: { semiMajorAxisAu: 1.3649, eccentricity: 0.95 } })]);
+    const renderer = new SystemOrbitsRenderer(
+      [],
+      [
+        exoplanet({
+          id: 'HD 20782 b',
+          name: 'HD 20782 b',
+          orbit: { semiMajorAxisAu: 1.3649, eccentricity: 0.95 },
+        }),
+      ],
+    );
     expect(renderer.outermostRadiusAu).toBeCloseTo(1.3649 * 1.95, 9);
     renderer.dispose();
   });
@@ -498,19 +622,38 @@ describe('photographs', () => {
     // Ids no other test here draws, since the loaded textures are shared through the cache.
     const ids = ['ganymede', 'callisto'];
     const records: BodyRecord[] = ids.map((id, index) => ({
-      id, systemStarId: 0, name: id, kind: 'planet', radiusKm: 2500, orbitSource: 'test',
-      orbit: { semiMajorAxisAu: 1 + index, eccentricity: 0, inclinationDeg: 0, longitudeOfAscendingNodeDeg: 0, argumentOfPeriapsisDeg: 0, meanAnomalyAtEpochDeg: 0, epochJd: DEFAULT_EPOCH_JD },
-      rates: keplerRates(1 + index, GM_SUN_AU3_PER_DAY2)
+      id,
+      systemStarId: 0,
+      name: id,
+      kind: 'planet',
+      radiusKm: 2500,
+      orbitSource: 'test',
+      orbit: {
+        semiMajorAxisAu: 1 + index,
+        eccentricity: 0,
+        inclinationDeg: 0,
+        longitudeOfAscendingNodeDeg: 0,
+        argumentOfPeriapsisDeg: 0,
+        meanAnomalyAtEpochDeg: 0,
+        epochJd: DEFAULT_EPOCH_JD,
+      },
+      rates: keplerRates(1 + index, GM_SUN_AU3_PER_DAY2),
     }));
     const renderer = new SystemOrbitsRenderer(records, []);
-    const materials = (): THREE.MeshStandardMaterial[] => renderer.members.map((member) => (member.marker as THREE.Mesh).material as THREE.MeshStandardMaterial);
+    const materials = (): THREE.MeshStandardMaterial[] =>
+      renderer.members.map(
+        (member) => (member.marker as THREE.Mesh).material as THREE.MeshStandardMaterial,
+      );
     const maps = (): Array<THREE.Texture | null> => materials().map((material) => material.map);
     const colours = (): number[] => materials().map((material) => material.color.getHex());
 
     renderer.update(DEFAULT_EPOCH_JD);
     expect(maps()).toEqual([null, null]); // not loaded yet: jsdom never loads an image
     // Until then each is its kind's flat colour, a planet's pale blue.
-    expect(colours()).toEqual([new THREE.Color(0.55, 0.75, 1).getHex(), new THREE.Color(0.55, 0.75, 1).getHex()]);
+    expect(colours()).toEqual([
+      new THREE.Color(0.55, 0.75, 1).getHex(),
+      new THREE.Color(0.55, 0.75, 1).getHex(),
+    ]);
 
     for (const id of ids) {
       loadCachedTexture(bodyTexturePath(id)!).image = { width: 2, height: 1 };
@@ -529,16 +672,37 @@ describe('photographs', () => {
 describe('markers', () => {
   it('draws every body on the one sphere, scaled to its radius, and leaves that sphere when a system is left', () => {
     const records: BodyRecord[] = [2500, 60000].map((radiusKm, index) => ({
-      id: `body-${index}`, systemStarId: 0, name: `Body ${index}`, kind: 'planet', radiusKm, orbitSource: 'test',
-      orbit: { semiMajorAxisAu: 1 + index, eccentricity: 0, inclinationDeg: 0, longitudeOfAscendingNodeDeg: 0, argumentOfPeriapsisDeg: 0, meanAnomalyAtEpochDeg: 0, epochJd: DEFAULT_EPOCH_JD },
-      rates: keplerRates(1 + index, GM_SUN_AU3_PER_DAY2)
+      id: `body-${index}`,
+      systemStarId: 0,
+      name: `Body ${index}`,
+      kind: 'planet',
+      radiusKm,
+      orbitSource: 'test',
+      orbit: {
+        semiMajorAxisAu: 1 + index,
+        eccentricity: 0,
+        inclinationDeg: 0,
+        longitudeOfAscendingNodeDeg: 0,
+        argumentOfPeriapsisDeg: 0,
+        meanAnomalyAtEpochDeg: 0,
+        epochJd: DEFAULT_EPOCH_JD,
+      },
+      rates: keplerRates(1 + index, GM_SUN_AU3_PER_DAY2),
     }));
-    const renderer = new SystemOrbitsRenderer(records, [exoplanet({ radiusEarth: 1.1 })], undefined, 1);
+    const renderer = new SystemOrbitsRenderer(
+      records,
+      [exoplanet({ radiusEarth: 1.1 })],
+      undefined,
+      1,
+    );
     const meshes = renderer.members.map((member) => member.marker as THREE.Mesh);
     expect(new Set(meshes.map((mesh) => mesh.geometry)).size).toBe(1);
     [2500, 60000, 1.1 * 6371].forEach((radiusKm, index) => {
       const sphere = meshes[index].geometry as THREE.SphereGeometry;
-      expect(meshes[index].scale.x * sphere.parameters.radius).toBeCloseTo(bodyMarkerRadiusAu(radiusKm), 12);
+      expect(meshes[index].scale.x * sphere.parameters.radius).toBeCloseTo(
+        bodyMarkerRadiusAu(radiusKm),
+        12,
+      );
     });
     const disposed = vi.fn();
     meshes[0].geometry.addEventListener('dispose', disposed);
@@ -549,18 +713,33 @@ describe('markers', () => {
 
 describe('derived surfaces', () => {
   const maps = (renderer: SystemOrbitsRenderer): Array<THREE.Texture | null> =>
-    renderer.members.map((member) => ((member.marker as THREE.Mesh).material as THREE.MeshStandardMaterial).map);
+    renderer.members.map(
+      (member) => ((member.marker as THREE.Mesh).material as THREE.MeshStandardMaterial).map,
+    );
   const nextTask = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
   const twoPlanets = (): SystemOrbitsRenderer =>
-    new SystemOrbitsRenderer([], [exoplanet({ radiusEarth: 1.1 }), exoplanet({ id: 'TRAPPIST-1 c', name: 'TRAPPIST-1 c', radiusEarth: 1.0 })], undefined, 1);
+    new SystemOrbitsRenderer(
+      [],
+      [
+        exoplanet({ radiusEarth: 1.1 }),
+        exoplanet({ id: 'TRAPPIST-1 c', name: 'TRAPPIST-1 c', radiusEarth: 1.0 }),
+      ],
+      undefined,
+      1,
+    );
 
   it('paints them after the system is built, one a task, so entering a system is not held up, and in their own colours', async () => {
     const colours = (renderer: SystemOrbitsRenderer): number[] =>
-      renderer.members.map((member) => ((member.marker as THREE.Mesh).material as THREE.MeshStandardMaterial).color.getHex());
+      renderer.members.map((member) =>
+        ((member.marker as THREE.Mesh).material as THREE.MeshStandardMaterial).color.getHex(),
+      );
     const renderer = twoPlanets();
     expect(maps(renderer)).toEqual([null, null]);
     // Until then each is its kind's flat colour, an exoplanet's magenta.
-    expect(colours(renderer)).toEqual([new THREE.Color(0.85, 0.4, 0.85).getHex(), new THREE.Color(0.85, 0.4, 0.85).getHex()]);
+    expect(colours(renderer)).toEqual([
+      new THREE.Color(0.85, 0.4, 0.85).getHex(),
+      new THREE.Color(0.85, 0.4, 0.85).getHex(),
+    ]);
     await nextTask();
     expect(maps(renderer).filter(Boolean)).toHaveLength(1);
     await nextTask();
@@ -605,12 +784,20 @@ describe('exoplanet size without a measured radius', () => {
 describe("SystemOrbitsRenderer's star light", () => {
   const lightOf = (renderer: SystemOrbitsRenderer): THREE.PointLight => {
     let light: THREE.PointLight | undefined;
-    renderer.object.traverse((object) => (light ??= (object as THREE.PointLight).isPointLight ? (object as THREE.PointLight) : undefined));
+    renderer.object.traverse(
+      (object) =>
+        (light ??= (object as THREE.PointLight).isPointLight
+          ? (object as THREE.PointLight)
+          : undefined),
+    );
     return light!;
   };
 
-  it("is white at π from the Sun, or from a star with no temperature", () => {
-    for (const renderer of [new SystemOrbitsRenderer([], [], undefined, 1, 5772), new SystemOrbitsRenderer([], [exoplanet()])]) {
+  it('is white at π from the Sun, or from a star with no temperature', () => {
+    for (const renderer of [
+      new SystemOrbitsRenderer([], [], undefined, 1, 5772),
+      new SystemOrbitsRenderer([], [exoplanet()]),
+    ]) {
       expect(lightOf(renderer).color.toArray()).toEqual([1, 1, 1]);
       expect(lightOf(renderer).intensity).toBe(Math.PI);
       renderer.dispose();
@@ -637,40 +824,117 @@ describe('solar-system bodies against Horizons', () => {
   // e and i rates or Io's and Europa's backward periapses passed the whole suite on the data it
   // wrote. Horizons' dates are TDB and the renderer's are the clock's UT, so each is handed over
   // TT - UT earlier: 69.184 s today, 29 in 1950.
-  const SHIPPED: BodyRecord[] = JSON.parse(readFileSync(`${process.cwd()}/src/assets/data/bodies.json`, 'utf8'));
+  const SHIPPED: BodyRecord[] = JSON.parse(
+    readFileSync(`${process.cwd()}/src/assets/data/bodies.json`, 'utf8'),
+  );
   // Mimas and Phobos among them for the terms of their IAU W that are motion along the orbit: the
   // Mimas-Tethys libration and Phobos's tidal acceleration (see `orbitalTermsOfPrimeMeridian`).
-  const IDS = ['earth', 'jupiter', 'saturn', 'neptune', 'pluto', 'moon', 'io', 'europa', 'titan', 'triton', 'uranus', 'titania', 'charon', 'venus', 'mars', 'mimas', 'phobos'];
+  const IDS = [
+    'earth',
+    'jupiter',
+    'saturn',
+    'neptune',
+    'pluto',
+    'moon',
+    'io',
+    'europa',
+    'titan',
+    'triton',
+    'uranus',
+    'titania',
+    'charon',
+    'venus',
+    'mars',
+    'mimas',
+    'phobos',
+  ];
   // Each ceiling sits just above what these elements measure on that date: Earth 0.003 degrees,
   // Jupiter 0.063, Saturn 0.164, Pluto 0.054, the Moon 0.72 (no mean ellipse has its evection or
   // variation), Io 0.021, Europa 0.036, Titan 0.014, Triton 0.137, Titania 0.62 (against Uranus's
   // equator, 120 years from its 1980 epoch), Charon 0.37, Mimas 2.24 on 2026 May 27, when its libration has it
   // 44 degrees ahead of its mean motion (43.3 without the term), and Phobos 1.25 in 2100 (11.1 without its
   // tidal acceleration).
-  const HORIZONS: Array<[id: string, jd: number, x: number, y: number, z: number, maxDeg: number]> = [
-    ['earth', 2488069.5, -0.1574071329883954, 0.890666220858489, 0.3859132211165683, 0.02],
-    // AD 3000, the end of the clock's window and of Standish's fit: the Earth-Moon barycentre and
-    // Saturn's, 0.005 and 0.065 degrees out. Without Standish's rates for a, e and i they were 0.129
-    // and 0.412, which no date between 1950 and 2100 shows (at most 0.036, Saturn in 2100).
-    ['earth', 2816787.5, 0.06574092668156256, 0.9022934196570718, 0.3887693148519465, 0.02],
-    ['saturn', 2816787.5, 8.434780522117482, 3.87565654130078, 1.235068259814154, 0.1],
-    ['jupiter', 2433282.5, 3.406605247558555, -3.425997624196318, -1.551719750032203, 0.1],
-    ['saturn', 2478938.5, -3.51309768447752, -8.723317933082274, -3.452662390556131, 0.25],
-    ['pluto', 2442413.5, -29.2488165026956, -7.1421817246801, 6.58403957591589, 0.1],
-    ['moon', 2469807.5, 0.00240364781322315, 0.0006554283236619424, 0.0004472719300783614, 2],
-    ['io', 2433282.5, 0.0004488349204269952, 0.002519633434577752, 0.00120678715190893, 0.05],
-    ['europa', 2433282.5, 0.004084372287322533, -0.001665375585011311, -0.0007673072324795899, 0.1],
-    ['titan', 2488069.5, 0.007800850235156121, -0.001556932380983438, -0.0006078959246502567, 0.05],
-    ['triton', 2488069.5, -0.001421151845853369, -0.0001894510477241482, 0.001888790702926415, 0.2],
-    ['titania', 2488069.5, -0.00151919968294745, -0.0003387914082135071, 0.002465657830788125, 0.75],
-    ['charon', 2488069.5, -0.00003046411046017432, -0.000009404114448552256, 0.0001270457155789907, 0.5],
-    ['mimas', 2461187.5, -3.840685116962088e-4, 1.182766232573268e-3, -2.006928678577268e-5, 3],
-    ['phobos', 2488069.5, 4.269855297288105e-5, -2.759158950396543e-5, -3.816269137755616e-5, 1.5],
-  ];
+  const HORIZONS: Array<[id: string, jd: number, x: number, y: number, z: number, maxDeg: number]> =
+    [
+      ['earth', 2488069.5, -0.1574071329883954, 0.890666220858489, 0.3859132211165683, 0.02],
+      // AD 3000, the end of the clock's window and of Standish's fit: the Earth-Moon barycentre and
+      // Saturn's, 0.005 and 0.065 degrees out. Without Standish's rates for a, e and i they were 0.129
+      // and 0.412, which no date between 1950 and 2100 shows (at most 0.036, Saturn in 2100).
+      ['earth', 2816787.5, 0.06574092668156256, 0.9022934196570718, 0.3887693148519465, 0.02],
+      ['saturn', 2816787.5, 8.434780522117482, 3.87565654130078, 1.235068259814154, 0.1],
+      ['jupiter', 2433282.5, 3.406605247558555, -3.425997624196318, -1.551719750032203, 0.1],
+      ['saturn', 2478938.5, -3.51309768447752, -8.723317933082274, -3.452662390556131, 0.25],
+      ['pluto', 2442413.5, -29.2488165026956, -7.1421817246801, 6.58403957591589, 0.1],
+      ['moon', 2469807.5, 0.00240364781322315, 0.0006554283236619424, 0.0004472719300783614, 2],
+      ['io', 2433282.5, 0.0004488349204269952, 0.002519633434577752, 0.00120678715190893, 0.05],
+      [
+        'europa',
+        2433282.5,
+        0.004084372287322533,
+        -0.001665375585011311,
+        -0.0007673072324795899,
+        0.1,
+      ],
+      [
+        'titan',
+        2488069.5,
+        0.007800850235156121,
+        -0.001556932380983438,
+        -0.0006078959246502567,
+        0.05,
+      ],
+      [
+        'triton',
+        2488069.5,
+        -0.001421151845853369,
+        -0.0001894510477241482,
+        0.001888790702926415,
+        0.2,
+      ],
+      [
+        'titania',
+        2488069.5,
+        -0.00151919968294745,
+        -0.0003387914082135071,
+        0.002465657830788125,
+        0.75,
+      ],
+      [
+        'charon',
+        2488069.5,
+        -0.00003046411046017432,
+        -0.000009404114448552256,
+        0.0001270457155789907,
+        0.5,
+      ],
+      ['mimas', 2461187.5, -3.840685116962088e-4, 1.182766232573268e-3, -2.006928678577268e-5, 3],
+      [
+        'phobos',
+        2488069.5,
+        4.269855297288105e-5,
+        -2.759158950396543e-5,
+        -3.816269137755616e-5,
+        1.5,
+      ],
+    ];
 
   function record(id: string): BodyRecord {
-    const { kind, orbit, rates, laplacePole, parentBodyId, massRatio, rotationalElements } = SHIPPED.find((body) => body.id === id)!;
-    return { id, systemStarId: 0, name: id, radiusKm: 1000, orbitSource: 'test', kind, orbit, rates, laplacePole, parentBodyId, massRatio, rotationalElements };
+    const { kind, orbit, rates, laplacePole, parentBodyId, massRatio, rotationalElements } =
+      SHIPPED.find((body) => body.id === id)!;
+    return {
+      id,
+      systemStarId: 0,
+      name: id,
+      radiusKm: 1000,
+      orbitSource: 'test',
+      kind,
+      orbit,
+      rates,
+      laplacePole,
+      parentBodyId,
+      massRatio,
+      rotationalElements,
+    };
   }
 
   const renderer = new SystemOrbitsRenderer(IDS.map(record), []);
@@ -686,11 +950,18 @@ describe('solar-system bodies against Horizons', () => {
 
   it('puts Pluto where Horizons has it round its barycentre with Charon, 2 131 km out and opposite Charon', () => {
     // Horizons, Pluto (999) from the Pluto-system barycentre (9), on JD 2488069.5 TDB (2100).
-    const horizons = new THREE.Vector3(0.000003313612032581019, 0.000001023040948538272, -0.00001381793390079716);
+    const horizons = new THREE.Vector3(
+      0.000003313612032581019,
+      0.000001023040948538272,
+      -0.00001381793390079716,
+    );
     renderer.update(utOf(2488069.5));
     const charon = renderer.members.find((member) => member.id === 'charon')!.marker;
     const barycentre = charon.parent!.position;
-    const pluto = renderer.members.find((member) => member.id === 'pluto')!.marker.position.clone().sub(barycentre);
+    const pluto = renderer.members
+      .find((member) => member.id === 'pluto')!
+      .marker.position.clone()
+      .sub(barycentre);
     const charonFromBarycentre = charon.position;
 
     expect((pluto.angleTo(horizons) * 180) / Math.PI).toBeLessThan(0.5);
@@ -702,15 +973,23 @@ describe('solar-system bodies against Horizons', () => {
 
   it('draws Pluto’s own orbit round the barycentre, in the plane it is going round in', () => {
     const charon = renderer.members.find((member) => member.id === 'charon')!.marker;
-    const [charonLine, plutoLine] = charon.parent!.children.filter((child) => child.name === 'orbit-line');
+    const [charonLine, plutoLine] = charon.parent!.children.filter(
+      (child) => child.name === 'orbit-line',
+    );
     for (const days of [0, 3000, 30000]) {
       renderer.update(DEFAULT_EPOCH_JD + days);
-      const pluto = renderer.members.find((member) => member.id === 'pluto')!.marker.position.clone().sub(charon.parent!.position);
+      const pluto = renderer.members
+        .find((member) => member.id === 'pluto')!
+        .marker.position.clone()
+        .sub(charon.parent!.position);
       const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(plutoLine.quaternion);
       expect(Math.abs(pluto.clone().normalize().dot(normal))).toBeLessThan(1e-9);
       // A near-circle 2 131 km across, a ninth of Charon's.
       expect(Math.abs(plutoLine.scale.x) * 0.00013095774631236113).toBeCloseTo(pluto.length(), 8);
-      expect(charonLine.scale.x / Math.abs(plutoLine.scale.x)).toBeCloseTo(1 / 0.1220485755631374, 9);
+      expect(charonLine.scale.x / Math.abs(plutoLine.scale.x)).toBeCloseTo(
+        1 / 0.1220485755631374,
+        9,
+      );
     }
   });
 
@@ -729,16 +1008,25 @@ describe('solar-system bodies against Horizons', () => {
   /** How far a top-level body is from its own drawn orbit line, in AU: from the nearest of its chords. */
   function offLineAu(id: string): number {
     const marker = renderer.members.find((member) => member.id === id)!.marker;
-    const line = renderer.object.children[renderer.object.children.indexOf(marker) - 1] as THREE.Line;
+    const line = renderer.object.children[
+      renderer.object.children.indexOf(marker) - 1
+    ] as THREE.Line;
     expect(line.name).toBe('orbit-line');
     line.updateMatrixWorld();
     const position = line.geometry.getAttribute('position');
-    const vertex = (index: number): THREE.Vector3 => new THREE.Vector3().fromBufferAttribute(position, index).applyMatrix4(line.matrixWorld);
+    const vertex = (index: number): THREE.Vector3 =>
+      new THREE.Vector3().fromBufferAttribute(position, index).applyMatrix4(line.matrixWorld);
     const chord = new THREE.Line3();
     const closest = new THREE.Vector3();
     let nearest = Number.POSITIVE_INFINITY;
     for (let index = 0; index + 1 < position.count; index++) {
-      nearest = Math.min(nearest, chord.set(vertex(index), vertex(index + 1)).closestPointToPoint(marker.position, true, closest).distanceTo(marker.position));
+      nearest = Math.min(
+        nearest,
+        chord
+          .set(vertex(index), vertex(index + 1))
+          .closestPointToPoint(marker.position, true, closest)
+          .distanceTo(marker.position),
+      );
     }
     return nearest;
   }
@@ -748,16 +1036,27 @@ describe('solar-system bodies against Horizons', () => {
     // planet falls between two points: at most 0.0032 AU for Saturn, near aphelion, and 0.00055 for
     // Mars. Measured 0.0017 AU for Saturn and 0.0005 for Mars at AD 1, and 0.0011 for Saturn at
     // J2000. Drawn at J2000's shape at AD 1, the lines were 0.054 AU from Saturn and 0.0022 from Mars.
-    const saturnLine = renderer.object.children[renderer.object.children.indexOf(renderer.members.find((member) => member.id === 'saturn')!.marker) - 1] as THREE.Line;
+    const saturnLine = renderer.object.children[
+      renderer.object.children.indexOf(
+        renderer.members.find((member) => member.id === 'saturn')!.marker,
+      ) - 1
+    ] as THREE.Line;
     renderer.update(DEFAULT_EPOCH_JD);
-    const drawnVersion = (saturnLine.geometry.getAttribute('position') as THREE.BufferAttribute).version;
-    for (const [id, days, maxAu] of [['saturn', -730000, 0.0035], ['mars', -730000, 0.0006], ['saturn', 0, 0.0035]] as const) {
+    const drawnVersion = (saturnLine.geometry.getAttribute('position') as THREE.BufferAttribute)
+      .version;
+    for (const [id, days, maxAu] of [
+      ['saturn', -730000, 0.0035],
+      ['mars', -730000, 0.0006],
+      ['saturn', 0, 0.0035],
+    ] as const) {
       renderer.update(DEFAULT_EPOCH_JD + days);
       expect(offLineAu(id)).toBeLessThan(maxAu);
       if (days !== 0) {
         // Handed to the GPU again, which uploads a buffer only when its version rises: the points
         // rewritten on the CPU alone leave J2000's ellipse on screen.
-        expect((saturnLine.geometry.getAttribute('position') as THREE.BufferAttribute).version).toBeGreaterThan(drawnVersion);
+        expect(
+          (saturnLine.geometry.getAttribute('position') as THREE.BufferAttribute).version,
+        ).toBeGreaterThan(drawnVersion);
       }
     }
   });
@@ -790,7 +1089,9 @@ describe('solar-system bodies against Horizons', () => {
     renderer.update(JUNE_1_2025_NOON_UTC + 0.01);
     const turn = marker.quaternion.clone().multiply(start.invert());
     const spin = new THREE.Vector3(turn.x, turn.y, turn.z).multiplyScalar(Math.sign(turn.w));
-    return (spin.angleTo(new THREE.Vector3(0, 0, 1).applyQuaternion(line.quaternion)) * 180) / Math.PI;
+    return (
+      (spin.angleTo(new THREE.Vector3(0, 0, 1).applyQuaternion(line.quaternion)) * 180) / Math.PI
+    );
   }
 
   it('turns Venus, Uranus and Pluto backwards against their orbits, at the tilts Horizons gives the first two', () => {
@@ -815,7 +1116,10 @@ describe('solar-system bodies against Horizons', () => {
     const centre = worldPosition(id);
     const towards = point.clone().sub(centre).normalize();
     const radius = marker.userData['radiusAu'];
-    const hit = new THREE.Raycaster(centre.clone().addScaledVector(towards, radius * 4), towards.clone().negate()).intersectObject(marker)[0];
+    const hit = new THREE.Raycaster(
+      centre.clone().addScaledVector(towards, radius * 4),
+      towards.clone().negate(),
+    ).intersectObject(marker)[0];
     return { eastDeg: (hit.uv!.x - 0.5) * 360, latDeg: (hit.uv!.y - 0.5) * 180 };
   }
 
@@ -830,15 +1134,23 @@ describe('solar-system bodies against Horizons', () => {
 
   /** Where the IAU puts a body's prime meridian at a TDB date, in the scene. */
   function iauPrimeMeridian(id: string, jdTdb: number): THREE.Vector3 {
-    const { poleRaDeg, poleDecDeg, primeMeridianDeg } = orientationAt(SHIPPED.find((body) => body.id === id)!.rotationalElements!, jdTdb);
+    const { poleRaDeg, poleDecDeg, primeMeridianDeg } = orientationAt(
+      SHIPPED.find((body) => body.id === id)!.rotationalElements!,
+      jdTdb,
+    );
     const w = (primeMeridianDeg * Math.PI) / 180;
-    const meridian = laplacePlaneToEquatorial({ x: Math.cos(w), y: Math.sin(w), z: 0 }, { raDeg: poleRaDeg, decDeg: poleDecDeg });
+    const meridian = laplacePlaneToEquatorial(
+      { x: Math.cos(w), y: Math.sin(w), z: 0 },
+      { raDeg: poleRaDeg, decDeg: poleDecDeg },
+    );
     return new THREE.Vector3(meridian.x, meridian.y, meridian.z);
   }
 
   /** The drawn sphere's longitude 0 on its equator: +X of the sphere as `SphereGeometry` wraps its map. */
   function drawnPrimeMeridian(id: string): THREE.Vector3 {
-    return new THREE.Vector3(1, 0, 0).applyQuaternion(renderer.members.find((member) => member.id === id)!.marker.quaternion);
+    return new THREE.Vector3(1, 0, 0).applyQuaternion(
+      renderer.members.find((member) => member.id === id)!.marker.quaternion,
+    );
   }
 
   it('turns Jupiter at AD 1000 by its W at that date’s TT, 1 574 s after the UT the clock names', () => {
@@ -846,7 +1158,11 @@ describe('solar-system bodies against Horizons', () => {
     // at today's 69 s, Jupiter was drawn 15 degrees short of its W.
     const jdUt = 2086307.5;
     renderer.update(jdUt);
-    expect((drawnPrimeMeridian('jupiter').angleTo(iauPrimeMeridian('jupiter', jdUt + 1574.1 / 86400)) * 180) / Math.PI).toBeLessThan(0.01);
+    expect(
+      (drawnPrimeMeridian('jupiter').angleTo(iauPrimeMeridian('jupiter', jdUt + 1574.1 / 86400)) *
+        180) /
+        Math.PI,
+    ).toBeLessThan(0.01);
   });
 
   it('turns Earth by the UT the clock names, which is its turning: at AD 1000 the Sun stands over Horizons’ point', () => {
@@ -873,15 +1189,18 @@ describe('solar-system bodies against Horizons', () => {
   const RING_OPENING: Array<[date: string, jd: number, planetodeticDeg: number]> = [
     ['16 October 2017, near their widest', 2458042.5, 32.017423],
     ['23 March 2025, as Earth crossed their plane', 2460757.5, 0.051359],
-    ['24 September 2026, the south face turned to Earth', 2461307.5, -9.571756]
+    ['24 September 2026, the south face turned to Earth', 2461307.5, -9.571756],
   ];
 
-  const saturnRingMesh = (): THREE.Mesh => renderer.members.find((member) => member.id === 'saturn')!.marker.children[0] as THREE.Mesh;
+  const saturnRingMesh = (): THREE.Mesh =>
+    renderer.members.find((member) => member.id === 'saturn')!.marker.children[0] as THREE.Mesh;
 
   /** The ring's face normal in the scene, read off its own geometry rather than its transform. */
   function ringNormal(ring: THREE.Mesh): THREE.Vector3 {
     ring.updateWorldMatrix(true, false);
-    return new THREE.Vector3().fromBufferAttribute(ring.geometry.attributes['normal'], 0).transformDirection(ring.matrixWorld);
+    return new THREE.Vector3()
+      .fromBufferAttribute(ring.geometry.attributes['normal'], 0)
+      .transformDirection(ring.matrixWorld);
   }
 
   for (const [date, jd, planetodeticDeg] of RING_OPENING) {
@@ -890,7 +1209,10 @@ describe('solar-system bodies against Horizons', () => {
       const normal = ringNormal(saturnRingMesh());
       const toEarth = worldPosition('earth').sub(worldPosition('saturn')).normalize();
       const openingDeg = (Math.asin(normal.dot(toEarth)) * 180) / Math.PI;
-      const expectedDeg = (Math.atan((1 - SATURN_FLATTENING) ** 2 * Math.tan((planetodeticDeg * Math.PI) / 180)) * 180) / Math.PI;
+      const expectedDeg =
+        (Math.atan((1 - SATURN_FLATTENING) ** 2 * Math.tan((planetodeticDeg * Math.PI) / 180)) *
+          180) /
+        Math.PI;
       expect(Math.abs(openingDeg - expectedDeg)).toBeLessThan(0.1);
     });
   }
@@ -899,7 +1221,9 @@ describe('solar-system bodies against Horizons', () => {
     renderer.update(JUNE_1_2025_NOON_UTC);
     const ring = saturnRingMesh();
     const normal = ringNormal(ring);
-    const inRingPlane = new THREE.Vector3().fromBufferAttribute(ring.geometry.attributes['position'], 0).transformDirection(ring.matrixWorld);
+    const inRingPlane = new THREE.Vector3()
+      .fromBufferAttribute(ring.geometry.attributes['position'], 0)
+      .transformDirection(ring.matrixWorld);
     // Straight down onto the B ring, 100 000 km out: nowhere near the planet itself.
     const onRing = worldPosition('saturn').addScaledVector(inRingPlane, 100000 / 149597870.7);
     // Looking down onto that point from 0.01 AU, with no slop: only the drawn extent can reach it.
@@ -930,7 +1254,8 @@ describe('solar-system bodies against Horizons', () => {
     it('picks a body 11 px off its drawn disc with a 12 px slop, and nothing at 13', () => {
       // Venus, which has no moon to come nearer the pointer than it does.
       const radiusPx = frame('venus', 0.05);
-      const pointer = (px: number): THREE.Vector2 => new THREE.Vector2(0, (radiusPx + px) * PIXEL_NDC);
+      const pointer = (px: number): THREE.Vector2 =>
+        new THREE.Vector2(0, (radiusPx + px) * PIXEL_NDC);
       expect(renderer.pickAt(pointer(11), camera, 1, 12 * PIXEL_NDC)?.id).toBe('venus');
       expect(renderer.pickAt(pointer(13), camera, 1, 12 * PIXEL_NDC)).toBeUndefined();
     });
@@ -990,21 +1315,79 @@ describe('solar-system bodies against Horizons', () => {
   // Moon's face towards Earth, 0.70 and 0.09 out because its mean orbit is (its evection alone is
   // 1.27 degrees); its face towards the Sun is within 0.002. Io's face towards Jupiter is 0.012 out:
   // with its orbit taken at the clock's UTC and its spin at TDB it was 0.175, the 69 s between them.
-  const SUB_POINTS: Array<[id: string, observer: string | undefined, lightMinutes: number, west: boolean, flattening: number, observerLon: number, observerLat: number, sunLon: number, sunLat: number, maxObserverDeg: number]> = [
-    ['earth', undefined, 8.43351424, false, 1 / 298.257, 1.5855, 22.261204, 1.579501, 22.260426, 0.1],
-    ['mars', 'earth', 14.13295841, true, 1 - 3376.2 / 3396.19, 307.365389, 21.27653, 269.287887, 25.451264, 0.1],
+  const SUB_POINTS: Array<
+    [
+      id: string,
+      observer: string | undefined,
+      lightMinutes: number,
+      west: boolean,
+      flattening: number,
+      observerLon: number,
+      observerLat: number,
+      sunLon: number,
+      sunLat: number,
+      maxObserverDeg: number,
+    ]
+  > = [
+    [
+      'earth',
+      undefined,
+      8.43351424,
+      false,
+      1 / 298.257,
+      1.5855,
+      22.261204,
+      1.579501,
+      22.260426,
+      0.1,
+    ],
+    [
+      'mars',
+      'earth',
+      14.13295841,
+      true,
+      1 - 3376.2 / 3396.19,
+      307.365389,
+      21.27653,
+      269.287887,
+      25.451264,
+      0.1,
+    ],
     ['moon', 'earth', 0.02150549, false, 0, 7.256763, -3.462104, 116.285934, 1.503004, 0.8],
-    ['jupiter', 'earth', 50.70337676, true, 1 - 66854 / 71492, 251.139846, 2.58787, 247.855871, 2.572658, 0.1],
-    ['io', 'jupiter', 0.02340584, true, 0, 359.964094, -0.002537, 355.673108, 2.26528, 0.05]
+    [
+      'jupiter',
+      'earth',
+      50.70337676,
+      true,
+      1 - 66854 / 71492,
+      251.139846,
+      2.58787,
+      247.855871,
+      2.572658,
+      0.1,
+    ],
+    ['io', 'jupiter', 0.02340584, true, 0, 359.964094, -0.002537, 355.673108, 2.26528, 0.05],
   ];
 
-  for (const [id, observer, lightMinutes, west, flattening, observerLon, observerLat, sunLon, sunLat, maxObserverDeg] of SUB_POINTS) {
+  for (const [
+    id,
+    observer,
+    lightMinutes,
+    west,
+    flattening,
+    observerLon,
+    observerLat,
+    sunLon,
+    sunLat,
+    maxObserverDeg,
+  ] of SUB_POINTS) {
     it(`faces ${observer ?? 'the Sun'} and the Sun with the points Horizons gives on ${id}`, () => {
       renderer.update(JUNE_1_2025_NOON_UTC - lightMinutes / 1440);
       const seen = facing(id, observer ? worldPosition(observer) : new THREE.Vector3());
       const lit = facing(id, new THREE.Vector3());
       const east = (longitude: number): number => (west ? -longitude : longitude);
-      const planetodetic = (latDeg: number): number => (Math.atan(Math.tan((latDeg * Math.PI) / 180) / (1 - flattening) ** 2) * 180) / Math.PI;
+      const planetodetic = (latDeg: number): number =>
+        (Math.atan(Math.tan((latDeg * Math.PI) / 180) / (1 - flattening) ** 2) * 180) / Math.PI;
       expect(apart(seen.eastDeg, east(observerLon))).toBeLessThan(maxObserverDeg);
       expect(Math.abs(planetodetic(seen.latDeg) - observerLat)).toBeLessThan(maxObserverDeg);
       expect(apart(lit.eastDeg, east(sunLon))).toBeLessThan(0.1);
@@ -1016,31 +1399,58 @@ describe('solar-system bodies against Horizons', () => {
 describe('locked moons across the clock’s window', () => {
   // As shipped, pole, W and all: the IAU gives each a W fitted near the present, and its rate is
   // not quite its orbit's, nor Iapetus's pole a line for twenty centuries.
-  const shipped: BodyRecord[] = JSON.parse(readFileSync(`${process.cwd()}/src/assets/data/bodies.json`, 'utf8'));
+  const shipped: BodyRecord[] = JSON.parse(
+    readFileSync(`${process.cwd()}/src/assets/data/bodies.json`, 'utf8'),
+  );
   const renderer = new SystemOrbitsRenderer(
-    shipped.filter((body) => ['jupiter', 'saturn', 'uranus', 'neptune', 'europa', 'ganymede', 'callisto', 'mimas', 'rhea', 'iapetus', 'miranda', 'triton', 'proteus'].includes(body.id)),
-    []
+    shipped.filter((body) =>
+      [
+        'jupiter',
+        'saturn',
+        'uranus',
+        'neptune',
+        'europa',
+        'ganymede',
+        'callisto',
+        'mimas',
+        'rhea',
+        'iapetus',
+        'miranda',
+        'triton',
+        'proteus',
+      ].includes(body.id),
+    ),
+    [],
   );
 
   /** Degrees between two lines, the way a spin axis and an orbit normal are compared: Miranda turns backwards against the IAU's pole. */
   function linesApartDeg(a: THREE.Vector3, b: THREE.Vector3): number {
-    return (Math.acos(Math.min(1, Math.abs(a.clone().normalize().dot(b.clone().normalize())))) * 180) / Math.PI;
+    return (
+      (Math.acos(Math.min(1, Math.abs(a.clone().normalize().dot(b.clone().normalize())))) * 180) /
+      Math.PI
+    );
   }
 
   /** A moon's drawn spin axis and the normal of its drawn orbit line, in the scene's ICRF frame. */
   function axisAndOrbitNormal(id: string): { axis: THREE.Vector3; normal: THREE.Vector3 } {
     const moon = renderer.members.find((member) => member.id === id)!.marker;
     const line = moon.parent!.children.find((child) => child.name === 'orbit-line')!;
-    return { axis: new THREE.Vector3(0, 1, 0).applyQuaternion(moon.quaternion), normal: new THREE.Vector3(0, 0, 1).applyQuaternion(line.quaternion) };
+    return {
+      axis: new THREE.Vector3(0, 1, 0).applyQuaternion(moon.quaternion),
+      normal: new THREE.Vector3(0, 0, 1).applyQuaternion(line.quaternion),
+    };
   }
 
   /** East longitude, on its map, of the point on a moon's drawn sphere that faces its planet. */
   function facingPlanet(id: string): number {
     const moon = renderer.members.find((member) => member.id === id)!.marker;
     // Its position is from the planet, which is its pivot; SphereGeometry wraps u = atan2(z, -x) / 2 pi.
-    const toPlanet = moon.position.clone().negate().applyQuaternion(moon.quaternion.clone().invert());
+    const toPlanet = moon.position
+      .clone()
+      .negate()
+      .applyQuaternion(moon.quaternion.clone().invert());
     const u = Math.atan2(toPlanet.z, -toPlanet.x) / (2 * Math.PI);
-    return ((((u - 0.5) * 360) % 360) + 540) % 360 - 180;
+    return (((((u - 0.5) * 360) % 360) + 540) % 360) - 180;
   }
 
   it('keeps Proteus, Miranda, Mimas and Iapetus facing their planets at AD 1 and AD 3000', () => {
@@ -1090,12 +1500,16 @@ describe('locked moons across the clock’s window', () => {
     // axis 2.4 at 1601. A date this far back is TDB less some two minutes; the node moves 0.004 degrees in that.
     const HORIZONS_NORMALS: Array<[jd: number, raDeg: number, decDeg: number]> = [
       [2305813.5, 72.83137, 16.17526],
-      [2594102.5, 81.27691, 17.43782]
+      [2594102.5, 81.27691, 17.43782],
     ];
     for (const [jd, raDeg, decDeg] of HORIZONS_NORMALS) {
       renderer.update(jd);
       const [ra, dec] = [(raDeg * Math.PI) / 180, (decDeg * Math.PI) / 180];
-      const horizons = new THREE.Vector3(Math.cos(dec) * Math.cos(ra), Math.cos(dec) * Math.sin(ra), Math.sin(dec));
+      const horizons = new THREE.Vector3(
+        Math.cos(dec) * Math.cos(ra),
+        Math.cos(dec) * Math.sin(ra),
+        Math.sin(dec),
+      );
       const { axis, normal } = axisAndOrbitNormal('miranda');
       expect(linesApartDeg(normal, horizons)).toBeLessThan(0.5);
       expect(linesApartDeg(axis, horizons)).toBeLessThan(0.5);

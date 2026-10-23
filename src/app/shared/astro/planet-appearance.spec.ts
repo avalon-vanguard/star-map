@@ -10,10 +10,21 @@ import {
   PLANET_CLASS_LABELS,
   PlanetClass,
   polarCapExtentDeg,
-  seedFromId
+  seedFromId,
 } from './planet-appearance';
 
-const EARTH_RADII = { mercury: 0.383, venus: 0.949, earth: 1, mars: 0.532, jupiter: 10.97, saturn: 9.14, uranus: 3.98, neptune: 3.86, europa: 0.245, phobos: 0.0017 };
+const EARTH_RADII = {
+  mercury: 0.383,
+  venus: 0.949,
+  earth: 1,
+  mars: 0.532,
+  jupiter: 10.97,
+  saturn: 9.14,
+  uranus: 3.98,
+  neptune: 3.86,
+  europa: 0.245,
+  phobos: 0.0017,
+};
 
 describe('bulkDensityGramsPerCm3', () => {
   it('gives Earth its own density, by construction', () => {
@@ -40,10 +51,13 @@ describe('equilibriumTemperatureK', () => {
     ['Earth', 1, 1, 255],
     ['Mars', 1, 1.524, 206],
     ['Jupiter', 1, 5.204, 112],
-    ['Neptune', 1, 30.07, 46]
-  ])('reproduces the published equilibrium temperature of %s', (_name, luminosity, semiMajorAxisAu, expected) => {
-    expect(equilibriumTemperatureK(luminosity, semiMajorAxisAu)).toBeCloseTo(expected, -0.5);
-  });
+    ['Neptune', 1, 30.07, 46],
+  ])(
+    'reproduces the published equilibrium temperature of %s',
+    (_name, luminosity, semiMajorAxisAu, expected) => {
+      expect(equilibriumTemperatureK(luminosity, semiMajorAxisAu)).toBeCloseTo(expected, -0.5);
+    },
+  );
 
   it('follows the inverse square root of distance', () => {
     const near = equilibriumTemperatureK(1, 1)!;
@@ -82,17 +96,51 @@ describe('equilibriumTemperatureK', () => {
 
 describe('classifyPlanet', () => {
   /** Every solar-system body this app carries, at its real size and equilibrium temperature. */
-  it.each<[string, { radiusEarth?: number; massEarth?: number; equilibriumTemperatureK?: number }, PlanetClass]>([
-    ['Mercury', { radiusEarth: EARTH_RADII.mercury, massEarth: 0.055, equilibriumTemperatureK: 410 }, 'scorched'],
+  it.each<
+    [
+      string,
+      { radiusEarth?: number; massEarth?: number; equilibriumTemperatureK?: number },
+      PlanetClass,
+    ]
+  >([
+    [
+      'Mercury',
+      { radiusEarth: EARTH_RADII.mercury, massEarth: 0.055, equilibriumTemperatureK: 410 },
+      'scorched',
+    ],
     ['Earth', { radiusEarth: 1, massEarth: 1, equilibriumTemperatureK: 255 }, 'temperate'],
-    ['Mars', { radiusEarth: EARTH_RADII.mars, massEarth: 0.107, equilibriumTemperatureK: 206 }, 'temperate'],
-    ['Jupiter', { radiusEarth: EARTH_RADII.jupiter, massEarth: 317.8, equilibriumTemperatureK: 112 }, 'gasGiant'],
-    ['Saturn', { radiusEarth: EARTH_RADII.saturn, massEarth: 95.2, equilibriumTemperatureK: 82 }, 'gasGiant'],
-    ['Uranus', { radiusEarth: EARTH_RADII.uranus, massEarth: 14.5, equilibriumTemperatureK: 58 }, 'iceGiant'],
-    ['Neptune', { radiusEarth: EARTH_RADII.neptune, massEarth: 17.1, equilibriumTemperatureK: 46 }, 'iceGiant'],
+    [
+      'Mars',
+      { radiusEarth: EARTH_RADII.mars, massEarth: 0.107, equilibriumTemperatureK: 206 },
+      'temperate',
+    ],
+    [
+      'Jupiter',
+      { radiusEarth: EARTH_RADII.jupiter, massEarth: 317.8, equilibriumTemperatureK: 112 },
+      'gasGiant',
+    ],
+    [
+      'Saturn',
+      { radiusEarth: EARTH_RADII.saturn, massEarth: 95.2, equilibriumTemperatureK: 82 },
+      'gasGiant',
+    ],
+    [
+      'Uranus',
+      { radiusEarth: EARTH_RADII.uranus, massEarth: 14.5, equilibriumTemperatureK: 58 },
+      'iceGiant',
+    ],
+    [
+      'Neptune',
+      { radiusEarth: EARTH_RADII.neptune, massEarth: 17.1, equilibriumTemperatureK: 46 },
+      'iceGiant',
+    ],
     ['Europa', { radiusEarth: EARTH_RADII.europa, equilibriumTemperatureK: 112 }, 'icy'],
     ['51 Peg b', { massEarth: 193.9, equilibriumTemperatureK: 1227 }, 'hotGasGiant'],
-    ['GJ 1214 b', { radiusEarth: 2.733, massEarth: 8.4, equilibriumTemperatureK: 596 }, 'subNeptune']
+    [
+      'GJ 1214 b',
+      { radiusEarth: 2.733, massEarth: 8.4, equilibriumTemperatureK: 596 },
+      'subNeptune',
+    ],
   ])('puts %s in the right class', (_name, measurements, expected) => {
     expect(classifyPlanet(measurements)).toBe(expected);
   });
@@ -113,9 +161,13 @@ describe('classifyPlanet', () => {
 
   it('lets density override temperature at both extremes', () => {
     // Iron whatever the weather...
-    expect(classifyPlanet({ radiusEarth: 1, massEarth: 1.6, equilibriumTemperatureK: 255 })).toBe('iron');
+    expect(classifyPlanet({ radiusEarth: 1, massEarth: 1.6, equilibriumTemperatureK: 255 })).toBe(
+      'iron',
+    );
     // ...and too light to be rock means ice, even where rock would be solid.
-    expect(classifyPlanet({ radiusEarth: 1.5, massEarth: 1, equilibriumTemperatureK: 250 })).toBe('icy');
+    expect(classifyPlanet({ radiusEarth: 1.5, massEarth: 1, equilibriumTemperatureK: 250 })).toBe(
+      'icy',
+    );
   });
 
   it('melts a rocky world that is hot enough', () => {
@@ -124,7 +176,9 @@ describe('classifyPlanet', () => {
 
   it('refuses to call a 11 km moon temperate on the strength of its orbital distance', () => {
     // Phobos sits at Mars's distance and so at Mars's temperature, and is an airless rock.
-    expect(classifyPlanet({ radiusEarth: EARTH_RADII.phobos, equilibriumTemperatureK: 206 })).toBe('rocky');
+    expect(classifyPlanet({ radiusEarth: EARTH_RADII.phobos, equilibriumTemperatureK: 206 })).toBe(
+      'rocky',
+    );
   });
 
   it('falls back to size alone when the host star is unknown', () => {
@@ -171,7 +225,13 @@ describe('polarCapExtentDeg', () => {
   });
 
   it('does not put ice on a world where ice is not the question', () => {
-    for (const planetClass of ['gasGiant', 'hotGasGiant', 'iceGiant', 'subNeptune', 'lava'] as PlanetClass[]) {
+    for (const planetClass of [
+      'gasGiant',
+      'hotGasGiant',
+      'iceGiant',
+      'subNeptune',
+      'lava',
+    ] as PlanetClass[]) {
       expect(polarCapExtentDeg(planetClass, 100)).toBeNull();
     }
   });
@@ -207,10 +267,22 @@ describe('paletteFor', () => {
   });
 
   it('bands the worlds with a fluid envelope and gives terrain to the ones with a surface', () => {
-    for (const planetClass of ['gasGiant', 'hotGasGiant', 'iceGiant', 'subNeptune'] as PlanetClass[]) {
+    for (const planetClass of [
+      'gasGiant',
+      'hotGasGiant',
+      'iceGiant',
+      'subNeptune',
+    ] as PlanetClass[]) {
       expect(paletteFor(planetClass).structure).toBe('banded');
     }
-    for (const planetClass of ['lava', 'scorched', 'iron', 'rocky', 'temperate', 'icy'] as PlanetClass[]) {
+    for (const planetClass of [
+      'lava',
+      'scorched',
+      'iron',
+      'rocky',
+      'temperate',
+      'icy',
+    ] as PlanetClass[]) {
       expect(paletteFor(planetClass).structure).toBe('terrain');
     }
   });
@@ -245,7 +317,13 @@ describe('seedFromId', () => {
 
 describe('planetAppearance', () => {
   it('derives the whole chain from published measurements', () => {
-    const earth = planetAppearance({ id: 'earth', radiusEarth: 1, massEarth: 1, semiMajorAxisAu: 1, hostLuminositySolar: 1 });
+    const earth = planetAppearance({
+      id: 'earth',
+      radiusEarth: 1,
+      massEarth: 1,
+      semiMajorAxisAu: 1,
+      hostLuminositySolar: 1,
+    });
 
     expect(earth.planetClass).toBe('temperate');
     expect(earth.equilibriumTemperatureK).toBeCloseTo(255, -0.5);

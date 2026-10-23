@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatAu, formatDensity, formatDistance, formatLuminosity, formatMassEarth, formatParsecs, formatPeriod, formatRadiusKm, formatTemperature } from './quantity';
+import {
+  formatAu,
+  formatDensity,
+  formatDistance,
+  formatLuminosity,
+  formatMassEarth,
+  formatParsecs,
+  formatPeriod,
+  formatRadiusKm,
+  formatTemperature,
+} from './quantity';
 
 describe('formatParsecs', () => {
   it('switches to kiloparsecs past a thousand parsecs', () => {
@@ -31,7 +41,7 @@ describe('formatDistance', () => {
     expect(formatDistance(117.3, undefined)).toBe('117 pc');
   });
 
-  it("gives a range once the error is a fifth of the parallax, and no upper end past all of it", () => {
+  it('gives a range once the error is a fifth of the parallax, and no upper end past all of it', () => {
     // Alnilam: 1.65 ± 0.45 mas in Hipparcos.
     expect(formatDistance(606.06, 0.45 / 1.65)).toBe('476 pc to 833 pc');
     expect(formatDistance(250, 1)).toBe('125 pc or more');

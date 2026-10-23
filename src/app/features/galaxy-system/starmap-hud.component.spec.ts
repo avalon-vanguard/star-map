@@ -14,7 +14,9 @@ describe('StarmapHudComponent', () => {
   }
 
   function buttonLabels(host: HTMLElement): string[] {
-    return [...host.querySelectorAll('nav button')].map((button) => button.textContent?.trim() ?? '');
+    return [...host.querySelectorAll('nav button')].map(
+      (button) => button.textContent?.trim() ?? '',
+    );
   }
 
   beforeEach(async () => {
@@ -84,7 +86,11 @@ describe('StarmapHudComponent', () => {
     fixture.componentRef.setInput('title', 'Sol');
     fixture.detectChanges();
 
-    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="hud-banner"]')?.textContent?.trim()).toBe('Sol');
+    expect(
+      (fixture.nativeElement as HTMLElement)
+        .querySelector('[data-testid="hud-banner"]')
+        ?.textContent?.trim(),
+    ).toBe('Sol');
   });
 
   it('names what the view is holding on a phone too, under the scale bar and inside the frame, and across the centre from lg', () => {
@@ -97,7 +103,9 @@ describe('StarmapHudComponent', () => {
 
     expect(place).not.toContain('hidden');
     expect(place).toEqual(expect.arrayContaining(['top-24', 'left-6', 'max-w-[calc(100%-3rem)]']));
-    expect(place).toEqual(expect.arrayContaining(['lg:top-6', 'lg:left-1/2', 'lg:-translate-x-1/2', 'lg:max-w-none']));
+    expect(place).toEqual(
+      expect.arrayContaining(['lg:top-6', 'lg:left-1/2', 'lg:-translate-x-1/2', 'lg:max-w-none']),
+    );
     // Wrapped, never cut: a designation's last digits are what tell it apart.
     expect(banner.querySelector(':scope > span')!.classList).toContain('wrap-break-word');
   });

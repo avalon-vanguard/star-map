@@ -3,12 +3,29 @@ import * as THREE from 'three/webgpu';
 import { appearanceForBody, appearanceForExoplanet } from '../../shared/astro/body-appearance';
 import { PlanetAppearance } from '../../shared/astro/planet-appearance';
 import { planetTexture } from '../../shared/rendering/procedural-planet-texture';
-import { bodyTexturePath, loadCachedTexture, saturnRing } from '../../shared/rendering/texture-catalog';
-import { isPropagatableOrbit, keplerRates, meanElementsAt, orbitEllipsePoints, positionAtEpoch, resolveGravitationalParameter, resolveOrbitalElements } from '../../shared/astro/kepler';
+import {
+  bodyTexturePath,
+  loadCachedTexture,
+  saturnRing,
+} from '../../shared/rendering/texture-catalog';
+import {
+  isPropagatableOrbit,
+  keplerRates,
+  meanElementsAt,
+  orbitEllipsePoints,
+  positionAtEpoch,
+  resolveGravitationalParameter,
+  resolveOrbitalElements,
+} from '../../shared/astro/kepler';
 import { CartesianCoordinates, OBLIQUITY_J2000_DEG } from '../../shared/astro/coordinates';
 import { tdbFromUtc } from '../../shared/astro/constants';
 import { blackbodyColor, SOLAR_EFFECTIVE_TEMPERATURE_K } from '../../shared/astro/stellar';
-import { BodyRecord, MeanElementRates, OrbitalElements, RotationalElements } from '../../shared/models/body.model';
+import {
+  BodyRecord,
+  MeanElementRates,
+  OrbitalElements,
+  RotationalElements,
+} from '../../shared/models/body.model';
 import { bodyOrientation, poleFrame } from '../../shared/rendering/body-orientation';
 import { bodyMarkerRadiusAu, systemGridRingsAu } from './system-framing';
 import { PolarGridPlane, TetherField } from './grid-plane';
@@ -34,7 +51,7 @@ const ORBIT_LINE_OPACITY_BY_KIND: Record<SystemMemberKind, number> = {
   planet: 0.5,
   dwarf: 0.4,
   moon: 0.35,
-  exoplanet: 0.35
+  exoplanet: 0.35,
 };
 
 const EARTH_RADIUS_KM = 6371;
@@ -50,7 +67,10 @@ const SYSTEM_TETHER_OPACITY = 0.3;
  * obliquity about the shared vernal-equinox axis. The planets' and the Moon's mean elements are
  * given against the J2000 ecliptic, so this is their frame.
  */
-const ECLIPTIC_FRAME = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), OBLIQUITY_J2000_DEG * DEG_TO_RAD);
+const ECLIPTIC_FRAME = new THREE.Quaternion().setFromAxisAngle(
+  new THREE.Vector3(1, 0, 0),
+  OBLIQUITY_J2000_DEG * DEG_TO_RAD,
+);
 
 /**
  * Rotation carrying a moon's element frame into the scene: its local Laplace plane where JPL
@@ -71,10 +91,16 @@ const scratchTurn = new THREE.Quaternion();
  * scene: the argument of periapsis, then the inclination, then the node, as
  * `positionAtTrueAnomaly` turns a point, and then the frame the elements are measured in.
  */
-function orientOrbit(target: THREE.Quaternion, elements: OrbitalElements, frame: THREE.Quaternion): THREE.Quaternion {
+function orientOrbit(
+  target: THREE.Quaternion,
+  elements: OrbitalElements,
+  frame: THREE.Quaternion,
+): THREE.Quaternion {
   return target
     .copy(frame)
-    .multiply(scratchTurn.setFromAxisAngle(Z_AXIS, elements.longitudeOfAscendingNodeDeg * DEG_TO_RAD))
+    .multiply(
+      scratchTurn.setFromAxisAngle(Z_AXIS, elements.longitudeOfAscendingNodeDeg * DEG_TO_RAD),
+    )
     .multiply(scratchTurn.setFromAxisAngle(X_AXIS, elements.inclinationDeg * DEG_TO_RAD))
     .multiply(scratchTurn.setFromAxisAngle(Z_AXIS, elements.argumentOfPeriapsisDeg * DEG_TO_RAD));
 }
@@ -104,7 +130,10 @@ function skyPlaneFrame(lineOfSight: CartesianCoordinates | undefined): THREE.Qua
   if (direction.lengthSq() === 0) {
     return ECLIPTIC_FRAME.clone();
   }
-  return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction.normalize());
+  return new THREE.Quaternion().setFromUnitVectors(
+    new THREE.Vector3(0, 0, 1),
+    direction.normalize(),
+  );
 }
 
 function colorForKind(kind: SystemMemberKind): THREE.Color {
@@ -132,19 +161,32 @@ const ORBIT_LINE_NAME = 'orbit-line';
  *
  * The shape is redrawn by {@link reshapeOrbitLine} as the planets' axes and eccentricities drift.
  */
-function buildOrbitLine(elements: OrbitalElements, kind: SystemMemberKind, frame: THREE.Quaternion): THREE.Line {
+function buildOrbitLine(
+  elements: OrbitalElements,
+  kind: SystemMemberKind,
+  frame: THREE.Quaternion,
+): THREE.Line {
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(ellipseInItsPlane(elements, new Float32Array((ORBIT_LINE_SEGMENTS + 1) * 3)), 3));
+  geometry.setAttribute(
+    'position',
+    new THREE.BufferAttribute(
+      ellipseInItsPlane(elements, new Float32Array((ORBIT_LINE_SEGMENTS + 1) * 3)),
+      3,
+    ),
+  );
 
   const material = new THREE.LineBasicMaterial({
     color: colorForKind(kind),
     transparent: true,
-    opacity: ORBIT_LINE_OPACITY_BY_KIND[kind]
+    opacity: ORBIT_LINE_OPACITY_BY_KIND[kind],
   });
 
   const line = new THREE.Line(geometry, material);
   line.name = ORBIT_LINE_NAME;
-  line.userData = { semiMajorAxisAu: elements.semiMajorAxisAu, eccentricity: elements.eccentricity };
+  line.userData = {
+    semiMajorAxisAu: elements.semiMajorAxisAu,
+    eccentricity: elements.eccentricity,
+  };
   orientOrbit(line.quaternion, elements, frame);
   return line;
 }
@@ -153,7 +195,10 @@ const ORBIT_LINE_SEGMENTS = 128;
 
 /** The orbit's ellipse in its own plane, periapsis along +X, written into `positions`. */
 function ellipseInItsPlane(elements: OrbitalElements, positions: Float32Array): Float32Array {
-  orbitEllipsePoints({ ...elements, inclinationDeg: 0, longitudeOfAscendingNodeDeg: 0, argumentOfPeriapsisDeg: 0 }, ORBIT_LINE_SEGMENTS).forEach((point, index) => {
+  orbitEllipsePoints(
+    { ...elements, inclinationDeg: 0, longitudeOfAscendingNodeDeg: 0, argumentOfPeriapsisDeg: 0 },
+    ORBIT_LINE_SEGMENTS,
+  ).forEach((point, index) => {
     positions[index * 3] = point.x;
     positions[index * 3 + 1] = point.y;
     positions[index * 3 + 2] = point.z;
@@ -177,7 +222,9 @@ const ORBIT_RESHAPE_AU = 1e-4;
  */
 function reshapeOrbitLine(line: THREE.Line, elements: OrbitalElements): void {
   const drawn = line.userData as { semiMajorAxisAu: number; eccentricity: number };
-  const driftAu = Math.abs(elements.semiMajorAxisAu - drawn.semiMajorAxisAu) + elements.semiMajorAxisAu * Math.abs(elements.eccentricity - drawn.eccentricity);
+  const driftAu =
+    Math.abs(elements.semiMajorAxisAu - drawn.semiMajorAxisAu) +
+    elements.semiMajorAxisAu * Math.abs(elements.eccentricity - drawn.eccentricity);
   if (driftAu <= ORBIT_RESHAPE_AU) {
     return;
   }
@@ -185,7 +232,10 @@ function reshapeOrbitLine(line: THREE.Line, elements: OrbitalElements): void {
   ellipseInItsPlane(elements, position.array as Float32Array);
   position.needsUpdate = true;
   line.geometry.computeBoundingSphere();
-  line.userData = { semiMajorAxisAu: elements.semiMajorAxisAu, eccentricity: elements.eccentricity };
+  line.userData = {
+    semiMajorAxisAu: elements.semiMajorAxisAu,
+    eccentricity: elements.eccentricity,
+  };
 }
 
 /**
@@ -220,7 +270,7 @@ function buildMarker(
   radiusKm: number | undefined,
   appearance: PlanetAppearance | undefined,
   deferSurface: (paint: () => void) => void,
-  deferPhotograph: (material: THREE.MeshStandardMaterial, texture: THREE.Texture) => void
+  deferPhotograph: (material: THREE.MeshStandardMaterial, texture: THREE.Texture) => void,
 ): THREE.Mesh {
   const photograph = id ? bodyTexturePath(id) : undefined;
   // null, not undefined, until there is one: three warns "parameter 'map' has value of
@@ -229,7 +279,7 @@ function buildMarker(
     map: null,
     color: colorForKind(kind),
     roughness: 1,
-    metalness: 0
+    metalness: 0,
   });
   if (photograph) {
     deferPhotograph(material, loadCachedTexture(photograph));
@@ -270,7 +320,10 @@ function buildMarker(
  */
 function starLight(temperatureK: number | null | undefined): THREE.PointLight {
   const light = new THREE.PointLight(0xffffff, Math.PI, 0, 0);
-  light.color.setRGB(...blackbodyColor(temperatureK ?? SOLAR_EFFECTIVE_TEMPERATURE_K, SOLAR_EFFECTIVE_TEMPERATURE_K), THREE.LinearSRGBColorSpace);
+  light.color.setRGB(
+    ...blackbodyColor(temperatureK ?? SOLAR_EFFECTIVE_TEMPERATURE_K, SOLAR_EFFECTIVE_TEMPERATURE_K),
+    THREE.LinearSRGBColorSpace,
+  );
   light.position.set(0, 0, 0);
   return light;
 }
@@ -316,10 +369,19 @@ const HOURS_PER_DAY = 24;
  *
  * Every other body is turned by {@link bodyOrientation}.
  */
-function spinFor(elements: OrbitalElements, frame: THREE.Quaternion, rotationPeriodHours: number, daysSinceEpoch: number): THREE.Quaternion {
+function spinFor(
+  elements: OrbitalElements,
+  frame: THREE.Quaternion,
+  rotationPeriodHours: number,
+  daysSinceEpoch: number,
+): THREE.Quaternion {
   const node = elements.longitudeOfAscendingNodeDeg * DEG_TO_RAD;
   const inclination = elements.inclinationDeg * DEG_TO_RAD;
-  const axis = new THREE.Vector3(Math.sin(inclination) * Math.sin(node), -Math.sin(inclination) * Math.cos(node), Math.cos(inclination)).applyQuaternion(frame);
+  const axis = new THREE.Vector3(
+    Math.sin(inclination) * Math.sin(node),
+    -Math.sin(inclination) * Math.cos(node),
+    Math.cos(inclination),
+  ).applyQuaternion(frame);
   const turns = (daysSinceEpoch * HOURS_PER_DAY) / rotationPeriodHours;
   return new THREE.Quaternion()
     .setFromUnitVectors(SPIN_AXIS, axis)
@@ -386,7 +448,10 @@ export class SystemOrbitsRenderer {
 
   private readonly topLevelBodies: TrackedTopLevelBody[] = [];
   private readonly moons: TrackedMoon[] = [];
-  private readonly disposables: Array<{ geometry: THREE.BufferGeometry; material: THREE.Material }> = [];
+  private readonly disposables: Array<{
+    geometry: THREE.BufferGeometry;
+    material: THREE.Material;
+  }> = [];
   private readonly grid?: PolarGridPlane;
   private readonly tethers?: TetherField;
   /**
@@ -403,11 +468,18 @@ export class SystemOrbitsRenderer {
   };
   private readonly paintNextSurface = (): void => {
     this.surfacesToPaint.shift()?.();
-    this.surfaceTimer = this.surfacesToPaint.length > 0 ? setTimeout(this.paintNextSurface, 0) : undefined;
+    this.surfaceTimer =
+      this.surfacesToPaint.length > 0 ? setTimeout(this.paintNextSurface, 0) : undefined;
   };
   /** Photographs still to put on their bodies, one a frame once loaded; see `buildMarker`. */
-  private readonly photographsToShow: Array<{ material: THREE.MeshStandardMaterial; texture: THREE.Texture }> = [];
-  private readonly deferPhotograph = (material: THREE.MeshStandardMaterial, texture: THREE.Texture): void => {
+  private readonly photographsToShow: Array<{
+    material: THREE.MeshStandardMaterial;
+    texture: THREE.Texture;
+  }> = [];
+  private readonly deferPhotograph = (
+    material: THREE.MeshStandardMaterial,
+    texture: THREE.Texture,
+  ): void => {
     this.photographsToShow.push({ material, texture });
   };
 
@@ -423,14 +495,21 @@ export class SystemOrbitsRenderer {
      */
     hostLuminositySolar?: number | null,
     /** The host star's effective temperature, which is the colour of the light it casts. */
-    hostTemperatureK?: number | null
+    hostTemperatureK?: number | null,
   ) {
     const members: SystemMember[] = [];
     const topLevelBodiesById = new Map<string, BodyRecord>();
 
     const topLevelOrbits = [
-      ...bodies.filter((body) => !body.parentBodyId).map(({ orbit }) => ({ axis: orbit.semiMajorAxisAu, eccentricity: orbit.eccentricity })),
-      ...exoplanets.filter((exoplanet) => isPropagatableOrbit(exoplanet.orbit)).map(({ orbit }) => ({ axis: orbit.semiMajorAxisAu!, eccentricity: orbit.eccentricity ?? 0 }))
+      ...bodies
+        .filter((body) => !body.parentBodyId)
+        .map(({ orbit }) => ({ axis: orbit.semiMajorAxisAu, eccentricity: orbit.eccentricity })),
+      ...exoplanets
+        .filter((exoplanet) => isPropagatableOrbit(exoplanet.orbit))
+        .map(({ orbit }) => ({
+          axis: orbit.semiMajorAxisAu!,
+          eccentricity: orbit.eccentricity ?? 0,
+        })),
     ].filter(({ axis }) => Number.isFinite(axis) && axis > 0);
     const topLevelAxes = topLevelOrbits.map(({ axis }) => axis);
     this.maxTopLevelSemiMajorAxisAu = topLevelAxes.length > 0 ? Math.max(...topLevelAxes) : 0;
@@ -447,7 +526,16 @@ export class SystemOrbitsRenderer {
       }
       // A body reaches here only when it has no parentBodyId, so `kind` is 'planet' or 'dwarf'.
       const kind: SystemMemberKind = body.kind;
-      const tracked = this.addTopLevelBody(body.id, kind, body.orbit, body.rates, body.radiusKm, ECLIPTIC_FRAME, appearanceForBody(body, bodies, hostLuminositySolar), { periodHours: body.rotationPeriodHours, elements: body.rotationalElements });
+      const tracked = this.addTopLevelBody(
+        body.id,
+        kind,
+        body.orbit,
+        body.rates,
+        body.radiusKm,
+        ECLIPTIC_FRAME,
+        appearanceForBody(body, bodies, hostLuminositySolar),
+        { periodHours: body.rotationPeriodHours, elements: body.rotationalElements },
+      );
       if (body.id === 'saturn') {
         // A child of the sphere, so it lies in the equator the IAU pole turns the sphere into and
         // is scaled with it where the marker is held to its pixel floor. Jupiter's, Uranus's and
@@ -465,11 +553,22 @@ export class SystemOrbitsRenderer {
         continue;
       }
       const parent = topLevelBodiesById.get(body.parentBodyId);
-      const parentTracked = parent && this.topLevelBodies.find((tracked) => tracked.id === parent.id);
+      const parentTracked =
+        parent && this.topLevelBodies.find((tracked) => tracked.id === parent.id);
       if (!parentTracked) {
         continue; // orphaned moon reference; skip rather than crash.
       }
-      const moon = this.addMoon(body.id, body.orbit, body.rates, body.radiusKm, parentTracked, moonFrame(body), appearanceForBody(body, bodies, hostLuminositySolar), { periodHours: body.rotationPeriodHours, elements: body.rotationalElements }, body.massRatio);
+      const moon = this.addMoon(
+        body.id,
+        body.orbit,
+        body.rates,
+        body.radiusKm,
+        parentTracked,
+        moonFrame(body),
+        appearanceForBody(body, bodies, hostLuminositySolar),
+        { periodHours: body.rotationPeriodHours, elements: body.rotationalElements },
+        body.massRatio,
+      );
       members.push({ id: body.id, kind: 'moon', marker: moon.marker, parentId: parent.id });
     }
 
@@ -492,9 +591,17 @@ export class SystemOrbitsRenderer {
       const gm = resolveGravitationalParameter({
         semiMajorAxisAu: exoplanet.orbit.semiMajorAxisAu,
         periodDays: exoplanet.periodDays,
-        hostStarMassSolar: exoplanet.hostStarMassSolar
+        hostStarMassSolar: exoplanet.hostStarMassSolar,
       });
-      const tracked = this.addTopLevelBody(exoplanet.id, 'exoplanet', elements, keplerRates(elements.semiMajorAxisAu, gm), radiusKm, exoplanetFrame, appearanceForExoplanet(exoplanet, hostLuminositySolar));
+      const tracked = this.addTopLevelBody(
+        exoplanet.id,
+        'exoplanet',
+        elements,
+        keplerRates(elements.semiMajorAxisAu, gm),
+        radiusKm,
+        exoplanetFrame,
+        appearanceForExoplanet(exoplanet, hostLuminositySolar),
+      );
       members.push({ id: exoplanet.id, kind: 'exoplanet', marker: tracked.marker });
     }
 
@@ -503,10 +610,15 @@ export class SystemOrbitsRenderer {
     // Which plane the system is read against follows from where its elements came from. Only the
     // Sun has JPL bodies and no system has both, so this is a choice between the two rather
     // than a compromise: the ecliptic if there are solar-system bodies, the sky plane otherwise.
-    this.referenceFrame = bodies.some((body) => !body.parentBodyId) ? ECLIPTIC_FRAME.clone() : exoplanetFrame;
+    this.referenceFrame = bodies.some((body) => !body.parentBodyId)
+      ? ECLIPTIC_FRAME.clone()
+      : exoplanetFrame;
 
     const rings = systemGridRingsAu(this.maxTopLevelSemiMajorAxisAu);
-    this.outermostRadiusAu = Math.max(rings.length > 0 ? rings[rings.length - 1] : 0, ...topLevelOrbits.map(({ axis, eccentricity }) => axis * (1 + eccentricity)));
+    this.outermostRadiusAu = Math.max(
+      rings.length > 0 ? rings[rings.length - 1] : 0,
+      ...topLevelOrbits.map(({ axis, eccentricity }) => axis * (1 + eccentricity)),
+    );
     if (rings.length > 0) {
       this.grid = new PolarGridPlane({
         ringRadii: rings,
@@ -516,13 +628,13 @@ export class SystemOrbitsRenderer {
         // orbit ellipses, which are themselves rings, and it must not be mistaken for one.
         opacity: SYSTEM_GRID_OPACITY,
         dashed: true,
-        emphasisRadii: [rings[rings.length - 1]]
+        emphasisRadii: [rings[rings.length - 1]],
       });
       this.grid.setStrength(1);
 
       this.tethers = new TetherField(this.topLevelBodies.length, {
         normal: new THREE.Vector3(0, 0, 1).applyQuaternion(this.referenceFrame),
-        opacity: SYSTEM_TETHER_OPACITY
+        opacity: SYSTEM_TETHER_OPACITY,
       });
       this.tethers.setStrength(1);
       this.tetherPoints = this.topLevelBodies.map((body) => body.position);
@@ -549,9 +661,16 @@ export class SystemOrbitsRenderer {
       orientOrbit(body.orbitLine.quaternion, current, body.frame);
       reshapeOrbitLine(body.orbitLine, current);
       if (body.rotationalElements) {
-        bodyOrientation(body.rotationalElements, epochJd, body.marker.quaternion, body.id === 'earth');
+        bodyOrientation(
+          body.rotationalElements,
+          epochJd,
+          body.marker.quaternion,
+          body.id === 'earth',
+        );
       } else if (body.rotationPeriodHours) {
-        body.marker.quaternion.copy(spinFor(current, body.frame, body.rotationPeriodHours, jdTdb - body.elements.epochJd));
+        body.marker.quaternion.copy(
+          spinFor(current, body.frame, body.rotationPeriodHours, jdTdb - body.elements.epochJd),
+        );
       }
     }
 
@@ -569,14 +688,18 @@ export class SystemOrbitsRenderer {
         // The planet's elements place the pair's barycentre, which is where the pivot is: the
         // planet sits the moon's share of their separation back from it, the moon the rest out.
         const { massRatio, parentOrbitLine } = moon.barycentre;
-        parent.marker.position.copy(parent.position).addScaledVector(moon.marker.position, -massRatio / (1 + massRatio));
+        parent.marker.position
+          .copy(parent.position)
+          .addScaledVector(moon.marker.position, -massRatio / (1 + massRatio));
         moon.marker.position.multiplyScalar(1 / (1 + massRatio));
         parentOrbitLine.quaternion.copy(moon.orbitLine.quaternion);
       }
       if (moon.rotationalElements) {
         bodyOrientation(moon.rotationalElements, epochJd, moon.marker.quaternion);
       } else if (moon.rotationPeriodHours) {
-        moon.marker.quaternion.copy(spinFor(current, moon.frame, moon.rotationPeriodHours, jdTdb - moon.elements.epochJd));
+        moon.marker.quaternion.copy(
+          spinFor(current, moon.frame, moon.rotationPeriodHours, jdTdb - moon.elements.epochJd),
+        );
       }
     }
 
@@ -613,7 +736,12 @@ export class SystemOrbitsRenderer {
    * Earth's centre. A moon drawn inside its planet's disc, as the Moon is inside Earth's at that
    * framing, never ranks above the planet; one drawn clear of it is picked on its own.
    */
-  pickAt(pointerNdc: THREE.Vector2, camera: THREE.Camera, aspect: number, slopNdc: number): SystemMember | undefined {
+  pickAt(
+    pointerNdc: THREE.Vector2,
+    camera: THREE.Camera,
+    aspect: number,
+    slopNdc: number,
+  ): SystemMember | undefined {
     const centre = new THREE.Vector3();
     const edge = new THREE.Vector3();
     const scale = new THREE.Vector3();
@@ -635,7 +763,11 @@ export class SystemOrbitsRenderer {
       member.marker.getWorldPosition(centre);
       member.marker.getWorldScale(scale);
       // An offset along the camera's up projects to the drawn radius under either projection.
-      edge.copy(up).multiplyScalar(extent * scale.x).add(centre).project(camera);
+      edge
+        .copy(up)
+        .multiplyScalar(extent * scale.x)
+        .add(centre)
+        .project(camera);
       centre.project(camera);
       // `project` mirrors a point behind the camera onto the screen.
       if (centre.z < -1 || centre.z > 1) {
@@ -694,15 +826,33 @@ export class SystemOrbitsRenderer {
     radiusKm: number | undefined,
     frame: THREE.Quaternion,
     appearance?: PlanetAppearance,
-    rotation?: { periodHours?: number; elements?: RotationalElements }
+    rotation?: { periodHours?: number; elements?: RotationalElements },
   ): TrackedTopLevelBody {
     const orbitLine = buildOrbitLine(elements, kind, frame);
-    const marker = buildMarker(id, kind, radiusKm, appearance, this.deferSurface, this.deferPhotograph);
+    const marker = buildMarker(
+      id,
+      kind,
+      radiusKm,
+      appearance,
+      this.deferSurface,
+      this.deferPhotograph,
+    );
     this.object.add(orbitLine, marker);
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);
     this.trackDisposable(marker.geometry, marker.material as THREE.Material);
 
-    const tracked: TrackedTopLevelBody = { id, kind, elements, rates, marker, orbitLine, frame, position: new THREE.Vector3(), rotationPeriodHours: rotation?.periodHours, rotationalElements: rotation?.elements };
+    const tracked: TrackedTopLevelBody = {
+      id,
+      kind,
+      elements,
+      rates,
+      marker,
+      orbitLine,
+      frame,
+      position: new THREE.Vector3(),
+      rotationPeriodHours: rotation?.periodHours,
+      rotationalElements: rotation?.elements,
+    };
     this.topLevelBodies.push(tracked);
     return tracked;
   }
@@ -716,11 +866,18 @@ export class SystemOrbitsRenderer {
     frame: THREE.Quaternion,
     appearance?: PlanetAppearance,
     rotation?: { periodHours?: number; elements?: RotationalElements },
-    massRatio?: number
+    massRatio?: number,
   ): TrackedMoon {
     const pivot = new THREE.Group();
     const orbitLine = buildOrbitLine(elements, 'moon', frame);
-    const marker = buildMarker(id, 'moon', radiusKm, appearance, this.deferSurface, this.deferPhotograph);
+    const marker = buildMarker(
+      id,
+      'moon',
+      radiusKm,
+      appearance,
+      this.deferSurface,
+      this.deferPhotograph,
+    );
     pivot.add(orbitLine, marker);
     this.object.add(pivot);
     this.trackDisposable(orbitLine.geometry, orbitLine.material as THREE.Material);
@@ -739,7 +896,19 @@ export class SystemOrbitsRenderer {
       barycentre = { massRatio, parentOrbitLine };
     }
 
-    const moon: TrackedMoon = { id, elements, rates, marker, orbitLine, frame, pivot, parentId: parent.id, rotationPeriodHours: rotation?.periodHours, rotationalElements: rotation?.elements, barycentre };
+    const moon: TrackedMoon = {
+      id,
+      elements,
+      rates,
+      marker,
+      orbitLine,
+      frame,
+      pivot,
+      parentId: parent.id,
+      rotationPeriodHours: rotation?.periodHours,
+      rotationalElements: rotation?.elements,
+      barycentre,
+    };
     this.moons.push(moon);
     return moon;
   }

@@ -15,7 +15,7 @@ const RADIUS_PATTERNS = [
   new RegExp(String.raw`Radius\s*\(IAU\)[^=]*${RADIUS_VALUE}`, 'i'),
   // Charon's page says `Radius (km, IAU2015) = 606`.
   new RegExp(String.raw`Radius,?\s*\(km(?:,\s*IAU\s*2015)?\)\s*${RADIUS_VALUE}`, 'i'),
-  new RegExp(String.raw`Radius\s*\(gravity\),?\s*km\s*${RADIUS_VALUE}`, 'i')
+  new RegExp(String.raw`Radius\s*\(gravity\),?\s*km\s*${RADIUS_VALUE}`, 'i'),
 ];
 
 /**
@@ -32,10 +32,11 @@ const ROTATION_RATE_PATTERN = /Rot(?:ational)?\.?\s*Rate\s*[(,]\s*rad\/s\s*\)?\s
  * `9h 55m 29.711 s`, as Jupiter and Saturn state it, and `9h 16.438 m`, as Phoebe does: read as
  * a period in hours alone, Phoebe turned once in 9 hours instead of 9.274.
  */
-const SEXAGESIMAL_ROTATION_PATTERN = /(?:Sid(?:ereal|\.)?\s*rot\.?|Rotation(?:al)?)\s*period[^=]*=\s*(\d+)\s*h\s*([\d.]+)\s*m(?:\s*([\d.]+)\s*s)?/i;
+const SEXAGESIMAL_ROTATION_PATTERN =
+  /(?:Sid(?:ereal|\.)?\s*rot\.?|Rotation(?:al)?)\s*period[^=]*=\s*(\d+)\s*h\s*([\d.]+)\s*m(?:\s*([\d.]+)\s*s)?/i;
 const ROTATION_PERIOD_PATTERNS = [
   /Sid(?:ereal|\.)?\s*rot\.?\s*period[^=]*=\s*(-?[\d.]+)(?:\+-[\d.]+)?\s*(h|hr|hrs|d|day|days)\b/i,
-  /Rotation(?:al)?\s*period[^=]*=\s*(-?[\d.]+)\s*(h|hr|hrs|d|day|days)\b/i
+  /Rotation(?:al)?\s*period[^=]*=\s*(-?[\d.]+)\s*(h|hr|hrs|d|day|days)\b/i,
 ];
 const SYNCHRONOUS_PATTERN = /Rotation(?:al)?\s*period\s*=?\s*:?\s*Synchronous/i;
 /** `25.19 deg` on most pages, `2.11' +/- 0.1'` in arcminutes on Mercury's. */
@@ -63,7 +64,11 @@ export function extractRotationPeriodHours(text: string): number | undefined {
   }
   const sexagesimal = text.match(SEXAGESIMAL_ROTATION_PATTERN);
   if (sexagesimal) {
-    return Number(sexagesimal[1]) + Number(sexagesimal[2]) / 60 + Number(sexagesimal[3] ?? 0) / SECONDS_PER_HOUR;
+    return (
+      Number(sexagesimal[1]) +
+      Number(sexagesimal[2]) / 60 +
+      Number(sexagesimal[3] ?? 0) / SECONDS_PER_HOUR
+    );
   }
   for (const pattern of ROTATION_PERIOD_PATTERNS) {
     const match = text.match(pattern);

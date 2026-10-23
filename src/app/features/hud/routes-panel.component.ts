@@ -62,7 +62,9 @@ type Field = 'from' | 'to';
                covers nothing, and the field being typed into does not move. Hung below instead,
                six matches ran 61 px past the bottom of a 390 by 844 screen. -->
           <div class="relative max-sm:flex max-sm:flex-col">
-            <label [for]="'route-' + field" class="type-label text-muted">{{ field === 'from' ? 'Departure' : 'Destination' }}</label>
+            <label [for]="'route-' + field" class="type-label text-muted">{{
+              field === 'from' ? 'Departure' : 'Destination'
+            }}</label>
             <input
               #input
               [id]="'route-' + field"
@@ -96,8 +98,12 @@ type Field = 'from' | 'to';
                       (click)="choose(field, option)"
                       class="flex w-full items-baseline gap-3 px-2.5 py-1.5 text-left transition-colors hover:bg-accent/8 focus-visible:bg-accent/12 focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
                     >
-                      <span class="min-w-0 flex-1 truncate text-sm text-text">{{ option.name }}</span>
-                      <span class="type-label shrink-0 truncate text-muted">{{ option.subtitle }}</span>
+                      <span class="min-w-0 flex-1 truncate text-sm text-text">{{
+                        option.name
+                      }}</span>
+                      <span class="type-label shrink-0 truncate text-muted">{{
+                        option.subtitle
+                      }}</span>
                     </button>
                   </li>
                 }
@@ -119,7 +125,11 @@ type Field = 'from' | 'to';
           (input)="onRange($event)"
           class="h-1 min-w-0 flex-1 appearance-none rounded-none bg-border accent-accent"
         />
-        <output for="route-range" class="w-20 shrink-0 text-right text-sm text-accent tabular-nums">{{ rangeLabel() }}</output>
+        <output
+          for="route-range"
+          class="w-20 shrink-0 text-right text-sm text-accent tabular-nums"
+          >{{ rangeLabel() }}</output
+        >
       </div>
 
       <div class="flex items-center gap-3">
@@ -134,7 +144,8 @@ type Field = 'from' | 'to';
         @if (result(); as plotted) {
           @if (plotted.stars.length) {
             <p data-testid="route-summary" class="text-sm text-text tabular-nums">
-              {{ plotted.stars.length - 1 }} {{ plotted.stars.length === 2 ? 'jump' : 'jumps' }} <span class="text-muted">·</span> {{ format(plotted.totalPc) }}
+              {{ plotted.stars.length - 1 }} {{ plotted.stars.length === 2 ? 'jump' : 'jumps' }}
+              <span class="text-muted">·</span> {{ format(plotted.totalPc) }}
             </p>
           } @else {
             <p data-testid="route-summary" class="text-sm text-muted">
@@ -177,7 +188,7 @@ type Field = 'from' | 'to';
         </ol>
       }
     </div>
-  `
+  `,
 })
 export class RoutesPanelComponent {
   /** Whatever the scene found for the last query it was given. */
@@ -213,7 +224,9 @@ export class RoutesPanelComponent {
    */
   // Trimmed, as the scene trims the same text before offering matches for it: a field holding one
   // space looks empty, offers nothing to choose, and would otherwise count as a departure.
-  private readonly departure = computed(() => this.chosen().from ?? (this.typed().from.trim() ? null : this.currentStar()));
+  private readonly departure = computed(
+    () => this.chosen().from ?? (this.typed().from.trim() ? null : this.currentStar()),
+  );
 
   readonly canPlot = computed(() => this.departure() !== null && this.chosen().to !== null);
   readonly rangeLabel = computed(() => formatParsecs(this.rangePc(), 1));

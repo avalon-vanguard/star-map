@@ -1,4 +1,7 @@
-import { eclipticToEquatorial, laplacePlaneToEquatorial } from '../../../src/app/shared/astro/coordinates';
+import {
+  eclipticToEquatorial,
+  laplacePlaneToEquatorial,
+} from '../../../src/app/shared/astro/coordinates';
 import { meanElementsAt, positionAtEpoch } from '../../../src/app/shared/astro/kepler';
 import { MeanOrbit } from '../../../src/app/shared/astro/mean-elements';
 import { orientationAt } from '../../../src/app/shared/astro/rotational-elements';
@@ -35,15 +38,22 @@ const MAX_NODE_HARMONIC = 9;
 const MAX_PRESENT_OFFSET_DEG = 1e-6;
 
 /** The planet's east longitude on a moon's IAU body-fixed frame, from the moon's mean place, at a TDB date. */
-export function subPlanetLongitudeDeg(body: Pick<BodyRecord, 'orbit' | 'rates' | 'laplacePole'>, elements: RotationalElements, jd: number): number {
+export function subPlanetLongitudeDeg(
+  body: Pick<BodyRecord, 'orbit' | 'rates' | 'laplacePole'>,
+  elements: RotationalElements,
+  jd: number,
+): number {
   const own = positionAtEpoch(meanElementsAt(body.orbit, body.rates, jd));
-  const place = body.laplacePole ? laplacePlaneToEquatorial(own, body.laplacePole) : eclipticToEquatorial(own);
+  const place = body.laplacePole
+    ? laplacePlaneToEquatorial(own, body.laplacePole)
+    : eclipticToEquatorial(own);
   const { poleRaDeg, poleDecDeg, primeMeridianDeg } = orientationAt(elements, jd);
   const pole = { raDeg: poleRaDeg, decDeg: poleDecDeg };
   const w = primeMeridianDeg * DEG_TO_RAD;
   const meridian = laplacePlaneToEquatorial({ x: Math.cos(w), y: Math.sin(w), z: 0 }, pole);
   const east = laplacePlaneToEquatorial({ x: -Math.sin(w), y: Math.cos(w), z: 0 }, pole);
-  const along = (axis: { x: number; y: number; z: number }) => -(place.x * axis.x + place.y * axis.y + place.z * axis.z);
+  const along = (axis: { x: number; y: number; z: number }) =>
+    -(place.x * axis.x + place.y * axis.y + place.z * axis.z);
   return Math.atan2(along(east), along(meridian)) / DEG_TO_RAD;
 }
 
@@ -89,54 +99,96 @@ export function subPlanetLongitudeDeg(body: Pick<BodyRecord, 'orbit' | 'rates' |
  * normal (the IAU's line, 11.06), and the face within 16 of Saturn (87), which is what the row's own
  * 9.4-degree lag and its eccentricity make it from 1950 to 2100 as well (15.9).
  */
-export function lockedToOrbit(elements: RotationalElements, mean: Pick<MeanOrbit, 'orbit' | 'rates' | 'laplacePole'>, name: string, poleFollowsOrbit = false): RotationalElements {
+export function lockedToOrbit(
+  elements: RotationalElements,
+  mean: Pick<MeanOrbit, 'orbit' | 'rates' | 'laplacePole'>,
+  name: string,
+  poleFollowsOrbit = false,
+): RotationalElements {
   const [w0, w1, w2 = 0] = elements.primeMeridianDeg;
   if (w2 !== 0) {
     return elements;
   }
   const n = Math.sign(w1) * mean.rates.meanMotionDegPerDay;
   if (Math.abs(w1 / n - 1) > MAX_LOCKED_RATE_OFFSET) {
-    throw new Error(`${name}'s IAU W turns at ${w1} degrees a day, ${Math.abs(w1 / n - 1).toExponential(2)} of its orbit's ${n}: not the rate of the orbit it keeps its face to.`);
+    throw new Error(
+      `${name}'s IAU W turns at ${w1} degrees a day, ${Math.abs(w1 / n - 1).toExponential(2)} of its orbit's ${n}: not the rate of the orbit it keeps its face to.`,
+    );
   }
   const nodeRate = mean.rates.longitudeOfAscendingNodeDegPerDay * DAYS_PER_JULIAN_CENTURY;
   const present = (PRESENT_JD - J2000_JD) / DAYS_PER_JULIAN_CENTURY;
   const terms = elements.terms?.map((term) => {
     const [constant, rate, quadratic = 0] = term.angleDeg;
     const k = Math.round(rate / nodeRate);
-    if (quadratic !== 0 || k === 0 || Math.abs(k) > MAX_NODE_HARMONIC || Math.abs(rate / (k * nodeRate) - 1) > MAX_NODE_RATE_OFFSET) {
+    if (
+      quadratic !== 0 ||
+      k === 0 ||
+      Math.abs(k) > MAX_NODE_HARMONIC ||
+      Math.abs(rate / (k * nodeRate) - 1) > MAX_NODE_RATE_OFFSET
+    ) {
       return term;
     }
     return { ...term, angleDeg: [constant + (rate - k * nodeRate) * present, k * nodeRate] };
   });
-  const locked: RotationalElements = { ...elements, primeMeridianDeg: [w0 + (w1 - n) * (PRESENT_JD - J2000_JD), n, 0], ...(terms ? { terms } : {}) };
+  const locked: RotationalElements = {
+    ...elements,
+    primeMeridianDeg: [w0 + (w1 - n) * (PRESENT_JD - J2000_JD), n, 0],
+    ...(terms ? { terms } : {}),
+  };
   const turned = poleFollowsOrbit ? poleRoundOrbit(locked, mean) : locked;
   // Whatever is re-rated, the pole and W at the present are the kernel's, which is what they were
   // fitted to. Measured: at most 4.7e-10 degrees (Deimos's W, some 2.6 million degrees round).
   const [iau, own] = [elements, turned].map((each) => orientationAt(each, PRESENT_JD));
-  const moved = Math.max(...(['poleRaDeg', 'poleDecDeg', 'primeMeridianDeg'] as const).map((key) => Math.abs(own[key] - iau[key])));
+  const moved = Math.max(
+    ...(['poleRaDeg', 'poleDecDeg', 'primeMeridianDeg'] as const).map((key) =>
+      Math.abs(own[key] - iau[key]),
+    ),
+  );
   if (moved > MAX_PRESENT_OFFSET_DEG) {
-    throw new Error(`${name}'s pole or W on ${PRESENT_JD} is ${moved.toExponential(2)} degrees from the IAU's: re-rated, it should be where the kernel has it today.`);
+    throw new Error(
+      `${name}'s pole or W on ${PRESENT_JD} is ${moved.toExponential(2)} degrees from the IAU's: re-rated, it should be where the kernel has it today.`,
+    );
   }
   return turned;
 }
 
-function poleRoundOrbit(elements: RotationalElements, mean: Pick<MeanOrbit, 'orbit' | 'rates' | 'laplacePole'>): RotationalElements {
+function poleRoundOrbit(
+  elements: RotationalElements,
+  mean: Pick<MeanOrbit, 'orbit' | 'rates' | 'laplacePole'>,
+): RotationalElements {
   if (!mean.laplacePole) {
-    throw new Error('A pole that follows its orbit is carried round the orbit\'s Laplace pole, and this orbit has none.');
+    throw new Error(
+      "A pole that follows its orbit is carried round the orbit's Laplace pole, and this orbit has none.",
+    );
   }
   const laplacePole = mean.laplacePole;
   const normalAt = (jd: number) => {
-    const { inclinationDeg, longitudeOfAscendingNodeDeg } = meanElementsAt(mean.orbit, mean.rates, jd);
+    const { inclinationDeg, longitudeOfAscendingNodeDeg } = meanElementsAt(
+      mean.orbit,
+      mean.rates,
+      jd,
+    );
     const tilt = inclinationDeg * DEG_TO_RAD;
     const node = longitudeOfAscendingNodeDeg * DEG_TO_RAD;
-    const normal = laplacePlaneToEquatorial({ x: Math.sin(tilt) * Math.sin(node), y: -Math.sin(tilt) * Math.cos(node), z: Math.cos(tilt) }, laplacePole);
-    return { raDeg: Math.atan2(normal.y, normal.x) / DEG_TO_RAD, decDeg: Math.asin(normal.z) / DEG_TO_RAD };
+    const normal = laplacePlaneToEquatorial(
+      {
+        x: Math.sin(tilt) * Math.sin(node),
+        y: -Math.sin(tilt) * Math.cos(node),
+        z: Math.cos(tilt),
+      },
+      laplacePole,
+    );
+    return {
+      raDeg: Math.atan2(normal.y, normal.x) / DEG_TO_RAD,
+      decDeg: Math.asin(normal.z) / DEG_TO_RAD,
+    };
   };
   // The node's angle, T in centuries, turned so that 0 is where the normal is furthest north: the
   // circle is then even in declination and odd in right ascension about it, as the form requires.
   const nodeRate = mean.rates.longitudeOfAscendingNodeDegPerDay * DAYS_PER_JULIAN_CENTURY;
   const nodeAtJ2000 = meanElementsAt(mean.orbit, mean.rates, J2000_JD).longitudeOfAscendingNodeDeg;
-  const jdAtAngle = (angleDeg: number, phaseDeg: number) => J2000_JD + ((angleDeg - phaseDeg - nodeAtJ2000) / nodeRate) * DAYS_PER_JULIAN_CENTURY;
+  const jdAtAngle = (angleDeg: number, phaseDeg: number) =>
+    J2000_JD + ((angleDeg - phaseDeg - nodeAtJ2000) / nodeRate) * DAYS_PER_JULIAN_CENTURY;
   let phase = 0;
   let northmost = -Infinity;
   for (let candidate = 0; candidate < 360; candidate += 0.01) {
@@ -156,14 +208,22 @@ function poleRoundOrbit(elements: RotationalElements, mean: Pick<MeanOrbit, 'orb
     const raOffset = ((((normal.raDeg - centre.raDeg) % 360) + 540) % 360) - 180;
     for (let k = 0; k <= POLE_HARMONICS; k++) {
       ra[k] += (2 / samples) * raOffset * Math.sin(k * angle * DEG_TO_RAD);
-      dec[k] += ((k === 0 ? 1 : 2) / samples) * (normal.decDeg - centre.decDeg) * Math.cos(k * angle * DEG_TO_RAD);
+      dec[k] +=
+        ((k === 0 ? 1 : 2) / samples) *
+        (normal.decDeg - centre.decDeg) *
+        Math.cos(k * angle * DEG_TO_RAD);
     }
   }
   const terms = Array.from({ length: POLE_HARMONICS }, (_, index) => {
     const k = index + 1;
     return { angleDeg: [k * (nodeAtJ2000 + phase), k * nodeRate], ra: ra[k], dec: dec[k], pm: 0 };
   });
-  const round: RotationalElements = { ...elements, poleRaDeg: [centre.raDeg, 0, 0], poleDecDeg: [centre.decDeg + dec[0], 0, 0], terms: [...(elements.terms ?? []), ...terms] };
+  const round: RotationalElements = {
+    ...elements,
+    poleRaDeg: [centre.raDeg, 0, 0],
+    poleDecDeg: [centre.decDeg + dec[0], 0, 0],
+    terms: [...(elements.terms ?? []), ...terms],
+  };
   // The IAU's pole at the present, exactly: the fitted circle's constants moved onto it.
   const iau = orientationAt(elements, PRESENT_JD);
   const fitted = orientationAt(round, PRESENT_JD);
@@ -180,9 +240,16 @@ function poleRoundOrbit(elements: RotationalElements, mean: Pick<MeanOrbit, 'orb
     }
   }
   const ownTerms = elements.terms?.length ?? 0;
-  const turned: RotationalElements = { ...round, terms: round.terms!.map((term, index) => (index < ownTerms ? term : { ...term, pm: pm[index - ownTerms + 1] })) };
+  const turned: RotationalElements = {
+    ...round,
+    terms: round.terms!.map((term, index) =>
+      index < ownTerms ? term : { ...term, pm: pm[index - ownTerms + 1] },
+    ),
+  };
   // And W the IAU's at the present.
-  const shift = orientationAt(turned, PRESENT_JD).primeMeridianDeg - orientationAt(elements, PRESENT_JD).primeMeridianDeg;
+  const shift =
+    orientationAt(turned, PRESENT_JD).primeMeridianDeg -
+    orientationAt(elements, PRESENT_JD).primeMeridianDeg;
   turned.primeMeridianDeg = [turned.primeMeridianDeg[0] - shift, turned.primeMeridianDeg[1], 0];
   return turned;
 }

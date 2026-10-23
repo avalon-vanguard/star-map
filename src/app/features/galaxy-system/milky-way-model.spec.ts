@@ -1,18 +1,34 @@
 import { describe, expect, it } from 'vitest';
 
-import { DISC_RADIUS_PC, equatorialToGalactic, SUN_GALACTOCENTRIC_RADIUS_PC, SUN_HEIGHT_ABOVE_MIDPLANE_PC } from '../../shared/astro/galaxy';
-import { createRandom, DEFAULT_PARTICLE_COUNTS, generateMilkyWayParticles } from './milky-way-model';
+import {
+  DISC_RADIUS_PC,
+  equatorialToGalactic,
+  SUN_GALACTOCENTRIC_RADIUS_PC,
+  SUN_HEIGHT_ABOVE_MIDPLANE_PC,
+} from '../../shared/astro/galaxy';
+import {
+  createRandom,
+  DEFAULT_PARTICLE_COUNTS,
+  generateMilkyWayParticles,
+} from './milky-way-model';
 
 /** A small, fast budget — the shape of the model does not depend on how many particles trace it. */
 const TEST_COUNTS = { arms: 3000, disc: 1500, bulge: 1200, halo: 200 };
 const TEST_BUDGET = TEST_COUNTS.arms + TEST_COUNTS.disc + TEST_COUNTS.bulge + TEST_COUNTS.halo;
 
 /** Galactocentric radius and height above the midplane of the i-th particle, in parsecs. */
-function galactocentric(positions: Float32Array, index: number): { radiusPc: number; heightPc: number } {
-  const galactic = equatorialToGalactic({ x: positions[index * 3], y: positions[index * 3 + 1], z: positions[index * 3 + 2] });
+function galactocentric(
+  positions: Float32Array,
+  index: number,
+): { radiusPc: number; heightPc: number } {
+  const galactic = equatorialToGalactic({
+    x: positions[index * 3],
+    y: positions[index * 3 + 1],
+    z: positions[index * 3 + 2],
+  });
   return {
     radiusPc: Math.hypot(SUN_GALACTOCENTRIC_RADIUS_PC - galactic.x, galactic.y),
-    heightPc: galactic.z + SUN_HEIGHT_ABOVE_MIDPLANE_PC
+    heightPc: galactic.z + SUN_HEIGHT_ABOVE_MIDPLANE_PC,
   };
 }
 
@@ -50,7 +66,9 @@ describe('generateMilkyWayParticles', () => {
   it('is the same Galaxy on every run, so the map does not reshuffle on reload', () => {
     const again = generateMilkyWayParticles(1234, TEST_COUNTS);
     expect(again.count).toBe(particles.count);
-    expect(Array.from(again.positions.slice(0, 300))).toEqual(Array.from(particles.positions.slice(0, 300)));
+    expect(Array.from(again.positions.slice(0, 300))).toEqual(
+      Array.from(particles.positions.slice(0, 300)),
+    );
   });
 
   it('places most of the requested budget, rejecting only the samples that miss', () => {
@@ -78,7 +96,9 @@ describe('generateMilkyWayParticles', () => {
 
   it('keeps every particle inside the modelled galaxy, halo included', () => {
     for (let index = 0; index < particles.count; index++) {
-      expect(galactocentric(particles.positions, index).radiusPc).toBeLessThan(DISC_RADIUS_PC * 1.3);
+      expect(galactocentric(particles.positions, index).radiusPc).toBeLessThan(
+        DISC_RADIUS_PC * 1.3,
+      );
     }
   });
 
@@ -125,7 +145,7 @@ describe('generateMilkyWayParticles', () => {
       const galactic = equatorialToGalactic({
         x: particles.positions[index * 3],
         y: particles.positions[index * 3 + 1],
-        z: particles.positions[index * 3 + 2]
+        z: particles.positions[index * 3 + 2],
       });
       const angle = Math.atan2(galactic.y, SUN_GALACTOCENTRIC_RADIUS_PC - galactic.x);
       quadrants.add(Math.floor(((angle + Math.PI) / (Math.PI / 2)) % 4));

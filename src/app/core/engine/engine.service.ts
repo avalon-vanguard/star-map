@@ -47,7 +47,9 @@ export class EngineService {
 
   /** The camera the scene is currently drawn through. */
   getCamera(): SceneCamera {
-    return this.projection === 'orthographic' ? this.requireInitialized(this.orthographic) : this.requireInitialized(this.perspective);
+    return this.projection === 'orthographic'
+      ? this.requireInitialized(this.orthographic)
+      : this.requireInitialized(this.perspective);
   }
 
   /**
@@ -93,7 +95,8 @@ export class EngineService {
   frameOrthographic(distanceToTarget: number): void {
     const perspective = this.requireInitialized(this.perspective);
     const orthographic = this.requireInitialized(this.orthographic);
-    const halfHeight = Math.max(distanceToTarget, 1e-6) * Math.tan((perspective.fov * Math.PI) / 360);
+    const halfHeight =
+      Math.max(distanceToTarget, 1e-6) * Math.tan((perspective.fov * Math.PI) / 360);
     orthographic.top = halfHeight;
     orthographic.bottom = -halfHeight;
     orthographic.left = -halfHeight * perspective.aspect;
@@ -109,7 +112,9 @@ export class EngineService {
       const orthographic = this.requireInitialized(this.orthographic);
       return (orthographic.top - orthographic.bottom) / (2 * orthographic.zoom);
     }
-    return distanceToTarget * Math.tan((this.requireInitialized(this.perspective).fov * Math.PI) / 360);
+    return (
+      distanceToTarget * Math.tan((this.requireInitialized(this.perspective).fov * Math.PI) / 360)
+    );
   }
 
   getRenderer(): THREE.WebGPURenderer {
@@ -213,14 +218,17 @@ export class EngineService {
       callback(deltaSeconds, elapsedSeconds);
     }
 
-    this.requireInitialized(this.renderer).render(this.requireInitialized(this.scene), this.getCamera());
+    this.requireInitialized(this.renderer).render(
+      this.requireInitialized(this.scene),
+      this.getCamera(),
+    );
   }
 
   private canvasSize(): { width: number; height: number } {
     const canvas = this.requireInitialized(this.canvas);
     return {
       width: canvas.clientWidth || 1,
-      height: canvas.clientHeight || 1
+      height: canvas.clientHeight || 1,
     };
   }
 

@@ -32,21 +32,35 @@ import { ChevronIconComponent } from '../../shared/ui/chevron-icon.component';
          header, shared readout sections, and a route rail — there at the top, here at the
          bottom, because here the route is the next step rather than the way back. -->
     <div class="pointer-events-auto absolute top-6 right-6 w-80 max-w-[calc(100%-3rem)]">
-      <div data-testid="object-card" class="hud-brackets hud-acquire hud-surface font-body text-text">
+      <div
+        data-testid="object-card"
+        class="hud-brackets hud-acquire hud-surface font-body text-text"
+      >
         <div class="flex items-start justify-between gap-3 px-4 pt-4 pb-3">
           <header class="min-w-0">
             <!-- Wrapped, not truncated, as on the detail page: a designation's last digits are the
                  ones that tell it from its neighbours. -->
-            <p data-testid="object-card-name" class="text-lg leading-tight font-bold tracking-[0.04em] wrap-break-word text-text uppercase">{{ body().name }}</p>
-            <p class="type-eyebrow mt-1 wrap-break-word text-accent">{{ readouts().kindLabel }} · {{ body().hostStarName }}</p>
+            <p
+              data-testid="object-card-name"
+              class="text-lg leading-tight font-bold tracking-[0.04em] wrap-break-word text-text uppercase"
+            >
+              {{ body().name }}
+            </p>
+            <p class="type-eyebrow mt-1 wrap-break-word text-accent">
+              {{ readouts().kindLabel }} · {{ body().hostStarName }}
+            </p>
           </header>
           <button
             type="button"
-            [attr.aria-label]="(bookmarks.has('body', body().id) ? 'Forget ' : 'Keep ') + body().name"
+            [attr.aria-label]="
+              (bookmarks.has('body', body().id) ? 'Forget ' : 'Keep ') + body().name
+            "
             [attr.aria-pressed]="bookmarks.has('body', body().id)"
             (click)="bookmarks.toggle({ kind: 'body', id: body().id, name: body().name })"
             class="shrink-0 p-1 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
-            [class]="bookmarks.has('body', body().id) ? 'text-accent' : 'text-muted hover:text-accent'"
+            [class]="
+              bookmarks.has('body', body().id) ? 'text-accent' : 'text-muted hover:text-accent'
+            "
           >
             <app-bookmark-icon class="h-3.5 w-3.5" [kept]="bookmarks.has('body', body().id)" />
           </button>
@@ -56,7 +70,14 @@ import { ChevronIconComponent } from '../../shared/ui/chevron-icon.component';
             aria-label="Close"
             class="-mt-2 -mr-2 shrink-0 p-1 text-muted transition-colors hover:text-accent focus-visible:text-accent focus-visible:outline-1 focus-visible:outline-accent"
           >
-            <svg class="h-3.5 w-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <svg
+              class="h-3.5 w-3.5"
+              viewBox="0 0 14 14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            >
               <path d="M3 3l8 8M11 3l-8 8" />
             </svg>
           </button>
@@ -74,7 +95,7 @@ import { ChevronIconComponent } from '../../shared/ui/chevron-icon.component';
         </button>
       </div>
     </div>
-  `
+  `,
 })
 export class SystemObjectCardComponent {
   readonly body = input.required<BodyDetailViewModel>();

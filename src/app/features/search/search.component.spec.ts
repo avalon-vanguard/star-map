@@ -18,8 +18,13 @@ const STARS: StarRecord[] = [
   ...Array.from({ length: 12 }, (_, i) => starRecord(100 + i, `Iot Star ${i}`)),
   starRecord(1, 'Proxima Centauri'),
   // As the ETL files a Gaia star: no type, a BP−RP colour; and a star with neither.
-  { ...starRecord(2, 'TRAPPIST-1'), spectralType: 'Unknown', colorIndex: 4.902, colorSystem: 'BP-RP' },
-  { ...starRecord(3, 'KMT-2016-BLG-1107L'), spectralType: 'Unknown', colorIndex: null }
+  {
+    ...starRecord(2, 'TRAPPIST-1'),
+    spectralType: 'Unknown',
+    colorIndex: 4.902,
+    colorSystem: 'BP-RP',
+  },
+  { ...starRecord(3, 'KMT-2016-BLG-1107L'), spectralType: 'Unknown', colorIndex: null },
 ];
 
 const IO: BodyRecord = {
@@ -36,10 +41,14 @@ const IO: BodyRecord = {
     longitudeOfAscendingNodeDeg: 0,
     argumentOfPeriapsisDeg: 0,
     meanAnomalyAtEpochDeg: 0,
-    epochJd: 2451545.0
+    epochJd: 2451545.0,
   },
-  rates: { meanMotionDegPerDay: 203.4889583, longitudeOfAscendingNodeDegPerDay: 0, argumentOfPeriapsisDegPerDay: 0 },
-  orbitSource: 'test'
+  rates: {
+    meanMotionDegPerDay: 203.4889583,
+    longitudeOfAscendingNodeDegPerDay: 0,
+    argumentOfPeriapsisDegPerDay: 0,
+  },
+  orbitSource: 'test',
 };
 
 const PROXIMA_B: ExoplanetRecord = {
@@ -47,7 +56,7 @@ const PROXIMA_B: ExoplanetRecord = {
   hostStarId: 1,
   hostStarName: 'Proxima Centauri',
   name: 'Proxima Cen b',
-  orbit: { semiMajorAxisAu: 0.0485, eccentricity: 0.02 }
+  orbit: { semiMajorAxisAu: 0.0485, eccentricity: 0.02 },
 };
 
 class FakeDataLoaderService {
@@ -75,7 +84,7 @@ describe('SearchComponent', () => {
 
   function resultNames(): string[] {
     return [...element.querySelectorAll('[data-testid="search-results"] button')].map((button) =>
-      (button.querySelector('span')?.textContent ?? '').trim()
+      (button.querySelector('span')?.textContent ?? '').trim(),
     );
   }
 
@@ -86,8 +95,8 @@ describe('SearchComponent', () => {
       imports: [SearchComponent],
       providers: [
         { provide: DataLoaderService, useClass: FakeDataLoaderService },
-        { provide: Router, useValue: router }
-      ]
+        { provide: Router, useValue: router },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(SearchComponent);
@@ -114,15 +123,27 @@ describe('SearchComponent', () => {
     expect(resultNames()).toContain('Proxima Cen b');
   });
 
-  it("lists a star by the type its colour gives it where it has none, and never as \"Unknown\"", async () => {
-    const kindLine = (): string => (element.querySelector('[data-testid="search-results"] button span:last-child')?.textContent ?? '').trim();
+  it('lists a star by the type its colour gives it where it has none, and never as "Unknown"', async () => {
+    const kindLine = (): string =>
+      (
+        element.querySelector('[data-testid="search-results"] button span:last-child')
+          ?.textContent ?? ''
+      ).trim();
     await type('TRAPPIST-1');
     expect(kindLine()).toBe('Star · ~M8');
     await type('KMT-2016-BLG-1107L');
     expect(kindLine()).toBe('Star');
     // Classified for the rows shown only: over all 455 571 stars, each opening of the tab spent 140-230 ms on it.
-    const index = (fixture.componentInstance as unknown as { index(): { entry: { kind: string; subtitle: string } }[] }).index();
-    expect(index.filter(({ entry }) => entry.kind === 'star').every(({ entry }) => entry.subtitle === '')).toBe(true);
+    const index = (
+      fixture.componentInstance as unknown as {
+        index(): { entry: { kind: string; subtitle: string } }[];
+      }
+    ).index();
+    expect(
+      index
+        .filter(({ entry }) => entry.kind === 'star')
+        .every(({ entry }) => entry.subtitle === ''),
+    ).toBe(true);
   });
 
   it('shows nothing for a query that matches nothing', async () => {
@@ -166,7 +187,9 @@ describe('SearchComponent', () => {
 
   describe('from the keyboard', () => {
     const field = (): HTMLInputElement => element.querySelector('input')!;
-    const options = (): HTMLElement[] => [...element.querySelectorAll<HTMLElement>('[role="option"]')];
+    const options = (): HTMLElement[] => [
+      ...element.querySelectorAll<HTMLElement>('[role="option"]'),
+    ];
     function press(target: Element, key: string): KeyboardEvent {
       const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
       target.dispatchEvent(event);

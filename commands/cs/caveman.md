@@ -22,6 +22,7 @@ Once invoked: respond terse every turn. No "OK switching mode" preamble. BEGIN i
 ## Rules (per Matt Pocock)
 
 Drop:
+
 - Articles (a/an/the)
 - Filler (just/really/basically/actually/simply)
 - Pleasantries (sure/certainly/of course/happy to)
@@ -38,6 +39,7 @@ Code blocks + inline code + technical terms + errors: unchanged.
 ## Auto-Clarity Exception
 
 Drop caveman for:
+
 - Security warnings (`**Warning:** ...`)
 - Irreversible action confirmations
 - Multi-step sequences where order matters

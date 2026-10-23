@@ -19,7 +19,10 @@ import { EARTH_RADIUS_KM, PlanetAppearance, planetAppearance } from './planet-ap
  * irrelevant to how much starlight reaches it, and using it would be off by three orders of
  * magnitude.
  */
-export function heliocentricDistanceAu(body: BodyRecord, bodies: readonly BodyRecord[]): number | undefined {
+export function heliocentricDistanceAu(
+  body: BodyRecord,
+  bodies: readonly BodyRecord[],
+): number | undefined {
   if (!body.parentBodyId) {
     return body.orbit.semiMajorAxisAu;
   }
@@ -34,22 +37,29 @@ export function heliocentricDistanceAu(body: BodyRecord, bodies: readonly BodyRe
  * from the Sun the question is never whether a moon is rock or iron, it is whether its surface
  * is ice, and the temperature answers that on its own.
  */
-export function appearanceForBody(body: BodyRecord, bodies: readonly BodyRecord[], hostLuminositySolar: number | null | undefined): PlanetAppearance {
+export function appearanceForBody(
+  body: BodyRecord,
+  bodies: readonly BodyRecord[],
+  hostLuminositySolar: number | null | undefined,
+): PlanetAppearance {
   return planetAppearance({
     id: body.id,
     radiusEarth: body.radiusKm ? body.radiusKm / EARTH_RADIUS_KM : undefined,
     semiMajorAxisAu: heliocentricDistanceAu(body, bodies),
-    hostLuminositySolar
+    hostLuminositySolar,
   });
 }
 
 /** Appearance of an exoplanet, from the archive's published radius, mass and orbit. */
-export function appearanceForExoplanet(exoplanet: ExoplanetRecord, hostLuminositySolar: number | null | undefined): PlanetAppearance {
+export function appearanceForExoplanet(
+  exoplanet: ExoplanetRecord,
+  hostLuminositySolar: number | null | undefined,
+): PlanetAppearance {
   return planetAppearance({
     id: exoplanet.id,
     radiusEarth: exoplanet.radiusEarth,
     massEarth: exoplanet.massEarth,
     semiMajorAxisAu: exoplanet.orbit.semiMajorAxisAu,
-    hostLuminositySolar
+    hostLuminositySolar,
   });
 }

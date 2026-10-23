@@ -19,35 +19,129 @@ import { BodyDetailSceneComponent } from './body-detail-scene.component';
   disconnect(): void {}
 };
 
-const SUN: StarRecord = { id: 0, name: 'Sol', x: 0, y: 0, z: 0, magnitude: -26.7, spectralType: 'G2V', colorIndex: 0.656 };
+const SUN: StarRecord = {
+  id: 0,
+  name: 'Sol',
+  x: 0,
+  y: 0,
+  z: 0,
+  magnitude: -26.7,
+  spectralType: 'G2V',
+  colorIndex: 0.656,
+};
 
 // Earth and Saturn as bodies.json carries them: Standish's elements and the IAU's.
 const EARTH: BodyRecord = {
-  id: 'earth', systemStarId: 0, name: 'Earth', kind: 'planet', radiusKm: 6371, orbitSource: 'test',
-  orbit: {semiMajorAxisAu: 1.00000018, eccentricity: 0.01673163, inclinationDeg: -0.00054346, longitudeOfAscendingNodeDeg: -5.11260389, argumentOfPeriapsisDeg: 108.04266274, meanAnomalyAtEpochDeg: -2.4631431299999917, epochJd: 2451545},
-  rates: {meanMotionDegPerDay: 0.9856091187759068, longitudeOfAscendingNodeDegPerDay: -0.000006604751813826146, argumentOfPeriapsisDegPerDay: 0.000015309819575633124},
-  rotationalElements: {poleRaDeg: [0, -0.641, 0], poleDecDeg: [90, -0.557, 0], primeMeridianDeg: [190.147, 360.9856235, 0]}
+  id: 'earth',
+  systemStarId: 0,
+  name: 'Earth',
+  kind: 'planet',
+  radiusKm: 6371,
+  orbitSource: 'test',
+  orbit: {
+    semiMajorAxisAu: 1.00000018,
+    eccentricity: 0.01673163,
+    inclinationDeg: -0.00054346,
+    longitudeOfAscendingNodeDeg: -5.11260389,
+    argumentOfPeriapsisDeg: 108.04266274,
+    meanAnomalyAtEpochDeg: -2.4631431299999917,
+    epochJd: 2451545,
+  },
+  rates: {
+    meanMotionDegPerDay: 0.9856091187759068,
+    longitudeOfAscendingNodeDegPerDay: -0.000006604751813826146,
+    argumentOfPeriapsisDegPerDay: 0.000015309819575633124,
+  },
+  rotationalElements: {
+    poleRaDeg: [0, -0.641, 0],
+    poleDecDeg: [90, -0.557, 0],
+    primeMeridianDeg: [190.147, 360.9856235, 0],
+  },
 };
 const SATURN: BodyRecord = {
-  id: 'saturn', systemStarId: 0, name: 'Saturn', kind: 'planet', radiusKm: 58232, orbitSource: 'test',
-  orbit: {semiMajorAxisAu: 9.54149883, eccentricity: 0.05550825, inclinationDeg: 2.49424102, longitudeOfAscendingNodeDeg: 113.63998702, argumentOfPeriapsisDeg: -20.778626390000014, meanAnomalyAtEpochDeg: -42.78564733999999, epochJd: 2451545},
-  rates: {meanMotionDegPerDay: 0.033459683702669406, longitudeOfAscendingNodeDegPerDay: -0.000006848734291581108, argumentOfPeriapsisDegPerDay: 0.000021682266940451745},
-  rotationalElements: {poleRaDeg: [40.589, -0.036, 0], poleDecDeg: [83.537, -0.004, 0], primeMeridianDeg: [38.9, 810.7939024, 0]}
+  id: 'saturn',
+  systemStarId: 0,
+  name: 'Saturn',
+  kind: 'planet',
+  radiusKm: 58232,
+  orbitSource: 'test',
+  orbit: {
+    semiMajorAxisAu: 9.54149883,
+    eccentricity: 0.05550825,
+    inclinationDeg: 2.49424102,
+    longitudeOfAscendingNodeDeg: 113.63998702,
+    argumentOfPeriapsisDeg: -20.778626390000014,
+    meanAnomalyAtEpochDeg: -42.78564733999999,
+    epochJd: 2451545,
+  },
+  rates: {
+    meanMotionDegPerDay: 0.033459683702669406,
+    longitudeOfAscendingNodeDegPerDay: -0.000006848734291581108,
+    argumentOfPeriapsisDegPerDay: 0.000021682266940451745,
+  },
+  rotationalElements: {
+    poleRaDeg: [40.589, -0.036, 0],
+    poleDecDeg: [83.537, -0.004, 0],
+    primeMeridianDeg: [38.9, 810.7939024, 0],
+  },
 };
 // Eris and Hyperion as they are shipped for this page's purposes: no IAU model, so their pages keep
 // their own light; Eris's day is measured, and Hyperion tumbles and has none.
-const ERIS: BodyRecord = { ...EARTH, id: 'eris', name: 'Eris', kind: 'dwarf', radiusKm: 1163, rotationalElements: undefined, rotationPeriodHours: 378.504 };
-const HYPERION: BodyRecord = { ...ERIS, id: 'hyperion', name: 'Hyperion', kind: 'moon', radiusKm: 135, parentBodyId: 'saturn', rotationPeriodHours: undefined };
+const ERIS: BodyRecord = {
+  ...EARTH,
+  id: 'eris',
+  name: 'Eris',
+  kind: 'dwarf',
+  radiusKm: 1163,
+  rotationalElements: undefined,
+  rotationPeriodHours: 378.504,
+};
+const HYPERION: BodyRecord = {
+  ...ERIS,
+  id: 'hyperion',
+  name: 'Hyperion',
+  kind: 'moon',
+  radiusKm: 135,
+  parentBodyId: 'saturn',
+  rotationPeriodHours: undefined,
+};
 // Mercury as shipped, but its 0.01-degree libration: its Sun is never 0.034 degrees off its equator.
 const MERCURY: BodyRecord = {
-  id: 'mercury', systemStarId: 0, name: 'Mercury', kind: 'planet', radiusKm: 2439.4, orbitSource: 'test',
-  orbit: {semiMajorAxisAu: 0.38709843, eccentricity: 0.20563661, inclinationDeg: 7.00559432, longitudeOfAscendingNodeDeg: 48.33961819, argumentOfPeriapsisDeg: 29.118100759999997, meanAnomalyAtEpochDeg: 174.79394829, epochJd: 2451545},
-  rates: {meanMotionDegPerDay: 4.092338805372484, longitudeOfAscendingNodeDegPerDay: -0.0000033440607802874744, argumentOfPeriapsisDegPerDay: 0.000007708198494182067},
-  rotationalElements: {poleRaDeg: [281.0103, -0.0328, 0], poleDecDeg: [61.4155, -0.0049, 0], primeMeridianDeg: [329.5988, 6.1385108, 0]}
+  id: 'mercury',
+  systemStarId: 0,
+  name: 'Mercury',
+  kind: 'planet',
+  radiusKm: 2439.4,
+  orbitSource: 'test',
+  orbit: {
+    semiMajorAxisAu: 0.38709843,
+    eccentricity: 0.20563661,
+    inclinationDeg: 7.00559432,
+    longitudeOfAscendingNodeDeg: 48.33961819,
+    argumentOfPeriapsisDeg: 29.118100759999997,
+    meanAnomalyAtEpochDeg: 174.79394829,
+    epochJd: 2451545,
+  },
+  rates: {
+    meanMotionDegPerDay: 4.092338805372484,
+    longitudeOfAscendingNodeDegPerDay: -0.0000033440607802874744,
+    argumentOfPeriapsisDegPerDay: 0.000007708198494182067,
+  },
+  rotationalElements: {
+    poleRaDeg: [281.0103, -0.0328, 0],
+    poleDecDeg: [61.4155, -0.0049, 0],
+    primeMeridianDeg: [329.5988, 6.1385108, 0],
+  },
 };
 const BODIES = [EARTH, SATURN, ERIS, HYPERION, MERCURY];
 // An exoplanet round the Sun's record, which is all the page needs of its host.
-const EXOPLANET: ExoplanetRecord = { id: 'x b', hostStarId: 0, hostStarName: 'Sol', name: 'X b', orbit: { semiMajorAxisAu: 0.05 } };
+const EXOPLANET: ExoplanetRecord = {
+  id: 'x b',
+  hostStarId: 0,
+  hostStarName: 'Sol',
+  name: 'X b',
+  orbit: { semiMajorAxisAu: 0.05 },
+};
 
 /** Stands in for the WebGPU engine: a scene, a camera, and the tick hook, driven by hand. */
 class FakeEngineService {
@@ -111,11 +205,17 @@ describe('BodyDetailSceneComponent', () => {
       providers: [
         { provide: DataLoaderService, useClass: FakeDataLoaderService },
         { provide: ActivatedRoute, useValue: { paramMap: route } },
-        { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true) } }
-      ]
+        { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true) } },
+      ],
     }).overrideComponent(BodyDetailSceneComponent, {
       // The scene alone, unless asked: the info panel and the dock are tested on their own.
-      set: whole ? { providers: [{ provide: EngineService, useValue: engine }] } : { providers: [{ provide: EngineService, useValue: engine }], imports: [], template: '<canvas #canvas></canvas>' }
+      set: whole
+        ? { providers: [{ provide: EngineService, useValue: engine }] }
+        : {
+            providers: [{ provide: EngineService, useValue: engine }],
+            imports: [],
+            template: '<canvas #canvas></canvas>',
+          },
     });
     time = TestBed.inject(TimeStore);
     time.setRate(0);
@@ -133,7 +233,9 @@ describe('BodyDetailSceneComponent', () => {
     await open('saturn');
     const ring = page.ring!;
     ring.updateWorldMatrix(true, false);
-    const normal = new THREE.Vector3().fromBufferAttribute(ring.geometry.attributes['normal'], 0).transformDirection(ring.matrixWorld);
+    const normal = new THREE.Vector3()
+      .fromBufferAttribute(ring.geometry.attributes['normal'], 0)
+      .transformDirection(ring.matrixWorld);
     const pole = new THREE.Vector3(0, 1, 0).applyQuaternion(page.planet.quaternion);
     expect(normal.angleTo(pole)).toBeLessThan(1e-6);
   });
@@ -142,7 +244,9 @@ describe('BodyDetailSceneComponent', () => {
     await open('earth');
     const planet = new THREE.Quaternion();
     const sun = new THREE.Vector3();
-    expect(bodyPageView(EARTH, BODIES, time.julianDate(), Math.atan2(4, 5), planet, sun)).toBe(true);
+    expect(bodyPageView(EARTH, BODIES, time.julianDate(), Math.atan2(4, 5), planet, sun)).toBe(
+      true,
+    );
     expect(page.planet.quaternion.angleTo(planet)).toBeLessThan(1e-9);
     expect(page.sunLight.position.clone().normalize().angleTo(sun)).toBeLessThan(1e-9);
   });
@@ -152,7 +256,9 @@ describe('BodyDetailSceneComponent', () => {
     time.setDate(new Date('2025-06-01T18:00Z'));
     engine.tick(0.016);
     const planet = new THREE.Quaternion();
-    expect(bodyPageView(EARTH, BODIES, time.julianDate(), Math.atan2(4, 5), planet, new THREE.Vector3())).toBe(true);
+    expect(
+      bodyPageView(EARTH, BODIES, time.julianDate(), Math.atan2(4, 5), planet, new THREE.Vector3()),
+    ).toBe(true);
     // Six hours on, a quarter turn of Earth: a page frozen at its first frame is 90 degrees out.
     expect(page.planet.quaternion.angleTo(planet)).toBeLessThan(1e-9);
   });
@@ -184,7 +290,7 @@ describe('BodyDetailSceneComponent', () => {
     expect(page.planet.rotation.y).toBe(start);
     time.setDate(new Date(Date.parse('2025-06-01T12:00Z') + (378.504 / 6) * 3600000));
     engine.tick(0.016);
-    const turned = (((page.planet.rotation.y - start) / (2 * Math.PI)) % 1 + 1) % 1;
+    const turned = ((((page.planet.rotation.y - start) / (2 * Math.PI)) % 1) + 1) % 1;
     expect(turned).toBeCloseTo(1 / 6, 6);
     // Pole up, as the system view turns it about its orbit's normal.
     expect(new THREE.Vector3(0, 1, 0).applyQuaternion(page.planet.quaternion).y).toBeCloseTo(1, 12);
@@ -203,7 +309,9 @@ describe('BodyDetailSceneComponent', () => {
     fixture.detectChanges();
     const host = fixture.nativeElement as HTMLElement;
     expect(host.querySelector('[data-testid="hud-date"]')?.textContent).toContain('2032-06-01');
-    expect([...host.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent?.trim())).toContain('Clock');
+    expect(
+      [...host.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent?.trim()),
+    ).toContain('Clock');
     time.reset();
     engine.tick(0.016);
     fixture.detectChanges();

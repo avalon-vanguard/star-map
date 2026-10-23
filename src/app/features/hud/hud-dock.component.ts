@@ -584,7 +584,8 @@ export class HudDockComponent implements OnInit {
     this.dateShown();
     const list = this.host.nativeElement.querySelector('[role="tablist"]');
     const focused = document.activeElement;
-    const tab = focused && list?.contains(focused) ? focused : list?.querySelector('[aria-selected="true"]');
+    const tab =
+      focused && list?.contains(focused) ? focused : list?.querySelector('[aria-selected="true"]');
     // Optional: jsdom, which the unit tests run in, lays nothing out and has no scrollIntoView.
     tab?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   });

@@ -9,7 +9,10 @@ test.describe('Plan view', () => {
 
     const searchInput = await openSearch(page);
     await searchInput.fill('Sol');
-    await page.getByRole('option', { name: /^Sol\b/ }).first().click();
+    await page
+      .getByRole('option', { name: /^Sol\b/ })
+      .first()
+      .click();
     await expect(page.getByTestId('hud-title')).toHaveText('Sol', { timeout: 45_000 });
 
     // Where the planets are on screen before and after: under a plan view they lie on one
@@ -52,7 +55,9 @@ test.describe('Plan view', () => {
     test.setTimeout(90_000);
     await page.goto('/?stars=4000');
     await expect(page.getByTestId('scene-canvas')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId('hud-current-level')).toHaveText('Solar Neighbourhood', { timeout: 30_000 });
+    await expect(page.getByTestId('hud-current-level')).toHaveText('Solar Neighbourhood', {
+      timeout: 30_000,
+    });
 
     await page.getByRole('tab', { name: 'Display' }).click();
     await page.getByRole('button', { name: 'Plan view', exact: true }).click();
@@ -61,6 +66,8 @@ test.describe('Plan view', () => {
     // frame, so the level would be read from a number that stopped meaning anything.
     await expect(page.getByTestId('hud-current-level')).toHaveText('Solar Neighbourhood');
     await page.getByRole('button', { name: 'Milky Way' }).click();
-    await expect(page.getByTestId('hud-current-level')).toHaveText('Milky Way', { timeout: 45_000 });
+    await expect(page.getByTestId('hud-current-level')).toHaveText('Milky Way', {
+      timeout: 45_000,
+    });
   });
 });

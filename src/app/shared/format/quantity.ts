@@ -20,7 +20,9 @@ export function formatParsecs(distancePc: number, decimals?: number): string {
 }
 
 function parsecScale(distancePc: number): { divisor: number; digits: number; unit: string } {
-  return distancePc >= 1000 ? { divisor: 1000, digits: 1, unit: 'kpc' } : { divisor: 1, digits: distancePc < 10 ? 2 : 0, unit: 'pc' };
+  return distancePc >= 1000
+    ? { divisor: 1000, digits: 1, unit: 'kpc' }
+    : { divisor: 1, digits: distancePc < 10 ? 2 : 0, unit: 'pc' };
 }
 
 /**
@@ -39,17 +41,25 @@ function parsecScale(distancePc: number): { divisor: number; digits: number; uni
  * — and read as one they gave 129 cards a range the archive does not: 5.8 to 9.2 kpc there, where
  * it publishes 7 100 +800 −2 400 pc. They keep the ± at any size.
  */
-export function formatDistance(distancePc: number, relativeError: number | undefined, onDistance = false): string {
+export function formatDistance(
+  distancePc: number,
+  relativeError: number | undefined,
+  onDistance = false,
+): string {
   if (relativeError === undefined || relativeError <= 0.01) {
     return formatParsecs(distancePc);
   }
   if (relativeError < 0.2 || onDistance) {
     const { divisor, digits, unit } = parsecScale(distancePc);
     const error = ((distancePc * relativeError) / divisor).toFixed(digits);
-    return Number(error) === 0 ? formatParsecs(distancePc) : `${(distancePc / divisor).toFixed(digits)} ± ${error} ${unit}`;
+    return Number(error) === 0
+      ? formatParsecs(distancePc)
+      : `${(distancePc / divisor).toFixed(digits)} ± ${error} ${unit}`;
   }
   const nearest = formatParsecs(distancePc / (1 + relativeError));
-  return relativeError >= 1 ? `${nearest} or more` : `${nearest} to ${formatParsecs(distancePc / (1 - relativeError))}`;
+  return relativeError >= 1
+    ? `${nearest} or more`
+    : `${nearest} to ${formatParsecs(distancePc / (1 - relativeError))}`;
 }
 
 /** Distance in astronomical units, for anything inside a system. */

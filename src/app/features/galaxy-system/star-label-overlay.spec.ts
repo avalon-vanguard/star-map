@@ -117,6 +117,19 @@ describe('StarLabelOverlay', () => {
     expect(ghost.querySelector('.map-label-kind')).toBeNull();
   });
 
+  it('prints a stacked distance under the name, and rewrites a label whose form changed since it went up', () => {
+    const sirius = { id: 'neighbour:1', name: 'Sirius', distance: '2.64 pc', tone: 'ghost' as const, selectStarId: 1, x: 0, y: 1, z: 0 };
+    const lines = () => labels().map((label) => [label.querySelector('.map-label-name')?.textContent, label.querySelector('.map-label-kind')?.textContent]);
+    overlay.update([sirius]);
+
+    overlay.update([{ ...sirius, stacked: true }]);
+    expect(lines()).toEqual([['Sirius', '2.64 pc']]);
+    expect(labels()[0].getAttribute('aria-label')).toBe('Go to Sirius, 2.64 pc away');
+
+    overlay.update([sirius]);
+    expect(lines()).toEqual([['Sirius · 2.64 pc', undefined]]);
+  });
+
   it('makes a label that offers a star a button, and hands back the star it names', () => {
     const chosen: number[] = [];
     overlay = new StarLabelOverlay(scene, (starId) => chosen.push(starId));

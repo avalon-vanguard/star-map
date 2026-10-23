@@ -769,6 +769,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       update.mockRestore();
       ladder.mockRestore();
     });
+
   });
 
   it('keeps the stars of a plotted route drawn, and the selected star', async () => {
@@ -1166,6 +1167,27 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       // "Groombridge 34" reaches 125 px, 0.35 here: a rung 0.32 along is past the least reach and
       // still under the name.
       expect(component.ringLabelsInTheClear([at('ring-16', '16 pc', 0.32, 0)], camera, [at(3, 'Groombridge 34', 0, 0, 'Star')])).toEqual([]);
+    });
+
+  });
+
+  describe('on a 390x844 phone', () => {
+    it('stacks a neighbour’s distance under its name where the one line fits on neither side, and keeps it', () => {
+      const canvas = (fixture.nativeElement as HTMLElement).querySelector('canvas')!;
+      Object.defineProperty(canvas, 'clientWidth', { value: 390 });
+      Object.defineProperty(canvas, 'clientHeight', { value: 844 });
+      const component = fixture.componentInstance as unknown as { spreadLabels(candidates: Iterable<LabeledPoint>, camera: THREE.Camera, keepId: null): LabeledPoint[] };
+      const camera = engine.getCamera();
+      camera.updateMatrixWorld(true);
+      const centre = new THREE.Vector3(0, 0, 0.5).unproject(camera);
+      const neighbour = (id: number, name: string, distance: string): LabeledPoint => ({ id: `neighbour:${id}`, name, distance, tone: 'ghost', selectStarId: id, x: centre.x, y: centre.y, z: centre.z });
+      const form = (labels: LabeledPoint[]) => labels.map((label) => `${label.side}:${label.stacked ?? false}`);
+
+      // "Barnard's Star · 1.83 pc" is 199.5 px, 0.47 of the frame either way from the middle of a
+      // frame 0.46 wide on each side; "Barnard's Star" over "1.83 pc" is 125 px.
+      expect(form(component.spreadLabels([neighbour(2, "Barnard's Star", '1.83 pc')], camera, null))).toEqual(['right:true']);
+      // One that fits on one line keeps it.
+      expect(form(component.spreadLabels([neighbour(3, 'Sol', '1.30 pc')], camera, null))).toEqual(['right:false']);
     });
   });
 

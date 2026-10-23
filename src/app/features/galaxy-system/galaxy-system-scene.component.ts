@@ -77,7 +77,7 @@ import { MAX_JUMP_RANGE_PC } from '../hud/routes-panel.component';
 import { HostStarRings } from './host-star-rings';
 import { JumpLinkRenderer } from './jump-link-renderer';
 import { ReservedBox, ringPlacement } from './label-ring';
-import { LabeledPoint, LabelSide, nameLine, StarLabelOverlay } from './star-label-overlay';
+import { kindLine, LabeledPoint, LabelSide, nameLine, StarLabelOverlay } from './star-label-overlay';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
 import { catalogueCensus, positionsNote, starReadouts, starSubtitle } from './star-readouts';
 
@@ -174,12 +174,13 @@ interface LabelRect {
  * 14 px (the leader's margin) from the point. "Barnard's Star · 1.83 pc" comes to 199.5 px; the
  * browser drew it 199 px from its point.
  */
-function labelTextPx(label: Pick<LabeledPoint, 'name' | 'kind' | 'distance'>): {
+function labelTextPx(label: Pick<LabeledPoint, 'name' | 'kind' | 'distance' | 'stacked'>): {
   width: number;
   height: number;
 } {
-  const line = Math.max(nameLine(label).length * 7.48, (label.kind?.length ?? 0) * 7.2);
-  return { width: 14 + line + 6, height: 12.65 + (label.kind ? 10 : 0) };
+  const second = kindLine(label);
+  const line = Math.max(nameLine(label).length * 7.48, (second?.length ?? 0) * 7.2);
+  return { width: 14 + line + 6, height: 12.65 + (second ? 10 : 0) };
 }
 
 /**
@@ -192,7 +193,7 @@ function labelTextPx(label: Pick<LabeledPoint, 'name' | 'kind' | 'distance'>): {
 function labelRect(
   point: THREE.Vector2,
   side: LabelSide,
-  label: Pick<LabeledPoint, 'name' | 'kind' | 'distance'>,
+  label: Pick<LabeledPoint, 'name' | 'kind' | 'distance' | 'stacked'>,
   heightPx: number,
   reach = LABEL_REACH_NDC,
   row = LABEL_ROW_NDC,
@@ -1579,17 +1580,30 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       // panel; then on the left. The body the card is about hangs its label on the left only: the
       // leader line to the card leaves its right, and would otherwise run straight through it.
       const sides: LabelSide[] = candidate.id === this.cardBodyId ? ['left'] : ['right', 'left'];
-      const side = point
-        ? sides.find((each) => inTheClear(labelRect(point, each, candidate, height), taken, aspect))
-        : undefined;
+      const fits = (label: LabeledPoint) =>
+        point
+          ? sides.find((each) => inTheClear(labelRect(point, each, label, height), taken, aspect))
+          : undefined;
+      let label = candidate;
+      let side = fits(label);
+      // A distance on the name line fits nowhere a 200 px label cannot: on a 390 px phone the
+      // ring puts a neighbour's point near the middle, and the Sun's system named none. Under
+      // the name, "Barnard's Star" over "1.83 pc", it is 125 px.
+      if (!side && candidate.distance && !candidate.kind) {
+        const stacked = { ...candidate, stacked: true };
+        side = fits(stacked);
+        if (side) {
+          label = stacked;
+        }
+      }
       if (!side && !isKept) {
         continue;
       }
       const hung = side ?? sides[0];
       if (point) {
-        place(point, hung, candidate);
+        place(point, hung, label);
       }
-      chosen.push({ ...candidate, side: hung });
+      chosen.push({ ...label, side: hung });
       // Here rather than at the top of the loop: there, taking the fifteenth label asked the
       // candidates for a sixteenth first, and near the Sun finding one walks most of the catalogue.
       if (chosen.length >= LABEL_MAX_COUNT) {

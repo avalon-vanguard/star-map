@@ -93,12 +93,8 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
                     class="flex w-full items-baseline gap-3 border-l border-transparent px-3 py-2 text-left transition-colors hover:border-l-accent hover:bg-accent/8 focus-visible:border-l-accent focus-visible:bg-accent/12 focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
                   >
                     <span class="min-w-0 flex-1 truncate text-sm text-text">{{ result.name }}</span>
-                    <span class="type-label max-w-[45%] shrink-0 truncate text-muted"
-                      >{{ kindLabel(result.kind) }}
-                      @if (result.subtitle) {
-                        · {{ result.subtitle }}
-                      }
-                    </span>
+                    <!-- prettier-ignore -->
+                    <span class="type-label max-w-[45%] shrink-0 truncate text-muted">{{ kindLabel(result.kind) }}@if (result.subtitle) { · {{ result.subtitle }}}</span>
                   </button>
                 </li>
               }

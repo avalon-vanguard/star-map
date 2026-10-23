@@ -9,9 +9,7 @@
   "homepage": "https://github.com/avalon-vanguard/star-map",
   "repository": "https://github.com/avalon-vanguard/star-map",
   "license": "MIT",
-  "skills": [
-    "./skills/caveman"
-  ],
+  "skills": ["./skills/caveman"],
   "attribution": {
     "derived_from": "https://github.com/mattpocock/skills/tree/main/skills/productivity/caveman",
     "original_author": "Matt Pocock (@mattpocock)",

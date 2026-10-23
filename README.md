@@ -132,7 +132,7 @@ its own readout, so a stale image is visible as one.
 - **One reference frame, from three sources.** HYG gives star positions in equatorial J2000.
   JPL gives the planets' orbital elements against the ecliptic, tilted 23.4° away, and the moons'
   against the ecliptic (the Moon), a Laplace plane, or their planet's equator (Uranus's and Pluto's). The Exoplanet
-  Archive measures inclination from the *plane of the sky* — perpendicular to our line of sight
+  Archive measures inclination from the _plane of the sky_ — perpendicular to our line of sight
   to each host star, which is why transiting planets cluster at 90°. Each set of elements is
   rotated from its own reference plane into the scene's equatorial frame, so a direction means
   the same thing everywhere. Systems are still presented face-on — by placing the camera
@@ -162,7 +162,7 @@ and eighteen moons and dwarf planets in mission mosaics, grey where no probe has
 current instruments: none has had its surface imaged. The five large moons of Uranus and a few
 small bodies have no map in this asset set either.
 
-Those bodies get a surface reasoned from what *has* been measured, in a chain that is worth
+Those bodies get a surface reasoned from what _has_ been measured, in a chain that is worth
 following because every link is standard:
 
 1. The host star's **luminosity** comes from its catalogued apparent magnitude and its
@@ -204,7 +204,7 @@ Every other dataset here is measured. The Galaxy is the exception, and not for w
 we sit inside its disc, and dust blocks the view across it, so no catalogue holds the positions
 of its stars. Every rendering of the Milky Way seen face-on — including NASA's — is a model.
 
-What *is* measured is the skeleton, and that is what `shared/astro/galaxy.ts` contains: the
+What _is_ measured is the skeleton, and that is what `shared/astro/galaxy.ts` contains: the
 directions of the galactic centre and the north galactic pole, which fix the disc's 63° tilt
 against the celestial equator; the 8.18 kpc from the Sun to the centre, from the orbit of the
 star S2 around Sgr A*; and a reference radius, azimuth and pitch angle per spiral arm,
@@ -227,12 +227,12 @@ It commits this README and `src/index.html` with the data: the ETL rewrites the 
 from the assets it has just written (`tools/etl/lib/public-counts.ts`), and fails if a phrase it
 stamps has been reworded away.
 
-| Script | Source | Output |
-| --- | --- | --- |
-| `fetchStars.ts` | HYG database, plus any other positional catalogue wired in (see below) | the catalogue stars, handed to `fetchExoplanets.ts` |
-| `fetchSolarSystem.ts` | JPL SSD mean elements (Standish's planets, the satellite table), the Small-Body Database, NAIF's PCK, JPL Horizons | `bodies.json` |
-| `fetchExoplanets.ts` | NASA Exoplanet Archive (TAP), and the stars above with the hosts it adds | `exoplanets.json`, `stars.bin`, `stars-meta.bin`, `stars-index.json` |
-| `fetchDeepSky.ts` | OpenNGC | `deepsky.json` |
+| Script                | Source                                                                                                             | Output                                                               |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| `fetchStars.ts`       | HYG database, plus any other positional catalogue wired in (see below)                                             | the catalogue stars, handed to `fetchExoplanets.ts`                  |
+| `fetchSolarSystem.ts` | JPL SSD mean elements (Standish's planets, the satellite table), the Small-Body Database, NAIF's PCK, JPL Horizons | `bodies.json`                                                        |
+| `fetchExoplanets.ts`  | NASA Exoplanet Archive (TAP), and the stars above with the hosts it adds                                           | `exoplanets.json`, `stars.bin`, `stars-meta.bin`, `stars-index.json` |
+| `fetchDeepSky.ts`     | OpenNGC                                                                                                            | `deepsky.json`                                                       |
 
 The star catalogue ships as two binary column stores plus a small JSON file, not as an array of
 objects. When the catalogue held 68 388 stars, the old encoding — one JSON object per star, its
@@ -255,14 +255,14 @@ the reader cannot drift apart.
 `tools/etl/sources/registry.ts` lists every catalogue the pipeline knows about, and `npm run etl`
 prints it. Sources are wired in by role, because the roles are not interchangeable:
 
-| Source | Role | What it adds |
-| --- | --- | --- |
-| HYG | positional | The named, spectrally classified bright-star spine: Hipparcos, Yale Bright Star and Gliese. |
-| Gaia DR3 | positional | Parallaxes fifty times more precise, for 1.8 billion sources. |
-| DECaPS2 | backdrop | 3.32 billion objects across the southern galactic plane. |
-| SDSS-V Milky Way Mapper | enrichment | Spectroscopic temperatures, gravities, metallicities, radial velocities. |
-| Euclid Bulge Survey (Q2) | backdrop | High-resolution imagery and astrometry of the inner bulge. |
-| SAGA | enrichment | Compiled elemental abundances for metal-poor stars. |
+| Source                   | Role       | What it adds                                                                                |
+| ------------------------ | ---------- | ------------------------------------------------------------------------------------------- |
+| HYG                      | positional | The named, spectrally classified bright-star spine: Hipparcos, Yale Bright Star and Gliese. |
+| Gaia DR3                 | positional | Parallaxes fifty times more precise, for 1.8 billion sources.                               |
+| DECaPS2                  | backdrop   | 3.32 billion objects across the southern galactic plane.                                    |
+| SDSS-V Milky Way Mapper  | enrichment | Spectroscopic temperatures, gravities, metallicities, radial velocities.                    |
+| Euclid Bulge Survey (Q2) | backdrop   | High-resolution imagery and astrometry of the inner bulge.                                  |
+| SAGA                     | enrichment | Compiled elemental abundances for metal-poor stars.                                         |
 
 The distinction that matters is not size — it is whether a catalogue knows how **far away** its
 objects are, because a 3D map cannot place a star it only has a direction for. **Gaia is the only
@@ -297,7 +297,7 @@ of HYG's rows carry a Hipparcos identifier, and Hipparcos parallaxes are good to
 milliarcsecond — so at 250 pc a distance is uncertain by some tens of per cent and beyond it the
 catalogue would be plotting noise. A HYG star Gaia places further out is drawn where Gaia puts it,
 and a planet host only the Exoplanet Archive places sits at the archive's distance, kiloparsecs
-out for the microlensing ones. Only the *radial* placement blurs; a star's direction on the sky
+out for the microlensing ones. Only the _radial_ placement blurs; a star's direction on the sky
 stays exact at any distance. Note also that beyond about 50 pc the sample is magnitude-limited rather than
 volume-complete: it thins to the intrinsically bright, which is the same selection the naked eye
 makes.

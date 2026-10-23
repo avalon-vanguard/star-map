@@ -1,4 +1,14 @@
-import { AfterViewInit, Component, computed, effect, ElementRef, inject, OnDestroy, signal, viewChild } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  computed,
+  effect,
+  ElementRef,
+  inject,
+  OnDestroy,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import * as THREE from 'three/webgpu';
 import { normalView, positionViewDirection, texture, uniform } from 'three/tsl';
@@ -52,14 +62,24 @@ import {
   type ScaleBar,
 } from '../../shared/format/scale-bar';
 import { BodyDetailViewModel } from '../body-detail/body-detail.model';
-import { buildBodyViewModel, publishedTemperaturesK, starSurfaceOf, StarSurface } from '../body-detail/body-view-model';
+import {
+  buildBodyViewModel,
+  publishedTemperaturesK,
+  starSurfaceOf,
+  StarSurface,
+} from '../body-detail/body-view-model';
 import {
   DEFAULT_HUD_DISPLAY,
   HudDisplay,
   HudDockComponent,
   HudReadout,
 } from '../hud/hud-dock.component';
-import { RouteRequest, RouteResult, routeResultOf, RouteStarOption } from '../hud/routes-panel.component';
+import {
+  RouteRequest,
+  RouteResult,
+  routeResultOf,
+  RouteStarOption,
+} from '../hud/routes-panel.component';
 import { SearchIndexService } from '../search/search-index.service';
 import { entrySubtitle, rankSearchResults } from '../search/search-ranking';
 import { StarmapHudComponent } from './starmap-hud.component';
@@ -80,7 +100,13 @@ import { JumpLinkRenderer } from './jump-link-renderer';
 import { ReservedBox, ringPlacement } from './label-ring';
 import { LabeledPoint, LabelSide, StarLabelOverlay } from './star-label-overlay';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
-import { catalogueCensus, deepSkyReadouts, positionsNote, starReadouts, starSubtitle } from './star-readouts';
+import {
+  catalogueCensus,
+  deepSkyReadouts,
+  positionsNote,
+  starReadouts,
+  starSubtitle,
+} from './star-readouts';
 
 /** Radius, in CSS pixels, below which a body in the system view is scaled up to be seen at all. */
 const MIN_MARKER_PIXELS = 3;
@@ -801,7 +827,8 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // field's, were a band of 1 687 fixed-size rings over the opening view's lower right, on the
     // 250-350 pc grid labels, and read as neighbours; they still compete for the budget by brightness, and search
     // still enters them.
-    const ringed = (star: StarRecord): boolean => this.starIdsWithBodies.has(star.id) && Math.hypot(star.x, star.y, star.z) <= SURVEY_EDGE_PC;
+    const ringed = (star: StarRecord): boolean =>
+      this.starIdsWithBodies.has(star.id) && Math.hypot(star.x, star.y, star.z) <= SURVEY_EDGE_PC;
     this.hostStars = Uint8Array.from(stars, (star) => (ringed(star) ? 1 : 0));
     this.galaxyGroup.add(this.starField.object);
     this.hostRings = new HostStarRings(stars.filter(ringed), HUD_ACCENT);
@@ -1848,11 +1875,15 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       // Where the orbits come from, and for the Sun how far from the present they hold: each
       // body's card names its own source, and for a moon or an SBDB dwarf planet how far it strays from
       // Horizons over the span it was checked.
-      const source = this.bodies.some((body) => body.systemStarId === star.id) ? 'JPL mean elements, the planets’ fit for 3000 BC to AD 3000 and the moons’ checked from 1950 to 2100, and the SBDB’s osculating ones for Ceres, Eris, Haumea and Makemake, checked over the same span,' : 'published elements';
+      const source = this.bodies.some((body) => body.systemStarId === star.id)
+        ? 'JPL mean elements, the planets’ fit for 3000 BC to AD 3000 and the moons’ checked from 1950 to 2100, and the SBDB’s osculating ones for Ceres, Eris, Haumea and Makemake, checked over the same span,'
+        : 'published elements';
       // Named to the minute, in UTC like the date field: a jump to 18:00 on a given day is a
       // question about that hour, and the note is where the answer says which sky it is.
       const drawnFor = `${this.time.date().toISOString().slice(0, 16).replace('T', ' ')} UTC`;
-      this.hudNote.set(`Orbits propagated from ${source} to ${this.time.atNow() ? 'now, ' : ''}${drawnFor}.`);
+      this.hudNote.set(
+        `Orbits propagated from ${source} to ${this.time.atNow() ? 'now, ' : ''}${drawnFor}.`,
+      );
       this.hudRange.set(
         formatAu(
           this.engine.visibleHalfHeight(
@@ -1888,7 +1919,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     const deepSky = this.lookedAtDeepSky;
     const facing = this.controls?.target.clone().sub(camera.position).normalize();
-    if (deepSky && facing && facing.dot(new THREE.Vector3(deepSky.x, deepSky.y, deepSky.z)) > DEEP_SKY_FACING_COS) {
+    if (
+      deepSky &&
+      facing &&
+      facing.dot(new THREE.Vector3(deepSky.x, deepSky.y, deepSky.z)) > DEEP_SKY_FACING_COS
+    ) {
       const { subtitle, readouts, note } = deepSkyReadouts(deepSky);
       this.hudEyebrow.set('Deep Sky');
       this.hudTitle.set(deepSky.name);
@@ -2289,13 +2324,23 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
     const toward = new THREE.Vector3(record.x, record.y, record.z);
     this.rig.flyTo(
-      { position: toward.clone().multiplyScalar(DEEP_SKY_VIEWPOINT_PC), target: toward.multiplyScalar(2 * DEEP_SKY_VIEWPOINT_PC) },
+      {
+        position: toward.clone().multiplyScalar(DEEP_SKY_VIEWPOINT_PC),
+        target: toward.multiplyScalar(2 * DEEP_SKY_VIEWPOINT_PC),
+      },
       RETURN_DURATION_SECONDS,
     );
     const labels = this.deepSky
       .labelPoints(DEEP_SKY_LABEL_COUNT)
-      .filter((label) => label.id === record.id || toward.angleTo(new THREE.Vector3(label.x, label.y, label.z)) > DEEP_SKY_LABEL_CLEARANCE_RAD);
-    this.deepSkyLabels = labels.some((label) => label.id === record.id) ? labels : [...labels, ...deepSkyLabelPoints([record], 1)];
+      .filter(
+        (label) =>
+          label.id === record.id ||
+          toward.angleTo(new THREE.Vector3(label.x, label.y, label.z)) >
+            DEEP_SKY_LABEL_CLEARANCE_RAD,
+      );
+    this.deepSkyLabels = labels.some((label) => label.id === record.id)
+      ? labels
+      : [...labels, ...deepSkyLabelPoints([record], 1)];
   }
 
   private enterSystem(starId: number, onComplete: () => void): void {
@@ -2324,7 +2369,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     );
   }
 
-  private swapToSystemSpace(star: StarRecord, direction: THREE.Vector3, onComplete: () => void): void {
+  private swapToSystemSpace(
+    star: StarRecord,
+    direction: THREE.Vector3,
+    onComplete: () => void,
+  ): void {
     this.systemRenderer?.dispose();
     if (this.starMarker) {
       this.systemGroup.remove(this.starMarker);
@@ -2354,7 +2403,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.systemGroup.add(this.systemRenderer.object);
     this.applyDisplay(this.display());
 
-    const starRadiusAu = this.currentStarSurface.radiusSolar === null ? UNMEASURED_STAR_RADIUS_AU : this.currentStarSurface.radiusSolar * SUN_RADIUS_AU;
+    const starRadiusAu =
+      this.currentStarSurface.radiusSolar === null
+        ? UNMEASURED_STAR_RADIUS_AU
+        : this.currentStarSurface.radiusSolar * SUN_RADIUS_AU;
 
     // Framed against the outermost thing drawn — the grid's outer ring, or an eccentric orbit's
     // aphelion where it runs past it — or against the star, for a giant wider than both; and
@@ -2363,7 +2415,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     // the orthographic frustum is then sized from, so both projections show the same extent.
     const framingCamera = this.engine.getPerspectiveCamera();
     const canvas = this.canvasRef().nativeElement;
-    const viewport = { fovDegrees: framingCamera.fov, aspect: framingCamera.aspect, shorterSidePx: Math.min(canvas.clientWidth, canvas.clientHeight) };
+    const viewport = {
+      fovDegrees: framingCamera.fov,
+      aspect: framingCamera.aspect,
+      shorterSidePx: Math.min(canvas.clientWidth, canvas.clientHeight),
+    };
     const framingDistance = systemFramingDistanceAu(
       this.systemRenderer.outermostRadiusAu,
       viewport,
@@ -2445,7 +2501,11 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
 
     this.rig.flyTo(
       {
-        position: direction.clone().multiplyScalar(Math.max(SYSTEM_EXIT_DISTANCE_AU, SYSTEM_EXIT_PULL_BACK * camera.position.length())),
+        position: direction
+          .clone()
+          .multiplyScalar(
+            Math.max(SYSTEM_EXIT_DISTANCE_AU, SYSTEM_EXIT_PULL_BACK * camera.position.length()),
+          ),
         target: new THREE.Vector3(0, 0, 0),
       },
       EXIT_DURATION_SECONDS,
@@ -2455,7 +2515,12 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     );
   }
 
-  private swapToGalaxySpace(exitingStarId: number, direction: THREE.Vector3, isSwitchingSystems: boolean, onComplete: () => void): void {
+  private swapToGalaxySpace(
+    exitingStarId: number,
+    direction: THREE.Vector3,
+    isSwitchingSystems: boolean,
+    onComplete: () => void,
+  ): void {
     const star = this.starsById.get(exitingStarId);
     const starPc = star
       ? new THREE.Vector3(star.x, star.y, star.z)

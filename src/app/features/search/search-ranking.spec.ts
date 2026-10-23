@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildSearchIndex, rankSearchResults, scoreSearchMatch, SearchEntry } from './search-ranking';
+import {
+  buildSearchIndex,
+  rankSearchResults,
+  scoreSearchMatch,
+  SearchEntry,
+} from './search-ranking';
 
 function star(name: string): SearchEntry {
   return { kind: 'star', name, subtitle: 'G2V', starId: name.length };
@@ -77,18 +82,38 @@ describe('rankSearchResults', () => {
   });
 
   it('puts the host star ahead of its own planets', () => {
-    const entries = [exoplanet('Proxima Cen b'), exoplanet('Proxima Cen d'), star('Proxima Centauri')];
+    const entries = [
+      exoplanet('Proxima Cen b'),
+      exoplanet('Proxima Cen d'),
+      star('Proxima Centauri'),
+    ];
     expect(rank(entries, 'Proxima')[0]).toBe('Proxima Centauri');
   });
 
   it("lists a host's own planets ahead of the systems whose names run on from its own", () => {
-    const entries = [star('K2-18'), star('K2-180'), star('K2-181'), exoplanet('K2-18 b'), exoplanet('K2-18 c')];
+    const entries = [
+      star('K2-18'),
+      star('K2-180'),
+      star('K2-181'),
+      exoplanet('K2-18 b'),
+      exoplanet('K2-18 c'),
+    ];
     expect(rank(entries, 'K2-18')).toEqual(['K2-18', 'K2-18 b', 'K2-18 c', 'K2-180', 'K2-181']);
   });
 
   it('breaks remaining ties by name length, then alphabetically', () => {
-    const entries = [exoplanet('Kepler-1292 b'), exoplanet('Kepler-9 c'), exoplanet('Kepler-9 b'), exoplanet('Kepler-15 b')];
-    expect(rank(entries, 'Kepler')).toEqual(['Kepler-9 b', 'Kepler-9 c', 'Kepler-15 b', 'Kepler-1292 b']);
+    const entries = [
+      exoplanet('Kepler-1292 b'),
+      exoplanet('Kepler-9 c'),
+      exoplanet('Kepler-9 b'),
+      exoplanet('Kepler-15 b'),
+    ];
+    expect(rank(entries, 'Kepler')).toEqual([
+      'Kepler-9 b',
+      'Kepler-9 c',
+      'Kepler-15 b',
+      'Kepler-1292 b',
+    ]);
   });
 
   it('is independent of the order entries were indexed in', () => {
@@ -126,8 +151,19 @@ describe('rankSearchResults', () => {
   });
 
   it('finds a star by its type, below every entry found by its name', () => {
-    const typed = (name: string, spectralType: string): SearchEntry => ({ kind: 'star', name, subtitle: '', star: { spectralType, colorIndex: 0.65 } });
-    const entries = [typed('Sun', 'G2V'), typed('Alpha Cen A', 'G2V+K1V'), typed('Gl 1', 'K1V+G2V'), typed('Tau Cet', 'G8V'), typed('XG2V', 'K0V')];
+    const typed = (name: string, spectralType: string): SearchEntry => ({
+      kind: 'star',
+      name,
+      subtitle: '',
+      star: { spectralType, colorIndex: 0.65 },
+    });
+    const entries = [
+      typed('Sun', 'G2V'),
+      typed('Alpha Cen A', 'G2V+K1V'),
+      typed('Gl 1', 'K1V+G2V'),
+      typed('Tau Cet', 'G8V'),
+      typed('XG2V', 'K0V'),
+    ];
     // A name containing the query is the weakest name match there is, and still comes first; then
     // the type exactly, as its first part, and anywhere in it. 'Gl 1', shorter, would win a tie.
     expect(rank(entries, 'G2V')).toEqual(['XG2V', 'Sun', 'Alpha Cen A', 'Gl 1']);
@@ -136,8 +172,18 @@ describe('rankSearchResults', () => {
   it("searches a star's own type only, not the estimate its row prints, nor the compact form", () => {
     // 383 599 stars are typed "Unknown"; their rows print a colour estimate such as "~G2".
     const entries: SearchEntry[] = [
-      { kind: 'star', name: 'Gaia DR3 1', subtitle: '', star: { spectralType: 'Unknown', colorIndex: 0.65 } },
-      { kind: 'star', name: 'Gl 1', subtitle: '', star: { spectralType: 'M4.5V', colorIndex: 1.6 } }
+      {
+        kind: 'star',
+        name: 'Gaia DR3 1',
+        subtitle: '',
+        star: { spectralType: 'Unknown', colorIndex: 0.65 },
+      },
+      {
+        kind: 'star',
+        name: 'Gl 1',
+        subtitle: '',
+        star: { spectralType: 'M4.5V', colorIndex: 1.6 },
+      },
     ];
     expect(rank(entries, 'Unknown')).toEqual([]);
     expect(rank(entries, '~G')).toEqual([]);
@@ -146,7 +192,13 @@ describe('rankSearchResults', () => {
   });
 
   it('finds a deep-sky object by any of its names as fully as by its own, and ahead of a star that matches as well', () => {
-    const pleiades: SearchEntry = { kind: 'deepSky', name: 'Pleiades', subtitle: 'Cluster · M45', deepSkyId: 'Mel022', aliases: ['M45', 'Mel 22'] };
+    const pleiades: SearchEntry = {
+      kind: 'deepSky',
+      name: 'Pleiades',
+      subtitle: 'Cluster · M45',
+      deepSkyId: 'Mel022',
+      aliases: ['M45', 'Mel 22'],
+    };
     expect(rank([star('M451'), pleiades], 'M45')).toEqual(['Pleiades', 'M451']);
     expect(rank([star('Mel 22'), pleiades], 'mel22')).toEqual(['Pleiades', 'Mel 22']);
   });

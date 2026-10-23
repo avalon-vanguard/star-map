@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CameraPose, CameraRigController } from './camera-rig-controller';
 
-function createRig(): { camera: THREE.PerspectiveCamera; controls: OrbitControls; rig: CameraRigController } {
+function createRig(): {
+  camera: THREE.PerspectiveCamera;
+  controls: OrbitControls;
+  rig: CameraRigController;
+} {
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
   camera.position.set(0, 0, 5);
   const controls = new OrbitControls(camera, document.createElement('canvas'));

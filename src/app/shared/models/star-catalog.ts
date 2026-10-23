@@ -49,7 +49,14 @@ export const BYTES_PER_STAR_META =
  * temperature. The next bit says whose parallax the distance is, which for a HYG star Gaia did
  * not place can still be Gaia's, and the last whether the colour was read off a temperature.
  */
-const PHOTOMETRY = { bandV: 1, bandG: 2, bandMask: 3, colorBpRp: 4, distanceFromGaia: 8, colorFromTemperature: 16 } as const;
+const PHOTOMETRY = {
+  bandV: 1,
+  bandG: 2,
+  bandMask: 3,
+  colorBpRp: 4,
+  distanceFromGaia: 8,
+  colorFromTemperature: 16,
+} as const;
 
 /**
  * The distance error column holds the square root of the relative error, in 65 535ths, and 0 where
@@ -114,7 +121,7 @@ export interface StarCatalogIndex {
  */
 const DESIGNATION_PREFIXES: Readonly<Record<string, string>> = {
   gaia: 'Gaia DR3',
-  hyg: 'HYG'
+  hyg: 'HYG',
 };
 
 interface StarMetaColumns {
@@ -145,7 +152,15 @@ function metaColumns(buffer: ArrayBuffer, count: number): StarMetaColumns {
   offset += count * Uint16Array.BYTES_PER_ELEMENT;
   const photometry = new Uint8Array(buffer, offset, count);
 
-  return { gaiaSourceIds, ids, magnitudes, colorIndices, spectralTypeIndices, photometry, distanceErrors };
+  return {
+    gaiaSourceIds,
+    ids,
+    magnitudes,
+    colorIndices,
+    spectralTypeIndices,
+    photometry,
+    distanceErrors,
+  };
 }
 
 /**
@@ -182,7 +197,11 @@ export function encodeStarCatalog(stars: readonly StarRecord[]): {
     if (star.source !== undefined) {
       const known = sourceIds.get(star.source);
       if (known === undefined) {
-        sourceIndex = sources.push({ id: star.source, designationPrefix: DESIGNATION_PREFIXES[star.source] ?? star.source }) - 1;
+        sourceIndex =
+          sources.push({
+            id: star.source,
+            designationPrefix: DESIGNATION_PREFIXES[star.source] ?? star.source,
+          }) - 1;
         sourceIds.set(star.source, sourceIndex);
       } else {
         sourceIndex = known;
@@ -198,7 +217,11 @@ export function encodeStarCatalog(stars: readonly StarRecord[]): {
       columns.gaiaSourceIds[index] = gaiaSourceId;
       names.push('');
     } else {
-      names.push(star.name === designationFor(sources[sourceIndex]?.designationPrefix, star.id) ? '' : star.name);
+      names.push(
+        star.name === designationFor(sources[sourceIndex]?.designationPrefix, star.id)
+          ? ''
+          : star.name,
+      );
     }
 
     let spectralTypeId = spectralTypeIds.get(star.spectralType);
@@ -212,18 +235,37 @@ export function encodeStarCatalog(stars: readonly StarRecord[]): {
     columns.colorIndices[index] = star.colorIndex ?? Number.NaN;
     columns.spectralTypeIndices[index] = spectralTypeId;
     columns.photometry[index] =
-      (star.magnitudeBand === 'V' ? PHOTOMETRY.bandV : star.magnitudeBand === 'G' ? PHOTOMETRY.bandG : 0) |
+      (star.magnitudeBand === 'V'
+        ? PHOTOMETRY.bandV
+        : star.magnitudeBand === 'G'
+          ? PHOTOMETRY.bandG
+          : 0) |
       (star.colorSystem === 'BP-RP' ? PHOTOMETRY.colorBpRp : 0) |
       (star.distanceFromGaia ? PHOTOMETRY.distanceFromGaia : 0) |
       (star.colorFromTemperature ? PHOTOMETRY.colorFromTemperature : 0);
     // At least one step, so an error too small to round to one is not read back as none published.
     columns.distanceErrors[index] =
-      star.distanceError === undefined ? 0 : Math.max(1, Math.round(Math.sqrt(Math.min(1, star.distanceError)) * DISTANCE_ERROR_STEPS));
+      star.distanceError === undefined
+        ? 0
+        : Math.max(
+            1,
+            Math.round(Math.sqrt(Math.min(1, star.distanceError)) * DISTANCE_ERROR_STEPS),
+          );
   });
 
   // A per-star column is only worth writing when the stars actually differ.
   const mixedSources = sources.length > 1;
-  return { index: { count, names, spectralTypes, sources, sourceIndices: mixedSources ? sourceIndices : [] }, positions, meta };
+  return {
+    index: {
+      count,
+      names,
+      spectralTypes,
+      sources,
+      sourceIndices: mixedSources ? sourceIndices : [],
+    },
+    positions,
+    meta,
+  };
 }
 
 /** The name a source gives a star it has no other name for. */
@@ -239,19 +281,27 @@ function designationFor(prefix: string | undefined, id: number): string | undefi
  */
 export function isDesignation(star: StarRecord): boolean {
   // No source at all is a single-catalogue build, whose fallback is HYG's — see `decodeStarCatalog`.
-  const prefix = star.source === undefined ? DESIGNATION_PREFIXES['hyg'] : (DESIGNATION_PREFIXES[star.source] ?? star.source);
+  const prefix =
+    star.source === undefined
+      ? DESIGNATION_PREFIXES['hyg']
+      : (DESIGNATION_PREFIXES[star.source] ?? star.source);
   return star.name.startsWith(`${prefix} `);
 }
 
 /** Rebuilds the star records the app works with from the three loaded assets. */
-export function decodeStarCatalog(index: StarCatalogIndex, positions: Float32Array, meta: ArrayBuffer): StarRecord[] {
+export function decodeStarCatalog(
+  index: StarCatalogIndex,
+  positions: Float32Array,
+  meta: ArrayBuffer,
+): StarRecord[] {
   const columns = metaColumns(meta, index.count);
   const stars: StarRecord[] = new Array(index.count);
 
   for (let i = 0; i < index.count; i++) {
     const colorIndex = columns.colorIndices[i];
     const id = columns.ids[i];
-    const sourceIndex = index.sourceIndices.length > 0 ? index.sourceIndices[i] : index.sources.length === 1 ? 0 : -1;
+    const sourceIndex =
+      index.sourceIndices.length > 0 ? index.sourceIndices[i] : index.sources.length === 1 ? 0 : -1;
     const source = index.sources[sourceIndex];
     const photometry = columns.photometry[i];
     const band = photometry & PHOTOMETRY.bandMask;
@@ -262,7 +312,9 @@ export function decodeStarCatalog(index: StarCatalogIndex, positions: Float32Arr
       id,
       name:
         index.names[i] ||
-        (gaiaSourceId ? `${GAIA_DESIGNATION_PREFIX}${gaiaSourceId}` : designationFor(source?.designationPrefix, id) || `HYG ${id}`),
+        (gaiaSourceId
+          ? `${GAIA_DESIGNATION_PREFIX}${gaiaSourceId}`
+          : designationFor(source?.designationPrefix, id) || `HYG ${id}`),
       x: positions[i * 3],
       y: positions[i * 3 + 1],
       z: positions[i * 3 + 2],
@@ -271,11 +323,15 @@ export function decodeStarCatalog(index: StarCatalogIndex, positions: Float32Arr
       colorIndex: Number.isNaN(colorIndex) ? null : colorIndex,
       // Set on every record, if only to undefined, so that all of them have the one shape.
       magnitudeBand: band === PHOTOMETRY.bandV ? 'V' : band === PHOTOMETRY.bandG ? 'G' : undefined,
-      colorSystem: Number.isNaN(colorIndex) ? undefined : photometry & PHOTOMETRY.colorBpRp ? 'BP-RP' : 'B-V',
+      colorSystem: Number.isNaN(colorIndex)
+        ? undefined
+        : photometry & PHOTOMETRY.colorBpRp
+          ? 'BP-RP'
+          : 'B-V',
       distanceError: distanceError === 0 ? undefined : (distanceError / DISTANCE_ERROR_STEPS) ** 2,
       distanceFromGaia: (photometry & PHOTOMETRY.distanceFromGaia) !== 0,
       colorFromTemperature: (photometry & PHOTOMETRY.colorFromTemperature) !== 0,
-      ...(source ? { source: source.id } : {})
+      ...(source ? { source: source.id } : {}),
     };
   }
 

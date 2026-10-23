@@ -14,7 +14,9 @@ describe('StarmapHudComponent', () => {
   }
 
   function buttonLabels(host: HTMLElement): string[] {
-    return [...host.querySelectorAll('nav button')].map((button) => button.textContent?.trim() ?? '');
+    return [...host.querySelectorAll('nav button')].map(
+      (button) => button.textContent?.trim() ?? '',
+    );
   }
 
   beforeEach(async () => {
@@ -72,7 +74,11 @@ describe('StarmapHudComponent', () => {
     fixture.componentRef.setInput('title', 'Sol');
     fixture.detectChanges();
 
-    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="hud-banner"]')?.textContent?.trim()).toBe('Sol');
+    expect(
+      (fixture.nativeElement as HTMLElement)
+        .querySelector('[data-testid="hud-banner"]')
+        ?.textContent?.trim(),
+    ).toBe('Sol');
   });
 
   it('shows no banner when the view is holding nothing', () => {

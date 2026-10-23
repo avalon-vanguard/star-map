@@ -43,7 +43,12 @@ const NUDGE_STEP_RADIANS = Math.PI / 24;
 const LABEL_REACH_FRACTION = 0.13;
 const LABEL_HEIGHT_PX = 30;
 
-function overlaps(x: number, y: number, viewport: RingViewport, reserved: readonly ReservedBox[]): boolean {
+function overlaps(
+  x: number,
+  y: number,
+  viewport: RingViewport,
+  reserved: readonly ReservedBox[],
+): boolean {
   const px = ((x + 1) / 2) * viewport.width;
   const py = ((1 - y) / 2) * viewport.height;
   const reach = viewport.width * LABEL_REACH_FRACTION;
@@ -52,7 +57,9 @@ function overlaps(x: number, y: number, viewport: RingViewport, reserved: readon
   const right = px + reach;
   const top = py - LABEL_HEIGHT_PX / 2;
   const bottom = py + LABEL_HEIGHT_PX / 2;
-  return reserved.some((box) => left < box.right && right > box.left && top < box.bottom && bottom > box.top);
+  return reserved.some(
+    (box) => left < box.right && right > box.left && top < box.bottom && bottom > box.top,
+  );
 }
 
 /**
@@ -68,7 +75,7 @@ export function ringPlacement(
   angle: number,
   radius: number,
   viewport: RingViewport,
-  reserved: readonly ReservedBox[] = []
+  reserved: readonly ReservedBox[] = [],
 ): RingPlacement | null {
   const shorterSide = Math.min(viewport.width, viewport.height);
   const scaleX = viewport.width === 0 ? radius : (radius * shorterSide) / viewport.width;

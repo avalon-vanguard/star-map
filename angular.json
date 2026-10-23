@@ -35,9 +35,7 @@
                 "output": "assets"
               }
             ],
-            "styles": [
-              "src/styles.css"
-            ]
+            "styles": ["src/styles.css"]
           },
           "configurations": {
             "production": {
@@ -85,10 +83,7 @@
               "functions": 88,
               "lines": 91
             },
-            "include": [
-              "**/*.spec.ts",
-              "../tools/etl/**/*.spec.ts"
-            ]
+            "include": ["**/*.spec.ts", "../tools/etl/**/*.spec.ts"]
           }
         }
       }

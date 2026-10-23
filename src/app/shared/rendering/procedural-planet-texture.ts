@@ -36,7 +36,8 @@ const MAX_BANDS = 14;
 
 /** Hash of three lattice coordinates and a seed to a value in [0, 1). */
 function hash3(x: number, y: number, z: number, seed: number): number {
-  let h = seed ^ Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(z | 0, 2147483647);
+  let h =
+    seed ^ Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(z | 0, 2147483647);
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
@@ -89,7 +90,8 @@ function fbm(x: number, y: number, z: number, seed: number, octaves: number): nu
   let total = 0;
 
   for (let octave = 0; octave < octaves; octave++) {
-    sum += amplitude * valueNoise3(x * frequency, y * frequency, z * frequency, seed + octave * 7919);
+    sum +=
+      amplitude * valueNoise3(x * frequency, y * frequency, z * frequency, seed + octave * 7919);
     total += amplitude;
     amplitude *= 0.5;
     frequency *= 2;
@@ -127,7 +129,10 @@ export interface PlanetTextureSize {
  * Renders the surface into an RGBA byte array, row-major from the north pole down, ready to
  * hand to a `DataTexture`.
  */
-export function renderPlanetTexture(appearance: PlanetAppearance, size: PlanetTextureSize): Uint8Array {
+export function renderPlanetTexture(
+  appearance: PlanetAppearance,
+  size: PlanetTextureSize,
+): Uint8Array {
   const { width, height } = size;
   const pixels = new Uint8Array(width * height * 4);
   const { palette, seed } = appearance;
@@ -206,14 +211,22 @@ const textureCache = new Map<string, THREE.DataTexture>();
  * there is no reason to route them through a 2D context that may not exist — which also means
  * this works under a headless test environment where canvas rendering does not.
  */
-export function planetTexture(appearance: PlanetAppearance, size: PlanetTextureSize = { width: DETAIL_TEXTURE_WIDTH, height: DETAIL_TEXTURE_HEIGHT }): THREE.DataTexture {
+export function planetTexture(
+  appearance: PlanetAppearance,
+  size: PlanetTextureSize = { width: DETAIL_TEXTURE_WIDTH, height: DETAIL_TEXTURE_HEIGHT },
+): THREE.DataTexture {
   const key = `${appearance.seed}:${appearance.planetClass}:${appearance.polarCapExtentDeg ?? 'none'}:${size.width}x${size.height}`;
   const cached = textureCache.get(key);
   if (cached) {
     return cached;
   }
 
-  const texture = new THREE.DataTexture(renderPlanetTexture(appearance, size), size.width, size.height, THREE.RGBAFormat);
+  const texture = new THREE.DataTexture(
+    renderPlanetTexture(appearance, size),
+    size.width,
+    size.height,
+    THREE.RGBAFormat,
+  );
   texture.colorSpace = THREE.SRGBColorSpace;
   // Wraps in longitude — the noise is continuous across the seam — but is clamped in latitude,
   // where there is nothing beyond the pole to wrap to.

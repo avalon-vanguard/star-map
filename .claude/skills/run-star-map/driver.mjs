@@ -58,7 +58,10 @@ const pickNode = () => {
   const candidates = [process.execPath, '/opt/node/bin/node', '/usr/local/bin/node', 'node'];
   for (const bin of candidates) {
     try {
-      const v = execFileSync(bin, ['--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      const v = execFileSync(bin, ['--version'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
       if (v && satisfies(v.trim(), range)) return { bin, version: v.trim() };
     } catch {
       /* candidate absent — try the next */
@@ -88,7 +91,7 @@ async function startServer() {
   const proc = spawn(bin, [`${REPO}/node_modules/.bin/ng`, 'serve', `--port=${PORT}`], {
     cwd: REPO,
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, PATH: `${dirname(bin)}:${process.env.PATH}` }
+    env: { ...process.env, PATH: `${dirname(bin)}:${process.env.PATH}` },
   });
   let log = '';
   proc.stdout.on('data', (d) => (log += d));
@@ -115,7 +118,9 @@ async function startServer() {
 
 // The pinned @playwright/test does not necessarily match the browser revision baked into the
 // container, so prefer the one that is actually on disk over the one Playwright expects.
-const executablePath = existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined;
+const executablePath = existsSync('/opt/pw-browsers/chromium')
+  ? '/opt/pw-browsers/chromium'
+  : undefined;
 
 const level = (page) => page.getByTestId('hud-current-level');
 const title = (page) => page.getByTestId('hud-title');
@@ -149,7 +154,7 @@ async function enterSystem(page) {
         await canvas.click();
         return false;
       },
-      { timeout: 90_000, intervals: [400] }
+      { timeout: 90_000, intervals: [400] },
     )
     .toBe(true);
   await page.waitForTimeout(1500);
@@ -190,7 +195,7 @@ const VIEWS = {
     const au = await zoomTo(page, 6);
     console.log(`  zoomed to ${au ?? '?'} AU`);
     await capture(page, '4-system-inner');
-  }
+  },
 };
 
 /* ── Commands ───────────────────────────────────────────────────────────────────────────────*/
@@ -219,11 +224,13 @@ async function probe(page, view) {
       .map((n) => ({
         name: n.querySelector('.map-label-name')?.textContent?.trim() ?? '',
         kind: n.querySelector('.map-label-kind')?.textContent?.trim() ?? null,
-        ghost: n.classList.contains('map-label--ghost')
-      }))
+        ghost: n.classList.contains('map-label--ghost'),
+      })),
   );
   const labels = all.filter((label) => !label.ghost).map(({ name, kind }) => ({ name, kind }));
-  const neighbours = all.filter((label) => label.ghost).map(({ name, kind }) => ({ name, distance: kind }));
+  const neighbours = all
+    .filter((label) => label.ghost)
+    .map(({ name, kind }) => ({ name, distance: kind }));
   console.log(
     JSON.stringify(
       {
@@ -231,11 +238,11 @@ async function probe(page, view) {
         level: (await level(page).textContent())?.trim(),
         labelCount: labels.length,
         labels,
-        ...(neighbours.length ? { neighbours } : {})
+        ...(neighbours.length ? { neighbours } : {}),
       },
       null,
-      2
-    )
+      2,
+    ),
   );
 }
 
@@ -252,7 +259,8 @@ try {
   } else {
     const names = command === 'shot' && requested.length ? requested : Object.keys(VIEWS);
     for (const name of names) {
-      if (!VIEWS[name]) throw new Error(`unknown view "${name}" (have: ${Object.keys(VIEWS).join(', ')})`);
+      if (!VIEWS[name])
+        throw new Error(`unknown view "${name}" (have: ${Object.keys(VIEWS).join(', ')})`);
       console.log(`${name}:`);
       await VIEWS[name](page);
     }

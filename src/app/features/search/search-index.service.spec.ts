@@ -18,11 +18,16 @@ const STARS: StarRecord[] = Array.from({ length: STARS_PER_SLICE * 2 + 1 }, (_, 
   z: 0,
   magnitude: 5,
   spectralType: 'G2V',
-  colorIndex: 0.65
+  colorIndex: 0.65,
 }));
 
 const MARS = { id: 'mars', name: 'Mars', kind: 'planet' } as BodyRecord;
-const ANDROMEDA = { id: 'NGC0224', name: 'Andromeda Galaxy', kind: 'galaxy', messier: 'M31' } as DeepSkyRecord;
+const ANDROMEDA = {
+  id: 'NGC0224',
+  name: 'Andromeda Galaxy',
+  kind: 'galaxy',
+  messier: 'M31',
+} as DeepSkyRecord;
 
 class FakeDataLoaderService {
   loadStars(): Promise<StarField> {
@@ -43,7 +48,9 @@ describe('SearchIndexService', () => {
   let service: SearchIndexService;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [{ provide: DataLoaderService, useClass: FakeDataLoaderService }] });
+    TestBed.configureTestingModule({
+      providers: [{ provide: DataLoaderService, useClass: FakeDataLoaderService }],
+    });
     service = TestBed.inject(SearchIndexService);
   });
 
@@ -62,7 +69,7 @@ describe('SearchIndexService', () => {
       name: 'Andromeda Galaxy',
       subtitle: 'Galaxy · M31',
       deepSkyId: 'NGC0224',
-      aliases: ['M31', 'NGC 224']
+      aliases: ['M31', 'NGC 224'],
     });
   });
 

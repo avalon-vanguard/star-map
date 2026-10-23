@@ -17,7 +17,7 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
   star: 'Star',
   body: 'Body',
   exoplanet: 'Exoplanet',
-  deepSky: 'Deep sky'
+  deepSky: 'Deep sky',
 };
 
 /**
@@ -38,8 +38,12 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
       <!-- The one genuinely translucent surface, so it alone carries a (small) backdrop blur.
            The ring is the keyboard-focus indicator: a border hue shift alone is invisible over
            the star field. -->
-      <div class="hud-brackets hud-surface relative backdrop-blur-sm transition-colors focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/50">
-        <app-reticle-icon class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-accent/70" />
+      <div
+        class="hud-brackets hud-surface relative backdrop-blur-sm transition-colors focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/50"
+      >
+        <app-reticle-icon
+          class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-accent/70"
+        />
         <input
           #field
           type="text"
@@ -63,7 +67,10 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
                 <span> · top {{ results().length }}</span>
               }
             </p>
-            <ul data-testid="search-results" class="max-h-64 scheme-dark divide-y divide-border/25 overflow-y-auto [scrollbar-width:thin]">
+            <ul
+              data-testid="search-results"
+              class="max-h-64 scheme-dark divide-y divide-border/25 overflow-y-auto [scrollbar-width:thin]"
+            >
               @for (result of results(); track result.bodyId ?? result.deepSkyId ?? result.starId) {
                 <li>
                   <button
@@ -72,18 +79,26 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
                     class="flex w-full items-baseline gap-3 border-l border-transparent px-3 py-2 text-left transition-colors hover:border-l-accent hover:bg-accent/8 focus-visible:border-l-accent focus-visible:bg-accent/12 focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
                   >
                     <span class="min-w-0 flex-1 truncate text-sm text-text">{{ result.name }}</span>
-                    <span class="type-label max-w-[45%] shrink-0 truncate text-muted">{{ kindLabel(result.kind) }}@if (result.subtitle) { · {{ result.subtitle }}}</span>
+                    <span class="type-label max-w-[45%] shrink-0 truncate text-muted"
+                      >{{ kindLabel(result.kind) }}
+                      @if (result.subtitle) {
+                        · {{ result.subtitle }}
+                      }
+                    </span>
                   </button>
                 </li>
               }
             </ul>
           } @else {
-            <p class="type-label px-3 py-2.5 text-center text-muted">Nothing in the catalog matches <span class="normal-case text-text">“{{ query().trim() }}”</span></p>
+            <p class="type-label px-3 py-2.5 text-center text-muted">
+              Nothing in the catalog matches
+              <span class="normal-case text-text">“{{ query().trim() }}”</span>
+            </p>
           }
         </div>
       }
     </div>
-  `
+  `,
 })
 export class SearchComponent {
   private readonly searchIndex = inject(SearchIndexService);
@@ -117,7 +132,11 @@ export class SearchComponent {
   });
 
   readonly matchTotal = computed(() => this.matches().length);
-  readonly results = computed(() => this.matches().slice(0, MAX_RESULTS).map((entry) => ({ ...entry, subtitle: entrySubtitle(entry) })));
+  readonly results = computed(() =>
+    this.matches()
+      .slice(0, MAX_RESULTS)
+      .map((entry) => ({ ...entry, subtitle: entrySubtitle(entry) })),
+  );
 
   constructor() {
     void this.searchIndex.finish();

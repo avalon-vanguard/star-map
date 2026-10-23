@@ -1,6 +1,12 @@
 import { appearanceForBody, appearanceForExoplanet } from '../../shared/astro/body-appearance';
 import { EARTH_RADIUS_KM } from '../../shared/astro/planet-appearance';
-import { effectiveTemperatureK, luminositySolar, radiusFromLuminositySolar, SOLAR_EFFECTIVE_TEMPERATURE_K, StellarPhotometry } from '../../shared/astro/stellar';
+import {
+  effectiveTemperatureK,
+  luminositySolar,
+  radiusFromLuminositySolar,
+  SOLAR_EFFECTIVE_TEMPERATURE_K,
+  StellarPhotometry,
+} from '../../shared/astro/stellar';
 import { bodyTexturePath } from '../../shared/rendering/texture-catalog';
 import { BodyRecord } from '../../shared/models/body.model';
 import { ExoplanetRecord } from '../../shared/models/exoplanet.model';
@@ -25,7 +31,9 @@ export interface BodyCatalogues {
  * about 50 K, read 388 K. The Sun is the unit, whatever its magnitude is filed under.
  */
 export function luminosityOf(star: StarRecord | undefined): number | null {
-  return star && (star.magnitudeBand || star.id === SUN_STAR_ID) ? luminositySolar(photometryOf(star)) : null;
+  return star && (star.magnitudeBand || star.id === SUN_STAR_ID)
+    ? luminositySolar(photometryOf(star))
+    : null;
 }
 
 function photometryOf(star: StarRecord): StellarPhotometry {
@@ -55,7 +63,9 @@ export interface StarSurface {
  * among its planets, in their order, as {@link starSurfaceOf} takes it — for the star field, which
  * tints every star the colour of its own disc.
  */
-export function publishedTemperaturesK(exoplanets: readonly ExoplanetRecord[]): Map<number, number> {
+export function publishedTemperaturesK(
+  exoplanets: readonly ExoplanetRecord[],
+): Map<number, number> {
   const temperatures = new Map<number, number>();
   for (const { hostStarId, hostStarTemperatureK } of exoplanets) {
     if (hostStarId !== null && hostStarTemperatureK && !temperatures.has(hostStarId)) {
@@ -80,20 +90,36 @@ export function publishedTemperaturesK(exoplanets: readonly ExoplanetRecord[]): 
  */
 export function starSurfaceOf(star: StarRecord, planets: readonly ExoplanetRecord[]): StarSurface {
   if (star.id === SUN_STAR_ID) {
-    return { radiusSolar: 1, radiusDerived: false, temperatureK: SOLAR_EFFECTIVE_TEMPERATURE_K, luminositySolar: 1, luminosityDerived: false };
+    return {
+      radiusSolar: 1,
+      radiusDerived: false,
+      temperatureK: SOLAR_EFFECTIVE_TEMPERATURE_K,
+      luminositySolar: 1,
+      luminosityDerived: false,
+    };
   }
-  const temperatureK = planets.find((planet) => planet.hostStarTemperatureK)?.hostStarTemperatureK ?? effectiveTemperatureK(photometryOf(star));
-  const published = planets.find((planet) => planet.hostStarLuminositySolar)?.hostStarLuminositySolar;
+  const temperatureK =
+    planets.find((planet) => planet.hostStarTemperatureK)?.hostStarTemperatureK ??
+    effectiveTemperatureK(photometryOf(star));
+  const published = planets.find(
+    (planet) => planet.hostStarLuminositySolar,
+  )?.hostStarLuminositySolar;
   // None from a stand-in magnitude: PSR J1719-1438 came out 2.3 solar radii, wider than its
   // planet's orbit.
   const derived = luminosityOf(star);
-  const luminosity = { luminositySolar: published ?? derived, luminosityDerived: published === undefined };
+  const luminosity = {
+    luminositySolar: published ?? derived,
+    luminosityDerived: published === undefined,
+  };
   const measured = planets.find((planet) => planet.hostStarRadiusSolar)?.hostStarRadiusSolar;
   if (measured) {
     return { radiusSolar: measured, radiusDerived: false, temperatureK, ...luminosity };
   }
   return {
-    radiusSolar: derived !== null && temperatureK !== null ? radiusFromLuminositySolar(derived, temperatureK) : null,
+    radiusSolar:
+      derived !== null && temperatureK !== null
+        ? radiusFromLuminositySolar(derived, temperatureK)
+        : null,
     radiusDerived: true,
     temperatureK,
     ...luminosity,
@@ -108,7 +134,10 @@ export function starSurfaceOf(star: StarRecord, planets: readonly ExoplanetRecor
  * know about this world" is exactly the shape of bug where a planet reads 255 K in one panel
  * and 254 K in the other.
  */
-export function buildBodyViewModel(id: string, catalogues: BodyCatalogues): BodyDetailViewModel | undefined {
+export function buildBodyViewModel(
+  id: string,
+  catalogues: BodyCatalogues,
+): BodyDetailViewModel | undefined {
   const body = catalogues.bodies.find((candidate) => candidate.id === id);
   if (body) {
     const hostStar = catalogues.stars.find((star) => star.id === body.systemStarId);
@@ -124,7 +153,10 @@ export function buildBodyViewModel(id: string, catalogues: BodyCatalogues): Body
       hostStarId: body.systemStarId,
       radiusKm: body.radiusKm,
       semiAxesKm: body.semiAxesKm,
-      orbit: body.measuredEccentricity === undefined ? body.orbit : { ...body.orbit, eccentricity: body.measuredEccentricity },
+      orbit:
+        body.measuredEccentricity === undefined
+          ? body.orbit
+          : { ...body.orbit, eccentricity: body.measuredEccentricity },
       appearance: appearanceForBody(body, catalogues.bodies, luminosityOf(hostStar)),
       hasPhotography: bodyTexturePath(body.id) !== undefined,
       orbitalPeriodDays: periodDays,
@@ -160,7 +192,12 @@ export function buildBodyViewModel(id: string, catalogues: BodyCatalogues): Body
     // Warmed by what the system view warms it by: the archive's luminosity where it has one.
     appearance: appearanceForExoplanet(
       exoplanet,
-      hostStar ? starSurfaceOf(hostStar, catalogues.exoplanets.filter((candidate) => candidate.hostStarId === hostStar.id)).luminositySolar : null,
+      hostStar
+        ? starSurfaceOf(
+            hostStar,
+            catalogues.exoplanets.filter((candidate) => candidate.hostStarId === hostStar.id),
+          ).luminositySolar
+        : null,
     ),
     hasPhotography: bodyTexturePath(exoplanet.id) !== undefined,
     imaged: exoplanet.imaged,

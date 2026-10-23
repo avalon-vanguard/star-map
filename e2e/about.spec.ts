@@ -8,7 +8,7 @@ const SUMMARY = {
   type: 'standard',
   titles: { normalized: 'Titan (moon)' },
   extract: 'Titan is the largest moon of Saturn.',
-  content_urls: { desktop: { page: 'https://en.wikipedia.org/wiki/Titan_(moon)' } }
+  content_urls: { desktop: { page: 'https://en.wikipedia.org/wiki/Titan_(moon)' } },
 };
 
 test.describe('About', () => {
@@ -16,7 +16,11 @@ test.describe('About', () => {
     let requests = 0;
     await page.route(isWikipedia, async (route) => {
       requests++;
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(SUMMARY) });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(SUMMARY),
+      });
     });
 
     await page.goto('/body/titan');
@@ -44,7 +48,9 @@ test.describe('About', () => {
     await expect(page.getByText(/Wikipedia has no article on Titan/)).toBeVisible();
   });
 
-  test('tells being unable to ask apart from there being no answer, and offers to try again', async ({ page }) => {
+  test('tells being unable to ask apart from there being no answer, and offers to try again', async ({
+    page,
+  }) => {
     await page.route(isWikipedia, (route) => route.abort('failed'));
 
     await page.goto('/body/titan');
@@ -54,7 +60,13 @@ test.describe('About', () => {
 
     // And the retry actually retries, rather than reading back a remembered failure.
     await page.unroute(isWikipedia);
-    await page.route(isWikipedia, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(SUMMARY) }));
+    await page.route(isWikipedia, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(SUMMARY),
+      }),
+    );
     await page.getByRole('button', { name: 'Try again' }).click();
 
     await expect(page.getByText('Titan is the largest moon of Saturn.')).toBeVisible();

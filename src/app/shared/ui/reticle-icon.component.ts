@@ -14,11 +14,18 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block', 'aria-hidden': 'true' },
   template: `
-    <svg class="h-full w-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" [attr.stroke-width]="strokeWidth()" stroke-linecap="round">
+    <svg
+      class="h-full w-full"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      [attr.stroke-width]="strokeWidth()"
+      stroke-linecap="round"
+    >
       <circle cx="12" cy="12" r="5" vector-effect="non-scaling-stroke" />
       <path d="M12 2v3M12 19v3M2 12h3M19 12h3" vector-effect="non-scaling-stroke" />
     </svg>
-  `
+  `,
 })
 export class ReticleIconComponent {
   readonly strokeWidth = input(1.5);

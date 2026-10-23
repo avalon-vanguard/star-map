@@ -4,7 +4,10 @@ import { dismissBootLoader, failBootLoader } from './boot-loader';
 
 describe('boot loader', () => {
   beforeEach(() => {
-    document.body.insertAdjacentHTML('afterbegin', '<div id="boot-loader" role="status"><div class="boot-orbit"></div><p>Loading the catalogue</p></div>');
+    document.body.insertAdjacentHTML(
+      'afterbegin',
+      '<div id="boot-loader" role="status"><div class="boot-orbit"></div><p>Loading the catalogue</p></div>',
+    );
     vi.useFakeTimers();
   });
 
@@ -16,7 +19,9 @@ describe('boot loader', () => {
   it('fades the launch screen out, then removes it', () => {
     dismissBootLoader();
 
-    expect(document.getElementById('boot-loader')?.classList.contains('boot-loader--done')).toBe(true);
+    expect(document.getElementById('boot-loader')?.classList.contains('boot-loader--done')).toBe(
+      true,
+    );
     vi.runAllTimers();
     expect(document.getElementById('boot-loader')).toBeNull();
   });

@@ -42,7 +42,7 @@ function pckVariables(text: string): Map<string, number[]> {
         .trim()
         .split(/[\s,]+/)
         .filter(Boolean)
-        .map((token) => Number(token.replace(/d/i, 'e')))
+        .map((token) => Number(token.replace(/d/i, 'e'))),
     );
   }
   return variables;
@@ -58,7 +58,10 @@ function pckVariables(text: string): Map<string, number[]> {
  * it in. A term is kept if any of its three amplitudes reaches {@link MIN_PERIODIC_TERM_DEG};
  * the largest amplitude of each term left out comes back in `skippedDeg`, for the ETL to say so.
  */
-export function parsePckRotationalElements(text: string, naifId: number): { elements: RotationalElements; skippedDeg: number[] } | undefined {
+export function parsePckRotationalElements(
+  text: string,
+  naifId: number,
+): { elements: RotationalElements; skippedDeg: number[] } | undefined {
   const variables = pckVariables(text);
   const poleRaDeg = variables.get(`BODY${naifId}_POLE_RA`);
   const poleDecDeg = variables.get(`BODY${naifId}_POLE_DEC`);
@@ -91,14 +94,16 @@ export function parsePckRotationalElements(text: string, naifId: number): { elem
     }
     const angleDeg = angles.slice(index * coefficients, (index + 1) * coefficients);
     if (angleDeg.length !== coefficients || !angleDeg.every(Number.isFinite)) {
-      throw new Error(`Body ${naifId}'s periodic term ${index + 1} has no angle among BODY${system}_NUT_PREC_ANGLES.`);
+      throw new Error(
+        `Body ${naifId}'s periodic term ${index + 1} has no angle among BODY${system}_NUT_PREC_ANGLES.`,
+      );
     }
     terms.push({ angleDeg, ...term });
   }
 
   return {
     elements: { poleRaDeg, poleDecDeg, primeMeridianDeg, ...(terms.length > 0 ? { terms } : {}) },
-    skippedDeg
+    skippedDeg,
   };
 }
 
@@ -107,14 +112,21 @@ export function parsePckRotationalElements(text: string, naifId: number): { elem
  * the WGCCRE 2015 pole at RA 286.13, Dec 63.87 and W = 84.176 + 14.1844 d, a sidereal day of 25.38
  * days at the Carrington latitude. The ETL checks them against the kernel.
  */
-export const SUN_ROTATIONAL_ELEMENTS: RotationalElements = { poleRaDeg: [286.13, 0, 0], poleDecDeg: [63.87, 0, 0], primeMeridianDeg: [84.176, 14.1844, 0] };
+export const SUN_ROTATIONAL_ELEMENTS: RotationalElements = {
+  poleRaDeg: [286.13, 0, 0],
+  poleDecDeg: [63.87, 0, 0],
+  primeMeridianDeg: [84.176, 14.1844, 0],
+};
 
 function polynomial(coefficients: readonly number[], x: number): number {
   return (coefficients[0] ?? 0) + (coefficients[1] ?? 0) * x + (coefficients[2] ?? 0) * x * x;
 }
 
 /** The pole's right ascension and declination and the prime meridian W, in degrees, at a TDB Julian date. */
-export function orientationAt(elements: RotationalElements, jdTdb: number): { poleRaDeg: number; poleDecDeg: number; primeMeridianDeg: number } {
+export function orientationAt(
+  elements: RotationalElements,
+  jdTdb: number,
+): { poleRaDeg: number; poleDecDeg: number; primeMeridianDeg: number } {
   const days = jdTdb - J2000_JD;
   const centuries = days / DAYS_PER_JULIAN_CENTURY;
   let poleRaDeg = polynomial(elements.poleRaDeg, centuries);
@@ -147,25 +159,38 @@ export function orientationAt(elements: RotationalElements, jdTdb: number): { po
 export function orbitalTermsOfPrimeMeridian(
   elements: RotationalElements,
   epochJd: number,
-  angleRateDegPerCentury?: number
-): { meanAnomalyTerms: { b: number; c: number; s: number; f: number }; meanMotionDegPerDay: number; meanAnomalyDeg: number } {
+  angleRateDegPerCentury?: number,
+): {
+  meanAnomalyTerms: { b: number; c: number; s: number; f: number };
+  meanMotionDegPerDay: number;
+  meanAnomalyDeg: number;
+} {
   const epochCenturies = (epochJd - J2000_JD) / DAYS_PER_JULIAN_CENTURY;
   // W turns clockwise about the pole the IAU names where its rate is negative; the orbit does not.
   const sense = Math.sign(elements.primeMeridianDeg[1]);
-  const quadratic = sense * (elements.primeMeridianDeg[2] ?? 0) * DAYS_PER_JULIAN_CENTURY * DAYS_PER_JULIAN_CENTURY;
+  const quadratic =
+    sense * (elements.primeMeridianDeg[2] ?? 0) * DAYS_PER_JULIAN_CENTURY * DAYS_PER_JULIAN_CENTURY;
   let sine = { c: 0, s: 0, f: 0 };
   if (angleRateDegPerCentury !== undefined) {
-    const term = elements.terms?.find((candidate) => candidate.angleDeg[1] === angleRateDegPerCentury);
+    const term = elements.terms?.find(
+      (candidate) => candidate.angleDeg[1] === angleRateDegPerCentury,
+    );
     if (!term || (term.angleDeg[2] ?? 0) !== 0) {
-      throw new Error(`No term of W turns linearly at ${angleRateDegPerCentury} degrees a century.`);
+      throw new Error(
+        `No term of W turns linearly at ${angleRateDegPerCentury} degrees a century.`,
+      );
     }
     const phase = (term.angleDeg[0] + term.angleDeg[1] * epochCenturies) * DEG_TO_RAD;
-    sine = { c: sense * term.pm * Math.sin(phase), s: sense * term.pm * Math.cos(phase), f: term.angleDeg[1] };
+    sine = {
+      c: sense * term.pm * Math.sin(phase),
+      s: sense * term.pm * Math.cos(phase),
+      f: term.angleDeg[1],
+    };
   }
   // q (T + T0)², T from the epoch and T0 the epoch from J2000, is q T² + 2 q T0 T + q T0².
   return {
     meanAnomalyTerms: { b: quadratic, ...sine },
     meanMotionDegPerDay: (2 * quadratic * epochCenturies) / DAYS_PER_JULIAN_CENTURY,
-    meanAnomalyDeg: quadratic * epochCenturies * epochCenturies
+    meanAnomalyDeg: quadratic * epochCenturies * epochCenturies,
   };
 }

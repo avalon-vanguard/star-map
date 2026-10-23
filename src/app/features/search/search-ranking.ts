@@ -60,7 +60,7 @@ const KIND_PRIORITY: Readonly<Record<SearchResultKind, number>> = {
   body: 0,
   deepSky: 1,
   star: 2,
-  exoplanet: 3
+  exoplanet: 3,
 };
 
 /** Catalogue names separate their parts with spaces, hyphens, underscores and slashes. */
@@ -97,7 +97,11 @@ type IndexedName = Pick<IndexedSearchEntry, 'normalizedName' | 'compactName' | '
 
 function indexName(name: string): IndexedName {
   const normalizedName = normalize(name);
-  return { normalizedName, compactName: compact(name), words: normalizedName.split(WORD_SEPARATORS) };
+  return {
+    normalizedName,
+    compactName: compact(name),
+    words: normalizedName.split(WORD_SEPARATORS),
+  };
 }
 
 /**
@@ -124,7 +128,7 @@ export function buildSearchIndex(entries: readonly SearchEntry[]): IndexedSearch
       normalizedName,
       compactName: compact(entry.name),
       words: normalizedName.split(WORD_SEPARATORS),
-      normalizedSubtitle: subtitle && normalize(subtitle)
+      normalizedSubtitle: subtitle && normalize(subtitle),
     };
     return entry.aliases ? { ...indexed, aliases: entry.aliases.map(indexName) } : indexed;
   });
@@ -137,7 +141,9 @@ function scoreName(indexed: IndexedName, normalizedQuery: string, compactQuery: 
     return MATCH_EXACT;
   }
   if (indexed.normalizedName.startsWith(normalizedQuery)) {
-    return WORD_SEPARATORS.test(indexed.normalizedName.charAt(normalizedQuery.length)) ? MATCH_WORD_PREFIX : MATCH_PREFIX;
+    return WORD_SEPARATORS.test(indexed.normalizedName.charAt(normalizedQuery.length))
+      ? MATCH_WORD_PREFIX
+      : MATCH_PREFIX;
   }
   if (indexed.words.some((word) => word.startsWith(normalizedQuery))) {
     return MATCH_WORD_START;
@@ -160,14 +166,20 @@ function scoreSubtitle(subtitle: string, normalizedQuery: string): number {
 }
 
 /** The best of the name's and the aliases' scores, or, where none of them matches at all, the subtitle's. */
-function scoreIndexed(indexed: IndexedSearchEntry, normalizedQuery: string, compactQuery: string): number {
+function scoreIndexed(
+  indexed: IndexedSearchEntry,
+  normalizedQuery: string,
+  compactQuery: string,
+): number {
   let score = scoreName(indexed, normalizedQuery, compactQuery);
   if (indexed.aliases) {
     for (const alias of indexed.aliases) {
       score = Math.max(score, scoreName(alias, normalizedQuery, compactQuery));
     }
   }
-  return score > NO_MATCH || indexed.normalizedSubtitle === '' ? score : scoreSubtitle(indexed.normalizedSubtitle, normalizedQuery);
+  return score > NO_MATCH || indexed.normalizedSubtitle === ''
+    ? score
+    : scoreSubtitle(indexed.normalizedSubtitle, normalizedQuery);
 }
 
 /**
@@ -179,7 +191,11 @@ export function scoreSearchMatch(name: string, query: string): number {
   if (normalizedQuery === '') {
     return NO_MATCH;
   }
-  return scoreIndexed(buildSearchIndex([{ kind: 'star', name, subtitle: '' }])[0], normalizedQuery, compact(query));
+  return scoreIndexed(
+    buildSearchIndex([{ kind: 'star', name, subtitle: '' }])[0],
+    normalizedQuery,
+    compact(query),
+  );
 }
 
 /**
@@ -195,7 +211,11 @@ export function scoreSearchMatch(name: string, query: string): number {
  * the query is the closer match — and finally alphabetically, so the order is fully determined
  * rather than dependent on the input order.
  */
-export function rankSearchResults(index: readonly IndexedSearchEntry[], query: string, limit: number): SearchEntry[] {
+export function rankSearchResults(
+  index: readonly IndexedSearchEntry[],
+  query: string,
+  limit: number,
+): SearchEntry[] {
   const normalizedQuery = normalize(query);
   if (limit <= 0 || normalizedQuery === '') {
     return [];
@@ -215,7 +235,7 @@ export function rankSearchResults(index: readonly IndexedSearchEntry[], query: s
       b.score - a.score ||
       KIND_PRIORITY[a.entry.kind] - KIND_PRIORITY[b.entry.kind] ||
       a.entry.name.length - b.entry.name.length ||
-      a.entry.name.localeCompare(b.entry.name)
+      a.entry.name.localeCompare(b.entry.name),
   );
 
   return scored.slice(0, limit).map((match) => match.entry);

@@ -29,7 +29,11 @@ export interface BodyDetailViewModel {
    * `formatDistance` needs to print it as the system view prints the same star. Undefined for the
    * Sun's bodies, and for the 26 planets whose host the archive gives no distance for.
    */
-  hostDistance?: { readonly pc: number; readonly relativeError?: number; readonly onDistance: boolean };
+  hostDistance?: {
+    readonly pc: number;
+    readonly relativeError?: number;
+    readonly onDistance: boolean;
+  };
   /** The host star's mass in solar masses, as the archive publishes it (`st_mass`). */
   hostStarMassSolar?: number;
   orbit: Partial<OrbitalElements>;

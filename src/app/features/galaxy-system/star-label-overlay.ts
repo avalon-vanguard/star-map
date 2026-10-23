@@ -52,7 +52,7 @@ function classesFor(point: Pick<LabeledPoint, 'side' | 'tone' | 'selectStarId'>)
     point.side === 'left' ? 'map-label--left' : '',
     point.tone === 'ghost' ? 'map-label--ghost' : '',
     point.selectStarId === undefined ? '' : 'map-label--select',
-    'whitespace-nowrap font-body'
+    'whitespace-nowrap font-body',
   ]
     .filter(Boolean)
     .join(' ');
@@ -74,7 +74,7 @@ export class StarLabelOverlay {
   constructor(
     private readonly scene: THREE.Scene,
     /** Called with the star a selectable label names, when it is clicked or keyed. */
-    private readonly onSelectStar?: (starId: number) => void
+    private readonly onSelectStar?: (starId: number) => void,
   ) {
     this.cssRenderer.domElement.classList.add('star-label-layer');
     this.domElement = this.cssRenderer.domElement;
@@ -167,7 +167,10 @@ export class StarLabelOverlay {
       // Read out as a sentence rather than as the two lines run together — the name and the
       // distance are adjacent spans, so the default accessible name is "Sirius2.64 pc" — and
       // said as the action it is, since nothing else on screen says these labels are doors.
-      element.setAttribute('aria-label', `Go to ${point.name}${point.kind ? `, ${point.kind} away` : ''}`);
+      element.setAttribute(
+        'aria-label',
+        `Go to ${point.name}${point.kind ? `, ${point.kind} away` : ''}`,
+      );
       element.addEventListener('click', (event) => {
         event.stopPropagation();
         this.onSelectStar?.(starId);

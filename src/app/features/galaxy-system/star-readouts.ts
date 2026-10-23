@@ -1,7 +1,12 @@
 import { HUBBLE_CONSTANT_KM_S_PER_MPC } from '../../shared/astro/deep-sky';
 import { spectralClassification } from '../../shared/astro/spectral';
 import { temperatureFromColour } from '../../shared/astro/stellar';
-import { formatAngle, formatDistance, formatLuminosity, formatParsecs } from '../../shared/format/quantity';
+import {
+  formatAngle,
+  formatDistance,
+  formatLuminosity,
+  formatParsecs,
+} from '../../shared/format/quantity';
 import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { StarRecord, SUN_STAR_ID } from '../../shared/models/star.model';
 import { StarSurface } from '../body-detail/body-view-model';
@@ -32,7 +37,9 @@ export function describingCatalogue(star: StarRecord): string {
 export function starSubtitle(star: StarRecord): string {
   const classification = spectralClassification(star);
   const basis = star.colorFromTemperature ? ', from its temperature' : ', from colour';
-  return !classification ? '' : `Spectral type ${classification}${classification.startsWith('~') ? basis : ''}`;
+  return !classification
+    ? ''
+    : `Spectral type ${classification}${classification.startsWith('~') ? basis : ''}`;
 }
 
 /**
@@ -47,23 +54,50 @@ export function starReadouts(star: StarRecord, surface?: StarSurface): HudReadou
   return [
     // Suppressed for the Sun rather than printed as `0.00 pc`, which is arithmetically right
     // and reads as a bug: the distance from here to here is not a measurement.
-    ...(distancePc > 0 ? [{ label: 'Distance', value: formatDistance(distancePc, star.distanceError, star.source === 'exoplanet-archive') }] : []),
+    ...(distancePc > 0
+      ? [
+          {
+            label: 'Distance',
+            value: formatDistance(
+              distancePc,
+              star.distanceError,
+              star.source === 'exoplanet-archive',
+            ),
+          },
+        ]
+      : []),
     // A G magnitude and a V one are not comparable: a red dwarf is up to three brighter in G.
-    { label: 'Magnitude', value: star.magnitudeBand ? `${star.magnitudeBand} ${star.magnitude.toFixed(2)}` : 'Not measured' },
+    {
+      label: 'Magnitude',
+      value: star.magnitudeBand
+        ? `${star.magnitudeBand} ${star.magnitude.toFixed(2)}`
+        : 'Not measured',
+    },
     ...(star.colorIndex !== null
       ? [
           {
             label: 'Colour',
             value: `${star.colorSystem === 'BP-RP' ? 'BP−RP' : 'B−V'} ${star.colorIndex.toFixed(2)}${star.colorFromTemperature ? ', from its temperature' : ''}`,
-            ...(star.colorFromTemperature ? { derived: true } : {})
-          }
+            ...(star.colorFromTemperature ? { derived: true } : {}),
+          },
         ]
       : []),
     ...(surface?.luminositySolar
-      ? [{ label: 'Luminosity', value: formatLuminosity(surface.luminositySolar), ...(surface.luminosityDerived ? { derived: true } : {}) }]
+      ? [
+          {
+            label: 'Luminosity',
+            value: formatLuminosity(surface.luminositySolar),
+            ...(surface.luminosityDerived ? { derived: true } : {}),
+          },
+        ]
       : []),
-    ...(surface?.radiusSolar ? [radiusReadout(surface.radiusSolar, surface.radiusDerived, radiusBasis(star))] : []),
-    { label: 'Source', value: catalogue === 'HYG' && star.distanceFromGaia ? 'HYG, Gaia DR3 distance' : catalogue }
+    ...(surface?.radiusSolar
+      ? [radiusReadout(surface.radiusSolar, surface.radiusDerived, radiusBasis(star))]
+      : []),
+    {
+      label: 'Source',
+      value: catalogue === 'HYG' && star.distanceFromGaia ? 'HYG, Gaia DR3 distance' : catalogue,
+    },
   ];
 }
 
@@ -83,9 +117,16 @@ function radiusBasis(star: StarRecord): string {
 /** Two figures for a derived radius, three for a published one: 0.105 is not what colour gives. */
 function radiusReadout(radiusSolar: number, derived: boolean, basis: string): HudReadout {
   const digits = derived ? 2 : 3;
-  const figure = radiusSolar.toLocaleString('en-GB', { minimumSignificantDigits: digits, maximumSignificantDigits: digits });
+  const figure = radiusSolar.toLocaleString('en-GB', {
+    minimumSignificantDigits: digits,
+    maximumSignificantDigits: digits,
+  });
   return derived
-    ? { label: 'Radius', value: `~${figure} solar radii, from ${basis} and brightness`, derived: true }
+    ? {
+        label: 'Radius',
+        value: `~${figure} solar radii, from ${basis} and brightness`,
+        derived: true,
+      }
     : { label: 'Radius', value: `${figure} solar radii` };
 }
 
@@ -100,11 +141,21 @@ function radiusReadout(radiusSolar: number, derived: boolean, basis: string): Hu
  */
 export function positionsNote(stars: readonly StarRecord[]): string {
   const archive = stars.filter((star) => star.source === 'exoplanet-archive').length;
-  const gliese = stars.filter((star) => star.source === 'hyg' && star.distanceError === undefined && star.id !== SUN_STAR_ID).length;
+  const gliese = stars.filter(
+    (star) => star.source === 'hyg' && star.distanceError === undefined && star.id !== SUN_STAR_ID,
+  ).length;
   const where = [
     'Positions from measured parallaxes',
-    ...(gliese === 0 ? [] : [`for the ${gliese.toLocaleString('en-GB')} stars only the Gliese catalogue places, from its distances, about half of them photometric`]),
-    ...(archive === 0 ? [] : [`for the ${archive.toLocaleString('en-GB')} planet hosts only the NASA Exoplanet Archive places, from its distances`])
+    ...(gliese === 0
+      ? []
+      : [
+          `for the ${gliese.toLocaleString('en-GB')} stars only the Gliese catalogue places, from its distances, about half of them photometric`,
+        ]),
+    ...(archive === 0
+      ? []
+      : [
+          `for the ${archive.toLocaleString('en-GB')} planet hosts only the NASA Exoplanet Archive places, from its distances`,
+        ]),
   ].join('; ');
   return `${where}. Grid marks the galactic plane through the Sun.`;
 }
@@ -130,11 +181,16 @@ export function catalogueCensus(stars: readonly StarRecord[]): string {
  * no distance, and for the best-known objects neither its parallax nor a redshift gives one — the
  * Andromeda Galaxy approaches us, and its listed parallax is a foreground star's.
  */
-export function deepSkyReadouts(record: DeepSkyRecord): { subtitle: string; readouts: HudReadout[]; note: string } {
+export function deepSkyReadouts(record: DeepSkyRecord): {
+  subtitle: string;
+  readouts: HudReadout[];
+  note: string;
+} {
   const kind = record.kind.charAt(0).toUpperCase() + record.kind.slice(1);
   // 264 of the 488 are named by their designation alone, "NGC6231", which reads "NGC 6231" spaced out.
   const names = [record.messier, readableDesignation(record.id)].filter(
-    (name): name is string => !!name && name !== record.name && name !== readableDesignation(record.name),
+    (name): name is string =>
+      !!name && name !== record.name && name !== readableDesignation(record.name),
   );
   const notes = {
     parallax: 'Distance from the parallax OpenNGC lists for it.',
@@ -143,7 +199,10 @@ export function deepSkyReadouts(record: DeepSkyRecord): { subtitle: string; read
   return {
     subtitle: [kind, ...names].join(' · '),
     readouts: [
-      { label: 'Magnitude', value: record.magnitude === null ? 'Not measured' : record.magnitude.toFixed(2) },
+      {
+        label: 'Magnitude',
+        value: record.magnitude === null ? 'Not measured' : record.magnitude.toFixed(2),
+      },
       { label: 'Apparent size', value: formatAngle(record.angularSizeDeg) },
       { label: 'Constellation', value: record.constellation },
       record.distancePc === null
@@ -151,7 +210,9 @@ export function deepSkyReadouts(record: DeepSkyRecord): { subtitle: string; read
         : { label: 'Distance', value: formatParsecs(record.distancePc), derived: true },
     ],
     note: `From OpenNGC, which publishes directions and no distances. ${
-      record.distanceMethod ? notes[record.distanceMethod] : 'Neither a parallax nor a redshift gives this one a distance that can be trusted.'
+      record.distanceMethod
+        ? notes[record.distanceMethod]
+        : 'Neither a parallax nor a redshift gives this one a distance that can be trusted.'
     }`,
   };
 }

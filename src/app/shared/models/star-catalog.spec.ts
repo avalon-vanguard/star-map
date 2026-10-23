@@ -1,15 +1,57 @@
 import { describe, expect, it } from 'vitest';
 
-import { BYTES_PER_STAR_META, BYTES_PER_STAR_POSITION, decodeStarCatalog, encodeStarCatalog, isDesignation } from './star-catalog';
+import {
+  BYTES_PER_STAR_META,
+  BYTES_PER_STAR_POSITION,
+  decodeStarCatalog,
+  encodeStarCatalog,
+  isDesignation,
+} from './star-catalog';
 import { StarRecord } from './star.model';
 import { formatDistance } from '../format/quantity';
 
 const STARS: StarRecord[] = [
-  { id: 0, name: 'Sol', x: 0, y: 0, z: 0, magnitude: -26.7, spectralType: 'G2V', colorIndex: 0.656 },
-  { id: 71456, name: 'Rigil Kentaurus', x: -1.35, y: -0.04, z: -0.98, magnitude: -0.01, spectralType: 'G2V', colorIndex: 0.71 },
-  { id: 32263, name: 'Sirius', x: -0.49, y: 2.47, z: -0.75, magnitude: -1.44, spectralType: 'A0m...', colorIndex: 0.009 },
+  {
+    id: 0,
+    name: 'Sol',
+    x: 0,
+    y: 0,
+    z: 0,
+    magnitude: -26.7,
+    spectralType: 'G2V',
+    colorIndex: 0.656,
+  },
+  {
+    id: 71456,
+    name: 'Rigil Kentaurus',
+    x: -1.35,
+    y: -0.04,
+    z: -0.98,
+    magnitude: -0.01,
+    spectralType: 'G2V',
+    colorIndex: 0.71,
+  },
+  {
+    id: 32263,
+    name: 'Sirius',
+    x: -0.49,
+    y: 2.47,
+    z: -0.75,
+    magnitude: -1.44,
+    spectralType: 'A0m...',
+    colorIndex: 0.009,
+  },
   // The case a plain number cannot carry: about a tenth of the catalogue was never photometered.
-  { id: 118554, name: 'GJ 3512', x: 20.1, y: -3.4, z: 8.8, magnitude: 15, spectralType: 'Unknown', colorIndex: null }
+  {
+    id: 118554,
+    name: 'GJ 3512',
+    x: 20.1,
+    y: -3.4,
+    z: 8.8,
+    magnitude: 15,
+    spectralType: 'Unknown',
+    colorIndex: null,
+  },
 ];
 
 describe('encodeStarCatalog / decodeStarCatalog', () => {
@@ -67,7 +109,8 @@ describe('encodeStarCatalog / decodeStarCatalog', () => {
   it('is smaller than the array of objects it replaced', () => {
     // The whole reason for the format: the old encoding repeated eight key names per star.
     const asObjects = JSON.stringify(STARS).length;
-    const asCatalogue = JSON.stringify(encoded.index).length + encoded.positions.byteLength + encoded.meta.byteLength;
+    const asCatalogue =
+      JSON.stringify(encoded.index).length + encoded.positions.byteLength + encoded.meta.byteLength;
     expect(asCatalogue).toBeLessThan(asObjects);
   });
 
@@ -88,36 +131,138 @@ describe('encodeStarCatalog / decodeStarCatalog', () => {
       z: 0,
       magnitude: 10,
       spectralType: `S${i}`,
-      colorIndex: null
+      colorIndex: null,
     }));
-    const round = decodeStarCatalog(...(({ index, positions, meta }) => [index, positions, meta] as const)(encodeStarCatalog(many)));
+    const round = decodeStarCatalog(
+      ...(({ index, positions, meta }) => [index, positions, meta] as const)(
+        encodeStarCatalog(many),
+      ),
+    );
 
     expect(round[4999].spectralType).toBe('S4999');
     expect(round[4999].id).toBe(4999);
   });
 });
 
-
 describe('the photometry and distance error columns', () => {
   const MEASURED: StarRecord[] = [
-    { id: 1, name: 'Sirius', x: 1, y: 0, z: 0, magnitude: -1.44, magnitudeBand: 'V', spectralType: 'A0m', colorIndex: 0.009, colorSystem: 'B-V', distanceError: 0.0036, source: 'hyg' },
-    { id: 2, name: 'Gaia DR3 2', x: 0, y: 117, z: 0, magnitude: 11.2, magnitudeBand: 'G', spectralType: 'Unknown', colorIndex: 1.43, colorSystem: 'BP-RP', distanceError: 0.199, distanceFromGaia: true, source: 'gaia' },
+    {
+      id: 1,
+      name: 'Sirius',
+      x: 1,
+      y: 0,
+      z: 0,
+      magnitude: -1.44,
+      magnitudeBand: 'V',
+      spectralType: 'A0m',
+      colorIndex: 0.009,
+      colorSystem: 'B-V',
+      distanceError: 0.0036,
+      source: 'hyg',
+    },
+    {
+      id: 2,
+      name: 'Gaia DR3 2',
+      x: 0,
+      y: 117,
+      z: 0,
+      magnitude: 11.2,
+      magnitudeBand: 'G',
+      spectralType: 'Unknown',
+      colorIndex: 1.43,
+      colorSystem: 'BP-RP',
+      distanceError: 0.199,
+      distanceFromGaia: true,
+      source: 'gaia',
+    },
     // A HYG star at Gaia's distance, and one no survey gave a magnitude, a colour or an error.
-    { id: 3, name: 'HD 3', x: 0, y: 0, z: 300, magnitude: 7, magnitudeBand: 'V', spectralType: 'K0', colorIndex: 1.0, colorSystem: 'B-V', distanceError: 1e-12, distanceFromGaia: true, source: 'hyg' },
-    { id: 4, name: 'Gaia DR3 4', x: 5, y: 5, z: 0, magnitude: 12, spectralType: 'Unknown', colorIndex: null, distanceFromGaia: true, source: 'gaia' },
+    {
+      id: 3,
+      name: 'HD 3',
+      x: 0,
+      y: 0,
+      z: 300,
+      magnitude: 7,
+      magnitudeBand: 'V',
+      spectralType: 'K0',
+      colorIndex: 1.0,
+      colorSystem: 'B-V',
+      distanceError: 1e-12,
+      distanceFromGaia: true,
+      source: 'hyg',
+    },
+    {
+      id: 4,
+      name: 'Gaia DR3 4',
+      x: 5,
+      y: 5,
+      z: 0,
+      magnitude: 12,
+      spectralType: 'Unknown',
+      colorIndex: null,
+      distanceFromGaia: true,
+      source: 'gaia',
+    },
     // A Hipparcos parallax smaller than its own error.
-    { id: 5, name: 'HIP 5', x: 0, y: 200, z: 0, magnitude: 6, magnitudeBand: 'V', spectralType: 'B8', colorIndex: -0.1, colorSystem: 'B-V', distanceError: 1.4, source: 'hyg' },
+    {
+      id: 5,
+      name: 'HIP 5',
+      x: 0,
+      y: 200,
+      z: 0,
+      magnitude: 6,
+      magnitudeBand: 'V',
+      spectralType: 'B8',
+      colorIndex: -0.1,
+      colorSystem: 'B-V',
+      distanceError: 1.4,
+      source: 'hyg',
+    },
     // An archive host whose B−V is its temperature's.
-    { id: 6, name: 'Kepler-445', x: 0, y: 0, z: 90, magnitude: 17.6, magnitudeBand: 'G', spectralType: 'M4', colorIndex: 1.66, colorSystem: 'B-V', colorFromTemperature: true, source: 'exoplanet-archive' }
+    {
+      id: 6,
+      name: 'Kepler-445',
+      x: 0,
+      y: 0,
+      z: 90,
+      magnitude: 17.6,
+      magnitudeBand: 'G',
+      spectralType: 'M4',
+      colorIndex: 1.66,
+      colorSystem: 'B-V',
+      colorFromTemperature: true,
+      source: 'exoplanet-archive',
+    },
   ];
   const encoded = encodeStarCatalog(MEASURED);
   const decoded = decodeStarCatalog(encoded.index, encoded.positions, encoded.meta);
 
   it('carries the band, which colour the colour index is, and whose parallax the distance is', () => {
     expect(decoded.map((star) => star.magnitudeBand)).toEqual(['V', 'G', 'V', undefined, 'V', 'G']);
-    expect(decoded.map((star) => star.colorSystem)).toEqual(['B-V', 'BP-RP', 'B-V', undefined, 'B-V', 'B-V']);
-    expect(decoded.map((star) => star.distanceFromGaia)).toEqual([false, true, true, true, false, false]);
-    expect(decoded.map((star) => star.colorFromTemperature)).toEqual([false, false, false, false, false, true]);
+    expect(decoded.map((star) => star.colorSystem)).toEqual([
+      'B-V',
+      'BP-RP',
+      'B-V',
+      undefined,
+      'B-V',
+      'B-V',
+    ]);
+    expect(decoded.map((star) => star.distanceFromGaia)).toEqual([
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+    ]);
+    expect(decoded.map((star) => star.colorFromTemperature)).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+    ]);
   });
 
   it('keeps a distance error to within a step at both ends of its range, and none as none', () => {
@@ -134,7 +279,20 @@ describe('the photometry and distance error columns', () => {
 
   it('keeps an error close enough that the card prints the published one', () => {
     // Rigel, 264.55 pc at van Leeuwen's 3.78 ± 0.34 mas: 23.8 pc, which one byte stored as 23.5.
-    const rigel: StarRecord = { id: 7, name: 'Rigel', x: 264.55, y: 0, z: 0, magnitude: 0.18, magnitudeBand: 'V', spectralType: 'B8Ia', colorIndex: -0.03, colorSystem: 'B-V', distanceError: 0.34 / 3.78, source: 'hyg' };
+    const rigel: StarRecord = {
+      id: 7,
+      name: 'Rigel',
+      x: 264.55,
+      y: 0,
+      z: 0,
+      magnitude: 0.18,
+      magnitudeBand: 'V',
+      spectralType: 'B8Ia',
+      colorIndex: -0.03,
+      colorSystem: 'B-V',
+      distanceError: 0.34 / 3.78,
+      source: 'hyg',
+    };
     const packed = encodeStarCatalog([rigel]);
     const [kept] = decodeStarCatalog(packed.index, packed.positions, packed.meta);
     expect(formatDistance(264.55, kept.distanceError)).toBe('265 ± 24 pc');
@@ -144,10 +302,40 @@ describe('the photometry and distance error columns', () => {
 
 describe('star catalogue provenance and derived names', () => {
   const MIXED: StarRecord[] = [
-    { id: 5, name: 'Sirius', x: 1, y: 0, z: 0, magnitude: -1.4, spectralType: 'A0', colorIndex: 0.0, source: 'hyg' },
+    {
+      id: 5,
+      name: 'Sirius',
+      x: 1,
+      y: 0,
+      z: 0,
+      magnitude: -1.4,
+      spectralType: 'A0',
+      colorIndex: 0.0,
+      source: 'hyg',
+    },
     // A survey star with no name of its own: what it is called is its catalogue designation.
-    { id: 900, name: 'Gaia DR3 900', x: 0, y: 2, z: 0, magnitude: 11, spectralType: 'Unknown', colorIndex: 1.2, source: 'gaia' },
-    { id: 901, name: 'Gaia DR3 901', x: 0, y: 0, z: 3, magnitude: 11.5, spectralType: 'Unknown', colorIndex: 1.3, source: 'gaia' }
+    {
+      id: 900,
+      name: 'Gaia DR3 900',
+      x: 0,
+      y: 2,
+      z: 0,
+      magnitude: 11,
+      spectralType: 'Unknown',
+      colorIndex: 1.2,
+      source: 'gaia',
+    },
+    {
+      id: 901,
+      name: 'Gaia DR3 901',
+      x: 0,
+      y: 0,
+      z: 3,
+      magnitude: 11.5,
+      spectralType: 'Unknown',
+      colorIndex: 1.3,
+      source: 'gaia',
+    },
   ];
 
   const encoded = encodeStarCatalog(MIXED);
@@ -172,12 +360,14 @@ describe('star catalogue provenance and derived names', () => {
       // Not designations the column can print back: past 64 bits, a leading zero, and a name.
       { ...MIXED[1], id: 1_000_064_184, name: 'Gaia DR3 18446744073709551617' },
       { ...MIXED[1], id: 1_000_064_185, name: 'Gaia DR3 0123' },
-      { ...MIXED[1], id: 1_000_064_186, name: 'Gaia DR3 4472832130942575872 B' }
+      { ...MIXED[1], id: 1_000_064_186, name: 'Gaia DR3 4472832130942575872 B' },
     ];
     const packed = encodeStarCatalog(surveyed);
 
     expect(packed.index.names).toEqual(['', '', ...surveyed.slice(2).map((star) => star.name)]);
-    expect(decodeStarCatalog(packed.index, packed.positions, packed.meta).map((star) => star.name)).toEqual(surveyed.map((star) => star.name));
+    expect(
+      decodeStarCatalog(packed.index, packed.positions, packed.meta).map((star) => star.name),
+    ).toEqual(surveyed.map((star) => star.name));
   });
 
   it('carries each star provenance through', () => {
@@ -192,7 +382,9 @@ describe('star catalogue provenance and derived names', () => {
   it('keeps a real name even when the star has a source that could generate one', () => {
     const named = encodeStarCatalog([{ ...MIXED[1], name: 'Some Proper Name' }]);
     expect(named.index.names).toEqual(['Some Proper Name']);
-    expect(decodeStarCatalog(named.index, named.positions, named.meta)[0].name).toBe('Some Proper Name');
+    expect(decodeStarCatalog(named.index, named.positions, named.meta)[0].name).toBe(
+      'Some Proper Name',
+    );
   });
 
   it('tells a name somebody gave from the designation a survey generates', () => {

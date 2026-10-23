@@ -1,5 +1,15 @@
 import * as THREE from 'three/webgpu';
-import { float, instancedBufferAttribute, mix, modelViewMatrix, smoothstep, uniform, uv, vec2, vec4 } from 'three/tsl';
+import {
+  float,
+  instancedBufferAttribute,
+  mix,
+  modelViewMatrix,
+  smoothstep,
+  uniform,
+  uv,
+  vec2,
+  vec4,
+} from 'three/tsl';
 
 import { BrightnessIndex, brightnessIndex, Positioned } from '../../shared/astro/brightest';
 import { blackbodyColor, effectiveTemperatureK } from '../../shared/astro/stellar';
@@ -10,7 +20,6 @@ import { PIXELS_TO_ANGULAR_SIZE, REFERENCE_FOV_DEGREES } from './angular-size';
 /** Apparent star diameters, in pixels at {@link REFERENCE_VIEWPORT_HEIGHT_PX}. */
 const MIN_POINT_SIZE = 1.5;
 const MAX_POINT_SIZE = 6;
-
 
 /**
  * Extra click forgiveness added to a star's drawn radius, in NDC — roughly 4 px on the
@@ -117,9 +126,15 @@ const NEUTRAL_STAR_COLOR = new THREE.Color(1.0, 1.0, 1.0);
  * them while their disc was warm, and a G2 dwarf (0.956, 0.969, 1) beside its disc's (1, 0.878,
  * 0.821). Its red end, (1, 0.6, 0.35), was paler than an M dwarf's disc.
  */
-export function colorIndexToRgb(colorIndex: number | null, spectralType?: string, colorSystem?: 'B-V' | 'BP-RP'): THREE.Color {
+export function colorIndexToRgb(
+  colorIndex: number | null,
+  spectralType?: string,
+  colorSystem?: 'B-V' | 'BP-RP',
+): THREE.Color {
   // The distance is only there to say the star is not the Sun; the temperature reads none of the rest.
-  return temperatureTint(effectiveTemperatureK({ magnitude: 0, distancePc: 1, spectralType, colorIndex, colorSystem }));
+  return temperatureTint(
+    effectiveTemperatureK({ magnitude: 0, distancePc: 1, spectralType, colorIndex, colorSystem }),
+  );
 }
 
 /** The field's tint at a temperature: a blackbody against the display's white, neutral with none. */
@@ -148,9 +163,15 @@ function createQuadGeometry(instanceCount: number): THREE.InstancedBufferGeometr
   const geometry = new THREE.InstancedBufferGeometry();
   geometry.setAttribute(
     'position',
-    new THREE.BufferAttribute(new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]), 3)
+    new THREE.BufferAttribute(
+      new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]),
+      3,
+    ),
   );
-  geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2));
+  geometry.setAttribute(
+    'uv',
+    new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2),
+  );
   geometry.setIndex([0, 1, 2, 0, 2, 3]);
   geometry.instanceCount = instanceCount;
   return geometry;
@@ -185,7 +206,7 @@ export function selectDrawnStars(
   stars: readonly StarRecord[],
   budget = STAR_RENDER_BUDGET,
   focus: DrawFocus = {},
-  index: BrightnessIndex = brightnessIndex(stars)
+  index: BrightnessIndex = brightnessIndex(stars),
 ): Uint32Array {
   if (stars.length <= budget) {
     return Uint32Array.from(stars.keys());
@@ -221,7 +242,10 @@ export function selectDrawnStars(
       // In clip space: in frame when |x| and |y| are within w, widened by the margin. Behind a
       // perspective camera w is negative, so nothing there passes; an orthographic camera's w is 1.
       const reach = (view[3] * x + view[7] * y + view[11] * z + view[15]) * reachScale;
-      if (Math.abs(view[0] * x + view[4] * y + view[8] * z + view[12]) > reach || Math.abs(view[1] * x + view[5] * y + view[9] * z + view[13]) > reach) {
+      if (
+        Math.abs(view[0] * x + view[4] * y + view[8] * z + view[12]) > reach ||
+        Math.abs(view[1] * x + view[5] * y + view[9] * z + view[13]) > reach
+      ) {
         continue;
       }
     }
@@ -316,7 +340,7 @@ export class StarFieldRenderer {
      * from their own disc by more than 0.1 in RGB: Kepler-186 at 3 096 K in the field and 3 788 on
      * its disc, HD 97048 at 6 825 and 10 000.
      */
-    publishedTemperaturesK?: ReadonlyMap<number, number>
+    publishedTemperaturesK?: ReadonlyMap<number, number>,
   ) {
     this.budget = budget;
     this.brightness = brightness ?? brightnessIndex(catalogue);
@@ -331,7 +355,10 @@ export class StarFieldRenderer {
     this.catalogueSizes = new Float32Array(catalogue.length);
     catalogue.forEach((star, index) => {
       const published = publishedTemperaturesK?.get(star.id);
-      const color = published === undefined ? colorIndexToRgb(star.colorIndex, star.spectralType, star.colorSystem) : temperatureTint(published);
+      const color =
+        published === undefined
+          ? colorIndexToRgb(star.colorIndex, star.spectralType, star.colorSystem)
+          : temperatureTint(published);
       this.catalogueColors[index * 3] = color.r;
       this.catalogueColors[index * 3 + 1] = color.g;
       this.catalogueColors[index * 3 + 2] = color.b;
@@ -341,7 +368,7 @@ export class StarFieldRenderer {
     this.material = new THREE.SpriteNodeMaterial({
       transparent: true,
       depthWrite: false,
-      blending: THREE.AdditiveBlending
+      blending: THREE.AdditiveBlending,
     });
     // The compensation that turns an angular size into a world size is done here rather than by
     // `sizeAttenuation: false`, which three.js applies only when it is compiling against a
@@ -357,7 +384,9 @@ export class StarFieldRenderer {
     // exactly what the built-in does. Orthographic: distance does not set apparent size at all,
     // the frustum does, so the same angular size is scaled by the frustum instead.
     const viewDepth = modelViewMatrix.mul(vec4(position, 1)).z.negate();
-    this.material.scaleNode = angularSize.mul(mix(this.orthographicScale, viewDepth, this.perspective));
+    this.material.scaleNode = angularSize.mul(
+      mix(this.orthographicScale, viewDepth, this.perspective),
+    );
     this.material.colorNode = instancedBufferAttribute<'vec3'>(this.colorAttribute, 'vec3');
     // Soft radial falloff so each star is a small bright core inside a halo, rather than a
     // hard-edged square. `uv` runs 0..1 across the quad, so 0.5 is its centre.
@@ -433,12 +462,17 @@ export class StarFieldRenderer {
     this.perspective.value = halfHeightWorld === null ? 1 : 0;
     // The world size that subtends the same share of the viewport an angular size would under
     // the reference field of view: `angular * halfHeight / tan(fov/2)`.
-    this.orthographicScale.value = halfHeightWorld === null ? 0 : halfHeightWorld / Math.tan((REFERENCE_FOV_DEGREES * Math.PI) / 360);
+    this.orthographicScale.value =
+      halfHeightWorld === null
+        ? 0
+        : halfHeightWorld / Math.tan((REFERENCE_FOV_DEGREES * Math.PI) / 360);
   }
 
   /** Looks up the star id for a given instance index. */
   starIdAt(instanceIndex: number): number | undefined {
-    return instanceIndex >= 0 && instanceIndex < this.drawn.length ? this.catalogue[this.drawn[instanceIndex]].id : undefined;
+    return instanceIndex >= 0 && instanceIndex < this.drawn.length
+      ? this.catalogue[this.drawn[instanceIndex]].id
+      : undefined;
   }
 
   /**
@@ -463,7 +497,10 @@ export class StarFieldRenderer {
     // by that same half-height leaves the reference field of view and nothing else. Both cases
     // are therefore one formula over a different angle.
     const perspective = (camera as THREE.PerspectiveCamera).isPerspectiveCamera;
-    const tanHalfFov = Math.tan(((perspective ? (camera as THREE.PerspectiveCamera).fov : REFERENCE_FOV_DEGREES) * Math.PI) / 360);
+    const tanHalfFov = Math.tan(
+      ((perspective ? (camera as THREE.PerspectiveCamera).fov : REFERENCE_FOV_DEGREES) * Math.PI) /
+        360,
+    );
     const projected = new THREE.Vector3();
     const positions = this.positionAttribute.array as Float32Array;
     const sizes = this.sizeAttribute.array as Float32Array;
@@ -472,7 +509,9 @@ export class StarFieldRenderer {
     let bestScore = Infinity;
 
     for (let index = 0; index < this.drawn.length; index++) {
-      projected.set(positions[index * 3], positions[index * 3 + 1], positions[index * 3 + 2]).project(camera);
+      projected
+        .set(positions[index * 3], positions[index * 3 + 1], positions[index * 3 + 2])
+        .project(camera);
       // Outside the depth range means behind the camera or beyond the far plane; `project`
       // mirrors points behind the camera onto the screen, so this guard is load-bearing.
       if (projected.z < -1 || projected.z > 1) {
@@ -484,7 +523,10 @@ export class StarFieldRenderer {
       // Off screen if no part of the drawn disc is inside the frame. Tested before the slop is
       // added: the slop is forgiveness for an imprecise click on a star you can see, not a reach
       // past the edge to one you cannot.
-      if (Math.abs(projected.x) - drawnRadius / aspect > 1 || Math.abs(projected.y) - drawnRadius > 1) {
+      if (
+        Math.abs(projected.x) - drawnRadius / aspect > 1 ||
+        Math.abs(projected.y) - drawnRadius > 1
+      ) {
         continue;
       }
       const ndcRadius = drawnRadius + PICK_NDC_SLOP;

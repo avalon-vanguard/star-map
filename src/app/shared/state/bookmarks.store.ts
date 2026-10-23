@@ -63,7 +63,11 @@ export class BookmarksStore {
   /** Keeps a place, or drops it if it was already kept. Returns whether it is kept now. */
   toggle(bookmark: Bookmark): boolean {
     const kept = this.has(bookmark.kind, bookmark.id);
-    this.write(kept ? this.kept().filter((other) => !(other.kind === bookmark.kind && other.id === bookmark.id)) : [bookmark, ...this.kept()].slice(0, MAX_BOOKMARKS));
+    this.write(
+      kept
+        ? this.kept().filter((other) => !(other.kind === bookmark.kind && other.id === bookmark.id))
+        : [bookmark, ...this.kept()].slice(0, MAX_BOOKMARKS),
+    );
     return !kept;
   }
 
@@ -101,7 +105,11 @@ export class BookmarksStore {
       const seen = new Set<string>();
       return parsed
         .filter(isBookmark)
-        .filter((bookmark) => !seen.has(keyOf(bookmark.kind, bookmark.id)) && seen.add(keyOf(bookmark.kind, bookmark.id)))
+        .filter(
+          (bookmark) =>
+            !seen.has(keyOf(bookmark.kind, bookmark.id)) &&
+            seen.add(keyOf(bookmark.kind, bookmark.id)),
+        )
         .slice(0, MAX_BOOKMARKS)
         .map(({ kind, id, name }) => ({ kind, id, name }));
     } catch {

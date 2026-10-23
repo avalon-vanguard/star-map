@@ -56,12 +56,19 @@ function asksTheSame(a: RoutingRequest, b: RoutingRequest): boolean {
       a.budget?.centre.z === b.budget?.centre.z
     );
   }
-  return a.fromId === b.fromId && a.toId === b.toId && a.rangePc === b.rangePc && a.ceilingPc === b.ceilingPc;
+  return (
+    a.fromId === b.fromId &&
+    a.toId === b.toId &&
+    a.rangePc === b.rangePc &&
+    a.ceilingPc === b.ceilingPc
+  );
 }
 
 /** The routing worker, where this environment has one. */
 function startRoutingWorker(): Worker | undefined {
-  return typeof Worker === 'undefined' ? undefined : new Worker(new URL('../../shared/astro/routing.worker', import.meta.url), { type: 'module' });
+  return typeof Worker === 'undefined'
+    ? undefined
+    : new Worker(new URL('../../shared/astro/routing.worker', import.meta.url), { type: 'module' });
 }
 
 /**
@@ -89,13 +96,15 @@ export class RoutingClient {
     stars: readonly StarRecord[],
     positions: Float32Array,
     private readonly localIndex: StarNeighbourhood,
-    startWorker: () => Worker | undefined = startRoutingWorker
+    startWorker: () => Worker | undefined = startRoutingWorker,
   ) {
     this.worker = startWorker();
     if (!this.worker) {
       return;
     }
-    this.worker.addEventListener('message', ({ data }: MessageEvent<RoutingResponse>) => this.settle(data));
+    this.worker.addEventListener('message', ({ data }: MessageEvent<RoutingResponse>) =>
+      this.settle(data),
+    );
     // A worker that fails to load, or dies, answers nothing further: everything outstanding, and
     // everything asked from here on, is worked out in place instead of waiting for good.
     this.worker.addEventListener('error', () => this.abandonWorker());
@@ -107,10 +116,22 @@ export class RoutingClient {
   }
 
   route(fromId: number, toId: number, rangePc: number, ceilingPc: number): Promise<RouteAnswer> {
-    return this.ask({ kind: 'route', requestId: this.nextRequestId++, fromId, toId, rangePc, ceilingPc }).then((response) =>
+    return this.ask({
+      kind: 'route',
+      requestId: this.nextRequestId++,
+      fromId,
+      toId,
+      rangePc,
+      ceilingPc,
+    }).then((response) =>
       response.kind === 'route'
-        ? { route: response.route, neededRangePc: response.neededRangePc, gaveUp: response.gaveUp, least: response.least }
-        : { route: null, neededRangePc: null, gaveUp: false, least: false }
+        ? {
+            route: response.route,
+            neededRangePc: response.neededRangePc,
+            gaveUp: response.gaveUp,
+            least: response.least,
+          }
+        : { route: null, neededRangePc: null, gaveUp: false, least: false },
     );
   }
 
@@ -119,9 +140,13 @@ export class RoutingClient {
    * indices), three floats to an end; only those nearest the budget's centre that fit it, if given.
    */
   links(rangePc: number, drawn: Uint32Array, budget?: LinkBudget): Promise<Float32Array> {
-    return this.ask({ kind: 'links', requestId: this.nextRequestId++, rangePc, drawn, budget }).then((response) =>
-      response.kind === 'links' ? response.segments : new Float32Array(0)
-    );
+    return this.ask({
+      kind: 'links',
+      requestId: this.nextRequestId++,
+      rangePc,
+      drawn,
+      budget,
+    }).then((response) => (response.kind === 'links' ? response.segments : new Float32Array(0)));
   }
 
   dispose(): void {
@@ -143,7 +168,9 @@ export class RoutingClient {
     }
     // Shared rather than replaced: an identical request superseding the one it repeats would reject it,
     // and whoever holds that promise would take the rejection for its own question.
-    const same = [this.inFlight, this.waiting[request.kind]].find((other) => other !== undefined && asksTheSame(other.request, request));
+    const same = [this.inFlight, this.waiting[request.kind]].find(
+      (other) => other !== undefined && asksTheSame(other.request, request),
+    );
     if (same) {
       return same.promise;
     }

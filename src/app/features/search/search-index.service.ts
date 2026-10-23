@@ -31,9 +31,12 @@ function deepSkyEntry(record: DeepSkyRecord): SearchEntry {
   return {
     kind: 'deepSky',
     name: record.name,
-    subtitle: record.messier && record.messier !== record.name ? `${kind} · ${record.messier}` : kind,
+    subtitle:
+      record.messier && record.messier !== record.name ? `${kind} · ${record.messier}` : kind,
     deepSkyId: record.id,
-    aliases: [record.messier, readableDesignation(record.id)].filter((alias): alias is string => !!alias && alias !== record.name)
+    aliases: [record.messier, readableDesignation(record.id)].filter(
+      (alias): alias is string => !!alias && alias !== record.name,
+    ),
   };
 }
 
@@ -84,7 +87,7 @@ export class SearchIndexService {
         this.dataLoader.loadBodies(),
         this.dataLoader.loadExoplanets(),
         // The scene draws the map without the backdrop if its file fails, and search goes on without it too.
-        this.dataLoader.loadDeepSky().catch((): DeepSkyRecord[] => [])
+        this.dataLoader.loadDeepSky().catch((): DeepSkyRecord[] => []),
       ]);
 
       const starIndex: IndexedSearchEntry[] = [];
@@ -94,14 +97,26 @@ export class SearchIndexService {
         if (!this.hurried) {
           await nextTask();
         }
-        for (const indexed of buildSearchIndex(stars.slice(start, start + STARS_PER_SLICE).map(starEntry))) {
+        for (const indexed of buildSearchIndex(
+          stars.slice(start, start + STARS_PER_SLICE).map(starEntry),
+        )) {
           starIndex.push(indexed);
         }
       }
       const others = buildSearchIndex([
-        ...bodies.map((body): SearchEntry => ({ kind: 'body', name: body.name, subtitle: body.kind, bodyId: body.id })),
-        ...exoplanets.map((exoplanet): SearchEntry => ({ kind: 'exoplanet', name: exoplanet.name, subtitle: exoplanet.hostStarName, bodyId: exoplanet.id })),
-        ...deepSky.map(deepSkyEntry)
+        ...bodies.map((body): SearchEntry => ({
+          kind: 'body',
+          name: body.name,
+          subtitle: body.kind,
+          bodyId: body.id,
+        })),
+        ...exoplanets.map((exoplanet): SearchEntry => ({
+          kind: 'exoplanet',
+          name: exoplanet.name,
+          subtitle: exoplanet.hostStarName,
+          bodyId: exoplanet.id,
+        })),
+        ...deepSky.map(deepSkyEntry),
       ]);
 
       this.starIndex.set(starIndex);

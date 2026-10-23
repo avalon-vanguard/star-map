@@ -32,7 +32,7 @@ const DEGREES_TO_RADIANS = Math.PI / 180;
 const KIND_COLORS: Readonly<Record<DeepSkyKind, number>> = {
   galaxy: 0xffd9a0,
   nebula: 0xff86b0,
-  cluster: 0xa8c8ff
+  cluster: 0xa8c8ff,
 };
 
 /**
@@ -43,14 +43,17 @@ const KIND_COLORS: Readonly<Record<DeepSkyKind, number>> = {
 const BRIGHTNESS_BANDS: readonly { maxMagnitude: number; opacity: number }[] = [
   { maxMagnitude: 5, opacity: 0.5 },
   { maxMagnitude: 7.5, opacity: 0.3 },
-  { maxMagnitude: Infinity, opacity: 0.16 }
+  { maxMagnitude: Infinity, opacity: 0.16 },
 ];
 
 /**
  * Where a deep-sky object lands on the backdrop shell. The record stores a unit direction,
  * so this is just that direction pushed out to the shell radius.
  */
-export function backdropPosition(record: DeepSkyRecord, radiusPc = BACKDROP_RADIUS_PC): THREE.Vector3 {
+export function backdropPosition(
+  record: DeepSkyRecord,
+  radiusPc = BACKDROP_RADIUS_PC,
+): THREE.Vector3 {
   return new THREE.Vector3(record.x, record.y, record.z).multiplyScalar(radiusPc);
 }
 
@@ -83,11 +86,18 @@ export function brightnessBandIndex(magnitude: number | null): number {
 export function deepSkyLabelPoints(
   records: readonly DeepSkyRecord[],
   limit: number,
-  radiusPc = BACKDROP_RADIUS_PC
+  radiusPc = BACKDROP_RADIUS_PC,
 ): LabeledPoint[] {
   return records.slice(0, limit).map((record) => {
     const position = backdropPosition(record, radiusPc);
-    return { id: record.id, name: record.name, kind: record.kind.toUpperCase(), x: position.x, y: position.y, z: position.z };
+    return {
+      id: record.id,
+      name: record.name,
+      kind: record.kind.toUpperCase(),
+      x: position.x,
+      y: position.y,
+      z: position.z,
+    };
   });
 }
 
@@ -112,7 +122,7 @@ export class DeepSkyRenderer {
 
   constructor(
     private readonly records: readonly DeepSkyRecord[],
-    private readonly radiusPc = BACKDROP_RADIUS_PC
+    private readonly radiusPc = BACKDROP_RADIUS_PC,
   ) {
     // Drawn before the star field so the stars composite on top of the glow.
     this.object.renderOrder = -1;
@@ -163,7 +173,7 @@ export class DeepSkyRenderer {
         transparent: true,
         opacity: BRIGHTNESS_BANDS[band].opacity,
         depthWrite: false,
-        blending: THREE.AdditiveBlending
+        blending: THREE.AdditiveBlending,
       });
       this.materials.set(key, material);
     }

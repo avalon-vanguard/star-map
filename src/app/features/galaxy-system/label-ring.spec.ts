@@ -6,7 +6,10 @@ const VIEWPORT = { width: 1440, height: 900 };
 
 /** Where a placement lands on screen, which is what the rule is really about. */
 function screen(placement: { x: number; y: number }): { x: number; y: number } {
-  return { x: Math.round(((placement.x + 1) / 2) * VIEWPORT.width), y: Math.round(((1 - placement.y) / 2) * VIEWPORT.height) };
+  return {
+    x: Math.round(((placement.x + 1) / 2) * VIEWPORT.width),
+    y: Math.round(((1 - placement.y) / 2) * VIEWPORT.height),
+  };
 }
 
 describe('ringPlacement', () => {
@@ -16,7 +19,8 @@ describe('ringPlacement', () => {
 
     // Same distance from the centre in pixels, despite the frame being wider than it is tall.
     const centre = { x: VIEWPORT.width / 2, y: VIEWPORT.height / 2 };
-    const radius = (p: { x: number; y: number }) => Math.hypot(screen(p).x - centre.x, screen(p).y - centre.y);
+    const radius = (p: { x: number; y: number }) =>
+      Math.hypot(screen(p).x - centre.x, screen(p).y - centre.y);
     expect(radius(right!)).toBeCloseTo(radius(up!), 0);
     expect(screen(right!).y).toBe(450);
     expect(screen(up!).x).toBe(720);
@@ -36,7 +40,9 @@ describe('ringPlacement', () => {
     expect(placed).not.toBeNull();
     expect(placed!.angle).not.toBeCloseTo(behindIt);
     const { x, y } = screen(placed!);
-    expect(x > readout.right || x < readout.left || y < readout.top || y > readout.bottom).toBe(true);
+    expect(x > readout.right || x < readout.left || y < readout.top || y > readout.bottom).toBe(
+      true,
+    );
   });
 
   it('moves it the smallest distance that clears, and to the nearer side', () => {
@@ -73,7 +79,10 @@ describe('ringPlacement', () => {
     expect(Math.abs(right!.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(up!.y)).toBeLessThanOrEqual(1);
     // Still a circle: the same number of pixels out, whichever way it is measured.
-    expect(Math.abs(right!.x) * (phone.width / 2)).toBeCloseTo(Math.abs(up!.y) * (phone.height / 2), 0);
+    expect(Math.abs(right!.x) * (phone.width / 2)).toBeCloseTo(
+      Math.abs(up!.y) * (phone.height / 2),
+      0,
+    );
   });
 
   it('survives a viewport with no height rather than dividing by it', () => {

@@ -13,8 +13,15 @@ const planet: BodyDetailViewModel = {
   kind: 'exoplanet',
   hostStarName: '2MASS J21252752-8138278',
   orbit: { semiMajorAxisAu: 7493 },
-  appearance: { planetClass: 'gasGiant', palette: { structure: 'banded' }, equilibriumTemperatureK: 2.74, bulkDensityGramsPerCm3: null, polarCapExtentDeg: 0, seed: 1 } as unknown as PlanetAppearance,
-  hasPhotography: false
+  appearance: {
+    planetClass: 'gasGiant',
+    palette: { structure: 'banded' },
+    equilibriumTemperatureK: 2.74,
+    bulkDensityGramsPerCm3: null,
+    polarCapExtentDeg: 0,
+    seed: 1,
+  } as unknown as PlanetAppearance,
+  hasPhotography: false,
 };
 
 describe('InfoPanelComponent', () => {
@@ -23,7 +30,10 @@ describe('InfoPanelComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [InfoPanelComponent],
-      providers: [provideRouter([]), { provide: ArticleService, useValue: { lookup: async () => ({ status: 'none' }) } }]
+      providers: [
+        provideRouter([]),
+        { provide: ArticleService, useValue: { lookup: async () => ({ status: 'none' }) } },
+      ],
     }).compileComponents();
     fixture = TestBed.createComponent(InfoPanelComponent);
     fixture.componentRef.setInput('body', planet);

@@ -16,6 +16,7 @@ import { StarRecord } from '../../shared/models/star.model';
 import { Bookmark } from '../../shared/state/bookmarks.store';
 import { NavigationStore } from '../../shared/state/navigation.store';
 import { TimeStore } from '../../shared/state/time.store';
+import { dismissBootLoader, failBootLoader } from '../../shared/ui/boot-loader';
 import { ChevronIconComponent } from '../../shared/ui/chevron-icon.component';
 import { HudDockComponent } from '../hud/hud-dock.component';
 import { BodyDetailViewModel } from './body-detail.model';
@@ -132,7 +133,11 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
   private sunSide = 0;
 
   ngAfterViewInit(): void {
-    void this.bootstrap();
+    // Opened straight from a link, this page is the one the launch screen waits for.
+    this.bootstrap().catch((error: unknown) => {
+      console.error('Failed to load the catalogue.', error);
+      failBootLoader('The catalogue could not be loaded');
+    });
   }
 
   ngOnDestroy(): void {
@@ -253,6 +258,7 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
       await this.engine.init(canvas);
     } catch (error) {
       console.error('Failed to initialize the 3D engine.', error);
+      failBootLoader('This browser could not start the 3D view');
       return;
     }
 
@@ -290,6 +296,7 @@ export class BodyDetailSceneComponent implements AfterViewInit, OnDestroy {
     this.observeResize(canvas);
     this.unsubscribeTick = this.engine.onTick((deltaSeconds) => this.tick(deltaSeconds));
     this.engine.start();
+    dismissBootLoader();
   }
 
   /**

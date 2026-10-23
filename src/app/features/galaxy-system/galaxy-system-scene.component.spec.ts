@@ -770,6 +770,37 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       ladder.mockRestore();
     });
 
+    it('takes no place from a name for a survey edge that would print under the HUD', async () => {
+      const canvas = (fixture.nativeElement as HTMLElement).querySelector('canvas')!;
+      Object.defineProperty(canvas, 'clientWidth', { value: 1600 });
+      Object.defineProperty(canvas, 'clientHeight', { value: 900 });
+      canvas.getBoundingClientRect = () => new DOMRect(0, 0, 1600, 900);
+      const aspect = 1600 / 900;
+      // A pass first, which puts up the readout.
+      await advanceFrames(engine, 0.3);
+      fixture.detectChanges();
+      const update = vi.spyOn(StarLabelOverlay.prototype, 'update');
+      const camera = engine.getCamera();
+      camera.updateMatrixWorld(true);
+      // The rung 0.15 right of Sol's point, inside the 0.3 its name takes on that side, and the
+      // readout over the rung's text from 0.32 on, past the end of the name's.
+      const sol = new THREE.Vector3(SUN.x, SUN.y, SUN.z).project(camera);
+      const at = new THREE.Vector3(sol.x + 0.15 / aspect, sol.y, sol.z).unproject(camera);
+      const ladder = vi
+        .spyOn(GalaxySystemSceneComponent.prototype as unknown as { ringLabels: () => LabeledPoint[] }, 'ringLabels')
+        .mockReturnValue([{ id: `ring-250`, name: '250 pc', kind: 'Survey edge', tone: 'ghost', x: at.x, y: at.y, z: at.z }]);
+      const px = (x: number, y: number) => [(x + aspect) * 450, (1 - y) * 450];
+      const [left, top] = px(sol.x * aspect + 0.32, sol.y + 0.05);
+      const [right, bottom] = px(sol.x * aspect + 0.4, sol.y - 0.05);
+      (fixture.nativeElement as HTMLElement).querySelector('[role="tabpanel"]')!.getBoundingClientRect = () => new DOMRect(left, top, right - left, bottom - top);
+      await advanceFrames(engine, 0.3);
+
+      const labels = (update.mock.calls.at(-1)?.[0] ?? []) as LabeledPoint[];
+      expect(labels.map((label) => label.id)).not.toContain('ring-250');
+      expect(labels.find((label) => label.id === SUN.id)?.side).toBe('right');
+      update.mockRestore();
+      ladder.mockRestore();
+    });
   });
 
   it('keeps the stars of a plotted route drawn, and the selected star', async () => {
@@ -1169,6 +1200,13 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(component.ringLabelsInTheClear([at('ring-16', '16 pc', 0.32, 0)], camera, [at(3, 'Groombridge 34', 0, 0, 'Star')])).toEqual([]);
     });
 
+    it('measures a rung by its kind line where that is wider than its distance', () => {
+      // "Survey edge" is 99 px, 0.276 here, past the 0.23 every rung is given; "250 pc" is 65.
+      // A name 0.25 along, 90 px, is under the one and clear of the other.
+      const name = at(1, 'Sirius', 0.25, 0, 'Star');
+      expect(component.ringLabelsInTheClear([at('ring-250', '250 pc', 0, 0, 'Survey edge')], camera, [name])).toEqual([]);
+      expect(component.ringLabelsInTheClear([at('ring-250', '250 pc', 0, 0)], camera, [name]).map((label) => label.id)).toEqual(['ring-250']);
+    });
   });
 
   describe('on a 390x844 phone', () => {

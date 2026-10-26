@@ -26,13 +26,15 @@ export const STAR_POSITION_COMPONENTS = 3;
 export const BYTES_PER_STAR_POSITION = STAR_POSITION_COMPONENTS * Float32Array.BYTES_PER_ELEMENT;
 
 /**
- * Columns in `stars-meta.bin`, in order: catalogue id, apparent magnitude, colour index, an
- * index into the spectral-type dictionary, the distance's relative error (see
- * {@link DISTANCE_ERROR_STEPS}), and what those were measured in (see {@link PHOTOMETRY}). Stored column by column
- * rather than record by record so each one is a single typed-array view over the buffer, with no
- * per-record stride or alignment padding.
+ * Columns in `stars-meta.bin`, in order: Gaia DR3 source id (see {@link GAIA_DESIGNATION}),
+ * catalogue id, apparent magnitude, colour index, an index into the spectral-type dictionary, the
+ * distance's relative error (see {@link DISTANCE_ERROR_STEPS}), and what those were measured in
+ * (see {@link PHOTOMETRY}). Stored column by column rather than record by record so each one is a
+ * single typed-array view over the buffer, with no per-record stride or alignment padding; the
+ * 64-bit column goes first, the one offset every star count keeps it aligned at.
  */
 export const BYTES_PER_STAR_META =
+  BigUint64Array.BYTES_PER_ELEMENT +
   Int32Array.BYTES_PER_ELEMENT +
   Float32Array.BYTES_PER_ELEMENT +
   Float32Array.BYTES_PER_ELEMENT +
@@ -71,17 +73,26 @@ const PHOTOMETRY = {
  */
 const DISTANCE_ERROR_STEPS = 65_535;
 
+/**
+ * A Gaia designation, whose number is the source id: 19 digits at most, past what a double holds
+ * exactly, so it is carried as a 64-bit integer. The name is left empty in the index and printed
+ * again on load. Written out, the 378 105 of them were 11.7 MB of the 13.5 MB index, 86 %.
+ */
+const GAIA_DESIGNATION = /^Gaia DR3 ([1-9]\d*)$/;
+const GAIA_DESIGNATION_PREFIX = 'Gaia DR3 ';
+
 /** `stars-index.json`: everything that is a string, plus the count the columns are sized by. */
 export interface StarCatalogIndex {
   count: number;
   /**
    * One per star, in catalogue order — but empty where the name is simply the star's catalogue
-   * designation, which is regenerated on load from the source and the id.
+   * designation, which is regenerated on load: from the source and the id, or for a Gaia
+   * designation from the source id column in `stars-meta.bin`.
    *
    * A survey-scale catalogue has no proper names to speak of. Gaia's designations are its
    * 19-digit source ids, so writing "Gaia DR3 4472832130942575872" once per star would cost
    * 25 MB per million stars — more than the whole rest of the catalogue — to store a string that
-   * is already implied by two fields next to it. An empty entry costs three bytes.
+   * eight bytes beside it can hold. An empty entry costs three bytes.
    *
    * Dense with holes rather than a list of pairs, because which one is smaller depends entirely
    * on the catalogue: every HYG star has a designation worth keeping, and paying an index per
@@ -114,6 +125,8 @@ const DESIGNATION_PREFIXES: Readonly<Record<string, string>> = {
 };
 
 interface StarMetaColumns {
+  /** 0 where the star's name is not a Gaia designation. */
+  gaiaSourceIds: BigUint64Array;
   ids: Int32Array;
   magnitudes: Float32Array;
   colorIndices: Float32Array;
@@ -125,6 +138,8 @@ interface StarMetaColumns {
 /** Lays typed-array views over the meta buffer at the offsets the format defines. */
 function metaColumns(buffer: ArrayBuffer, count: number): StarMetaColumns {
   let offset = 0;
+  const gaiaSourceIds = new BigUint64Array(buffer, offset, count);
+  offset += count * BigUint64Array.BYTES_PER_ELEMENT;
   const ids = new Int32Array(buffer, offset, count);
   offset += count * Int32Array.BYTES_PER_ELEMENT;
   const magnitudes = new Float32Array(buffer, offset, count);
@@ -137,7 +152,15 @@ function metaColumns(buffer: ArrayBuffer, count: number): StarMetaColumns {
   offset += count * Uint16Array.BYTES_PER_ELEMENT;
   const photometry = new Uint8Array(buffer, offset, count);
 
-  return { ids, magnitudes, colorIndices, spectralTypeIndices, photometry, distanceErrors };
+  return {
+    gaiaSourceIds,
+    ids,
+    magnitudes,
+    colorIndices,
+    spectralTypeIndices,
+    photometry,
+    distanceErrors,
+  };
 }
 
 /**
@@ -186,12 +209,20 @@ export function encodeStarCatalog(stars: readonly StarRecord[]): {
     }
     sourceIndices.push(sourceIndex);
 
-    // Left empty when it is simply the designation the source would generate anyway.
-    names.push(
-      star.name === designationFor(sources[sourceIndex]?.designationPrefix, star.id)
-        ? ''
-        : star.name,
-    );
+    // Left empty when it is simply the designation the source would generate anyway, or a Gaia
+    // designation the source id column prints again, which a number past 64 bits would not be.
+    const digits = GAIA_DESIGNATION.exec(star.name)?.[1];
+    const gaiaSourceId = digits === undefined ? 0n : BigInt.asUintN(64, BigInt(digits));
+    if (gaiaSourceId !== 0n && gaiaSourceId.toString() === digits) {
+      columns.gaiaSourceIds[index] = gaiaSourceId;
+      names.push('');
+    } else {
+      names.push(
+        star.name === designationFor(sources[sourceIndex]?.designationPrefix, star.id)
+          ? ''
+          : star.name,
+      );
+    }
 
     let spectralTypeId = spectralTypeIds.get(star.spectralType);
     if (spectralTypeId === undefined) {
@@ -275,10 +306,15 @@ export function decodeStarCatalog(
     const photometry = columns.photometry[i];
     const band = photometry & PHOTOMETRY.bandMask;
     const distanceError = columns.distanceErrors[i];
+    const gaiaSourceId = columns.gaiaSourceIds[i];
 
     stars[i] = {
       id,
-      name: index.names[i] || designationFor(source?.designationPrefix, id) || `HYG ${id}`,
+      name:
+        index.names[i] ||
+        (gaiaSourceId
+          ? `${GAIA_DESIGNATION_PREFIX}${gaiaSourceId}`
+          : designationFor(source?.designationPrefix, id) || `HYG ${id}`),
       x: positions[i * 3],
       y: positions[i * 3 + 1],
       z: positions[i * 3 + 2],

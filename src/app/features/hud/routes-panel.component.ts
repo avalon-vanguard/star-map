@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 
+import { Route } from '../../shared/astro/jump-links';
 import { formatParsecs } from '../../shared/format/quantity';
+import { StarRecord } from '../../shared/models/star.model';
 
 /**
  * The widest jump the Routes panel offers. Past it the drawn graph is a solid sheet of lines, and
@@ -17,9 +19,14 @@ export interface RouteStarOption {
 
 /** What the scene worked out, once it has been asked. */
 export interface RouteResult {
-  /** The chain, departure first. Empty when there is no route at the range asked for. */
-  readonly stars: readonly { id: number; name: string }[];
+  /**
+   * The chain, departure first, each star with the hop that reached it (0 for the departure).
+   * Empty when there is no route at the range asked for.
+   */
+  readonly stars: readonly { id: number; name: string; legPc: number }[];
   readonly totalPc: number;
+  /** The straight line between the two ends, which a chain of more than one jump can only exceed. */
+  readonly directPc: number;
   /** A range that would open a route, where none was found at the one asked for. */
   readonly neededRangePc: number | null;
   /** True when the search gave up rather than showing there is no route at this range. */
@@ -32,6 +39,32 @@ export interface RouteRequest {
   readonly fromId: number;
   readonly toId: number;
   readonly rangePc: number;
+}
+
+/**
+ * The scene's answer as the panel lists it: each hop measured between the catalogue positions the
+ * search walked, so the legs add up to its total, and the two ends' straight-line separation.
+ */
+export function routeResultOf(
+  answer: { route: Route | null; neededRangePc: number | null; gaveUp: boolean; least: boolean },
+  starsById: ReadonlyMap<number, StarRecord>,
+): RouteResult {
+  const ids = answer.route?.stars ?? [];
+  const at = (index: number) => starsById.get(ids[index]);
+  const apart = (a?: StarRecord, b?: StarRecord) =>
+    a && b ? Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) : 0;
+  return {
+    stars: ids.map((id, index) => ({
+      id,
+      name: at(index)?.name ?? `Star ${id}`,
+      legPc: index === 0 ? 0 : apart(at(index - 1), at(index)),
+    })),
+    totalPc: answer.route?.totalPc ?? 0,
+    directPc: apart(at(0), at(ids.length - 1)),
+    neededRangePc: answer.neededRangePc,
+    gaveUp: answer.gaveUp,
+    least: answer.least,
+  };
 }
 
 /** Which end of the journey a query is for. */
@@ -118,7 +151,7 @@ type Field = 'from' | 'to';
           type="button"
           [disabled]="!canPlot() || pending()"
           (click)="plot()"
-          class="type-label border border-border/60 px-3 py-1.5 text-muted transition-colors enabled:hover:border-accent/70 enabled:hover:text-accent disabled:opacity-40 focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+          class="type-label shrink-0 whitespace-nowrap border border-border/60 px-3 py-1.5 text-muted transition-colors enabled:hover:border-accent/70 enabled:hover:text-accent disabled:opacity-40 focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
         >
           {{ pending() ? 'Plotting…' : 'Plot route' }}
         </button>
@@ -127,6 +160,10 @@ type Field = 'from' | 'to';
             <p data-testid="route-summary" class="text-sm text-text tabular-nums">
               {{ plotted.stars.length - 1 }} {{ plotted.stars.length === 2 ? 'jump' : 'jumps' }}
               <span class="text-muted">·</span> {{ format(plotted.totalPc) }}
+              <!-- One jump is the straight line already; past it, the detour is the difference. -->
+              @if (plotted.stars.length > 2) {
+                <span class="text-muted">· {{ format(plotted.directPc) }} direct</span>
+              }
             </p>
           } @else {
             <p data-testid="route-summary" class="text-sm text-muted">
@@ -163,6 +200,13 @@ type Field = 'from' | 'to';
               >
                 <span class="type-label w-6 shrink-0 text-muted tabular-nums">{{ i + 1 }}</span>
                 <span class="min-w-0 flex-1 truncate text-sm text-text">{{ step.name }}</span>
+                <!-- The hop that reaches this star; the departure has none. -->
+                @if (i > 0) {
+                  <!-- Not in the label face, whose capitals would print the unit as "PC". -->
+                  <span class="shrink-0 text-xs text-muted tabular-nums">{{
+                    format(step.legPc)
+                  }}</span>
+                }
               </button>
             </li>
           }

@@ -179,6 +179,15 @@ export function buildBodyViewModel(
     radiusKm: exoplanet.radiusEarth ? exoplanet.radiusEarth * EARTH_RADIUS_KM : undefined,
     massEarth: exoplanet.massEarth,
     discoveryYear: exoplanet.discoveryYear,
+    // The catalogue star's distance rather than the archive's `hostDistancePc`, so the card reads
+    // what the system view's Distance row reads for the same star. Every host the archive gives a
+    // distance for is in the catalogue: the 26 planets left without one have neither.
+    hostDistance: hostStar && {
+      pc: Math.hypot(hostStar.x, hostStar.y, hostStar.z),
+      relativeError: hostStar.distanceError,
+      onDistance: hostStar.source === 'exoplanet-archive',
+    },
+    hostStarMassSolar: exoplanet.hostStarMassSolar,
     orbit: exoplanet.orbit,
     // Warmed by what the system view warms it by: the archive's luminosity where it has one.
     appearance: appearanceForExoplanet(
@@ -192,9 +201,9 @@ export function buildBodyViewModel(
     ),
     hasPhotography: bodyTexturePath(exoplanet.id) !== undefined,
     imaged: exoplanet.imaged,
-    // `periodDays` is populated for none of the shipped records, and deriving one would need the
-    // host star's mass, which is equally absent. Left undefined rather than assuming a solar-mass
-    // host, which would silently mis-state the period of every planet around an M dwarf.
+    // The archive's period, which 5 995 of the 6 354 records carry. Left undefined where it gives
+    // none rather than derived from a solar-mass host, which would mis-state the period of every
+    // planet around an M dwarf.
     orbitalPeriodDays: exoplanet.periodDays,
     orbitalPeriodSource: exoplanet.periodDays === undefined ? undefined : 'measured',
   };

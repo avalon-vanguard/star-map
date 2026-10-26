@@ -29,3 +29,21 @@ jobs:
       runs-on: big
       timeout-minutes: 45
     secrets: inherit
+
+  # Lighthouse on the production build (avalon-vanguard/ci, lighthouse.yml): accessibility and
+  # best practices are gated at the default 0.9, on the median of 3 runs. Performance is not
+  # gated (min-performance 0): the page is a 3D scene that a GPU-less runner renders in software,
+  # so its score measures the rasterizer, not the app (0.40 in a container with 2.5 CPUs).
+  # ?stars=500 caps the star budget (see starRenderBudgetFromUrl): the full catalogue hangs
+  # headless Chromium, and larger budgets ran far slower here. Chromium needs more than Docker's
+  # default 64 MB /dev/shm (the tab crashed locally with it). Measured at about 100 s per run, so
+  # 3 runs fit well inside the timeout.
+  lighthouse:
+    needs: ci
+    uses: avalon-vanguard/ci/.gitea/workflows/lighthouse.yml@v2
+    with:
+      urls: http://localhost:4000/?stars=500
+      start-command: npx --yes serve@14.2.4 -n -s dist/star-map/browser -l 4000
+      min-performance: 0
+      runs-on: big
+      timeout-minutes: 20

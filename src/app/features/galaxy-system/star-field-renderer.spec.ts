@@ -610,6 +610,7 @@ describe('StarFieldRenderer refocus', () => {
         drawnStar.colorSystem,
       );
       expect(colorAttribute.getX(instance)).toBeCloseTo(expected.r, 5);
+      expect(colorAttribute.getY(instance)).toBeCloseTo(expected.g, 5);
       expect(colorAttribute.getZ(instance)).toBeCloseTo(expected.b, 5);
       expect(sizeAttribute.getX(instance)).toBeGreaterThan(0);
     }

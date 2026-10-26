@@ -20,6 +20,11 @@ export class NavigationStore {
   readonly viewLevel = signal<ViewLevel>('galaxy');
   readonly selectedStarId = signal<number | null>(null);
   readonly selectedBodyId = signal<string | null>(null);
+  /**
+   * The deep-sky object the view is to turn toward. A request rather than a selection: the scene
+   * clears it once it has turned, so asking for the same object again turns the view again.
+   */
+  readonly deepSkyTarget = signal<string | null>(null);
 
   selectStar(starId: number | null): void {
     this.selectedStarId.set(starId);
@@ -27,6 +32,15 @@ export class NavigationStore {
 
   selectBody(bodyId: string | null): void {
     this.selectedBodyId.set(bodyId);
+  }
+
+  lookAtDeepSky(deepSkyId: string | null): void {
+    // The view leaves any system to turn, so no star stays selected. The body route keeps its
+    // host selected, and the map, back from it, flew into the host's system and dropped the request.
+    if (deepSkyId !== null) {
+      this.selectedStarId.set(null);
+    }
+    this.deepSkyTarget.set(deepSkyId);
   }
 
   setViewLevel(viewLevel: ViewLevel): void {

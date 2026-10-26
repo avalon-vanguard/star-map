@@ -82,7 +82,8 @@ jobs:
         run: |
           git config user.name "gitea-actions"
           git config user.email "actions@noreply.avalonvanguard.com"
-          git add src/assets/data
+          # Le README et index.html citent les comptes que l'ETL vient d'y réécrire (lib/public-counts.ts).
+          git add src/assets/data README.md src/index.html
           git commit -m "Actualisation des catalogues astronomiques" \
             -m "Nouvelle exécution planifiée de l'ETL contre les archives en ligne. Validée par les tests unitaires et un build de production dans la même exécution, car un push fait avec le jeton du job ne déclenche pas la CI."
           git push origin HEAD:main

@@ -1,9 +1,17 @@
+import { HUBBLE_CONSTANT_KM_S_PER_MPC } from '../../shared/astro/deep-sky';
 import { spectralClassification } from '../../shared/astro/spectral';
 import { temperatureFromColour } from '../../shared/astro/stellar';
-import { formatDistance, formatLuminosity } from '../../shared/format/quantity';
+import {
+  formatAngle,
+  formatDistance,
+  formatLuminosity,
+  formatParsecs,
+} from '../../shared/format/quantity';
+import { DeepSkyRecord } from '../../shared/models/deepsky.model';
 import { StarRecord, SUN_STAR_ID } from '../../shared/models/star.model';
 import { StarSurface } from '../body-detail/body-view-model';
 import { HudReadout } from '../hud/hud-dock.component';
+import { readableDesignation } from '../search/search-index.service';
 
 /**
  * The catalogue that describes a star — its name, type and photometry — as the readout names it.
@@ -163,4 +171,48 @@ export function catalogueCensus(stars: readonly StarRecord[]): string {
     .sort((a, b) => b[1] - a[1])
     .map(([catalogue, count]) => `${catalogue} ${count.toLocaleString('en-GB')}`)
     .join(' · ');
+}
+
+/**
+ * What the readout says of a deep-sky object the view has turned to: everything OpenNGC's record
+ * holds. Its Messier number and designation go under the name, where the search found it by them.
+ *
+ * The distance is derived, and the note says from what, or why there is none: OpenNGC publishes
+ * no distance, and for the best-known objects neither its parallax nor a redshift gives one — the
+ * Andromeda Galaxy approaches us, and its listed parallax is a foreground star's.
+ */
+export function deepSkyReadouts(record: DeepSkyRecord): {
+  subtitle: string;
+  readouts: HudReadout[];
+  note: string;
+} {
+  const kind = record.kind.charAt(0).toUpperCase() + record.kind.slice(1);
+  // 264 of the 488 are named by their designation alone, "NGC6231", which reads "NGC 6231" spaced out.
+  const names = [record.messier, readableDesignation(record.id)].filter(
+    (name): name is string =>
+      !!name && name !== record.name && name !== readableDesignation(record.name),
+  );
+  const notes = {
+    parallax: 'Distance from the parallax OpenNGC lists for it.',
+    redshift: `Distance from its redshift, by the Hubble law at ${HUBBLE_CONSTANT_KM_S_PER_MPC} km/s/Mpc.`,
+  };
+  return {
+    subtitle: [kind, ...names].join(' · '),
+    readouts: [
+      {
+        label: 'Magnitude',
+        value: record.magnitude === null ? 'Not measured' : record.magnitude.toFixed(2),
+      },
+      { label: 'Apparent size', value: formatAngle(record.angularSizeDeg) },
+      { label: 'Constellation', value: record.constellation },
+      record.distancePc === null
+        ? { label: 'Distance', value: 'Not derivable' }
+        : { label: 'Distance', value: formatParsecs(record.distancePc), derived: true },
+    ],
+    note: `From OpenNGC, which publishes directions and no distances. ${
+      record.distanceMethod
+        ? notes[record.distanceMethod]
+        : 'Neither a parallax nor a redshift gives this one a distance that can be trusted.'
+    }`,
+  };
 }

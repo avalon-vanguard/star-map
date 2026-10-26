@@ -82,7 +82,8 @@
               "branches": 88,
               "functions": 88,
               "lines": 91
-            }
+            },
+            "include": ["**/*.spec.ts", "../tools/etl/**/*.spec.ts"]
           }
         }
       }

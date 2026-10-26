@@ -1,6 +1,6 @@
 import { spectralClassification } from '../../shared/astro/spectral';
 
-export type SearchResultKind = 'star' | 'body' | 'exoplanet';
+export type SearchResultKind = 'star' | 'body' | 'exoplanet' | 'deepSky';
 
 export interface SearchEntry {
   kind: SearchResultKind;
@@ -16,6 +16,10 @@ export interface SearchEntry {
   star?: Parameters<typeof spectralClassification>[0];
   /** `bodies.json`/`exoplanets.json` id, for `kind: 'body' | 'exoplanet'` results. */
   bodyId?: string;
+  /** `deepsky.json` id, for `kind: 'deepSky'` results. */
+  deepSkyId?: string;
+  /** Other names the entry answers to as fully as to its own: a deep-sky object's Messier number and designation. */
+  aliases?: readonly string[];
 }
 
 /** The line an entry is listed with: its subtitle, or a star's classification. */
@@ -39,16 +43,24 @@ const MATCH_PREFIX = 3;
 const MATCH_WORD_START = 2;
 const MATCH_SUBSTRING = 1;
 const NO_MATCH = 0;
+/**
+ * What a match in the subtitle counts for against the same match in the name. A tenth puts the
+ * best of them, an exact "G2V", below the worst name match, so a star named for what was typed is
+ * never crowded out by the thousands that merely share its type.
+ */
+const SUBTITLE_WEIGHT = 0.1;
 
 /**
  * Order for results that match equally well. Solar-system bodies are a few dozen named worlds
- * and win ties outright; a star outranks an exoplanet because searching a name like "Proxima"
+ * and win ties outright, then the 488 deep-sky objects, each kept for being famous or bright,
+ * ahead of the 455 518 stars; a star outranks an exoplanet because searching a name like "Proxima"
  * is usually an attempt to reach the system rather than one particular planet in it.
  */
 const KIND_PRIORITY: Readonly<Record<SearchResultKind, number>> = {
   body: 0,
-  star: 1,
-  exoplanet: 2,
+  deepSky: 1,
+  star: 2,
+  exoplanet: 3,
 };
 
 /** Catalogue names separate their parts with spaces, hyphens, underscores and slashes. */
@@ -75,25 +87,54 @@ export interface IndexedSearchEntry {
   readonly normalizedName: string;
   readonly compactName: string;
   readonly words: readonly string[];
+  /** The subtitle, normalised; empty when there is none to search. See {@link searchableSubtitle}. */
+  readonly normalizedSubtitle: string;
+  /** {@link SearchEntry.aliases}, broken up as the name is; absent, not empty, on the stars, which have none. */
+  readonly aliases?: readonly IndexedName[];
+}
+
+type IndexedName = Pick<IndexedSearchEntry, 'normalizedName' | 'compactName' | 'words'>;
+
+function indexName(name: string): IndexedName {
+  const normalizedName = normalize(name);
+  return {
+    normalizedName,
+    compactName: compact(name),
+    words: normalizedName.split(WORD_SEPARATORS),
+  };
+}
+
+/**
+ * The subtitle an entry is found by. For a star, the catalogue's own type rather than the line its
+ * row prints: that is a colour estimate ("~G2") for the 383 599 stars typed "Unknown", worked out
+ * for the rows shown only (see {@link SearchEntry.star}), and an estimate never carries the
+ * luminosity class a query like "G2V" asks for.
+ */
+function searchableSubtitle(entry: SearchEntry): string {
+  if (!entry.star) {
+    return entry.subtitle;
+  }
+  return entry.star.spectralType === 'Unknown' ? '' : entry.star.spectralType;
 }
 
 export function buildSearchIndex(entries: readonly SearchEntry[]): IndexedSearchEntry[] {
   return entries.map((entry) => {
+    // Spelled out rather than spread from indexName: over the 455 518 stars, spreading took the
+    // build from about 265 ms to 390 and the index from 176 MB to 186.
     const normalizedName = normalize(entry.name);
-    return {
+    const subtitle = searchableSubtitle(entry);
+    const indexed: IndexedSearchEntry = {
       entry,
       normalizedName,
       compactName: compact(entry.name),
       words: normalizedName.split(WORD_SEPARATORS),
+      normalizedSubtitle: subtitle && normalize(subtitle),
     };
+    return entry.aliases ? { ...indexed, aliases: entry.aliases.map(indexName) } : indexed;
   });
 }
 
-function scoreIndexed(
-  indexed: IndexedSearchEntry,
-  normalizedQuery: string,
-  compactQuery: string,
-): number {
+function scoreName(indexed: IndexedName, normalizedQuery: string, compactQuery: string): number {
   // Punctuation-insensitive as well as case-insensitive, because the catalogues are
   // inconsistent about it: HYG writes "Gl 357" where a user may well type "gl357".
   if (indexed.normalizedName === normalizedQuery || indexed.compactName === compactQuery) {
@@ -111,6 +152,34 @@ function scoreIndexed(
     return MATCH_SUBSTRING;
   }
   return NO_MATCH;
+}
+
+/** On the normalised form only: compacted, "M4.5V" reads "m45v", and "M45" would find every such dwarf. */
+function scoreSubtitle(subtitle: string, normalizedQuery: string): number {
+  if (subtitle === normalizedQuery) {
+    return MATCH_EXACT * SUBTITLE_WEIGHT;
+  }
+  if (subtitle.startsWith(normalizedQuery)) {
+    return MATCH_PREFIX * SUBTITLE_WEIGHT;
+  }
+  return subtitle.includes(normalizedQuery) ? MATCH_SUBSTRING * SUBTITLE_WEIGHT : NO_MATCH;
+}
+
+/** The best of the name's and the aliases' scores, or, where none of them matches at all, the subtitle's. */
+function scoreIndexed(
+  indexed: IndexedSearchEntry,
+  normalizedQuery: string,
+  compactQuery: string,
+): number {
+  let score = scoreName(indexed, normalizedQuery, compactQuery);
+  if (indexed.aliases) {
+    for (const alias of indexed.aliases) {
+      score = Math.max(score, scoreName(alias, normalizedQuery, compactQuery));
+    }
+  }
+  return score > NO_MATCH || indexed.normalizedSubtitle === ''
+    ? score
+    : scoreSubtitle(indexed.normalizedSubtitle, normalizedQuery);
 }
 
 /**

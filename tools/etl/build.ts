@@ -40,6 +40,7 @@ import {
 } from '../../src/app/shared/astro/coordinates';
 import { describeSources } from './sources/registry';
 import { dataPath } from './lib/paths';
+import { stampPublicCounts } from './lib/public-counts';
 
 class ValidationError extends Error {}
 
@@ -166,6 +167,13 @@ function validateStars(stars: StarRecord[]): void {
   assertCondition(
     decoded.length === stars.length,
     `Star catalogue round-trip lost records: ${decoded.length} of ${stars.length}.`,
+  );
+  // The source id column is what keeps them out: compared against the row id instead, every one of
+  // the 378 105 was written out, 86 % of the index.
+  const spelledOut = index.names.filter((name) => /^Gaia DR3 \d+$/.test(name)).length;
+  assertCondition(
+    spelledOut === 0,
+    `stars-index.json spells out ${spelledOut} Gaia designations that stars-meta.bin should carry as source ids.`,
   );
   for (let i = 0; i < stars.length; i++) {
     assertCondition(
@@ -1165,6 +1173,8 @@ async function build(): Promise<void> {
   validateBodies(bodies, horizonsOrbits, horizonsTracks);
   validateExoplanets(exoplanets, stars);
   validateDeepSky(deepSky);
+  // Only once the assets have passed: the pages then quote a catalogue that will ship.
+  stampPublicCounts();
 
   console.log('\nETL completed successfully:');
   console.log(`  stars:      ${stars.length}`);

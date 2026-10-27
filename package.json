@@ -7,6 +7,7 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
+    "test:coverage": "ng test --watch=false --coverage --coverage-reporters=text --coverage-reporters=json-summary && node -e \"require('fs').copyFileSync('coverage/star-map/coverage-summary.json','coverage/coverage-summary.json')\"",
     "lint": "eslint .",
     "etl": "tsx tools/etl/build.ts",
     "etl:typecheck": "tsc -p tools/etl/tsconfig.json --noEmit",

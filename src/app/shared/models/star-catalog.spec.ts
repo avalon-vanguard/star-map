@@ -350,6 +350,26 @@ describe('star catalogue provenance and derived names', () => {
     expect(decoded.map((star) => star.name)).toEqual(['Sirius', 'Gaia DR3 900', 'Gaia DR3 901']);
   });
 
+  it('stores a real Gaia designation as its source id, which no row id equals, and prints it back exactly', () => {
+    // As the ETL numbers them: a row id from 1 000 000 000, and the 19-digit source id in the name.
+    // Compared against the row id, not one of the 378 105 was ever left out of the index. Both ids
+    // are past 2^53, where a double no longer holds every integer: the second is 2^64 - 1.
+    const surveyed: StarRecord[] = [
+      { ...MIXED[1], id: 1_000_064_182, name: 'Gaia DR3 5853498713190525696' },
+      { ...MIXED[1], id: 1_000_064_183, name: 'Gaia DR3 18446744073709551615' },
+      // Not designations the column can print back: past 64 bits, a leading zero, and a name.
+      { ...MIXED[1], id: 1_000_064_184, name: 'Gaia DR3 18446744073709551617' },
+      { ...MIXED[1], id: 1_000_064_185, name: 'Gaia DR3 0123' },
+      { ...MIXED[1], id: 1_000_064_186, name: 'Gaia DR3 4472832130942575872 B' },
+    ];
+    const packed = encodeStarCatalog(surveyed);
+
+    expect(packed.index.names).toEqual(['', '', ...surveyed.slice(2).map((star) => star.name)]);
+    expect(
+      decodeStarCatalog(packed.index, packed.positions, packed.meta).map((star) => star.name),
+    ).toEqual(surveyed.map((star) => star.name));
+  });
+
   it('carries each star provenance through', () => {
     expect(decoded.map((star) => star.source)).toEqual(['hyg', 'gaia', 'gaia']);
   });

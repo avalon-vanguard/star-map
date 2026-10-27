@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   ci:
-    uses: avalon-vanguard/ci/.gitea/workflows/node.yml@v1
+    uses: avalon-vanguard/ci/.gitea/workflows/node.yml@v2
     # e2e Playwright réactivés, sur le runner `big` du VPS (stack, services/gitea-runner/runner-big.yml) :
     # la carte 3D rendue en logiciel par Chromium sur ng serve dépassait le petit runner (17 tests,
     # 7 en échec par délai dépassé en 16,8 min). Le build de production n'y change rien : à 1 Go,
@@ -25,6 +25,25 @@ jobs:
     # 0,45 CPU / 1 Go). Tout le job de vérification tourne donc là.
     with:
       e2e: true
+      coverage: true
       runs-on: big
       timeout-minutes: 45
     secrets: inherit
+
+  # Lighthouse on the production build (avalon-vanguard/ci, lighthouse.yml): accessibility and
+  # best practices are gated at the default 0.9, on the median of 3 runs. Performance is not
+  # gated (min-performance 0): the page is a 3D scene that a GPU-less runner renders in software,
+  # so its score measures the rasterizer, not the app (0.40 in a container with 2.5 CPUs).
+  # ?stars=500 caps the star budget (see starRenderBudgetFromUrl): the full catalogue hangs
+  # headless Chromium, and larger budgets ran far slower here. Chromium needs more than Docker's
+  # default 64 MB /dev/shm (the tab crashed locally with it). Measured at about 100 s per run, so
+  # 3 runs fit well inside the timeout.
+  lighthouse:
+    needs: ci
+    uses: avalon-vanguard/ci/.gitea/workflows/lighthouse.yml@v2
+    with:
+      urls: http://localhost:4000/?stars=500
+      start-command: npx --yes serve@14.2.4 -n -s dist/star-map/browser -l 4000
+      min-performance: 0
+      runs-on: big
+      timeout-minutes: 20

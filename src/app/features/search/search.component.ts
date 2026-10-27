@@ -1,33 +1,32 @@
 import { Component, computed, ElementRef, inject, output, signal, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
-import { DataLoaderService } from '../../core/data/data-loader.service';
 import { NavigationStore } from '../../shared/state/navigation.store';
 import { focusFirstOption, onOptionListKeydown } from '../../shared/ui/option-list-keys';
 import { ReticleIconComponent } from '../../shared/ui/reticle-icon.component';
-import {
-  buildSearchIndex,
-  entrySubtitle,
-  IndexedSearchEntry,
-  rankSearchResults,
-  SearchEntry,
-  SearchResultKind,
-} from './search-ranking';
+import { SearchIndexService } from './search-index.service';
+import { entrySubtitle, rankSearchResults, SearchEntry, SearchResultKind } from './search-ranking';
 
-const MAX_RESULTS = 8;
+/**
+ * Rows listed, in a list that scrolls. Eight, unscrolled, was the only view of "HD 1"'s 27 563
+ * matches; every row shown is classified as it is listed, so the cap stays well short of them.
+ */
+const MAX_RESULTS = 50;
 const MIN_QUERY_LENGTH = 2;
 
 const KIND_LABELS: Record<SearchResultKind, string> = {
   star: 'Star',
   body: 'Body',
   exoplanet: 'Exoplanet',
+  deepSky: 'Deep sky',
 };
 
 /**
- * Name search across stars, solar-system bodies, and exoplanets. Selecting a star result
- * jumps straight into that system's view; selecting a body/exoplanet result navigates to its
- * detail route — both go through `NavigationStore`/the router so behavior matches an
- * in-scene click, per the "consistent state across views" requirement.
+ * Name search across stars, solar-system bodies, exoplanets and deep-sky objects. Selecting a star
+ * result jumps straight into that system's view; selecting a body/exoplanet result navigates to its
+ * detail route; selecting a deep-sky object turns the map toward it — all through
+ * `NavigationStore`/the router so behavior matches an in-scene click, per the "consistent state
+ * across views" requirement.
  */
 @Component({
   selector: 'app-search',
@@ -80,9 +79,9 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
               data-testid="search-results"
               role="listbox"
               aria-label="Matches"
-              class="divide-y divide-border/25"
+              class="max-h-64 scheme-dark divide-y divide-border/25 overflow-y-auto [scrollbar-width:thin]"
             >
-              @for (result of results(); track result.bodyId ?? result.starId) {
+              @for (result of results(); track result.bodyId ?? result.deepSkyId ?? result.starId) {
                 <li role="none">
                   <button
                     type="button"
@@ -114,7 +113,7 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
   `,
 })
 export class SearchComponent {
-  private readonly dataLoader = inject(DataLoaderService);
+  private readonly searchIndex = inject(SearchIndexService);
   private readonly navigationStore = inject(NavigationStore);
   private readonly router = inject(Router);
 
@@ -124,11 +123,11 @@ export class SearchComponent {
   readonly picked = output<void>();
 
   private readonly field = viewChild.required<ElementRef<HTMLInputElement>>('field');
-  /** Pre-normalised once on load; re-deriving it per keystroke would stutter the render loop. */
-  private readonly index = signal<IndexedSearchEntry[]>([]);
+  /** Pre-normalised once per session; re-deriving it per keystroke would stutter the render loop. */
+  private readonly index = computed(() => this.searchIndex.all() ?? []);
   /** False until the catalogues have loaded — and forever if they fail, which beats a false
    *  "no matches" for bodies that exist but could not be fetched. */
-  readonly indexReady = signal(false);
+  readonly indexReady = computed(() => this.searchIndex.all() !== null);
 
   /** True once the query is long enough to have been searched — so "no matches" is only ever
    *  reported about a search that actually ran, never about a half-typed word. */
@@ -164,7 +163,7 @@ export class SearchComponent {
   protected readonly onOptionListKeydown = onOptionListKeydown;
 
   constructor() {
-    void this.buildIndex();
+    void this.searchIndex.finish();
   }
 
   onInput(event: Event): void {
@@ -199,46 +198,12 @@ export class SearchComponent {
       // Merged, so a pick made on the map keeps its ?stars= and is a same-URL no-op there; the map
       // itself writes the ?star= of the system it then flies into.
       void this.router.navigate(['/'], { queryParamsHandling: 'merge' });
+    } else if (result.kind === 'deepSky' && result.deepSkyId) {
+      this.navigationStore.lookAtDeepSky(result.deepSkyId);
+      void this.router.navigate(['/']);
     } else if (result.bodyId) {
       void this.router.navigate(['/body', result.bodyId]);
     }
     this.picked.emit();
-  }
-
-  private async buildIndex(): Promise<void> {
-    try {
-      const [{ stars }, bodies, exoplanets] = await Promise.all([
-        this.dataLoader.loadStars(),
-        this.dataLoader.loadBodies(),
-        this.dataLoader.loadExoplanets(),
-      ]);
-
-      const entries: SearchEntry[] = [
-        ...stars.map((star): SearchEntry => ({
-          kind: 'star',
-          name: star.name,
-          subtitle: '',
-          star,
-          starId: star.id,
-        })),
-        ...bodies.map((body): SearchEntry => ({
-          kind: 'body',
-          name: body.name,
-          subtitle: body.kind,
-          bodyId: body.id,
-        })),
-        ...exoplanets.map((exoplanet): SearchEntry => ({
-          kind: 'exoplanet',
-          name: exoplanet.name,
-          subtitle: exoplanet.hostStarName,
-          bodyId: exoplanet.id,
-        })),
-      ];
-
-      this.index.set(buildSearchIndex(entries));
-      this.indexReady.set(true);
-    } catch (error) {
-      console.error('Failed to build the search index.', error);
-    }
   }
 }

@@ -44,7 +44,7 @@ import { NavigationStore, ViewLevel } from '../../shared/state/navigation.store'
 import { TimeStore } from '../../shared/state/time.store';
 import { dismissBootLoader, failBootLoader } from '../../shared/ui/boot-loader';
 import { CameraRigController } from './camera-rig-controller';
-import { DeepSkyRenderer } from './deep-sky-renderer';
+import { deepSkyLabelPoints, DeepSkyRenderer } from './deep-sky-renderer';
 import { galacticNormal, PolarGridPlane, TetherField } from './grid-plane';
 import { MilkyWayRenderer } from './milky-way-renderer';
 import {
@@ -75,13 +75,14 @@ import {
   HudDockComponent,
   HudReadout,
 } from '../hud/hud-dock.component';
-import { RouteRequest, RouteResult, RouteStarOption } from '../hud/routes-panel.component';
 import {
-  buildSearchIndex,
-  entrySubtitle,
-  IndexedSearchEntry,
-  rankSearchResults,
-} from '../search/search-ranking';
+  RouteRequest,
+  RouteResult,
+  routeResultOf,
+  RouteStarOption,
+} from '../hud/routes-panel.component';
+import { SearchIndexService } from '../search/search-index.service';
+import { entrySubtitle, rankSearchResults } from '../search/search-ranking';
 import { StarmapHudComponent } from './starmap-hud.component';
 import { SystemObjectCardComponent } from './system-object-card.component';
 import { RoutingClient } from './routing-client';
@@ -106,7 +107,13 @@ import {
   StarLabelOverlay,
 } from './star-label-overlay';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
-import { catalogueCensus, positionsNote, starReadouts, starSubtitle } from './star-readouts';
+import {
+  catalogueCensus,
+  deepSkyReadouts,
+  positionsNote,
+  starReadouts,
+  starSubtitle,
+} from './star-readouts';
 
 /** Radius, in CSS pixels, below which a body in the system view is scaled up to be seen at all. */
 const MIN_MARKER_PIXELS = 3;
@@ -294,6 +301,19 @@ function servesTheSame(asked: LinkBudget | undefined, now: LinkBudget | undefine
 const JUMP_LINK_PIXEL_BUDGET = 1_000_000;
 
 /**
+ * The widest view the jump-link graph is drawn in: the half-height of the frame at the view's
+ * centre, in parsecs.
+ *
+ * Wider, the stars within 25 pc of the Sun, which are all drawn and all linked, fill a disc about
+ * 110 px across, and their links a solid disc over it that hides Sol's name: at the opening view,
+ * 143 pc, at 3 pc as at 8. From 100 pc it is still solid, from 75 it begins to show the links in
+ * it, and at 50 it is a mesh with holes, with every link around it a line of its own. On the
+ * Ryzen 7700X's Radeon at 1920 × 1080, with vsync off, the disc cost 1.7-2.2 ms a frame over the
+ * 6.6-6.8 ms the view takes without it.
+ */
+const JUMP_LINK_MAX_HALF_HEIGHT_PC = 50;
+
+/**
  * How far in or out the plan view may be zoomed from the extent its distance frames. Under a
  * parallel projection the wheel changes the frame rather than the distance, so the orbit limits
  * stop applying and this is what stands in for them.
@@ -337,6 +357,26 @@ const HUD_ACCENT = 0x4dd7ff;
  * always named.
  */
 const DEEP_SKY_LABEL_COUNT = 12;
+/**
+ * How far out from the Sun, toward a deep-sky object picked in the search, the view looks at it
+ * from, in parsecs; the orbit's centre is as far again. The backdrop is the sky as seen from the
+ * Sun, and from here it is drawn so. Seen past the Sun from the opening view's 307 pc, the Orion
+ * Nebula sat behind the crowded centre of the star field, and its name was lost there.
+ */
+const DEEP_SKY_VIEWPOINT_PC = 1;
+/**
+ * How close on the sky to a deep-sky object the search turned to another one's permanent label is
+ * dropped, in radians: the labels are not spread, and the Great Orion Nebula's printed over Lower
+ * Sword's, 0.52° away. 6° is a label 130 px wide from the 1 pc pose, 21.6 px a degree on a view
+ * 1080 px tall; a narrower or shorter view, more degrees to the pixel, could still let two touch.
+ */
+const DEEP_SKY_LABEL_CLEARANCE_RAD = THREE.MathUtils.degToRad(6);
+/**
+ * How far off the view's centre a deep-sky object the search turned to can drift, by the cosine of
+ * the angle, before the readout gives the neighbourhood back: 10°, so a small orbit round it keeps
+ * the record and turning away does not.
+ */
+const DEEP_SKY_FACING_COS = Math.cos((10 * Math.PI) / 180);
 /** How often (seconds) the visible label set is recomputed; doesn't need to be per-frame. */
 const LABEL_UPDATE_INTERVAL_SECONDS = 0.2;
 /**
@@ -559,6 +599,7 @@ function galacticOverviewPose(): { position: THREE.Vector3; target: THREE.Vector
 export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private readonly engine = inject(EngineService);
   private readonly dataLoader = inject(DataLoaderService);
+  private readonly searchIndex = inject(SearchIndexService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   readonly navigationStore = inject(NavigationStore);
@@ -660,7 +701,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    */
   readonly routeOptions = computed<readonly RouteStarOption[]>(() => {
     const query = this.routeQuery().trim();
-    const index = this.starSearchIndex();
+    const index = this.searchIndex.stars();
     if (query.length < MIN_ROUTE_QUERY_LENGTH || index.length === 0) {
       return [];
     }
@@ -695,13 +736,14 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
   private readonly ringPoint = new THREE.Vector3();
   private readonly labelProjection = new THREE.Vector3();
   private deepSky?: DeepSkyRenderer;
+  private deepSkyRecords: readonly DeepSkyRecord[] = [];
   private deepSkyLabels: readonly LabeledPoint[] = [];
+  /** The deep-sky object the search last turned the view to; the readout shows it while faced. */
+  private lookedAtDeepSky: DeepSkyRecord | null = null;
   /** Stars with at least one catalogued body, which are the ones the map can be flown into. */
   private starIdsWithBodies = new Set<number>();
   /** Catalogue indices, brightest first, for the labels to walk rather than sort. See `brightestWithin`. */
   private starsByBrightness: BrightnessIndex = brightnessIndex([]);
-  /** Stars alone, normalised once, for the two routing fields. Empty until the catalogue lands. */
-  private readonly starSearchIndex = signal<IndexedSearchEntry[]>([]);
   private milkyWay?: MilkyWayRenderer;
   private galacticLabels: readonly LabeledPoint[] = [];
   private galacticGrid?: PolarGridPlane;
@@ -774,6 +816,12 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       const selectedStarId = this.navigationStore.selectedStarId();
       if (this.ready) {
         this.reconcileSelection(selectedStarId);
+      }
+    });
+    effect(() => {
+      this.navigationStore.deepSkyTarget();
+      if (this.ready) {
+        this.reconcileDeepSky();
       }
     });
     effect(() => this.applyDisplay(this.display()));
@@ -905,17 +953,6 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.neighbourhood = new StarNeighbourhood(stars);
     this.routing = new RoutingClient(stars, positions, this.neighbourhood);
     this.starsByBrightness = brightnessIndex(stars);
-    this.starSearchIndex.set(
-      buildSearchIndex(
-        stars.map((star) => ({
-          kind: 'star' as const,
-          name: star.name,
-          subtitle: '',
-          star,
-          starId: star.id,
-        })),
-      ),
-    );
     this.bodies = bodies;
     this.exoplanets = exoplanets;
     // Which stars can be flown into: those with catalogued bodies of their own, plus the Sun.
@@ -980,6 +1017,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     this.galaxyGroup.add(this.milkyWay.object, this.galacticGrid.object, this.tethers.object);
 
     if (deepSky.length > 0) {
+      this.deepSkyRecords = deepSky;
       this.deepSky = new DeepSkyRenderer(deepSky);
       this.galaxyGroup.add(this.deepSky.object);
       this.deepSkyLabels = this.deepSky.labelPoints(DEEP_SKY_LABEL_COUNT);
@@ -1007,9 +1045,13 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     );
     this.engine.start();
     dismissBootLoader();
+    // After the first frame is on its way rather than ahead of it, where it was 122 ms of the boot task.
+    void this.searchIndex.load();
 
     this.ready = true;
     this.reconcileSelection(this.navigationStore.selectedStarId());
+    // Asked for from the body route, which has no scene to turn.
+    this.reconcileDeepSky();
   }
 
   private tick(camera: SceneCamera, deltaSeconds: number): void {
@@ -2108,6 +2150,22 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
+    const deepSky = this.lookedAtDeepSky;
+    const facing = this.controls?.target.clone().sub(camera.position).normalize();
+    if (
+      deepSky &&
+      facing &&
+      facing.dot(new THREE.Vector3(deepSky.x, deepSky.y, deepSky.z)) > DEEP_SKY_FACING_COS
+    ) {
+      const { subtitle, readouts, note } = deepSkyReadouts(deepSky);
+      this.hudEyebrow.set('Deep Sky');
+      this.hudTitle.set(deepSky.name);
+      this.hudSubtitle.set(subtitle);
+      this.hudReadouts.set(readouts);
+      this.hudNote.set(note);
+      return;
+    }
+
     this.hudEyebrow.set('Solar Neighbourhood');
     this.hudTitle.set('Local Stars');
     this.hudSubtitle.set(this.catalogueCensus);
@@ -2260,21 +2318,13 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     const request = ++this.routeRequest;
     this.routePending.set(true);
     void this.routing.route(fromId, toId, rangePc, ROUTE_RANGE_CEILING_PC).then(
-      ({ route, neededRangePc, gaveUp, least }) => {
+      (answer) => {
         if (request !== this.routeRequest) {
           return;
         }
         this.routePending.set(false);
-        this.routeResult.set({
-          stars: route
-            ? route.stars.map((id) => ({ id, name: this.starsById.get(id)?.name ?? `Star ${id}` }))
-            : [],
-          totalPc: route?.totalPc ?? 0,
-          neededRangePc,
-          gaveUp,
-          least,
-        });
-        this.jumpLinks?.setRoute(route?.stars ?? [], (id) => this.starsById.get(id));
+        this.routeResult.set(routeResultOf(answer, this.starsById));
+        this.jumpLinks?.setRoute(answer.route?.stars ?? [], (id) => this.starsById.get(id));
       },
       (error: unknown) => {
         // A request replaced by a newer one is settled this way too; only the latest matters.
@@ -2312,12 +2362,7 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     }
     const rangePc = this.jumpRangePc();
     if (!this.display().jumpLinks) {
-      if (this.drawnJumpRangePc !== null) {
-        this.jumpLinks.setSegments(new Float32Array(0));
-        this.drawnJumpRangePc = null;
-        this.linkedStars = null;
-        this.linkedBudget = undefined;
-      }
+      this.clearJumpLinks();
       return;
     }
     // Asked for in parsec space only: inside a system the camera and its centre are in astronomical
@@ -2326,8 +2371,17 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     if (!this.galaxyGroup.visible) {
       return;
     }
+    const centre = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
+    const halfHeight = this.engine.visibleHalfHeight(
+      this.engine.getCamera().position.distanceTo(centre),
+    );
+    // Cleared as when the layer is off, so the zoom back in, which chooses the drawn stars again, asks.
+    if (halfHeight > JUMP_LINK_MAX_HALF_HEIGHT_PC) {
+      this.clearJumpLinks();
+      return;
+    }
     const drawn = this.starField.drawnStars;
-    const budget = this.jumpLinkBudget();
+    const budget = this.jumpLinkBudget(centre, halfHeight);
     if (
       this.drawnJumpRangePc === rangePc &&
       this.linkedStars === drawn &&
@@ -2362,21 +2416,27 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
    * How much of the graph to draw: the links nearest the view's centre, up to the length that
    * `JUMP_LINK_PIXEL_BUDGET` pixels of line make at that depth. None without a canvas to measure.
    */
-  private jumpLinkBudget(): LinkBudget | undefined {
+  private jumpLinkBudget(centre: THREE.Vector3, halfHeight: number): LinkBudget | undefined {
     // In the pixels the lines are drawn in, not in CSS pixels: a scaled or HiDPI screen draws more of them.
     const heightPx =
       this.canvasRef().nativeElement.clientHeight * this.engine.getRenderer().getPixelRatio();
     if (heightPx === 0) {
       return undefined;
     }
-    const centre = this.controls?.target ?? GALAXY_OVERVIEW_TARGET;
-    const halfHeight = this.engine.visibleHalfHeight(
-      this.engine.getCamera().position.distanceTo(centre),
-    );
     return {
       centre: { x: centre.x, y: centre.y, z: centre.z },
       lengthPc: (JUMP_LINK_PIXEL_BUDGET * 2 * halfHeight) / heightPx,
     };
+  }
+
+  /** Takes the graph off the screen and forgets what it was asked for, so the next ask is not skipped. */
+  private clearJumpLinks(): void {
+    if (this.drawnJumpRangePc !== null) {
+      this.jumpLinks?.setSegments(new Float32Array(0));
+      this.drawnJumpRangePc = null;
+      this.linkedStars = null;
+      this.linkedBudget = undefined;
+    }
   }
 
   /** A pinned body wins over a hovered one, so the card does not change under the pointer. */
@@ -2466,6 +2526,10 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.busy = true;
+    // A star chosen while a deep-sky object waited for the view to leave a system wins over it.
+    if (selectedStarId !== null) {
+      this.navigationStore.lookAtDeepSky(null);
+    }
 
     if (selectedStarId === null) {
       this.exitToGalaxy(() => this.finishTransition());
@@ -2491,6 +2555,57 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
     if (pending && !this.busy && this.currentStarId === null) {
       this.flyToOverview(pending);
     }
+    this.reconcileDeepSky();
+  }
+
+  /**
+   * Turns the view toward the deep-sky object the search asked for, from beside the Sun (see
+   * {@link DEEP_SKY_VIEWPOINT_PC}), and names it there whether or not it is among the brightest that
+   * always are. From inside a system it leaves first, as the scale ladder does, and the request
+   * waits in the store for `finishTransition`.
+   */
+  private reconcileDeepSky(): void {
+    const deepSkyId = this.navigationStore.deepSkyTarget();
+    if (deepSkyId === null || this.busy) {
+      return;
+    }
+    if (this.currentStarId !== null) {
+      this.navigationStore.selectStar(null);
+      return;
+    }
+    this.navigationStore.lookAtDeepSky(null);
+    const record = this.deepSkyRecords.find((candidate) => candidate.id === deepSkyId);
+    if (!record || !this.rig || !this.deepSky) {
+      return;
+    }
+    this.lookedAtDeepSky = record;
+    // The plan frames what the camera's distance to its centre spans: at the 1 pc pose that is
+    // under half a parsec, filled by the object's sprite, with the Sun behind the camera drawn
+    // over it. Swapped now rather than by the plan's effect, which would hand the flight's tween
+    // to a new rig and leave it unfinished.
+    if (this.display().plan) {
+      this.display.update((display) => ({ ...display, plan: false }));
+      this.applyProjection(false);
+    }
+    const toward = new THREE.Vector3(record.x, record.y, record.z);
+    this.rig.flyTo(
+      {
+        position: toward.clone().multiplyScalar(DEEP_SKY_VIEWPOINT_PC),
+        target: toward.multiplyScalar(2 * DEEP_SKY_VIEWPOINT_PC),
+      },
+      RETURN_DURATION_SECONDS,
+    );
+    const labels = this.deepSky
+      .labelPoints(DEEP_SKY_LABEL_COUNT)
+      .filter(
+        (label) =>
+          label.id === record.id ||
+          toward.angleTo(new THREE.Vector3(label.x, label.y, label.z)) >
+            DEEP_SKY_LABEL_CLEARANCE_RAD,
+      );
+    this.deepSkyLabels = labels.some((label) => label.id === record.id)
+      ? labels
+      : [...labels, ...deepSkyLabelPoints([record], 1)];
   }
 
   private enterSystem(starId: number, onComplete: () => void): void {

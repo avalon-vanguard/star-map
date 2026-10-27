@@ -24,6 +24,18 @@ export interface BodyDetailViewModel {
   semiAxesKm?: readonly [number, number, number];
   massEarth?: number;
   discoveryYear?: number;
+  /**
+   * An exoplanet's host star's distance, from the catalogue star it was matched to, with what
+   * `formatDistance` needs to print it as the system view prints the same star. Undefined for the
+   * Sun's bodies, and for the 26 planets whose host the archive gives no distance for.
+   */
+  hostDistance?: {
+    readonly pc: number;
+    readonly relativeError?: number;
+    readonly onDistance: boolean;
+  };
+  /** The host star's mass in solar masses, as the archive publishes it (`st_mass`). */
+  hostStarMassSolar?: number;
   orbit: Partial<OrbitalElements>;
   /**
    * What this world is inferred to look like, and the quantities that inference rests on. Always

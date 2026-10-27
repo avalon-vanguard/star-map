@@ -150,6 +150,59 @@ describe('rankSearchResults', () => {
     expect(rank(entries, 'Iot Pic')).toHaveLength(2);
   });
 
+  it('finds a star by its type, below every entry found by its name', () => {
+    const typed = (name: string, spectralType: string): SearchEntry => ({
+      kind: 'star',
+      name,
+      subtitle: '',
+      star: { spectralType, colorIndex: 0.65 },
+    });
+    const entries = [
+      typed('Sun', 'G2V'),
+      typed('Alpha Cen A', 'G2V+K1V'),
+      typed('Gl 1', 'K1V+G2V'),
+      typed('Tau Cet', 'G8V'),
+      typed('XG2V', 'K0V'),
+    ];
+    // A name containing the query is the weakest name match there is, and still comes first; then
+    // the type exactly, as its first part, and anywhere in it. 'Gl 1', shorter, would win a tie.
+    expect(rank(entries, 'G2V')).toEqual(['XG2V', 'Sun', 'Alpha Cen A', 'Gl 1']);
+  });
+
+  it("searches a star's own type only, not the estimate its row prints, nor the compact form", () => {
+    // 383 599 stars are typed "Unknown"; their rows print a colour estimate such as "~G2".
+    const entries: SearchEntry[] = [
+      {
+        kind: 'star',
+        name: 'Gaia DR3 1',
+        subtitle: '',
+        star: { spectralType: 'Unknown', colorIndex: 0.65 },
+      },
+      {
+        kind: 'star',
+        name: 'Gl 1',
+        subtitle: '',
+        star: { spectralType: 'M4.5V', colorIndex: 1.6 },
+      },
+    ];
+    expect(rank(entries, 'Unknown')).toEqual([]);
+    expect(rank(entries, '~G')).toEqual([]);
+    expect(rank(entries, 'M45')).toEqual([]);
+    expect(rank(entries, 'M4.5')).toEqual(['Gl 1']);
+  });
+
+  it('finds a deep-sky object by any of its names as fully as by its own, and ahead of a star that matches as well', () => {
+    const pleiades: SearchEntry = {
+      kind: 'deepSky',
+      name: 'Pleiades',
+      subtitle: 'Cluster · M45',
+      deepSkyId: 'Mel022',
+      aliases: ['M45', 'Mel 22'],
+    };
+    expect(rank([star('M451'), pleiades], 'M45')).toEqual(['Pleiades', 'M451']);
+    expect(rank([star('Mel 22'), pleiades], 'mel22')).toEqual(['Pleiades', 'Mel 22']);
+  });
+
   it('carries the full entry through, not just the name', () => {
     const [result] = rankSearchResults(buildSearchIndex([body('Io')]), 'Io', 1);
     expect(result).toMatchObject({ kind: 'body', name: 'Io', bodyId: 'Io' });

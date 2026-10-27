@@ -19,14 +19,16 @@ import { TimeStore } from '../../shared/state/time.store';
 import { LinkBudget } from '../../shared/astro/jump-links';
 import { HudDisplay, HudDockComponent } from '../hud/hud-dock.component';
 import { GalaxySystemSceneComponent } from './galaxy-system-scene.component';
+import { SearchIndexService } from '../search/search-index.service';
 import { normalView, positionViewDirection } from 'three/tsl';
 import { galacticNormal } from './grid-plane';
-import { catalogueCensus, positionsNote } from './star-readouts';
+import { catalogueCensus, deepSkyReadouts, positionsNote } from './star-readouts';
 import { closestApproachAu, SUN_RADIUS_AU, systemFramingDistanceAu } from './system-framing';
 import { blackbodyColor, SOLAR_EFFECTIVE_TEMPERATURE_K } from '../../shared/astro/stellar';
 import { appearanceForExoplanet } from '../../shared/astro/body-appearance';
 import { planetTexture } from '../../shared/rendering/procedural-planet-texture';
 import { loadCachedTexture, SUN_TEXTURE_PATH } from '../../shared/rendering/texture-catalog';
+import { DeepSkyRenderer } from './deep-sky-renderer';
 import { JumpLinkRenderer } from './jump-link-renderer';
 import { StarFieldRenderer } from './star-field-renderer';
 import { SystemOrbitsRenderer } from './system-orbits-renderer';
@@ -1037,24 +1039,71 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     /** Real time, since the rebuild waits on a real timer for the range and the drawn stars to settle. */
     const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
 
-    function linkScene(links: LinkScene['routing']['links']): LinkScene {
+    /** The view's distance from its centre at which its frame is 20 pc tall: well inside the widest the graph is drawn in. */
+    const LINKED_VIEW_DISTANCE = 10 / Math.tan((50 * Math.PI) / 360);
+
+    function linkScene(
+      links: LinkScene['routing']['links'],
+      distance = LINKED_VIEW_DISTANCE,
+    ): LinkScene {
       const component = fixture.componentInstance as unknown as LinkScene;
       component.routing = {
         links,
         route: () => new Promise<never>(() => undefined),
         dispose: () => undefined,
       };
+      engine
+        .getCamera()
+        .position.sub(component.controls.target)
+        .setLength(distance)
+        .add(component.controls.target);
       component.display.update((display) => ({ ...display, jumpLinks: true }));
       TestBed.tick();
       return component;
     }
 
-    /** Makes the next refocus choose a different set: the field is told it draws one star, then the view moves. */
+    /** Makes the next refocus choose a different set: the field is told it draws one star, then the view moves, camera and all. */
     async function changeDrawnStars(component: LinkScene, targetX: number): Promise<void> {
       component.starField.drawn = Uint32Array.of(0);
+      engine.getCamera().position.x += targetX - component.controls.target.x;
       component.controls.target.set(targetX, 0, 0);
       await advanceFrames(engine, 0.3);
     }
+
+    it('draws no graph at the opening view, where it is a solid disc over the Sun, and asks once the view zooms in', async () => {
+      const links = vi.fn<LinkScene['routing']['links']>(() =>
+        Promise.resolve(new Float32Array(6)),
+      );
+      const setSegments = vi.spyOn(JumpLinkRenderer.prototype, 'setSegments');
+      const opening = engine.getCamera().position.length();
+      const component = linkScene(links, opening);
+      await advanceFrames(engine, 0.3);
+      await settle();
+      expect(links).not.toHaveBeenCalled();
+
+      engine
+        .getCamera()
+        .position.sub(component.controls.target)
+        .setLength(LINKED_VIEW_DISTANCE)
+        .add(component.controls.target);
+      await advanceFrames(engine, 0.3);
+      await settle();
+      expect(links).toHaveBeenCalledTimes(1);
+      await flushAsync();
+      expect(setSegments.mock.lastCall?.[0]).toHaveLength(6);
+
+      // Back out: the graph comes off the screen rather than staying as it was.
+      engine
+        .getCamera()
+        .position.sub(component.controls.target)
+        .setLength(opening)
+        .add(component.controls.target);
+      await advanceFrames(engine, 0.3);
+      await settle();
+      expect(links).toHaveBeenCalledTimes(1);
+      expect(setSegments.mock.lastCall?.[0]).toHaveLength(0);
+      setSegments.mockRestore();
+    });
 
     it('links the stars being drawn, and asks again once a new set of them holds still', async () => {
       const links = vi.fn<LinkScene['routing']['links']>(() =>
@@ -1100,7 +1149,7 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       await settle();
 
       const budget = links.mock.calls[0][2];
-      // The view opens centred on the Sun: its frame's half-height there, over 1080 drawn pixels, is a pixel's worth of parsecs.
+      // The view is centred on the Sun: its frame's half-height there, over 1080 drawn pixels, is a pixel's worth of parsecs.
       const halfHeight = engine.getCamera().position.length() * Math.tan((50 * Math.PI) / 360);
       expect(budget?.centre).toEqual({ x: 0, y: 0, z: 0 });
       expect(budget?.lengthPc).toBeCloseTo((1_000_000 * halfHeight) / 1080, 3);
@@ -1237,7 +1286,10 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     const component = fixture.componentInstance as unknown as {
       routing: { route(): Promise<Answer>; links(): Promise<Float32Array>; dispose(): void };
       routePending(): boolean;
-      routeResult(): { stars: { id: number }[]; gaveUp: boolean } | null;
+      routeResult(): {
+        stars: { id: number; name: string; legPc: number }[];
+        gaveUp: boolean;
+      } | null;
       onRouteRequested(request: { fromId: number; toId: number; rangePc: number }): void;
     };
     component.routing = {
@@ -1266,6 +1318,11 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     await flushAsync();
 
     expect(component.routeResult()?.stars.map((star) => star.id)).toEqual([SUN.id, PROXIMA.id]);
+    // Named and measured from the catalogue the scene holds, for the panel to list.
+    expect(component.routeResult()?.stars.map(({ name, legPc }) => [name, legPc])).toEqual([
+      ['Sol', 0],
+      ['Proxima Centauri', 1.3],
+    ]);
     expect(component.routePending()).toBe(false);
 
     // "It gave up" travels to the panel, which says something else for it than for "there is none".
@@ -1991,6 +2048,194 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(navigationStore.viewLevel()).toBe('galactic');
   });
 
+  describe('a deep-sky object picked in the search', () => {
+    interface SkyScene {
+      currentStarId: number | null;
+      controls: { target: THREE.Vector3 };
+      deepSky: DeepSkyRenderer;
+      deepSkyRecords: readonly DeepSkyRecord[];
+      deepSkyLabels: readonly LabeledPoint[];
+    }
+    const scene = (): SkyScene => fixture.componentInstance as unknown as SkyScene;
+    /** Where the view looks: from the camera through the orbit's centre. */
+    const lookingAlong = (): THREE.Vector3 =>
+      scene().controls.target.clone().sub(engine.getCamera().position).normalize();
+
+    it('turns the view toward it from beside the Sun, where the backdrop is the sky seen from the Sun', async () => {
+      navigationStore.lookAtDeepSky(DEEP_SKY_OBJECT.id);
+      await flushAsync();
+      await advanceFrames(engine, 1.5);
+
+      // Andromeda lies along +z: the view looks that way from a parsec out, the Sun behind it.
+      expect(lookingAlong().z).toBeCloseTo(1, 5);
+      expect(engine.getCamera().position.z).toBeCloseTo(1, 5);
+      // Taken up, so asking for it again turns the view again.
+      expect(navigationStore.deepSkyTarget()).toBeNull();
+    });
+
+    it('shows its record in the readout while the view faces it, and the neighbourhood once it turns away', async () => {
+      const hud = fixture.componentInstance as unknown as {
+        hudTitle(): string;
+        hudReadouts(): unknown;
+      };
+      navigationStore.lookAtDeepSky(DEEP_SKY_OBJECT.id);
+      await flushAsync();
+      await advanceFrames(engine, 1.5);
+      expect(hud.hudTitle()).toBe('Andromeda Galaxy');
+      expect(hud.hudReadouts()).toEqual(deepSkyReadouts(DEEP_SKY_OBJECT).readouts);
+
+      // Turned a quarter round, toward +x: what the view shows is no longer the galaxy.
+      scene()
+        .controls.target.copy(engine.getCamera().position)
+        .add(new THREE.Vector3(1, 0, 0));
+      await advanceFrames(engine, 0.5);
+      expect(hud.hudTitle()).toBe('Local Stars');
+    });
+
+    it('names it on the backdrop though it is not among the brightest that always are', async () => {
+      const faint: DeepSkyRecord = {
+        ...DEEP_SKY_OBJECT,
+        id: 'NGC7293',
+        name: 'Helix Nebula',
+        kind: 'nebula',
+        x: 1,
+        z: 0,
+        magnitude: 7.6,
+        messier: null,
+      };
+      const records = [
+        ...Array.from({ length: 12 }, (_, i) => ({
+          ...DEEP_SKY_OBJECT,
+          id: `B${i}`,
+          magnitude: i,
+        })),
+        faint,
+      ];
+      scene().deepSkyRecords = records;
+      scene().deepSky = new DeepSkyRenderer(records);
+      navigationStore.lookAtDeepSky('NGC7293');
+      await flushAsync();
+
+      expect(scene().deepSkyLabels.map((label) => label.id)).toContain('NGC7293');
+      expect(scene().deepSkyLabels).toHaveLength(13);
+    });
+
+    it('drops a permanent label so close on the sky that the two would print over each other', async () => {
+      // The Great Orion Nebula is 0.52° from Lower Sword, which is always named.
+      const sword: DeepSkyRecord = {
+        ...DEEP_SKY_OBJECT,
+        id: 'NGC1980',
+        name: 'Lower Sword',
+        x: 1,
+        y: 0,
+        z: 0,
+      };
+      const nebula: DeepSkyRecord = {
+        ...sword,
+        id: 'NGC1976',
+        name: 'Great Orion Nebula',
+        y: Math.tan(THREE.MathUtils.degToRad(0.52)),
+        magnitude: 13,
+      };
+      const records = [
+        sword,
+        ...Array.from({ length: 11 }, (_, i) => ({
+          ...DEEP_SKY_OBJECT,
+          id: `B${i}`,
+          magnitude: i,
+        })),
+        nebula,
+      ];
+      scene().deepSkyRecords = records;
+      scene().deepSky = new DeepSkyRenderer(records);
+      navigationStore.lookAtDeepSky('NGC1976');
+      await flushAsync();
+
+      const named = scene().deepSkyLabels.map((label) => label.id);
+      expect(named).toContain('NGC1976');
+      expect(named).not.toContain('NGC1980');
+      expect(named).toHaveLength(12);
+    });
+
+    it('turns toward one picked on the body route once the map is back, which it was not there to see', async () => {
+      fixture.destroy();
+      // The body route selects the planet's host, here Earth's Sun.
+      navigationStore.selectStar(SUN.id);
+      navigationStore.lookAtDeepSky(DEEP_SKY_OBJECT.id);
+      fixture = TestBed.createComponent(GalaxySystemSceneComponent);
+      fixture.detectChanges();
+      await flushAsync();
+      await advanceFrames(engine, 1.5);
+
+      expect(scene().currentStarId).toBeNull();
+      expect(lookingAlong().z).toBeCloseTo(1, 5);
+      expect(navigationStore.deepSkyTarget()).toBeNull();
+    });
+
+    it('leaves the plan view to turn, whose frame from a parsec out would be the object sprite alone', async () => {
+      fixture.componentInstance.display.update((display) => ({ ...display, plan: true }));
+      TestBed.tick();
+      expect(engine.currentProjection).toBe('orthographic');
+
+      navigationStore.lookAtDeepSky(DEEP_SKY_OBJECT.id);
+      await flushAsync();
+      await advanceFrames(engine, 1.5);
+
+      expect(engine.currentProjection).toBe('perspective');
+      expect(fixture.componentInstance.display().plan).toBe(false);
+      // Flown by the rig the swap made, so the flight lands.
+      expect(engine.getCamera().position.z).toBeCloseTo(1, 5);
+      expect(lookingAlong().z).toBeCloseTo(1, 5);
+    });
+
+    it('waits for a flight into a star to land before turning, rather than cutting into it', async () => {
+      navigationStore.selectStar(PROXIMA.id);
+      await flushAsync();
+      await advanceFrames(engine, 0.3);
+      navigationStore.lookAtDeepSky(DEEP_SKY_OBJECT.id);
+      await flushAsync();
+
+      // Still on its way in: taken up now, the turn would replace the approach and its landing.
+      expect(navigationStore.deepSkyTarget()).toBe(DEEP_SKY_OBJECT.id);
+      // In, settled, back out and turned: 1.0 + 0.9 + 0.9 + 1.1 + 1.1 s of flight.
+      await advanceFrames(engine, 6);
+
+      expect(scene().currentStarId).toBeNull();
+      expect(navigationStore.deepSkyTarget()).toBeNull();
+      expect(lookingAlong().z).toBeCloseTo(1, 5);
+    });
+
+    it('leaves a system first, as the scale ladder does, and then turns', async () => {
+      navigationStore.selectStar(SUN.id);
+      await flushAsync();
+      await advanceFrames(engine, 2.5);
+      expect(navigationStore.viewLevel()).toBe('system');
+
+      navigationStore.lookAtDeepSky(DEEP_SKY_OBJECT.id);
+      await flushAsync();
+      await advanceFrames(engine, 6);
+
+      expect(scene().currentStarId).toBeNull();
+      expect(navigationStore.selectedStarId()).toBeNull();
+      expect(lookingAlong().z).toBeCloseTo(1, 5);
+    });
+
+    it('gives way to a star chosen while the view was leaving the system for it', async () => {
+      navigationStore.selectStar(SUN.id);
+      await flushAsync();
+      await advanceFrames(engine, 2.5);
+      navigationStore.lookAtDeepSky(DEEP_SKY_OBJECT.id);
+      await flushAsync();
+      await advanceFrames(engine, 0.3);
+      navigationStore.selectStar(PROXIMA.id);
+      await flushAsync();
+      await advanceFrames(engine, 8);
+
+      expect(scene().currentStarId).toBe(PROXIMA.id);
+      expect(navigationStore.deepSkyTarget()).toBeNull();
+    });
+  });
+
   it('names what the neighbourhood holds, and where the positions of the stars in it come from', async () => {
     await advanceFrames(engine, 0.3);
     const component = fixture.componentInstance as unknown as {
@@ -2038,7 +2283,6 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
   it('offers a star for a route by its classification, and a star with none by its name alone', () => {
     const component = fixture.componentInstance as unknown as {
-      starSearchIndex(): { entry: { starId?: number; subtitle: string } }[];
       routeOptions(): { id: number; subtitle: string }[];
       onRouteQuery(query: string): void;
       currentStarOption(): { subtitle: string } | null;
@@ -2050,7 +2294,11 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(optionFor('KMT-2016', LENS.id)).toBe('');
     expect(optionFor('Proxima', PROXIMA.id)).toBe('M5V');
     // Classified for the options shown only: the index holds none, where all 455 571 stars cost 140-230 ms at boot.
-    expect(component.starSearchIndex().every(({ entry }) => entry.subtitle === '')).toBe(true);
+    expect(
+      TestBed.inject(SearchIndexService)
+        .stars()
+        .every(({ entry }) => entry.subtitle === ''),
+    ).toBe(true);
     navigationStore.selectStar(LENS.id);
     expect(component.currentStarOption()?.subtitle).toBe('');
     navigationStore.selectStar(PROXIMA.id);

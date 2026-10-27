@@ -8,7 +8,8 @@
  */
 
 /**
- * Distance in parsecs, switching to kiloparsecs where the number would otherwise run long.
+ * Distance in parsecs, switching to kiloparsecs, and for the galaxies the deep-sky backdrop gives
+ * a redshift distance, megaparsecs, where the number would otherwise run long: M87 read 17987.5 kpc.
  *
  * `decimals` fixes the decimals for a figure a control holds to its own step: the jump range
  * moves by tenths, and at the two decimals a distance gets it read "3.00 pc", hundredths the
@@ -20,9 +21,22 @@ export function formatParsecs(distancePc: number, decimals?: number): string {
 }
 
 function parsecScale(distancePc: number): { divisor: number; digits: number; unit: string } {
+  if (distancePc >= 1e6) {
+    return { divisor: 1e6, digits: 1, unit: 'Mpc' };
+  }
   return distancePc >= 1000
     ? { divisor: 1000, digits: 1, unit: 'kpc' }
     : { divisor: 1, digits: distancePc < 10 ? 2 : 0, unit: 'pc' };
+}
+
+/**
+ * An angle on the sky: degrees from one up, arcminutes below, where OpenNGC's sizes mostly are —
+ * the median deep-sky object is 7′ across, and in degrees would read 0.12°.
+ */
+export function formatAngle(degrees: number): string {
+  return degrees >= 1
+    ? `${degrees.toFixed(2)}°`
+    : `${(degrees * 60).toFixed(degrees * 60 < 10 ? 1 : 0)}′`;
 }
 
 /**
@@ -100,6 +114,15 @@ export function formatMassEarth(massEarth: number): string {
     return `${massEarth.toFixed(0)} M⊕`;
   }
   return `${massEarth.toFixed(massEarth < 1 ? 3 : 2)} M⊕`;
+}
+
+/**
+ * Stellar mass in solar masses, to three figures at most: TRAPPIST-1's 0.0898 M☉ to two decimals
+ * would read 0.09, and the archive's hosts run from 0.0094 to 9.1. No trailing zero, which would
+ * print KMT-2016-BLG-1107L's published 0.087 as a 0.0870 nobody measured.
+ */
+export function formatMassSolar(massSolar: number): string {
+  return `${Number(massSolar.toPrecision(3))} M☉`;
 }
 
 /** Equilibrium temperature. Always a whole kelvin — the model is not good to a fraction of one. */

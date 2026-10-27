@@ -10,7 +10,7 @@ on:
 
 jobs:
   quality:
-    uses: avalon-vanguard/ci/.gitea/workflows/quality.yml@v1
+    uses: avalon-vanguard/ci/.gitea/workflows/quality.yml@v2
     with:
       jscpd-path: src
       # Non bloquant : osv-scanner relève 22 avis sur des dépendances transitives de développement

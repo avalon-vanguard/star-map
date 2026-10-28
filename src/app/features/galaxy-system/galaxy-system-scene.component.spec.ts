@@ -1,5 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { By } from '@angular/platform-browser';
+import { Location } from '@angular/common';
+import { provideLocationMocks, SpyLocation } from '@angular/common/testing';
+import { Navigation, provideRouter, Router } from '@angular/router';
 import * as THREE from 'three/webgpu';
 import { afterEach, beforeEach, describe, expect, it, MockInstance, vi } from 'vitest';
 
@@ -14,7 +17,7 @@ import { StarRecord } from '../../shared/models/star.model';
 import { NavigationStore } from '../../shared/state/navigation.store';
 import { TimeStore } from '../../shared/state/time.store';
 import { LinkBudget } from '../../shared/astro/jump-links';
-import { HudDisplay } from '../hud/hud-dock.component';
+import { HudDisplay, HudDockComponent } from '../hud/hud-dock.component';
 import { GalaxySystemSceneComponent } from './galaxy-system-scene.component';
 import { SearchIndexService } from '../search/search-index.service';
 import { normalView, positionViewDirection } from 'three/tsl';
@@ -306,7 +309,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       imports: [GalaxySystemSceneComponent],
       providers: [
         { provide: DataLoaderService, useClass: FakeDataLoaderService },
-        { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true) } },
+        // A real router over a mocked location, so the URL the scene writes can be read back and Back pressed.
+        provideRouter([]),
+        provideLocationMocks(),
       ],
     }).overrideComponent(GalaxySystemSceneComponent, {
       set: { providers: [{ provide: EngineService, useValue: engine }] },
@@ -348,6 +353,106 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
 
     expect(navigationStore.selectedStarId()).toBeNull();
     expect(navigationStore.viewLevel()).toBe('galaxy');
+  });
+
+  describe('the address bar', () => {
+    let location: SpyLocation;
+
+    beforeEach(() => {
+      location = TestBed.inject(Location) as SpyLocation;
+      // What the app's bootstrap does and TestBed does not: it is what subscribes the router to popstate.
+      TestBed.inject(Router).initialNavigation();
+    });
+
+    /** Puts a fresh map on the URL given, as a link, a reload or the body page's back control would. */
+    async function mountAt(url: string): Promise<void> {
+      fixture.destroy();
+      await TestBed.inject(Router).navigateByUrl(url);
+      fixture = TestBed.createComponent(GalaxySystemSceneComponent);
+      fixture.detectChanges();
+      await flushAsync();
+      // Long enough for a star-to-star hop: out of one system, then into the next.
+      await advanceFrames(engine, 5, 0.1);
+    }
+
+    async function choose(starId: number | null): Promise<void> {
+      navigationStore.selectStar(starId);
+      TestBed.tick();
+      await flushAsync();
+      // Long enough for a star-to-star hop: out of one system, then into the next.
+      await advanceFrames(engine, 5, 0.1);
+    }
+
+    async function back(): Promise<void> {
+      location.back();
+      await flushAsync();
+      // Long enough for a star-to-star hop: out of one system, then into the next.
+      await advanceFrames(engine, 5, 0.1);
+    }
+
+    it('names each system entered in ?star=, keeping the other parameters, and Back retraces them to the neighbourhood', async () => {
+      await mountAt('/?stars=4000');
+      const opened = location.urlChanges.length;
+      await choose(SUN.id);
+      await choose(PROXIMA.id);
+      // Pushed, not replaced: one history entry per system.
+      expect(location.urlChanges.slice(opened)).toEqual([
+        '/?stars=4000&star=0',
+        '/?stars=4000&star=42',
+      ]);
+
+      await back();
+      expect(navigationStore.selectedStarId()).toBe(SUN.id);
+      expect(navigationStore.viewLevel()).toBe('system');
+      await back();
+      expect(navigationStore.selectedStarId()).toBeNull();
+      expect(navigationStore.viewLevel()).toBe('galaxy');
+      expect(location.path()).toBe('/?stars=4000');
+      // Four flights of five frames each: 4.3-4.8 s on an idle machine, and past Vitest's 5 s
+      // default (5.2 s) on a loaded one.
+    }, 15_000);
+
+    it('opens in the system a link names', async () => {
+      await mountAt('/?star=42');
+      expect(navigationStore.selectedStarId()).toBe(PROXIMA.id);
+      expect(navigationStore.viewLevel()).toBe('system');
+      expect(location.path()).toBe('/?star=42');
+    });
+
+    it('opens on the neighbourhood for an id the catalogue lacks, replacing the entry so Back does not return to it', async () => {
+      await mountAt('/?star=987654321');
+      expect(navigationStore.selectedStarId()).toBeNull();
+      expect(navigationStore.viewLevel()).toBe('galaxy');
+      expect(location.urlChanges.at(-1)).toBe('replace: /');
+    });
+
+    it('reads anything but digits as no star at all, not as the Sun', async () => {
+      await mountAt('/?star=');
+      expect(navigationStore.selectedStarId()).toBeNull();
+      expect(navigationStore.viewLevel()).toBe('galaxy');
+    });
+
+    it('opens on the neighbourhood when Back returns to an entry naming no star, whatever a body page chose', async () => {
+      // The body page chose its host star; Back then builds the map under the router's popstate
+      // navigation, still under way while the map is constructed.
+      navigationStore.selectStar(SUN.id);
+      const router = TestBed.inject(Router);
+      vi.spyOn(router, 'currentNavigation').mockReturnValue({ trigger: 'popstate' } as Navigation);
+      const before = location.urlChanges.length;
+      await mountAt('/?stars=4000');
+      expect(navigationStore.selectedStarId()).toBeNull();
+      expect(navigationStore.viewLevel()).toBe('galaxy');
+      // The entry is left as it was, not rewritten to the host star's system.
+      expect(location.path()).toBe('/?stars=4000');
+      expect(location.urlChanges.slice(before)).toEqual(['/?stars=4000']);
+    });
+
+    it('carries a star chosen before the map mounted, from a body page, onto the URL without a second entry', async () => {
+      navigationStore.selectStar(SUN.id);
+      await mountAt('/');
+      expect(navigationStore.viewLevel()).toBe('system');
+      expect(location.urlChanges.at(-1)).toBe('replace: /?star=0');
+    });
   });
 
   it('chooses the drawn stars again once the view centre has moved, and not for a small drift', async () => {
@@ -699,6 +804,15 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(
         component.ringLabelsInTheClear([rung], camera, [{ ...rightHand, side: 'left' }]),
       ).toEqual([rung]);
+      // But not the point itself: a rung 0.04 right of it, where no text is, still crowds the name.
+      const onThePoint = at(0.1, -0.12);
+      expect(
+        component.ringLabelsInTheClear(
+          [{ ...rung, x: onThePoint.x, y: onThePoint.y, z: onThePoint.z }],
+          camera,
+          [{ ...rightHand, side: 'left' }],
+        ),
+      ).toEqual([]);
 
       // And a rung to the left of a name keeps its place: "50 pc" is a third of a star name's
       // width, so it ends well before the name starts, whatever the anchors' spacing suggests.
@@ -721,6 +835,51 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       };
 
       expect(component.ringLabelsInTheClear([clearRung], camera, [spanning])).toEqual([clearRung]);
+    });
+
+    it('drops a rung whose distance would print on the one kept before it, where the ladder foreshortens', () => {
+      const component = fixture.componentInstance as unknown as {
+        ringLabelsInTheClear(
+          candidates: readonly LabeledPoint[],
+          camera: THREE.Camera,
+          stars: readonly LabeledPoint[],
+        ): LabeledPoint[];
+        viewportAspect(): number;
+      };
+      const camera = engine.getCamera();
+      camera.updateMatrixWorld(true);
+      const aspect = component.viewportAspect();
+      // Looking along the ladder's bearing, low over the plane: the rungs step 0.12 across and
+      // barely up, closer than the 0.23 a distance's text reaches.
+      const ladder = [0, 1, 2, 3, 4, 5].map((step): LabeledPoint => {
+        const point = new THREE.Vector3((-0.6 + step * 0.12) / aspect, 0.005 * step, 0.5).unproject(
+          camera,
+        );
+        return { id: `ring-${step}`, name: `${step} pc`, x: point.x, y: point.y, z: point.z };
+      });
+
+      expect(component.ringLabelsInTheClear(ladder, camera, []).map((label) => label.id)).toEqual([
+        'ring-0',
+        'ring-2',
+        'ring-4',
+      ]);
+
+      // Straight up, 0.04 apart: a distance is one line, so one clears the next; a rung with
+      // "Survey edge" under its distance is two, and does not.
+      const rung = (id: string, y: number, kind?: string): LabeledPoint => {
+        const point = new THREE.Vector3(0, y, 0.5).unproject(camera);
+        return { id, name: id, ...(kind ? { kind } : {}), x: point.x, y: point.y, z: point.z };
+      };
+      expect(
+        component
+          .ringLabelsInTheClear([rung('a', 0), rung('b', 0.04)], camera, [])
+          .map((label) => label.id),
+      ).toEqual(['a', 'b']);
+      expect(
+        component
+          .ringLabelsInTheClear([rung('a', 0), rung('b', 0.04, 'Survey edge')], camera, [])
+          .map((label) => label.id),
+      ).toEqual(['a']);
     });
 
     it('places the ring labels with the star names rather than over them', async () => {
@@ -746,6 +905,97 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(rings).toEqual(cleared.mock.results.at(-1)?.value);
       update.mockRestore();
       cleared.mockRestore();
+    });
+
+    it('places the survey edge before the star names, as the one rung the Readout cites', async () => {
+      const update = vi.spyOn(StarLabelOverlay.prototype, 'update');
+      const camera = engine.getCamera();
+      camera.updateMatrixWorld(true);
+      // Where Sol's name would print: 0.15 right of its point, past the 0.12 two names keep
+      // between their points and inside its text.
+      const sol = new THREE.Vector3(SUN.x, SUN.y, SUN.z).project(camera);
+      const point = (dx: number, dy: number) =>
+        new THREE.Vector3(sol.x + dx, sol.y + dy, sol.z).unproject(camera);
+      const rung = (radius: number, dy: number, kind?: string): LabeledPoint => {
+        const at = point(0.15, dy);
+        return {
+          id: `ring-${radius}`,
+          name: `${radius} pc`,
+          ...(kind ? { kind } : {}),
+          tone: 'ghost',
+          x: at.x,
+          y: at.y,
+          z: at.z,
+        };
+      };
+      // The rung before it in the ladder prints into it, and a deep-sky name would sit on its point.
+      const ladder = vi
+        .spyOn(
+          GalaxySystemSceneComponent.prototype as unknown as { ringLabels: () => LabeledPoint[] },
+          'ringLabels',
+        )
+        .mockReturnValue([rung(200, -0.02), rung(250, 0, 'Survey edge')]);
+      const nebula = point(0.2, 0);
+      (fixture.componentInstance as unknown as { deepSkyLabels: LabeledPoint[] }).deepSkyLabels = [
+        { id: 'M42', name: 'Orion Nebula', kind: 'Nebula', x: nebula.x, y: nebula.y, z: nebula.z },
+      ];
+      await advanceFrames(engine, 0.3);
+
+      const labels = (update.mock.calls.at(-1)?.[0] ?? []) as LabeledPoint[];
+      expect(labels.map((label) => label.id)).toContain('ring-250');
+      expect(labels.map((label) => label.id)).not.toContain('ring-200');
+      expect(labels.map((label) => label.id)).not.toContain('M42');
+      // The name gives way, to its other side.
+      expect(labels.find((label) => label.id === SUN.id)?.side).toBe('left');
+      update.mockRestore();
+      ladder.mockRestore();
+    });
+
+    it('takes no place from a name for a survey edge that would print under the HUD', async () => {
+      const canvas = (fixture.nativeElement as HTMLElement).querySelector('canvas')!;
+      Object.defineProperty(canvas, 'clientWidth', { value: 1600 });
+      Object.defineProperty(canvas, 'clientHeight', { value: 900 });
+      canvas.getBoundingClientRect = () => new DOMRect(0, 0, 1600, 900);
+      const aspect = 1600 / 900;
+      // A pass first, which puts up the readout.
+      await advanceFrames(engine, 0.3);
+      fixture.detectChanges();
+      const update = vi.spyOn(StarLabelOverlay.prototype, 'update');
+      const camera = engine.getCamera();
+      camera.updateMatrixWorld(true);
+      // The rung 0.15 right of Sol's point, inside the 0.3 its name takes on that side, and the
+      // readout over the rung's text from 0.32 on, past the end of the name's.
+      const sol = new THREE.Vector3(SUN.x, SUN.y, SUN.z).project(camera);
+      const at = new THREE.Vector3(sol.x + 0.15 / aspect, sol.y, sol.z).unproject(camera);
+      const ladder = vi
+        .spyOn(
+          GalaxySystemSceneComponent.prototype as unknown as { ringLabels: () => LabeledPoint[] },
+          'ringLabels',
+        )
+        .mockReturnValue([
+          {
+            id: `ring-250`,
+            name: '250 pc',
+            kind: 'Survey edge',
+            tone: 'ghost',
+            x: at.x,
+            y: at.y,
+            z: at.z,
+          },
+        ]);
+      const px = (x: number, y: number) => [(x + aspect) * 450, (1 - y) * 450];
+      const [left, top] = px(sol.x * aspect + 0.32, sol.y + 0.05);
+      const [right, bottom] = px(sol.x * aspect + 0.4, sol.y - 0.05);
+      (fixture.nativeElement as HTMLElement).querySelector(
+        '[role="tabpanel"]',
+      )!.getBoundingClientRect = () => new DOMRect(left, top, right - left, bottom - top);
+      await advanceFrames(engine, 0.3);
+
+      const labels = (update.mock.calls.at(-1)?.[0] ?? []) as LabeledPoint[];
+      expect(labels.map((label) => label.id)).not.toContain('ring-250');
+      expect(labels.find((label) => label.id === SUN.id)?.side).toBe('right');
+      update.mockRestore();
+      ladder.mockRestore();
     });
   });
 
@@ -1121,7 +1371,8 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       for (let row = 0; row < 5; row++) {
         for (let column = 0; column < 5; column++) {
           pulled++;
-          const point = new THREE.Vector3(-0.8 + column * 0.4, -0.8 + row * 0.4, 0.5).unproject(
+          // A name's reach apart and clear of the right edge, so every one of them is placed.
+          const point = new THREE.Vector3(-0.9 + column * 0.35, -0.8 + row * 0.4, 0.5).unproject(
             camera,
           );
           yield {
@@ -1139,6 +1390,339 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(pulled).toBe(15);
   });
 
+  describe('where a name is printed', () => {
+    type Spreading = {
+      spreadLabels(
+        candidates: Iterable<LabeledPoint>,
+        camera: THREE.Camera,
+        keepId: number | string | null,
+        placed?: readonly LabeledPoint[],
+      ): LabeledPoint[];
+      ringLabelsInTheClear(
+        candidates: readonly LabeledPoint[],
+        camera: THREE.Camera,
+        names: readonly LabeledPoint[],
+      ): LabeledPoint[];
+      cardBodyId: string | null;
+    };
+    let component: Spreading;
+    let camera: THREE.Camera;
+    const sides = (labels: LabeledPoint[]) => labels.map((label) => `${label.id}:${label.side}`);
+    // A point on a 1600x900 canvas, from x in the aspect-scaled NDC the label pass works in.
+    let at: (id: number | string, x: number, y: number) => LabeledPoint;
+
+    beforeEach(() => {
+      const canvas = (fixture.nativeElement as HTMLElement).querySelector('canvas')!;
+      Object.defineProperty(canvas, 'clientWidth', { value: 1600 });
+      Object.defineProperty(canvas, 'clientHeight', { value: 900 });
+      canvas.getBoundingClientRect = () => new DOMRect(0, 0, 1600, 900);
+      component = fixture.componentInstance as unknown as Spreading;
+      camera = engine.getCamera();
+      camera.updateMatrixWorld(true);
+      at = (id, x, y) => {
+        const point = new THREE.Vector3(x / (1600 / 900), y, 0.5).unproject(camera);
+        return { id, name: `label-${id}`, x: point.x, y: point.y, z: point.z };
+      };
+    });
+
+    it('keeps a name off the text of one placed on either side of it, on its other side or not at all', () => {
+      // Every anchor is further from the others than the 0.12 two names keep: it is the text,
+      // up to 0.3 of it, that runs into the next name.
+      expect(
+        sides(
+          component.spreadLabels(
+            [
+              at(1, 0, 0),
+              at(2, 0.5, 0),
+              // Between the two: its right runs into 2's name and its left into 1's.
+              at(3, 0.25, 0),
+              // 1's name to its right, nothing to its left.
+              at(4, -0.2, 0),
+              // Over the end of 1's name, a row up: clear of it.
+              at(5, 0.15, 0.1),
+            ],
+            camera,
+            null,
+          ),
+        ),
+      ).toEqual(['1:right', '2:right', '4:left', '5:right']);
+      // A name only right-hung ones sit left of used to print into: 1's text runs through it.
+      expect(
+        component.spreadLabels([at(6, 0.2, 0)], camera, null, [{ ...at(1, 0, 0), side: 'right' }]),
+      ).toEqual([]);
+    });
+
+    it('keeps the selection’s name though neither side is clear, and hangs the card’s body left or not at all', () => {
+      // 3 again, boxed in on both sides, but the star about to be flown to.
+      expect(
+        sides(component.spreadLabels([at(1, 0, 0), at(2, 0.5, 0), at(3, 0.25, 0)], camera, 3)),
+      ).toEqual(['1:right', '2:right', '3:right']);
+
+      // The leader to the card leaves the body's right: left with the right clear, and nowhere
+      // once something takes its left.
+      component.cardBodyId = 'earth';
+      expect(sides(component.spreadLabels([at('earth', 0, 0)], camera, null))).toEqual([
+        'earth:left',
+      ]);
+      expect(component.spreadLabels([at('earth', 0, 0)], camera, null, [at(1, -0.2, 0)])).toEqual(
+        [],
+      );
+    });
+
+    it('keeps a name out from under the HUD and inside the frame', async () => {
+      // A pass first, which names the view and so puts up the banner.
+      await advanceFrames(engine, 0.3);
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+      const box = (selector: string, rect: DOMRect) => {
+        const element = host.querySelector(selector)!;
+        expect(element).not.toBeNull();
+        element.getBoundingClientRect = () => rect;
+      };
+      box('[role="tabpanel"]', new DOMRect(24, 600, 512, 260));
+      box('[data-testid="hud-banner"]', new DOMRect(760, 24, 400, 30));
+      box('nav[aria-label="Map scale"]', new DOMRect(24, 24, 360, 30));
+      // Read on the next label pass.
+      await advanceFrames(engine, 0.3);
+      // From pixels on the canvas.
+      const px = (id: number, x: number, y: number) =>
+        at(id, (2 * x) / 900 - 1600 / 900, 1 - (2 * y) / 900);
+
+      const placed = component.spreadLabels(
+        [
+          px(1, 200, 700), // under the readout
+          px(2, 900, 39), // under the banner
+          px(3, 100, 39), // under the scale ladder
+          px(4, 1400, 5), // its point on the frame, its text over the top
+          px(5, 1590, 450), // too near the right edge for its text to hang there
+          px(6, 1000, 400), // clear
+          px(9, 1000, 897), // its point on the frame, its text under the bottom
+        ],
+        camera,
+        null,
+      );
+
+      expect(placed.map((label) => `${label.id}:${label.side}`)).toEqual(['5:left', '6:right']);
+      // Near the left edge, with its right taken: the left would run off the frame, so nowhere.
+      expect(component.spreadLabels([px(10, 5, 300)], camera, null, [px(11, 80, 300)])).toEqual([]);
+      // A distance on a ring as much as a name.
+      expect(
+        component
+          .ringLabelsInTheClear([px(7, 200, 700), px(8, 1000, 300)], camera, [])
+          .map((label) => label.id),
+      ).toEqual([8]);
+    });
+
+    it('measures a name by its own text where that reaches further than the least reach', () => {
+      // 0.35 inside the right edge: room for the 0.3 every name is given, not for a neighbour's
+      // name and distance, which reach 214 px from the point, 0.48 of the frame at 900 px.
+      const nearEdge = at('neighbour:70890', 1600 / 900 - 0.35, 0);
+      const neighbour: LabeledPoint = {
+        ...nearEdge,
+        name: 'Proxima Centauri',
+        distance: '1.30 pc',
+        tone: 'ghost',
+      };
+      expect(component.spreadLabels([neighbour], camera, null).map((label) => label.side)).toEqual([
+        'left',
+      ]);
+      expect(
+        component
+          .spreadLabels([{ ...nearEdge, name: 'Sirius' }], camera, null)
+          .map((label) => label.side),
+      ).toEqual(['right']);
+    });
+  });
+
+  describe('on a 1280x720 canvas', () => {
+    type Spreading = {
+      spreadLabels(
+        candidates: Iterable<LabeledPoint>,
+        camera: THREE.Camera,
+        keepId: null,
+      ): LabeledPoint[];
+      ringLabelsInTheClear(
+        candidates: readonly LabeledPoint[],
+        camera: THREE.Camera,
+        names: readonly LabeledPoint[],
+      ): LabeledPoint[];
+    };
+    let component: Spreading;
+    let camera: THREE.Camera;
+    let at: (
+      id: number | string,
+      name: string,
+      x: number,
+      y: number,
+      kind?: string,
+    ) => LabeledPoint;
+
+    beforeEach(() => {
+      const canvas = (fixture.nativeElement as HTMLElement).querySelector('canvas')!;
+      Object.defineProperty(canvas, 'clientWidth', { value: 1280 });
+      Object.defineProperty(canvas, 'clientHeight', { value: 720 });
+      component = fixture.componentInstance as unknown as Spreading;
+      camera = engine.getCamera();
+      camera.updateMatrixWorld(true);
+      at = (id, name, x, y, kind) => {
+        const point = new THREE.Vector3(x / (1280 / 720), y, 0.5).unproject(camera);
+        return { id, name, ...(kind ? { kind } : {}), x: point.x, y: point.y, z: point.z };
+      };
+    });
+
+    it('keeps names and rungs a row of their own text apart, where that is taller than the least row', () => {
+      const ids = (labels: LabeledPoint[]) => labels.map((label) => label.id);
+      // Two lines are 22.65 px, 0.063 of the frame here: 0.062 up clears the least row, 0.06, and
+      // still prints into the name below. Its left runs into that name too.
+      expect(
+        ids(
+          component.spreadLabels(
+            [at(1, 'Sirius', 0, 0, 'Star'), at(2, 'Vega', 0.15, 0.062, 'Star')],
+            camera,
+            null,
+          ),
+        ),
+      ).toEqual([1]);
+      // A distance is one line, 12.65 px, 0.035 here, against half the least row, 0.03.
+      expect(
+        ids(
+          component.ringLabelsInTheClear(
+            [at('ring-12', '12 pc', 0, 0), at('ring-14', '14 pc', 0, 0.032)],
+            camera,
+            [],
+          ),
+        ),
+      ).toEqual(['ring-12']);
+      // "Groombridge 34" reaches 125 px, 0.35 here: a rung 0.32 along is past the least reach and
+      // still under the name.
+      expect(
+        component.ringLabelsInTheClear([at('ring-16', '16 pc', 0.32, 0)], camera, [
+          at(3, 'Groombridge 34', 0, 0, 'Star'),
+        ]),
+      ).toEqual([]);
+    });
+
+    it('measures a rung by its kind line where that is wider than its distance', () => {
+      // "Survey edge" is 99 px, 0.276 here, past the 0.23 every rung is given; "250 pc" is 65.
+      // A name 0.25 along, 90 px, is under the one and clear of the other.
+      const name = at(1, 'Sirius', 0.25, 0, 'Star');
+      expect(
+        component.ringLabelsInTheClear([at('ring-250', '250 pc', 0, 0, 'Survey edge')], camera, [
+          name,
+        ]),
+      ).toEqual([]);
+      expect(
+        component
+          .ringLabelsInTheClear([at('ring-250', '250 pc', 0, 0)], camera, [name])
+          .map((label) => label.id),
+      ).toEqual(['ring-250']);
+    });
+  });
+
+  describe('on a 390x844 phone', () => {
+    it('stacks a neighbour’s distance under its name where the one line fits on neither side, and keeps it', () => {
+      const canvas = (fixture.nativeElement as HTMLElement).querySelector('canvas')!;
+      Object.defineProperty(canvas, 'clientWidth', { value: 390 });
+      Object.defineProperty(canvas, 'clientHeight', { value: 844 });
+      const component = fixture.componentInstance as unknown as {
+        spreadLabels(
+          candidates: Iterable<LabeledPoint>,
+          camera: THREE.Camera,
+          keepId: null,
+        ): LabeledPoint[];
+      };
+      const camera = engine.getCamera();
+      camera.updateMatrixWorld(true);
+      const centre = new THREE.Vector3(0, 0, 0.5).unproject(camera);
+      const neighbour = (id: number, name: string, distance: string): LabeledPoint => ({
+        id: `neighbour:${id}`,
+        name,
+        distance,
+        tone: 'ghost',
+        selectStarId: id,
+        x: centre.x,
+        y: centre.y,
+        z: centre.z,
+      });
+      const form = (labels: LabeledPoint[]) =>
+        labels.map((label) => `${label.side}:${label.stacked ?? false}`);
+
+      // "Barnard's Star · 1.83 pc" is 199.5 px, 0.47 of the frame either way from the middle of a
+      // frame 0.46 wide on each side; "Barnard's Star" over "1.83 pc" is 125 px.
+      expect(
+        form(component.spreadLabels([neighbour(2, "Barnard's Star", '1.83 pc')], camera, null)),
+      ).toEqual(['right:true']);
+      // One that fits on one line keeps it.
+      expect(form(component.spreadLabels([neighbour(3, 'Sol', '1.30 pc')], camera, null))).toEqual([
+        'right:false',
+      ]);
+    });
+  });
+
+  it('places the deep-sky names after the star names and around them, outside their count', async () => {
+    type Spread = { spreadLabels: (...args: unknown[]) => LabeledPoint[] };
+    const spread = vi.spyOn(
+      GalaxySystemSceneComponent.prototype as unknown as Spread,
+      'spreadLabels',
+    );
+    const rings = vi.spyOn(
+      GalaxySystemSceneComponent.prototype as unknown as {
+        ringLabelsInTheClear: (...args: unknown[]) => LabeledPoint[];
+      },
+      'ringLabelsInTheClear',
+    );
+    // No ladder: at this pose the 250 pc rung, placed before the names, takes Sol's place.
+    const ladder = vi
+      .spyOn(
+        GalaxySystemSceneComponent.prototype as unknown as { ringLabels: () => LabeledPoint[] },
+        'ringLabels',
+      )
+      .mockReturnValue([]);
+    const update = vi.spyOn(StarLabelOverlay.prototype, 'update');
+    // A deep-sky object in the open, where the test's one (Andromeda, straight up) is not.
+    const camera = engine.getCamera();
+    camera.updateMatrixWorld(true);
+    const toward = new THREE.Vector3(0.5, -0.5, 0.5)
+      .unproject(camera)
+      .sub(camera.position)
+      .normalize();
+    const open = camera.position.clone().addScaledVector(toward, camera.position.length());
+    (fixture.componentInstance as unknown as { deepSkyLabels: LabeledPoint[] }).deepSkyLabels = [
+      { id: 'M42', name: 'Orion Nebula', kind: 'Nebula', x: open.x, y: open.y, z: open.z },
+    ];
+    await advanceFrames(engine, 0.3);
+
+    // The last pass: the stars, then the deep-sky objects around what the stars took.
+    const [stars, backdrop] = spread.mock.results
+      .slice(-2)
+      .map((result) => result.value as LabeledPoint[]);
+    expect(stars.length).toBeGreaterThan(0);
+    expect(spread.mock.calls.at(-1)?.[3]).toEqual(expect.arrayContaining(stars));
+    const shown = (update.mock.calls.at(-1)?.[0] ?? []) as LabeledPoint[];
+    expect(
+      shown.filter((label) => typeof label.id === 'string' && !label.id.startsWith('ring-')),
+    ).toEqual(backdrop);
+    // The ring distances keep out of both, a deep-sky name as much as a star's.
+    expect(backdrop.length).toBeGreaterThan(0);
+    expect(rings.mock.calls.at(-1)?.[2]).toEqual(expect.arrayContaining([...stars, ...backdrop]));
+    spread.mockRestore();
+    rings.mockRestore();
+    ladder.mockRestore();
+    update.mockRestore();
+  });
+
+  it('offers every star it names in the field as somewhere to go, as a neighbour’s name is from a system', async () => {
+    const update = vi.spyOn(StarLabelOverlay.prototype, 'update');
+    await advanceFrames(engine, 0.3);
+
+    const stars = ((update.mock.calls.at(-1)?.[0] ?? []) as LabeledPoint[]).filter(
+      (label) => typeof label.id === 'number',
+    );
+    expect(stars.length).toBeGreaterThan(0);
+    expect(stars.every((label) => label.selectStarId === label.id)).toBe(true);
+    update.mockRestore();
+  });
+
   it('flies the camera into a selected star system: hides the galaxy group, shows the system group, and switches to AU-scale near/far planes', async () => {
     navigationStore.selectStar(SUN.id);
     await flushAsync();
@@ -1154,6 +1738,24 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(component.systemGroup.visible).toBe(true);
     expect(engine.getCamera().near).toBeCloseTo(0.002, 9);
     expect(navigationStore.viewLevel()).toBe('system');
+  });
+
+  it('prints how far each neighbour is on its name’s own line, not under it', async () => {
+    const update = vi.spyOn(StarLabelOverlay.prototype, 'update');
+    navigationStore.selectStar(SUN.id);
+    await flushAsync();
+    await advanceFrames(engine, 2.5);
+
+    const labels = update.mock.calls.flatMap(([points]) => points as LabeledPoint[]);
+    const proxima = labels.filter((label) => label.id === `neighbour:${PROXIMA.id}`).at(-1);
+    expect(proxima).toMatchObject({
+      name: 'Proxima Centauri',
+      distance: '1.30 pc',
+      tone: 'ghost',
+      selectStarId: PROXIMA.id,
+    });
+    expect(proxima?.kind).toBeUndefined();
+    update.mockRestore();
   });
 
   it('says where a system’s orbits come from, and for the Sun how long they hold', async () => {
@@ -1276,6 +1878,41 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
       expect(
         (earth.scale.x * (earth.geometry as THREE.SphereGeometry).parameters.radius) / pixelAu,
       ).toBeCloseTo(3, 3);
+    });
+
+    it('shows Earth’s card on a hover 11 px from its centre, 8 px off its disc, and pins it on a click there', async () => {
+      // A raycast had to land on the 3-pixel disc itself.
+      const canvas = (fixture.nativeElement as HTMLElement).querySelector('canvas')!;
+      Object.defineProperty(canvas, 'clientWidth', { value: 1600 });
+      Object.defineProperty(canvas, 'clientHeight', { value: 1000 });
+      canvas.getBoundingClientRect = () => new DOMRect(0, 0, 1600, 1000);
+      const component = await enterTheSun(1.6);
+      const earth = component.systemRenderer.members
+        .find((member) => member.id === 'earth')!
+        .marker.getWorldPosition(new THREE.Vector3())
+        .project(engine.getCamera());
+      const at = { clientX: ((earth.x + 1) / 2) * 1600 + 11, clientY: ((1 - earth.y) / 2) * 1000 };
+      const card = (): { name: string } | undefined =>
+        (component as unknown as { objectCard(): { name: string } | undefined }).objectCard();
+
+      canvas.dispatchEvent(new MouseEvent('pointermove', at));
+      expect(card()?.name).toBe('Earth');
+      canvas.dispatchEvent(new MouseEvent('pointermove', { clientX: 0, clientY: 0 }));
+      expect(card()).toBeUndefined();
+
+      canvas.dispatchEvent(new MouseEvent('click', at));
+      expect(navigationStore.selectedBodyId()).toBe('earth');
+      expect(card()?.name).toBe('Earth');
+
+      // Escape takes the card away before anything in the dock: the panel stays as it was.
+      fixture.detectChanges();
+      const dock = fixture.debugElement.query(By.directive(HudDockComponent))
+        .componentInstance as HudDockComponent;
+      const tab = dock.activeTab();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      fixture.detectChanges();
+      expect(card()).toBeUndefined();
+      expect(dock.activeTab()).toBe(tab);
     });
 
     it('leaves the system outwards even from a phone’s framing, which stands past the 400 AU it used to fly to', async () => {
@@ -1612,6 +2249,38 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     );
   });
 
+  it('groups the digits of every count it prints, and gives the Sun’s distance from the centre as the range is given', async () => {
+    await advanceFrames(engine, 0.3);
+    const scene = fixture.componentInstance as unknown as {
+      stars: readonly StarRecord[];
+      exoplanets: readonly ExoplanetRecord[];
+      enterableSystems: number;
+      galacticStrength: number;
+      starField: StarFieldRenderer;
+      updateHud(camera: THREE.Camera): void;
+      hudReadouts(): { label: string; value: string }[];
+      hudNote(): string;
+    };
+    // The catalogue's own sizes, which no fixture this small reaches.
+    scene.stars = Array.from({ length: 455_518 }, () => LENS);
+    scene.exoplanets = Array.from({ length: 6_354 }, () => LENS_B);
+    scene.enterableSystems = 4_737;
+    vi.spyOn(scene.starField, 'drawnCount', 'get').mockReturnValue(70_000);
+    const value = (label: string) =>
+      scene.hudReadouts().find((readout) => readout.label === label)?.value;
+
+    scene.updateHud(engine.getCamera());
+    expect(value('Stars')).toBe('70,000 / 455,518');
+    expect(value('Exoplanets')).toBe('6,354');
+    expect(value('Systems')).toBe('4,737');
+
+    scene.galacticStrength = 1;
+    scene.updateHud(engine.getCamera());
+    expect(value('Sun to centre')).toBe('8.2 kpc');
+    expect(value('Catalogued')).toBe('455,518 stars');
+    expect(scene.hudNote()).toContain('The 455,518 catalogued stars are real.');
+  });
+
   it('offers a star for a route by its classification, and a star with none by its name alone', () => {
     const component = fixture.componentInstance as unknown as {
       routeOptions(): { id: number; subtitle: string }[];
@@ -1634,6 +2303,81 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     expect(component.currentStarOption()?.subtitle).toBe('');
     navigationStore.selectStar(PROXIMA.id);
     expect(component.currentStarOption()?.subtitle).toBe('M5V');
+  });
+
+  describe('from the keyboard', () => {
+    type KeyedScene = { controls: { target: THREE.Vector3; enabled: boolean } };
+    let canvas: HTMLCanvasElement;
+    let component: KeyedScene;
+
+    beforeEach(() => {
+      canvas = (fixture.nativeElement as HTMLElement).querySelector('canvas')!;
+      // OrbitControls pans by pixels of the element's height, of which jsdom lays out none.
+      Object.defineProperty(canvas, 'clientHeight', { value: 900 });
+      component = fixture.componentInstance as unknown as KeyedScene;
+    });
+
+    const distance = (): number =>
+      engine.getCamera().position.distanceTo(component.controls.target);
+    function press(on: EventTarget, key: string, init: KeyboardEventInit = {}): KeyboardEvent {
+      const event = new KeyboardEvent('keydown', {
+        key,
+        code: key,
+        bubbles: true,
+        cancelable: true,
+        ...init,
+      });
+      on.dispatchEvent(event);
+      return event;
+    }
+
+    it('pans on the arrows while the map has focus, and leaves an arrow typed in a field to the field', () => {
+      expect(canvas.tabIndex).toBe(0);
+      expect(canvas.getAttribute('aria-label')).toMatch(/^Star map\./);
+      const field = document.createElement('input');
+      document.body.appendChild(field);
+      const start = component.controls.target.clone();
+
+      // Prevented, an arrow in Search or a route field would no longer move the caret.
+      expect(press(field, 'ArrowLeft').defaultPrevented).toBe(false);
+      expect(component.controls.target.equals(start)).toBe(true);
+
+      expect(press(canvas, 'ArrowLeft').defaultPrevented).toBe(true);
+      expect(component.controls.target.equals(start)).toBe(false);
+      field.remove();
+    });
+
+    it('steps in on + and =, out on -, from the dock’s pair too, and leaves Ctrl, Cmd and Alt with them to the browser', async () => {
+      const start = distance();
+      expect(press(canvas, '+').defaultPrevented).toBe(true);
+      expect(distance()).toBeCloseTo(start * 0.8, 6);
+      press(canvas, '=');
+      expect(distance()).toBeCloseTo(start * 0.64, 6);
+      press(canvas, '-');
+      expect(distance()).toBeCloseTo(start * 0.8, 6);
+      // Ctrl and - is the browser's page zoom, Cmd and = or - the same on a Mac.
+      expect(press(canvas, '-', { ctrlKey: true }).defaultPrevented).toBe(false);
+      expect(press(canvas, '=', { metaKey: true }).defaultPrevented).toBe(false);
+      expect(press(canvas, '-', { altKey: true }).defaultPrevented).toBe(false);
+      expect(distance()).toBeCloseTo(start * 0.8, 6);
+
+      await advanceFrames(engine, 0.3);
+      fixture.detectChanges();
+      const zoomOut = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+        'button[aria-label="Zoom out"]',
+      )!;
+      zoomOut.click();
+      expect(distance()).toBeCloseTo(start, 6);
+    });
+
+    it('leaves the camera to a flight while one is under way', async () => {
+      navigationStore.selectStar(PROXIMA.id);
+      await flushAsync();
+      expect(component.controls.enabled).toBe(false);
+      const before = distance();
+      press(canvas, '+');
+      expect(distance()).toBe(before);
+    });
   });
 
   describe('each star at its own size and in its own colour', () => {

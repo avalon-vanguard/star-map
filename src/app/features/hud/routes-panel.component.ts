@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output, signal } f
 
 import { Route } from '../../shared/astro/jump-links';
 import { formatParsecs } from '../../shared/format/quantity';
+import { focusFirstOption, onOptionListKeydown } from '../../shared/ui/option-list-keys';
 import { StarRecord } from '../../shared/models/star.model';
 
 /**
@@ -87,28 +88,46 @@ type Field = 'from' | 'to';
     <div class="flex flex-col gap-3">
       <div class="grid gap-2 sm:grid-cols-2">
         @for (field of fields; track field) {
-          <div class="relative">
+          <!-- From sm up the suggestions float above their field. Below it the two fields stack,
+               and floating there the Destination list covered Departure, so a tap meant for
+               Departure chose a destination. There the list sits in the flow between the label and
+               the field instead (the field ordered last), pushing what is above it up the sheet: it
+               covers nothing, and the field being typed into does not move. Hung below instead,
+               six matches ran 61 px past the bottom of a 390 by 844 screen. -->
+          <div class="relative max-sm:flex max-sm:flex-col">
             <label [for]="'route-' + field" class="type-label text-muted">{{
               field === 'from' ? 'Departure' : 'Destination'
             }}</label>
             <input
+              #input
               [id]="'route-' + field"
               type="text"
               autocomplete="off"
+              role="combobox"
+              [attr.aria-expanded]="listed(field)"
+              [attr.aria-controls]="listed(field) ? 'route-' + field + '-options' : null"
               [value]="text(field)"
               [placeholder]="field === 'from' ? 'From this system' : 'Search a star'"
               (input)="onInput(field, $event)"
-              (keydown.escape)="closeOptions()"
-              class="hud-surface mt-1 w-full px-2.5 py-1.5 text-sm text-text caret-accent placeholder:text-muted focus:border-accent focus:outline-none"
+              (keydown.enter)="chooseFirst(field, $event)"
+              (keydown.arrowdown)="focusFirstOption($event)"
+              (keydown.escape)="$event.stopPropagation(); closeOptions()"
+              class="hud-surface mt-1 w-full px-2.5 py-1.5 text-sm text-text caret-accent placeholder:text-muted focus:border-accent focus:outline-none max-sm:order-1"
             />
-            @if (open() === field && options().length) {
+            @if (listed(field)) {
               <ul
-                class="hud-surface absolute bottom-full left-0 z-10 mb-1 max-h-48 w-full overflow-y-auto divide-y divide-border/25"
+                [id]="'route-' + field + '-options'"
+                role="listbox"
+                aria-label="Matches"
+                class="hud-surface mb-1 max-h-48 w-full overflow-y-auto divide-y divide-border/25 max-sm:mt-1 sm:absolute sm:bottom-full sm:left-0 sm:z-10"
               >
                 @for (option of options(); track option.id) {
-                  <li>
+                  <li role="none">
                     <button
                       type="button"
+                      role="option"
+                      aria-selected="false"
+                      (keydown)="onOptionListKeydown($event, input)"
                       (click)="choose(field, option)"
                       class="flex w-full items-baseline gap-3 px-2.5 py-1.5 text-left transition-colors hover:bg-accent/8 focus-visible:bg-accent/12 focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
                     >
@@ -179,10 +198,10 @@ type Field = 'from' | 'to';
                   (click)="raiseTo(plotted.neededRangePc)"
                   class="text-accent underline decoration-accent/40 underline-offset-2 disabled:opacity-40 disabled:no-underline enabled:hover:decoration-accent focus-visible:outline-1 focus-visible:outline-accent"
                 >
-                  {{ format(plotted.neededRangePc) }} would reach.
+                  {{ format(stepped(plotted.neededRangePc), 1) }} would reach.
                 </button>
               } @else if (plotted.least) {
-                No chain of jumps up to {{ format(maxRangePc) }} reaches it.
+                No chain of jumps up to {{ format(maxRangePc, 1) }} reaches it.
               }
             </p>
           }
@@ -254,14 +273,22 @@ export class RoutesPanelComponent {
   );
 
   readonly canPlot = computed(() => this.departure() !== null && this.chosen().to !== null);
-  readonly rangeLabel = computed(() => formatParsecs(this.rangePc()));
+  readonly rangeLabel = computed(() => formatParsecs(this.rangePc(), 1));
+
+  protected readonly focusFirstOption = focusFirstOption;
+  protected readonly onOptionListKeydown = onOptionListKeydown;
+
+  /** The field's suggestions are showing: it is the one being typed into, and something matched. */
+  listed(field: Field): boolean {
+    return this.open() === field && this.options().length > 0;
+  }
 
   text(field: Field): string {
     return this.chosen()[field]?.name ?? this.typed()[field];
   }
 
-  format(distancePc: number): string {
-    return formatParsecs(distancePc);
+  format(distancePc: number, decimals?: number): string {
+    return formatParsecs(distancePc, decimals);
   }
 
   onInput(field: Field, event: Event): void {
@@ -278,6 +305,15 @@ export class RoutesPanelComponent {
     this.closeOptions();
   }
 
+  /** Enter takes the first suggestion, the one a reader who typed the whole name means. */
+  chooseFirst(field: Field, event: Event): void {
+    const first = this.options()[0];
+    if (this.listed(field) && first) {
+      event.preventDefault();
+      this.choose(field, first);
+    }
+  }
+
   closeOptions(): void {
     this.open.set(null);
     this.queryChange.emit('');
@@ -289,10 +325,18 @@ export class RoutesPanelComponent {
     this.rangeChange.emit(value);
   }
 
+  /**
+   * A range rounded up to the control's own step, so the number offered is one it can actually
+   * hold — and up rather than down, since down would land just short of the crossing it names.
+   * The offer prints this, not the crossing's own distance: it read "2.31 pc would reach" and set
+   * the slider to 2.4.
+   */
+  stepped(rangePc: number): number {
+    return Math.min(this.maxRangePc, Math.ceil(rangePc * 10) / 10);
+  }
+
   raiseTo(rangePc: number): void {
-    // Rounded up to the control's own step, so the number shown is one it can actually hold —
-    // and up rather than down, since down would land just short of the crossing it names.
-    const stepped = Math.min(this.maxRangePc, Math.ceil(rangePc * 10) / 10);
+    const stepped = this.stepped(rangePc);
     this.rangePc.set(stepped);
     this.rangeChange.emit(stepped);
     this.plot();

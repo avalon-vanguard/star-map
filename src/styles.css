@@ -190,7 +190,17 @@ body {
   background: none;
   border: 0;
   padding: 0;
-  font: inherit;
+  /* No `font: inherit`: Tailwind's base already gives a button the page's font, and the shorthand
+   * here also took the page's 1.5 line height over .map-label's 1.15, which made a label that is
+   * a button 28.5 px tall where the same label as a div is 21.9. */
+}
+
+/* A star's own name in the field is a button for the keyboard only: the pointer goes through it
+ * to the map, as before. There are up to 15 of them over the field, and a wheel turned over one
+ * that took the pointer moved nothing (250 pc before and after, where through it 307 -> 250); a
+ * click on the star itself already selects it. */
+.map-label--select:not(.map-label--ghost) {
+  pointer-events: none;
 }
 
 .map-label--select:hover .map-label-name,
@@ -221,6 +231,16 @@ body {
   right: -0.75rem;
 }
 
+/* A plate under each line: the text-shadow alone left the name at 1.0-2.6:1 wherever it sat on
+ * something bright (Sagittarius A* on the bulge, Sol on the clump at the opening view). */
+.map-label-name,
+.map-label-kind {
+  background: color-mix(in oklab, var(--color-void) 80%, transparent);
+  padding: 0 3px;
+}
+
+/* The label pass sizes each label from these sizes, tracking and plates without reading the DOM
+ * (`labelTextPx` in galaxy-system-scene.component.ts): change the two together. */
 .map-label-name {
   font-size: 11px;
   letter-spacing: 0.08em;
@@ -228,9 +248,16 @@ body {
   color: var(--color-accent);
 }
 
+/* 10 px, the size of the HUD's own labels: at 8 px the line that says whether a name is a star or
+ * a system was the smallest text on screen. Set solid and tracked 0.12em, so the line is as wide as
+ * it was at 8 px and 0.3em (7.2 px a character) and a two-line label 22.6 px tall against 21.8,
+ * inside the reach and close to the row the label pass keeps between names (LABEL_REACH_NDC,
+ * LABEL_ROW_NDC). At 0.3em,
+ * "Galactic centre" ran under the Scutum–Centaurus Arm's name at 1280x720. */
 .map-label-kind {
-  font-size: 8px;
-  letter-spacing: 0.3em;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: color-mix(in oklab, var(--color-accent) 70%, transparent);
 }

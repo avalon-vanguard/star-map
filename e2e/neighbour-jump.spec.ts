@@ -12,7 +12,7 @@ test.describe('Neighbour jump', () => {
     const searchInput = await openSearch(page);
     await searchInput.fill('Sol');
     await page
-      .getByRole('button', { name: /^Sol\b/ })
+      .getByRole('option', { name: /^Sol\b/ })
       .first()
       .click();
 

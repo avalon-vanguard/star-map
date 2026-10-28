@@ -2,6 +2,7 @@ import { Component, computed, ElementRef, inject, output, signal, viewChild } fr
 import { Router } from '@angular/router';
 
 import { NavigationStore } from '../../shared/state/navigation.store';
+import { focusFirstOption, onOptionListKeydown } from '../../shared/ui/option-list-keys';
 import { ReticleIconComponent } from '../../shared/ui/reticle-icon.component';
 import { SearchIndexService } from './search-index.service';
 import { entrySubtitle, rankSearchResults, SearchEntry, SearchResultKind } from './search-ranking';
@@ -48,9 +49,15 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
           #field
           type="text"
           placeholder="Search stars, planets, exoplanets…"
+          role="combobox"
+          aria-label="Search stars, planets and exoplanets"
+          [attr.aria-expanded]="results().length > 0"
+          [attr.aria-controls]="results().length ? 'search-results' : null"
           [value]="query()"
           (input)="onInput($event)"
-          (keydown.escape)="clear()"
+          (keydown.enter)="pickFirst($event)"
+          (keydown.arrowdown)="focusFirstOption($event)"
+          (keydown.escape)="$event.stopPropagation(); clear()"
           class="w-full bg-transparent py-2.5 pr-3 pl-10 text-sm tracking-[0.02em] text-text caret-accent placeholder:text-muted focus:outline-none"
         />
       </div>
@@ -68,13 +75,19 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
               }
             </p>
             <ul
+              id="search-results"
               data-testid="search-results"
+              role="listbox"
+              aria-label="Matches"
               class="max-h-64 scheme-dark divide-y divide-border/25 overflow-y-auto [scrollbar-width:thin]"
             >
               @for (result of results(); track result.bodyId ?? result.deepSkyId ?? result.starId) {
-                <li>
+                <li role="none">
                   <button
                     type="button"
+                    role="option"
+                    aria-selected="false"
+                    (keydown)="onOptionListKeydown($event, field)"
                     (click)="select(result)"
                     class="flex w-full items-baseline gap-3 border-l border-transparent px-3 py-2 text-left transition-colors hover:border-l-accent hover:bg-accent/8 focus-visible:border-l-accent focus-visible:bg-accent/12 focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
                   >
@@ -93,6 +106,9 @@ const KIND_LABELS: Record<SearchResultKind, string> = {
           }
         </div>
       }
+      <!-- Always there, and read out when it changes: a live region that arrives with its text
+           already in it, as the lines above do, is often not read at all. -->
+      <p class="sr-only" aria-live="polite">{{ status() }}</p>
     </div>
   `,
 })
@@ -133,6 +149,18 @@ export class SearchComponent {
       .slice(0, MAX_RESULTS)
       .map((entry) => ({ ...entry, subtitle: entrySubtitle(entry) })),
   );
+  /** What the panel above the field says, for a screen reader: the count, or that nothing matched. */
+  readonly status = computed(() => {
+    if (!this.indexReady() || !this.hasQuery()) {
+      return '';
+    }
+    return this.results().length
+      ? `Matches ${this.matchTotal()}`
+      : `Nothing in the catalog matches “${this.query().trim()}”`;
+  });
+
+  protected readonly focusFirstOption = focusFirstOption;
+  protected readonly onOptionListKeydown = onOptionListKeydown;
 
   constructor() {
     void this.searchIndex.finish();
@@ -144,6 +172,15 @@ export class SearchComponent {
 
   clear(): void {
     this.query.set('');
+  }
+
+  /** Enter takes the first result, the one a reader who typed the whole name means. */
+  pickFirst(event: Event): void {
+    const first = this.results()[0];
+    if (first) {
+      event.preventDefault();
+      this.select(first);
+    }
   }
 
   focus(): void {
@@ -158,7 +195,9 @@ export class SearchComponent {
     this.clear();
     if (result.kind === 'star' && result.starId !== undefined) {
       this.navigationStore.selectStar(result.starId);
-      void this.router.navigate(['/']);
+      // Merged, so a pick made on the map keeps its ?stars= and is a same-URL no-op there; the map
+      // itself writes the ?star= of the system it then flies into.
+      void this.router.navigate(['/'], { queryParamsHandling: 'merge' });
     } else if (result.kind === 'deepSky' && result.deepSkyId) {
       this.navigationStore.lookAtDeepSky(result.deepSkyId);
       void this.router.navigate(['/']);

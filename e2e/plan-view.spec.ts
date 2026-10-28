@@ -10,7 +10,7 @@ test.describe('Plan view', () => {
     const searchInput = await openSearch(page);
     await searchInput.fill('Sol');
     await page
-      .getByRole('button', { name: /^Sol\b/ })
+      .getByRole('option', { name: /^Sol\b/ })
       .first()
       .click();
     await expect(page.getByTestId('hud-title')).toHaveText('Sol', { timeout: 45_000 });

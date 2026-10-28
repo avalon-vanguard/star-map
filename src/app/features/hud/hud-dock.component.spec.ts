@@ -66,6 +66,15 @@ describe('HudDockComponent', () => {
     fixture.componentRef.setInput('range', '21.5 kpc');
   }
 
+  /** Types into a route field as the reader does, and returns the field. */
+  function typeRoute(field: 'from' | 'to', value: string): HTMLInputElement {
+    const input = host().querySelector<HTMLInputElement>(`#route-${field}`)!;
+    input.value = value;
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    return input;
+  }
+
   beforeEach(async () => {
     localStorage.clear();
     await TestBed.configureTestingModule({
@@ -148,6 +157,25 @@ describe('HudDockComponent', () => {
     fixture.componentRef.setInput('range', '');
     fixture.detectChanges();
     expect(host().textContent).not.toContain('Range');
+  });
+
+  it('puts a named zoom pair beside the range, which hands each step to the surface, and none without a range', () => {
+    setReadout();
+    fixture.detectChanges();
+    const steps: string[] = [];
+    fixture.componentInstance.zoom.subscribe((step) => steps.push(step));
+    const zoomIn = host().querySelector<HTMLButtonElement>('button[aria-label="Zoom in"]')!;
+    const zoomOut = host().querySelector<HTMLButtonElement>('button[aria-label="Zoom out"]')!;
+    zoomIn.click();
+    zoomOut.click();
+    expect(steps).toEqual(['in', 'out']);
+    const range = [...host().querySelectorAll('p')].find((p) => p.textContent?.includes('Range'))!;
+    expect(zoomIn.parentElement).toBe(range.parentElement);
+
+    // A body page passes no range, and has no camera of this scene's to move.
+    fixture.componentRef.setInput('range', '');
+    fixture.detectChanges();
+    expect(host().querySelector('[aria-label^="Zoom"]')).toBeNull();
   });
 
   it('toggles a tab closed when it is clicked while open', () => {
@@ -303,6 +331,70 @@ describe('HudDockComponent', () => {
     expect(tab('Search').getAttribute('aria-selected')).toBe('true');
   });
 
+  describe('Escape', () => {
+    const escape = (target: EventTarget = document) => {
+      target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      fixture.detectChanges();
+    };
+
+    it('takes one thing away per press: the overlay, then the panel, then hands it to the surface', () => {
+      setReadout();
+      fixture.componentRef.setInput('defaultTab', 'readout');
+      fixture.componentRef.setInput('overlayOpen', true);
+      fixture.detectChanges();
+      const escaped = vi.fn();
+      fixture.componentInstance.escaped.subscribe(escaped);
+
+      escape();
+      expect(escaped).toHaveBeenCalledTimes(1);
+      expect(tab('Readout').getAttribute('aria-selected')).toBe('true');
+
+      fixture.componentRef.setInput('overlayOpen', false);
+      escape();
+      expect(escaped).toHaveBeenCalledTimes(1);
+      expect(host().querySelector('[role="tabpanel"]')).toBeNull();
+
+      escape();
+      expect(escaped).toHaveBeenCalledTimes(2);
+    });
+
+    it('leaves the search field and the route fields their own Escape, and the panel open', () => {
+      setReadout();
+      fixture.componentRef.setInput('routing', true);
+      fixture.componentRef.setInput('defaultTab', 'search');
+      fixture.detectChanges();
+
+      escape(host().querySelector('#dock-panel-search input')!);
+      expect(tab('Search').getAttribute('aria-selected')).toBe('true');
+
+      tab('Routes').click();
+      fixture.detectChanges();
+      escape(host().querySelector('#route-to')!);
+      expect(tab('Routes').getAttribute('aria-selected')).toBe('true');
+    });
+
+    it('hands focus from the panel it folds to that panel’s tab, not to the page', () => {
+      setReadout();
+      fixture.componentRef.setInput('routing', true);
+      fixture.componentRef.setInput('defaultTab', 'routes');
+      fixture.detectChanges();
+      const range = host().querySelector<HTMLInputElement>('#route-range')!;
+      range.focus();
+
+      escape(range);
+      expect(host().querySelector<HTMLElement>('#dock-panel-routes')!.hidden).toBe(true);
+      expect(document.activeElement).toBe(tab('Routes'));
+
+      // Focus anywhere else, such as another tab, is left where it is.
+      tab('Routes').click();
+      fixture.detectChanges();
+      tab('Bookmarks').focus();
+      escape(tab('Bookmarks'));
+      expect(host().querySelector<HTMLElement>('#dock-panel-routes')!.hidden).toBe(true);
+      expect(document.activeElement).toBe(tab('Bookmarks'));
+    });
+  });
+
   it('hands the panel back to the readout once a result is picked', () => {
     setReadout();
     fixture.componentRef.setInput('defaultTab', 'search');
@@ -430,7 +522,7 @@ describe('HudDockComponent', () => {
       least: false,
     });
     fixture.detectChanges();
-    expect(summary()).toBe('Too many stars to search at this range. 6.40 pc would reach.');
+    expect(summary()).toBe('Too many stars to search at this range. 6.4 pc would reach.');
 
     // The other way round: the range asked for was searched to exhaustion and the wider search was
     // the one that gave up. There is no route at this range, and nothing further can be claimed.
@@ -443,6 +535,35 @@ describe('HudDockComponent', () => {
     });
     fixture.detectChanges();
     expect(summary()).toBe('No route at this range.');
+  });
+
+  it('gives the jump range in the tenths its slider steps by, and offers the range a click will set', () => {
+    setReadout();
+    fixture.componentRef.setInput('routing', true);
+    fixture.componentRef.setInput('currentStar', { id: 0, name: 'Sol', subtitle: 'G2V' });
+    fixture.componentRef.setInput('routeOptions', [{ id: 7, name: 'Sirius', subtitle: '2.6 pc' }]);
+    fixture.componentRef.setInput('defaultTab', 'routes');
+    fixture.detectChanges();
+    const output = () => host().querySelector('output[for="route-range"]')!.textContent!.trim();
+    expect(output()).toBe('3.0 pc');
+    typeRoute('to', 'Sir');
+    host().querySelector<HTMLButtonElement>('#dock-panel-routes ul button')!.click();
+
+    // The crossing is 2.31 pc away, and the slider can only hold 2.4: the offer says what it sets.
+    fixture.componentRef.setInput('routeResult', {
+      stars: [],
+      totalPc: 0,
+      neededRangePc: 2.31,
+      gaveUp: false,
+      least: true,
+    });
+    fixture.detectChanges();
+    const offer = host().querySelector<HTMLButtonElement>('[data-testid="route-summary"] button')!;
+    expect(offer.textContent!.trim()).toBe('2.4 pc would reach.');
+    offer.click();
+    fixture.detectChanges();
+    expect(host().querySelector<HTMLInputElement>('#route-range')!.value).toBe('2.4');
+    expect(output()).toBe('2.4 pc');
   });
 
   it('keeps what the Routes panel was set to across a trip to another tab', () => {
@@ -471,6 +592,99 @@ describe('HudDockComponent', () => {
     expect(host().querySelector<HTMLElement>('#dock-panel-routes')!.hidden).toBe(false);
     expect(host().querySelector<HTMLInputElement>('#route-to')!.value).toBe('Sirius');
     expect(host().querySelector<HTMLInputElement>('#route-range')!.value).toBe('6');
+  });
+
+  it('puts the open panel after the tabs in the focus order, while drawing it above them', () => {
+    setReadout();
+    fixture.componentRef.setInput('routing', true);
+    fixture.componentRef.setInput('defaultTab', 'routes');
+    fixture.detectChanges();
+    const strip = host().querySelector('[role="tablist"]')!;
+    const follows = (id: string) =>
+      !!(
+        strip.compareDocumentPosition(host().querySelector(id)!) & Node.DOCUMENT_POSITION_FOLLOWING
+      );
+
+    expect(follows('#dock-panel-routes')).toBe(true);
+    tab('Readout').click();
+    fixture.detectChanges();
+    expect(follows('#dock-panel-readout')).toBe(true);
+    // Drawn above the strip all the same: the column runs bottom-up.
+    expect(strip.parentElement!.parentElement!.classList).toContain('flex-col-reverse');
+  });
+
+  it('fits the five tabs on a 360 px phone, padding them 6 px a side below sm and 16 from it', () => {
+    // jsdom lays nothing out: the classes are what decide it. Measured in Chromium, the five took
+    // 397 px at 12 px a side and the strip of a 360 px phone holds 342: Display was cut to "DI".
+    // At 6 px a side they take 337.
+    setReadout();
+    fixture.componentRef.setInput('routing', true);
+    fixture.componentRef.setInput('display', DEFAULT_HUD_DISPLAY);
+    fixture.detectChanges();
+
+    expect(tabNames()).toHaveLength(5);
+    for (const name of tabNames()) {
+      expect([...tab(name).classList]).toEqual(expect.arrayContaining(['px-1.5', 'sm:px-4']));
+    }
+  });
+
+  it('floats the route suggestions over the panel only from sm up, and on a phone puts them between the label and the field', () => {
+    // jsdom lays nothing out: the classes are what decide it. Measured in Chromium at 390 by 844,
+    // the floating Destination list covered Departure (list 576-643 px, Departure 605-639).
+    fixture.componentRef.setInput('routing', true);
+    fixture.componentRef.setInput('routeOptions', [{ id: 7, name: 'Sirius', subtitle: '2.6 pc' }]);
+    fixture.componentRef.setInput('defaultTab', 'routes');
+    fixture.detectChanges();
+    const destination = typeRoute('to', 'Sir');
+
+    const list = host().querySelector('#route-to-options')!;
+    expect(list.classList).not.toContain('absolute');
+    expect(list.classList).toContain('sm:absolute');
+    expect(destination.classList).toContain('max-sm:order-1');
+    expect([...destination.parentElement!.classList]).toEqual(
+      expect.arrayContaining(['max-sm:flex', 'max-sm:flex-col']),
+    );
+  });
+
+  it('chooses the first suggestion on Enter, and walks the suggestions with the arrows', () => {
+    setReadout();
+    fixture.componentRef.setInput('routing', true);
+    fixture.componentRef.setInput('currentStar', { id: 0, name: 'Sol', subtitle: 'G2V' });
+    fixture.componentRef.setInput('routeOptions', [
+      { id: 7, name: 'Sirius', subtitle: '2.6 pc' },
+      { id: 8, name: 'Sirius B', subtitle: '2.6 pc' },
+    ]);
+    fixture.componentRef.setInput('defaultTab', 'routes');
+    fixture.detectChanges();
+    const plot = () =>
+      [...host().querySelectorAll<HTMLButtonElement>('button')].find((button) =>
+        button.textContent?.includes('Plot route'),
+      )!;
+    const press = (target: Element, key: string) => {
+      target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+      fixture.detectChanges();
+    };
+    const destination = host().querySelector<HTMLInputElement>('#route-to')!;
+    expect(destination.getAttribute('role')).toBe('combobox');
+    expect(destination.getAttribute('aria-expanded')).toBe('false');
+    typeRoute('to', 'Sir');
+
+    const list = host().querySelector('#dock-panel-routes [role="listbox"]')!;
+    const options = [...list.querySelectorAll<HTMLElement>('[role="option"]')];
+    expect(destination.getAttribute('aria-expanded')).toBe('true');
+    expect(destination.getAttribute('aria-controls')).toBe(list.id);
+    press(destination, 'ArrowDown');
+    expect(document.activeElement).toBe(options[0]);
+    press(options[0], 'ArrowDown');
+    expect(document.activeElement).toBe(options[1]);
+    press(options[1], 'Escape');
+    expect(document.activeElement).toBe(destination);
+    expect(tab('Routes').getAttribute('aria-selected')).toBe('true');
+
+    press(destination, 'Enter');
+    expect(destination.value).toBe('Sirius');
+    expect(destination.getAttribute('aria-expanded')).toBe('false');
+    expect(plot().disabled).toBe(false);
   });
 
   describe('clock', () => {
@@ -593,10 +807,10 @@ describe('HudDockComponent', () => {
         true,
       );
       // The range keeps its width where it is shown, or '417 AU' wraps and the row grows 20 px; on a
-      // phone it is not shown, where at the present it took the Display tab out of sight.
-      const range = [...host().querySelectorAll('p')].find((p) =>
-        p.textContent?.includes('Range'),
-      )!.classList;
+      // phone it is not shown, where at the present it took the Display tab out of sight. Its zoom
+      // pair goes with it.
+      const range = [...host().querySelectorAll('p')].find((p) => p.textContent?.includes('Range'))!
+        .parentElement!.classList;
       expect(range.contains('shrink-0') && range.contains('max-sm:hidden')).toBe(true);
     });
 

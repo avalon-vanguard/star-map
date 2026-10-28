@@ -54,6 +54,13 @@ test.describe('Galaxy view', () => {
 
     // The rings are distances from the Sun, the survey's own edge called out among them.
     await expect(page.getByText('Survey edge')).toBeVisible({ timeout: 30_000 });
+    const rung = page
+      .locator('.map-label--ghost .map-label-name')
+      .filter({ hasText: /^\d+ pc$/ })
+      .first();
+    await expect(rung).toBeVisible({ timeout: 30_000 });
+    // On a plate of the void, 80% opaque, so the label reads over a bright field as over black.
+    await expect(rung).toHaveCSS('background-color', /^oklab\(0\.12\d* .* \/ 0\.8\)$/);
     const scale = page.getByTestId('hud-scale');
     await expect(scale).toHaveAttribute('aria-label', /^Scale: [\d.]+ k?pc$/);
     const opening = await scale.getAttribute('aria-label');
@@ -64,5 +71,39 @@ test.describe('Galaxy view', () => {
       await page.mouse.wheel(0, -400);
     }
     await expect(scale).not.toHaveAttribute('aria-label', opening ?? '', { timeout: 15_000 });
+  });
+
+  test('a star’s name is a Tab away from the map and flies there on Enter, and the pointer still reaches the map through it', async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await page.goto('/?stars=4000');
+    await expect(page.getByTestId('scene-canvas')).toBeVisible({ timeout: 30_000 });
+    const label = page.locator('button.map-label:not(.map-label--ghost):visible').first();
+    await expect(label).toHaveAttribute('aria-label', /^Go to .+, (Star|System)$/, {
+      timeout: 30_000,
+    });
+
+    // The wheel and a drag that start on a name still move the map, as they did when no name
+    // could be pressed.
+    const box = (await label.boundingBox())!;
+    // An 11 px name at the labels' 1.15 line height over a 10 px kind set solid, as tall as a
+    // name that is not a button: the label pass keeps names a 22 px row apart.
+    expect(box.height).toBeLessThan(23);
+    // The kind line at the HUD labels' 10 px, not the 8 px it was the quietest text on screen at.
+    expect(
+      await label.locator('.map-label-kind').evaluate((kind) => getComputedStyle(kind).fontSize),
+    ).toBe('10px');
+    const under = await page.evaluate(
+      ([x, y]) => document.elementFromPoint(x, y)?.getAttribute('data-testid'),
+      [box.x + box.width / 2, box.y + box.height / 2],
+    );
+    expect(under).toBe('scene-canvas');
+
+    await page.getByTestId('scene-canvas').focus();
+    await page.keyboard.press('Tab');
+    await expect(label).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/[?&]star=\d+/, { timeout: 30_000 });
   });
 });

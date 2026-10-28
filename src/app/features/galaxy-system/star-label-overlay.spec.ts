@@ -107,13 +107,13 @@ describe('StarLabelOverlay', () => {
     expect(scene.children).toHaveLength(0);
   });
 
-  it('says a neighbour more quietly than a body of this system', () => {
+  it('says a neighbour more quietly than a body of this system, with its distance on the name’s line', () => {
     overlay.update([
       { id: 'earth', name: 'Earth', kind: 'Planet', x: 1, y: 0, z: 0 },
       {
         id: 'neighbour:1',
         name: 'Sirius',
-        kind: '2.64 pc',
+        distance: '2.64 pc',
         tone: 'ghost',
         selectStarId: 1,
         x: 0,
@@ -125,7 +125,34 @@ describe('StarLabelOverlay', () => {
     const [body, ghost] = labels();
     expect(body.classList.contains('map-label--ghost')).toBe(false);
     expect(ghost.classList.contains('map-label--ghost')).toBe(true);
-    expect(ghost.querySelector('.map-label-kind')?.textContent).toBe('2.64 pc');
+    expect(ghost.querySelector('.map-label-name')?.textContent).toBe('Sirius · 2.64 pc');
+    expect(ghost.querySelector('.map-label-kind')).toBeNull();
+  });
+
+  it('prints a stacked distance under the name, and rewrites a label whose form changed since it went up', () => {
+    const sirius = {
+      id: 'neighbour:1',
+      name: 'Sirius',
+      distance: '2.64 pc',
+      tone: 'ghost' as const,
+      selectStarId: 1,
+      x: 0,
+      y: 1,
+      z: 0,
+    };
+    const lines = () =>
+      labels().map((label) => [
+        label.querySelector('.map-label-name')?.textContent,
+        label.querySelector('.map-label-kind')?.textContent,
+      ]);
+    overlay.update([sirius]);
+
+    overlay.update([{ ...sirius, stacked: true }]);
+    expect(lines()).toEqual([['Sirius', '2.64 pc']]);
+    expect(labels()[0].getAttribute('aria-label')).toBe('Go to Sirius, 2.64 pc away');
+
+    overlay.update([sirius]);
+    expect(lines()).toEqual([['Sirius · 2.64 pc', undefined]]);
   });
 
   it('makes a label that offers a star a button, and hands back the star it names', () => {
@@ -136,7 +163,7 @@ describe('StarLabelOverlay', () => {
       {
         id: 'neighbour:42',
         name: 'Sirius',
-        kind: '2.64 pc',
+        distance: '2.64 pc',
         tone: 'ghost',
         selectStarId: 42,
         x: 1,
@@ -147,11 +174,19 @@ describe('StarLabelOverlay', () => {
 
     const ghost = labels()[0];
     expect(ghost.tagName).toBe('BUTTON');
-    // Its two lines are adjacent spans, so without this it is announced as "Sirius2.64 pc".
+    // Said as a sentence, not as the "Sirius · 2.64 pc" printed.
     expect(ghost.getAttribute('aria-label')).toBe('Go to Sirius, 2.64 pc away');
     ghost.click();
 
     expect(chosen).toEqual([42]);
+  });
+
+  it('names a star of the field by what it is, and keeps "away" for a distance', () => {
+    overlay.update([{ id: 7, name: 'Canopus', kind: 'Star', selectStarId: 7, x: 1, y: 0, z: 0 }]);
+
+    const label = labels()[0];
+    expect(label.tagName).toBe('BUTTON');
+    expect(label.getAttribute('aria-label')).toBe('Go to Canopus, Star');
   });
 
   it('leaves a label that offers nothing untouchable, so the scene behind it stays clickable', () => {

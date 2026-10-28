@@ -119,8 +119,81 @@ function isWideViewport(): boolean {
   template: `
     <!-- The column is transparent to the pointer and each surface in it opts back in: it is as
          wide as the strip and as tall as the open panel, so a solid one would swallow every
-         click in the empty band beside the panel — where the scene, and its labels, are. -->
-    <div class="flex flex-col items-start">
+         click in the empty band beside the panel — where the scene, and its labels, are.
+         The strip comes first in the DOM and is drawn last (flex-col-reverse), so Tab goes on
+         from the tabs into the panel they opened, drawn above them. The other way round, Tab
+         from the Routes tab went to Bookmarks, Display and out of the dock, and the panel's
+         fields were three Shift+Tabs back. -->
+    <div class="flex flex-col-reverse items-start">
+      <div class="hud-brackets hud-surface pointer-events-auto flex w-full items-stretch">
+        <!-- The tabs give way to the date and the range, and scroll: on a portrait phone they
+             pushed the date off the right edge. Below sm they are padded 6 px a side, not 12: the
+             five then take 337 px and fit a 360 px phone's 342 px strip, where at 397 px Display
+             was cut to its first two letters and only a swipe reached it. Where
+             the browser draws a scrollbar of its own, it is a thin dark one: on a desktop window
+             under 770 px wide its default was a light bar 15 px tall across the dark dock. -->
+        <div
+          role="tablist"
+          aria-label="Dock"
+          class="flex min-w-0 scheme-dark items-stretch divide-x divide-border/40 overflow-x-auto [scrollbar-width:thin]"
+        >
+          @for (tab of tabs(); track tab) {
+            <button
+              type="button"
+              role="tab"
+              [id]="'dock-tab-' + tab"
+              [attr.aria-selected]="activeTab() === tab"
+              [attr.aria-controls]="activeTab() === tab ? 'dock-panel-' + tab : null"
+              (click)="toggleTab(tab)"
+              class="type-eyebrow px-1.5 py-2 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent sm:px-4"
+              [class]="
+                activeTab() === tab
+                  ? 'bg-accent/15 text-accent'
+                  : 'text-muted hover:bg-accent/8 hover:text-accent'
+              "
+            >
+              {{ tabLabel(tab) }}
+            </button>
+          }
+        </div>
+        <!-- Only while the map is away from the present: at the present the date is
+             today's, which the reader's own machine already says. -->
+        @if (date()) {
+          <p
+            class="ml-auto flex shrink-0 items-baseline gap-2 border-l border-border/40 px-3 py-2 sm:px-4"
+            data-testid="hud-date"
+          >
+            <span class="type-label text-muted">Date</span>
+            <span class="text-sm text-accent tabular-nums">{{ date() }}</span>
+          </p>
+        }
+        <!-- Not on a phone, where it never showed before the tabs gave way to it: kept, its 121 px
+             took the Display tab out of sight at the present, the state the map opens in. The zoom
+             pair beside it, for a trackpad, a tablet or the keyboard, goes with it: on a phone it
+             took 73 px more of the tabs and put Bookmarks under the edge with Display, and a pinch
+             zooms there anyway. -->
+        @if (range()) {
+          <div
+            class="flex shrink-0 items-stretch divide-x divide-border/40 border-l border-border/40 max-sm:hidden"
+            [class.ml-auto]="!date()"
+          >
+            <p class="flex items-baseline gap-2 px-3 py-2 sm:px-4">
+              <span class="type-label text-muted">Range</span>
+              <span class="text-sm text-accent tabular-nums">{{ range() }}</span>
+            </p>
+            @for (step of zoomSteps; track step.direction) {
+              <button
+                type="button"
+                [attr.aria-label]="step.label"
+                (click)="zoom.emit(step.direction)"
+                class="w-9 text-base leading-none text-muted transition-colors hover:bg-accent/8 hover:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+              >
+                {{ step.glyph }}
+              </button>
+            }
+          </div>
+        }
+      </div>
       @if (activeTab(); as tab) {
         <!-- Switching tabs remounts the panel and replays its acquire wipe: a new readout
              locking on, once per switch, never per keystroke. -->
@@ -415,59 +488,6 @@ function isWideViewport(): boolean {
           />
         </section>
       }
-
-      <div class="hud-brackets hud-surface pointer-events-auto flex w-full items-stretch">
-        <!-- The tabs give way to the date and the range, and scroll: the five of the system view
-             take 397 px, and on a portrait phone they pushed the date off the right edge. Where
-             the browser draws a scrollbar of its own, it is a thin dark one: on a desktop window
-             under 770 px wide its default was a light bar 15 px tall across the dark dock. -->
-        <div
-          role="tablist"
-          aria-label="Dock"
-          class="flex min-w-0 scheme-dark items-stretch divide-x divide-border/40 overflow-x-auto [scrollbar-width:thin]"
-        >
-          @for (tab of tabs(); track tab) {
-            <button
-              type="button"
-              role="tab"
-              [id]="'dock-tab-' + tab"
-              [attr.aria-selected]="activeTab() === tab"
-              [attr.aria-controls]="activeTab() === tab ? 'dock-panel-' + tab : null"
-              (click)="toggleTab(tab)"
-              class="type-eyebrow px-3 py-2 transition-colors focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent sm:px-4"
-              [class]="
-                activeTab() === tab
-                  ? 'bg-accent/15 text-accent'
-                  : 'text-muted hover:bg-accent/8 hover:text-accent'
-              "
-            >
-              {{ tabLabel(tab) }}
-            </button>
-          }
-        </div>
-        <!-- Only while the map is away from the present: at the present the date is
-             today's, which the reader's own machine already says. -->
-        @if (date()) {
-          <p
-            class="ml-auto flex shrink-0 items-baseline gap-2 border-l border-border/40 px-3 py-2 sm:px-4"
-            data-testid="hud-date"
-          >
-            <span class="type-label text-muted">Date</span>
-            <span class="text-sm text-accent tabular-nums">{{ date() }}</span>
-          </p>
-        }
-        <!-- Not on a phone, where it never showed before the tabs gave way to it: kept, its 121 px
-             took the Display tab out of sight at the present, the state the map opens in. -->
-        @if (range()) {
-          <p
-            class="flex shrink-0 items-baseline gap-2 border-l border-border/40 px-3 py-2 max-sm:hidden sm:px-4"
-            [class.ml-auto]="!date()"
-          >
-            <span class="type-label text-muted">Range</span>
-            <span class="text-sm text-accent tabular-nums">{{ range() }}</span>
-          </p>
-        }
-      </div>
     </div>
   `,
 })
@@ -501,6 +521,12 @@ export class HudDockComponent implements OnInit {
   readonly keepableStarId = input<number | null>(null);
   /** Present makes the Routes tab available; absent means this surface cannot route. */
   readonly routing = input(false);
+  /**
+   * Something the surface has put over the scene, such as a body's card, that Escape takes away
+   * before the panel: on a wide screen the readout is open from the start, and folding it first
+   * would make the first Escape close the one thing the reader had not opened.
+   */
+  readonly overlayOpen = input(false);
 
   readonly displayChange = output<HudDisplay>();
   readonly routeQuery = output<string>();
@@ -508,6 +534,15 @@ export class HudDockComponent implements OnInit {
   readonly routeStarSelected = output<number>();
   readonly jumpRangeChange = output<number>();
   readonly bookmarkChosen = output<Bookmark>();
+  /** Escape, for the surface to answer: over an overlay, or with no panel left to fold. */
+  readonly escaped = output<void>();
+  /** A step of the camera in or out, from the pair beside the range. */
+  readonly zoom = output<'in' | 'out'>();
+
+  readonly zoomSteps = [
+    { direction: 'out', label: 'Zoom out', glyph: '−' },
+    { direction: 'in', label: 'Zoom in', glyph: '+' },
+  ] as const;
 
   readonly layers = DISPLAY_LAYERS;
   readonly hasDerived = computed(() => this.readouts().some((readout) => readout.derived));
@@ -628,9 +663,18 @@ export class HudDockComponent implements OnInit {
     this.activeTab.set(isWideViewport() && this.title() ? 'readout' : null);
   }
 
-  /** `/` opens the search from anywhere, unless something else is already taking text. */
+  /**
+   * `/` opens the search from anywhere, unless something else is already taking text. Escape takes
+   * one thing away per press: the surface's overlay, else the open panel, else whatever the surface
+   * does with it. A field with an Escape of its own (clearing the search, closing the suggestions)
+   * stops it before it gets here.
+   */
   @HostListener('document:keydown', ['$event'])
   onKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      this.onEscape();
+      return;
+    }
     if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) {
       return;
     }
@@ -645,6 +689,22 @@ export class HudDockComponent implements OnInit {
     this.activeTab.set('search');
     // The field only exists after the panel renders; defer the focus to after that pass.
     setTimeout(() => this.search()?.focus());
+  }
+
+  private onEscape(): void {
+    const tab = this.activeTab();
+    if (this.overlayOpen() || !tab) {
+      this.escaped.emit();
+      return;
+    }
+    // Focus inside the panel would fall to the page with it: it goes back to the tab that folded,
+    // as after a date is set on a phone, so Enter opens the panel again.
+    const panel = this.host.nativeElement.querySelector(`#dock-panel-${tab}`);
+    const hadFocus = !!panel?.contains(document.activeElement);
+    this.activeTab.set(null);
+    if (hadFocus) {
+      this.host.nativeElement.querySelector<HTMLElement>(`#dock-tab-${tab}`)?.focus();
+    }
   }
 
   /** On a narrow viewport the panel is a sheet over the scene: tapping the scene folds it away. */

@@ -22,7 +22,8 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
 
 /**
  * The top of the map's heads-up display: the scale ladder on the left with the scale bar under
- * it, the nameplate across the centre, and a centre reticle on whatever the camera is holding.
+ * it, the nameplate across the centre (under the scale bar below lg), and a centre reticle on
+ * whatever the camera is holding.
  * Readouts and tools live in the dock along the bottom (`HudDockComponent`).
  *
  * Purely presentational — every value arrives as an input and the only thing it emits is a
@@ -49,7 +50,10 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
     }
 
     <!-- Top rail: which scale the view is at, and what it is holding. Both sit on one line
-         across the top of the display; the search lives in the dock below, so nothing sits above. -->
+         across the top of the display; the search lives in the dock below, so nothing sits above.
+         Below sm each step is padded 8 px a side, not 16: the rail is then 317 px wide on one
+         line, where at 365 px it ran under the frame's corner on a 390 px phone and broke onto a
+         second line on a 360 px one, 4 px into the scale bar under it. -->
     <nav
       aria-label="Map scale"
       class="hud-brackets hud-surface pointer-events-auto absolute top-6 left-6 flex items-stretch divide-x divide-border/40"
@@ -59,7 +63,7 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
           <button
             type="button"
             (click)="levelSelected.emit(step.level)"
-            class="type-eyebrow px-4 py-1.5 text-muted transition-colors hover:bg-accent/8 hover:text-accent focus-visible:bg-accent/12 focus-visible:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+            class="type-eyebrow px-2 py-1.5 text-muted transition-colors hover:bg-accent/8 hover:text-accent focus-visible:bg-accent/12 focus-visible:text-accent focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent sm:px-4"
           >
             {{ step.label }}
           </button>
@@ -67,7 +71,7 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
           <span
             [attr.aria-current]="step.state === 'current' ? 'step' : null"
             [attr.data-testid]="step.state === 'current' ? 'hud-current-level' : null"
-            class="type-eyebrow px-4 py-1.5"
+            class="type-eyebrow px-2 py-1.5 sm:px-4"
             [class]="step.state === 'current' ? 'bg-accent/15 text-accent' : 'text-muted/40'"
             >{{ step.label }}</span
           >
@@ -93,16 +97,23 @@ const LADDER: readonly { level: ViewLevel; label: string }[] = [
     }
 
     @if (title()) {
-      <!-- Hidden below lg: the readout panel names the same thing, and at narrower widths a
-           long star name runs into the scale rail on its left and under the object card on its
-           right — all three share the top-6 line. -->
-      <div class="absolute top-6 left-1/2 hidden -translate-x-1/2 lg:block">
+      <!-- Centred on the rail's line from lg. Below it a long star name ran into the rail on its
+           left and under the object card on its right, so there it sits under the scale bar
+           instead, at the left, held inside the frame and wrapped rather than cut. It used to be
+           hidden there, and the readout that names the same thing folds away on a phone once a
+           search result is picked: after a pick on a phone the star's name was nowhere on screen. -->
+      <div
+        class="absolute top-24 left-6 max-w-[calc(100%-3rem)] lg:top-6 lg:left-1/2 lg:max-w-none lg:-translate-x-1/2"
+      >
         <div
           data-testid="hud-banner"
           class="hud-brackets hud-acquire hud-surface flex items-center gap-2.5 px-6 py-1.5"
         >
           <app-reticle-icon class="h-3 w-3 shrink-0 text-accent" />
-          <span class="text-[11px] tracking-[0.3em] text-accent uppercase">{{ title() }}</span>
+          <span
+            class="min-w-0 text-[11px] tracking-[0.3em] wrap-break-word text-accent uppercase"
+            >{{ title() }}</span
+          >
         </div>
       </div>
     }

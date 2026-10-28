@@ -69,6 +69,18 @@ describe('StarmapHudComponent', () => {
     expect(emitted).toEqual(['galactic', 'galaxy']);
   });
 
+  it('keeps the rail on one line on a phone, padding each step 8 px a side below sm and 16 from it', () => {
+    // jsdom lays nothing out: the classes are what decide it. Measured in Chromium at 16 px a side,
+    // the rail was 365 px wide, and on a 360 px phone it broke onto a second line, into the scale
+    // bar under it. At 8 px a side it is 317 px on one line.
+    const steps = [...render('system').querySelectorAll('nav > *')];
+
+    expect(steps).toHaveLength(3);
+    for (const step of steps) {
+      expect([...step.classList]).toEqual(expect.arrayContaining(['px-2', 'sm:px-4']));
+    }
+  });
+
   it('names what the view is holding on the banner across the top', () => {
     fixture.componentRef.setInput('level', 'system');
     fixture.componentRef.setInput('title', 'Sol');
@@ -79,6 +91,23 @@ describe('StarmapHudComponent', () => {
         .querySelector('[data-testid="hud-banner"]')
         ?.textContent?.trim(),
     ).toBe('Sol');
+  });
+
+  it('names what the view is holding on a phone too, under the scale bar and inside the frame, and across the centre from lg', () => {
+    // jsdom lays nothing out: the classes are what decide it. Hidden below lg, the name was nowhere
+    // on a phone once a search pick had folded the readout away. Measured in Chromium at 390 and 360
+    // wide, it now starts 96 px down, under the scale bar, which ends at 89.
+    fixture.componentRef.setInput('title', 'Gaia DR3 5855802671045627648');
+    const banner = render('system').querySelector('[data-testid="hud-banner"]')!;
+    const place = [...banner.parentElement!.classList];
+
+    expect(place).not.toContain('hidden');
+    expect(place).toEqual(expect.arrayContaining(['top-24', 'left-6', 'max-w-[calc(100%-3rem)]']));
+    expect(place).toEqual(
+      expect.arrayContaining(['lg:top-6', 'lg:left-1/2', 'lg:-translate-x-1/2', 'lg:max-w-none']),
+    );
+    // Wrapped, never cut: a designation's last digits are what tell it apart.
+    expect(banner.querySelector(':scope > span')!.classList).toContain('wrap-break-word');
   });
 
   it('shows no banner when the view is holding nothing', () => {

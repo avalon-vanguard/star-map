@@ -10,10 +10,14 @@
 /**
  * Distance in parsecs, switching to kiloparsecs, and for the galaxies the deep-sky backdrop gives
  * a redshift distance, megaparsecs, where the number would otherwise run long: M87 read 17987.5 kpc.
+ *
+ * `decimals` fixes the decimals for a figure a control holds to its own step: the jump range
+ * moves by tenths, and at the two decimals a distance gets it read "3.00 pc", hundredths the
+ * slider cannot take.
  */
-export function formatParsecs(distancePc: number): string {
+export function formatParsecs(distancePc: number, decimals?: number): string {
   const { divisor, digits, unit } = parsecScale(distancePc);
-  return `${(distancePc / divisor).toFixed(digits)} ${unit}`;
+  return `${(distancePc / divisor).toFixed(decimals ?? digits)} ${unit}`;
 }
 
 function parsecScale(distancePc: number): { divisor: number; digits: number; unit: string } {

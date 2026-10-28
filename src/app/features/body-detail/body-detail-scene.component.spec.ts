@@ -318,6 +318,24 @@ describe('BodyDetailSceneComponent', () => {
     expect(host.querySelector('[data-testid="hud-date"]')).toBeNull();
   });
 
+  it('goes back to the system on Escape once the clock panel is folded, as its System control does', async () => {
+    await open('earth', '2025-06-01T12:00Z', true);
+    const host = fixture.nativeElement as HTMLElement;
+    const navigate = TestBed.inject(Router).navigate as ReturnType<typeof vi.fn>;
+    const escape = () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      fixture.detectChanges();
+    };
+    host.querySelector<HTMLButtonElement>('#dock-tab-display')!.click();
+    fixture.detectChanges();
+
+    escape();
+    expect(host.querySelector('#dock-panel-display')).toBeNull();
+    expect(navigate).not.toHaveBeenCalled();
+    escape();
+    expect(navigate).toHaveBeenCalledWith(['/']);
+  });
+
   it('opens Saturn on the face of its rings the Sun lights: the south, from 2025 to 2039', async () => {
     await open('saturn', '2032-06-01T12:00Z');
     const camera = engine.getCamera();

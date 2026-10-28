@@ -47,7 +47,7 @@ test.describe('Bookmarks', () => {
     const searchInput = await openSearch(page);
     await searchInput.fill('Proxima Centauri');
     await page
-      .getByRole('button', { name: /Proxima Centauri/ })
+      .getByRole('option', { name: /Proxima Centauri/ })
       .first()
       .click();
 

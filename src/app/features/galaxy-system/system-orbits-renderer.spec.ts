@@ -1226,12 +1226,81 @@ describe('solar-system bodies against Horizons', () => {
       .transformDirection(ring.matrixWorld);
     // Straight down onto the B ring, 100 000 km out: nowhere near the planet itself.
     const onRing = worldPosition('saturn').addScaledVector(inRingPlane, 100000 / 149597870.7);
-    const [hit] = new THREE.Raycaster(
-      onRing.clone().addScaledVector(normal, 0.01),
-      normal.clone().negate(),
-    ).intersectObjects(renderer.pickableObjects);
-    expect(hit.object).toBe(ring);
-    expect(renderer.memberForObject(hit.object)?.id).toBe('saturn');
+    // Looking down onto that point from 0.01 AU, with no slop: only the drawn extent can reach it.
+    const camera = new THREE.PerspectiveCamera(50, 1, 1e-6, 1);
+    camera.position.copy(onRing).addScaledVector(normal, 0.01);
+    camera.lookAt(onRing);
+    camera.updateMatrixWorld();
+    expect(renderer.pickAt(new THREE.Vector2(0, 0), camera, 1, 0)?.id).toBe('saturn');
+  });
+
+  describe('pickAt', () => {
+    // 1000 px tall, square: a pixel is 0.002 in NDC.
+    const PIXEL_NDC = 2 / 1000;
+    const camera = new THREE.PerspectiveCamera(50, 1, 1e-6, 100);
+
+    /** Looks straight at `id` from `distanceAu`, and gives its drawn radius in pixels. */
+    function frame(id: string, distanceAu: number): number {
+      renderer.update(JUNE_1_2025_NOON_UTC);
+      const at = worldPosition(id);
+      camera.position.copy(at).add(new THREE.Vector3(0, 0, distanceAu));
+      camera.lookAt(at);
+      camera.updateMatrixWorld();
+      const marker = renderer.members.find((member) => member.id === id)!.marker;
+      const halfHeightAu = distanceAu * Math.tan((camera.fov * Math.PI) / 360);
+      return (marker.scale.x / halfHeightAu) * 500;
+    }
+
+    it('picks a body 11 px off its drawn disc with a 12 px slop, and nothing at 13', () => {
+      // Venus, which has no moon to come nearer the pointer than it does.
+      const radiusPx = frame('venus', 0.05);
+      const pointer = (px: number): THREE.Vector2 =>
+        new THREE.Vector2(0, (radiusPx + px) * PIXEL_NDC);
+      expect(renderer.pickAt(pointer(11), camera, 1, 12 * PIXEL_NDC)?.id).toBe('venus');
+      expect(renderer.pickAt(pointer(13), camera, 1, 12 * PIXEL_NDC)).toBeUndefined();
+    });
+
+    it('picks Earth at the Moon’s centre while the Moon is drawn inside Earth’s disc, and the Moon once it is drawn clear', () => {
+      const earth = renderer.members.find((member) => member.id === 'earth')!.marker;
+      const moonAt = (): THREE.Vector2 => {
+        const projected = worldPosition('moon').project(camera);
+        return new THREE.Vector2(projected.x, projected.y);
+      };
+      frame('earth', 1);
+      // Drawn as the pixel floor draws it from the arrival framing: Earth's disc past the Moon's orbit.
+      const radiusAu = earth.scale.x;
+      earth.scale.setScalar(0.005);
+      const insideEarth = renderer.pickAt(moonAt(), camera, 1, 12 * PIXEL_NDC)?.id;
+      // Put back before asserting: the later tests share this renderer.
+      earth.scale.setScalar(radiusAu);
+      expect(insideEarth).toBe('earth');
+      expect(renderer.pickAt(moonAt(), camera, 1, 12 * PIXEL_NDC)?.id).toBe('moon');
+    });
+
+    it('picks the nearer centre where two discs overlap, not the one listed first', () => {
+      // Earth is listed before Venus; both drawn wide enough that each covers the other's centre.
+      frame('venus', 1);
+      const earth = renderer.members.find((member) => member.id === 'earth')!.marker;
+      const venus = renderer.members.find((member) => member.id === 'venus')!.marker;
+      const apartAu = worldPosition('earth').distanceTo(worldPosition('venus'));
+      const radii = [earth.scale.x, venus.scale.x];
+      earth.scale.setScalar(2 * apartAu);
+      venus.scale.setScalar(2 * apartAu);
+      camera.position.copy(worldPosition('venus')).add(new THREE.Vector3(0, 0, 20 * apartAu));
+      camera.lookAt(worldPosition('venus'));
+      camera.updateMatrixWorld();
+      const picked = renderer.pickAt(new THREE.Vector2(0, 0), camera, 1, 12 * PIXEL_NDC)?.id;
+      earth.scale.setScalar(radii[0]);
+      venus.scale.setScalar(radii[1]);
+      expect(picked).toBe('venus');
+    });
+
+    it('picks nothing behind the camera', () => {
+      frame('venus', 0.05);
+      camera.lookAt(camera.position.clone().add(new THREE.Vector3(0, 0, 1)));
+      camera.updateMatrixWorld();
+      expect(renderer.pickAt(new THREE.Vector2(0, 0), camera, 1, 12 * PIXEL_NDC)).toBeUndefined();
+    });
   });
 
   // Horizons' observer quantities 14 and 15 at 2025-06-01 12:00 UTC, from Earth's centre (from the

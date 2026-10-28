@@ -16,6 +16,19 @@ export interface LabeledPoint {
    */
   kind?: string;
   /**
+   * A distance printed on the name line, after the name: a neighbour's, the one figure the ring of
+   * neighbours exists to give. As the second line it was the quietest text on screen (8 px at 60 %
+   * of the accent) and the first lost over a bright backdrop.
+   */
+  distance?: string;
+  /**
+   * Prints `distance` on the second line, under the name, as it was before it moved onto the
+   * name line. For a label that on one line fits on neither side of its point: on a 390 px phone
+   * "Barnard's Star · 1.83 pc" is 199 px, past the frame from the middle of the screen either way,
+   * and the Sun's system named no neighbour at all; see `spreadLabels`.
+   */
+  stacked?: boolean;
+  /**
    * Which side of the point the text hangs on. Right is the default; left is for a point close
    * to the right edge of the view, or one whose right-hand text would run into a neighbour's.
    */
@@ -38,6 +51,18 @@ export interface LabeledPoint {
 
 export type LabelSide = 'left' | 'right';
 export type LabelTone = 'normal' | 'ghost';
+
+/** The first line a label prints: its name, and a distance after it when it has one. */
+export function nameLine(point: Pick<LabeledPoint, 'name' | 'distance' | 'stacked'>): string {
+  return point.distance && !point.stacked ? `${point.name} · ${point.distance}` : point.name;
+}
+
+/** The second line a label prints, if any: its kind, or its distance when stacked. */
+export function kindLine(
+  point: Pick<LabeledPoint, 'kind' | 'distance' | 'stacked'>,
+): string | undefined {
+  return point.stacked ? point.distance : point.kind;
+}
 
 /** Where the selection mark sits, in the same scene units as the labels. */
 export interface SelectionPoint {
@@ -102,10 +127,15 @@ export class StarLabelOverlay {
 
     for (const point of points) {
       const existing = this.labelObjects.get(point.id);
-      if (existing) {
+      // The text is written once, at creation; a label whose text changed (a neighbour stacked
+      // onto two lines, or back) is built again, so it prints the form its box was measured for.
+      if (existing?.element.textContent === nameLine(point) + (kindLine(point) ?? '')) {
         existing.position.set(point.x, point.y, point.z);
         this.applyPresentation(existing, point);
       } else {
+        if (existing) {
+          this.removeLabel(point.id, existing);
+        }
         this.addLabel(point);
       }
     }
@@ -164,12 +194,13 @@ export class StarLabelOverlay {
     if (point.selectStarId !== undefined) {
       const starId = point.selectStarId;
       (element as HTMLButtonElement).type = 'button';
-      // Read out as a sentence rather than as the two lines run together — the name and the
-      // distance are adjacent spans, so the default accessible name is "Sirius2.64 pc" — and
-      // said as the action it is, since nothing else on screen says these labels are doors.
+      // Read out as a sentence rather than as the text run together — "Sirius · 2.64 pc", or a
+      // name and its kind as adjacent spans, "CanopusStar" — and said as the action it is, since
+      // nothing else on screen says these labels are doors.
+      const said = point.distance ? `${point.distance} away` : point.kind;
       element.setAttribute(
         'aria-label',
-        `Go to ${point.name}${point.kind ? `, ${point.kind} away` : ''}`,
+        said ? `Go to ${point.name}, ${said}` : `Go to ${point.name}`,
       );
       element.addEventListener('click', (event) => {
         event.stopPropagation();
@@ -184,13 +215,14 @@ export class StarLabelOverlay {
 
     const name = document.createElement('span');
     name.className = 'map-label-name';
-    name.textContent = point.name;
+    name.textContent = nameLine(point);
     element.appendChild(name);
 
-    if (point.kind) {
+    const second = kindLine(point);
+    if (second) {
       const kind = document.createElement('span');
       kind.className = 'map-label-kind';
-      kind.textContent = point.kind;
+      kind.textContent = second;
       element.appendChild(kind);
     }
 

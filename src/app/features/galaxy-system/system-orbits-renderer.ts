@@ -721,18 +721,66 @@ export class SystemOrbitsRenderer {
   }
 
   /**
-   * Looks up which system member a marker object belongs to (e.g. from a raycast hit), or a part
-   * of one: a ray through Saturn's rings picks Saturn.
+   * The body under `pointerNdc`, or `undefined`: the one whose drawn disc comes nearest the
+   * pointer, if that is within `slopNdc` (in NDC heights; `aspect` scales x to match).
+   *
+   * Screen space rather than a raycast, as `StarFieldRenderer.pickAt` is: at the Sun's arrival
+   * framing the markers are held to a 3-pixel floor, and a ray had to land on that disc, at most
+   * 2 px from Earth's centre at 1920x1080. On a phone it did not reach Earth even at its centre,
+   * where Mars, nearer the camera, took the ray. A disc counts with what it carries, so a click
+   * on Saturn's rings picks Saturn.
+   *
+   * Ranked by the pointer's distance to each disc's edge, negative inside it. Where discs overlap,
+   * as the inner planets' do on arrival, the one whose centre is nearest wins rather than the
+   * first listed: clamped at the edge, every disc under the pointer tied at zero and Venus took
+   * Earth's centre. A moon drawn inside its planet's disc, as the Moon is inside Earth's at that
+   * framing, never ranks above the planet; one drawn clear of it is picked on its own.
    */
-  memberForObject(object: THREE.Object3D): SystemMember | undefined {
-    return this.members.find(
-      (member) => member.marker === object || member.marker === object.parent,
-    );
-  }
-
-  /** All marker objects, for raycasting. */
-  get pickableObjects(): THREE.Object3D[] {
-    return this.members.map((member) => member.marker);
+  pickAt(
+    pointerNdc: THREE.Vector2,
+    camera: THREE.Camera,
+    aspect: number,
+    slopNdc: number,
+  ): SystemMember | undefined {
+    const centre = new THREE.Vector3();
+    const edge = new THREE.Vector3();
+    const scale = new THREE.Vector3();
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+    let best: SystemMember | undefined;
+    let bestGap = slopNdc;
+    for (const member of this.members) {
+      // In the marker's own units: its unit sphere, or further where a child reaches past it.
+      let extent = 0;
+      member.marker.traverse((object) => {
+        const geometry = (object as THREE.Mesh).geometry;
+        if (geometry) {
+          if (!geometry.boundingSphere) {
+            geometry.computeBoundingSphere();
+          }
+          extent = Math.max(extent, geometry.boundingSphere!.radius);
+        }
+      });
+      member.marker.getWorldPosition(centre);
+      member.marker.getWorldScale(scale);
+      // An offset along the camera's up projects to the drawn radius under either projection.
+      edge
+        .copy(up)
+        .multiplyScalar(extent * scale.x)
+        .add(centre)
+        .project(camera);
+      centre.project(camera);
+      // `project` mirrors a point behind the camera onto the screen.
+      if (centre.z < -1 || centre.z > 1) {
+        continue;
+      }
+      const radius = Math.hypot((edge.x - centre.x) * aspect, edge.y - centre.y);
+      const gap = Math.hypot((centre.x - pointerNdc.x) * aspect, centre.y - pointerNdc.y) - radius;
+      if (gap < bestGap) {
+        best = member;
+        bestGap = gap;
+      }
+    }
+    return best;
   }
 
   /** Shows or hides the orbit lines and the reference grid, leaving the bodies themselves. */

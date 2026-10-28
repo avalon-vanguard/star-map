@@ -1,9 +1,15 @@
 name: Actualisation des catalogues
 
-# Rejoue l'ETL contre les archives en ligne chaque semaine et redéploie le site quand les données
-# ont réellement changé, pour que les catalogues suivent la NASA sans toucher au code. Les archives
-# lues (HYG, Exoplanet Archive, JPL Horizons, OpenNGC, Gaia) sont des points d'accès publics et
-# anonymes : aucune clé.
+# Rejoue l'ETL contre les archives en ligne chaque semaine et, quand les données ont réellement
+# changé, ouvre une pull request vers main (correctif : branche fix/data-refresh-<date UTC>), pour
+# que les catalogues suivent la NASA sans toucher au code. main refuse les pushs directs : le
+# propriétaire relit et fusionne la PR, ce qui déclenche le déploiement, puis refusionne main dans
+# develop comme pour tout correctif. Les archives lues (HYG, Exoplanet Archive, JPL Horizons,
+# OpenNGC, Gaia) sont des points d'accès publics et anonymes : aucune clé.
+#
+# Le jeton du job ne déclenche aucun workflow : une PR ouverte avec lui n'aurait jamais ses
+# vérifications. Le push et la PR utilisent donc le secret de dépôt DATA_REFRESH_TOKEN, un PAT
+# (portée write:repository) d'un compte bot. Sans changement de données, il n'est pas lu.
 on:
   schedule:
     # Lundi 05:23 UTC. Une minute quelconque plutôt que :00, la minute la plus chargée du cron.
@@ -16,20 +22,21 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write # pousser les catalogues régénérés sur main
-  actions: write # lancer le déploiement ensuite — voir la dernière étape
+  contents: read # le job ne pousse rien avec son propre jeton
 
 jobs:
   refresh:
-    name: Récupérer, valider, publier
+    name: Récupérer, valider, proposer
     runs-on: big
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          # Les données vivent sur main et le push va sur main, quelle que soit la ref d'où le
-          # fichier de workflow a été lancé.
+          # Les données vivent sur main, quelle que soit la ref d'où le fichier de workflow a été
+          # lancé : la branche de correctif part de ce commit.
           ref: main
+          # Le jeton du job ne doit pas rester dans la config git : le push utilise celui du bot.
+          persist-credentials: false
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -67,39 +74,70 @@ jobs:
             { echo "Changements des catalogues :"; echo '```'; git diff --stat -- src/assets/data; echo '```'; } >> "$summary"
           fi
 
-      # Les mêmes garde-fous que la CI, joués ici : le push ci-dessous est fait avec le jeton du
-      # job, qui ne déclenche aucun workflow. Les données doivent donc être prouvées avant d'arriver.
-      - name: Tests unitaires sur les nouvelles données
-        if: steps.diff.outputs.changed == 'true'
-        run: npm test -- --no-watch
-
-      - name: Build de production sur les nouvelles données
-        if: steps.diff.outputs.changed == 'true'
-        run: npm run build
-
-      - name: Commit sur main
-        if: steps.diff.outputs.changed == 'true'
-        run: |
-          git config user.name "gitea-actions"
-          git config user.email "actions@noreply.avalonvanguard.com"
-          # Le README et index.html citent les comptes que l'ETL vient d'y réécrire (lib/public-counts.ts).
-          git add src/assets/data README.md src/index.html
-          git commit -m "Actualisation des catalogues astronomiques" \
-            -m "Nouvelle exécution planifiée de l'ETL contre les archives en ligne. Validée par les tests unitaires et un build de production dans la même exécution, car un push fait avec le jeton du job ne déclenche pas la CI."
-          git push origin HEAD:main
-
-      # Le push ci-dessus ne déclenche pas deploy.yml (même garde anti-récursion que sur GitHub) :
-      # on le lance explicitement par l'API. Les dispatches, eux, passent.
-      # Si l'API répond 403, le jeton du job ne suffit pas : créer le secret de dépôt DEPLOY_TOKEN,
-      # un PAT (portée write:repository) d'un compte ayant accès en écriture. Le préfixe GITEA_
-      # est réservé par Gitea pour les secrets : d'où ce nom.
-      - name: Redéployer le site
+      # La CI de la PR rejoue tests et build sur les nouvelles données : rien à rejouer ici.
+      # Le jeton passe par l'environnement git (GIT_CONFIG_*) et un fichier de config curl lu sur
+      # stdin : jamais dans une ligne de commande, jamais affiché.
+      - name: Ouvrir la pull request
         if: steps.diff.outputs.changed == 'true'
         env:
-          DISPATCH_TOKEN: ${{ secrets.DEPLOY_TOKEN || secrets.GITEA_TOKEN }}
+          DATA_REFRESH_TOKEN: ${{ secrets.DATA_REFRESH_TOKEN }}
         run: |
-          curl -fsS -X POST \
-            -H "Authorization: token ${DISPATCH_TOKEN}" \
-            -H 'Content-Type: application/json' \
-            -d '{"ref":"main"}' \
-            "${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}/actions/workflows/deploy.yml/dispatches"
+          set -eu
+          if [ -z "${DATA_REFRESH_TOKEN}" ]; then
+            printf '%s\n' "::error::Les données ont changé mais le secret DATA_REFRESH_TOKEN est vide : impossible d'ouvrir la pull request."
+            exit 1
+          fi
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=http.extraHeader
+          export GIT_CONFIG_VALUE_0="Authorization: token ${DATA_REFRESH_TOKEN}"
+
+          api="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
+          api_curl() {
+            printf 'header = "Authorization: token %s"\n' "${DATA_REFRESH_TOKEN}" | curl -fsS -K - "$@"
+          }
+          branch="fix/data-refresh-$(date -u +%F)"
+
+          # Une PR d'actualisation déjà ouverte attend le propriétaire : pas d'empilement.
+          open_prs=$(api_curl "${api}/pulls?state=open&limit=50")
+          existing=$(printf '%s' "${open_prs}" | node -e '
+            const prs = JSON.parse(require("fs").readFileSync(0, "utf8"));
+            const pr = prs.find((p) => p.head && p.head.ref.startsWith("fix/data-refresh-"));
+            if (pr) console.log(pr.html_url);
+          ')
+          if [ -n "${existing}" ]; then
+            echo "::notice::Une pull request d'actualisation est déjà ouverte : ${existing}"
+            exit 0
+          fi
+
+          # Branche déjà présente sans PR ouverte (relance le même jour) : échec explicite.
+          rc=0
+          git ls-remote --exit-code --heads origin "refs/heads/${branch}" > /dev/null || rc=$?
+          if [ "${rc}" -eq 0 ]; then
+            echo "::error::La branche ${branch} existe déjà sur le dépôt sans PR ouverte : la supprimer ou la traiter à la main."
+            exit 1
+          elif [ "${rc}" -ne 2 ]; then
+            echo "::error::Impossible de lire les branches distantes (git ls-remote a échoué, code ${rc})."
+            exit 1
+          fi
+
+          git config user.name "gitea-actions"
+          git config user.email "actions@noreply.avalonvanguard.com"
+          git switch -c "${branch}"
+          # Le README et index.html citent les comptes que l'ETL vient d'y réécrire (lib/public-counts.ts).
+          git add src/assets/data README.md src/index.html
+          git commit -m "🐛 fix(data): refresh the astronomical catalogues" \
+            -m "Scheduled ETL run against the online archives. The pull request checks validate the new data."
+          git push origin "refs/heads/${branch}:refs/heads/${branch}"
+
+          # Le JSON est construit par node : la stat du diff peut contenir guillemets et sauts de ligne.
+          payload=$(STAT="$(git diff --stat HEAD~1 HEAD)" BRANCH="${branch}" node -e '
+            const body = "Weekly refresh of the astronomical catalogues.\n\n```\n" + process.env.STAT + "\n```\n";
+            console.log(JSON.stringify({
+              title: "🚑️ fix(data): refresh the astronomical catalogues",
+              head: process.env.BRANCH,
+              base: "main",
+              body,
+            }));
+          ')
+          response=$(api_curl -X POST -H 'Content-Type: application/json' -d "${payload}" "${api}/pulls")
+          printf '%s' "${response}" | node -e 'console.log(JSON.parse(require("fs").readFileSync(0, "utf8")).html_url)'

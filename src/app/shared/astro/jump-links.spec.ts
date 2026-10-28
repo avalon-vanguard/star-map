@@ -365,23 +365,29 @@ describe('jumpLinkSegments', () => {
     expect(segments.buffer.byteLength).toBe(segments.byteLength);
   });
 
-  it('keeps exactly the links a full nearest-first sort would, without sorting them all', () => {
-    let seed = 7;
-    const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 40 - 20;
-    const points: StarPoint[] = Array.from({ length: 600 }, (_, id) => ({
-      id,
-      x: random(),
-      y: random(),
-      z: random(),
-    }));
-    const centre = { x: 3, y: -2, z: 1 };
+  // 1,2 s sur un poste récent ; le runner Gitea du VPS, couverture allumée, dépasse les 5 s par défaut : 30 s de marge.
+  it(
+    'keeps exactly the links a full nearest-first sort would, without sorting them all',
+    { timeout: 30_000 },
+    () => {
+      let seed = 7;
+      const random = () =>
+        ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 40 - 20;
+      const points: StarPoint[] = Array.from({ length: 600 }, (_, id) => ({
+        id,
+        x: random(),
+        y: random(),
+        z: random(),
+      }));
+      const centre = { x: 3, y: -2, z: 1 };
 
-    for (const lengthPc of [0, 5, 60, 900, 4000, 1e9]) {
-      expect(
-        linksDrawn(jumpLinkSegments(index(points), 4, { centre, lengthPc }), points).sort(),
-      ).toEqual(nearestFirst(points, 4, centre, lengthPc).sort());
-    }
-  });
+      for (const lengthPc of [0, 5, 60, 900, 4000, 1e9]) {
+        expect(
+          linksDrawn(jumpLinkSegments(index(points), 4, { centre, lengthPc }), points).sort(),
+        ).toEqual(nearestFirst(points, 4, centre, lengthPc).sort());
+      }
+    },
+  );
 
   it('sorts the distance band the budget runs out in, and stops at the first link there that does not fit', () => {
     // One pair 4 kpc out makes each band about a parsec deep, so dozens of short links near the

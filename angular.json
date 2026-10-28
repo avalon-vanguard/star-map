@@ -76,6 +76,7 @@
         "test": {
           "builder": "@angular/build:unit-test",
           "options": {
+            "runnerConfig": "vitest.config.ts",
             "coverage": true,
             "coverageThresholds": {
               "statements": 91,

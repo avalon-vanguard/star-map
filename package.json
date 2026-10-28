@@ -17,7 +17,7 @@
     "typecheck": "npm run etl:typecheck && npm run e2e:typecheck && npm run worker:typecheck"
   },
   "private": true,
-  "packageManager": "npm@11.12.1",
+  "packageManager": "npm@11.21.1",
   "engines": {
     "node": "^22.22.3 || ^24.15.0 || >=26.0.0"
   },

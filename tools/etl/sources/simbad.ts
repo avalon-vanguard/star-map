@@ -14,6 +14,12 @@ import { fetchTextCached } from '../lib/http';
 
 const SIMBAD_TAP_URL = 'https://simbad.cds.unistra.fr/simbad/sim-tap/sync';
 
+/**
+ * CDS's own mirror of SIMBAD, same database and same answers, asked when Strasbourg does not
+ * answer at all: on 2026-10-29 every CDS host there timed out while this one answered in half a second.
+ */
+const SIMBAD_MIRROR_TAP_URL = 'https://simbad.harvard.edu/simbad/sim-tap/sync';
+
 /** SIMBAD gave 4 868 GJ designations a Gaia DR3 one on 2026-09-30. */
 const MIN_GJ_DESIGNATIONS = 4_000;
 
@@ -72,13 +78,7 @@ async function fetchDesignations(
   column: string,
   cachePrefix: string,
 ): Promise<Map<string, string>> {
-  const url = `${SIMBAD_TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=${encodeURIComponent(query)}`;
-  const rows = parseCsvObjects(
-    await fetchTextCached(
-      url,
-      `${cachePrefix}-${createHash('sha1').update(url).digest('hex').slice(0, 8)}.csv`,
-    ),
-  );
+  const rows = parseCsvObjects(await fetchSimbadCsv(query, cachePrefix));
 
   const designations = new Map<string, string>();
   for (const row of rows) {
@@ -92,6 +92,24 @@ async function fetchDesignations(
     }
   }
   return designations;
+}
+
+/** The CSV SIMBAD answers `query` with, from Strasbourg or, when it does not answer, the Harvard mirror. */
+export async function fetchSimbadCsv(
+  query: string,
+  cachePrefix: string,
+  fetchText: (url: string, cacheKey: string) => Promise<string> = fetchTextCached,
+): Promise<string> {
+  const params = `?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=${encodeURIComponent(query)}`;
+  const url = SIMBAD_TAP_URL + params;
+  // Keyed on the Strasbourg URL whichever host answers, so the cache does not change with it.
+  const cacheKey = `${cachePrefix}-${createHash('sha1').update(url).digest('hex').slice(0, 8)}.csv`;
+  return fetchText(url, cacheKey).catch((error: unknown) => {
+    console.log(
+      `  ${error instanceof Error ? error.message : String(error)}; asking the Harvard mirror`,
+    );
+    return fetchText(SIMBAD_MIRROR_TAP_URL + params, cacheKey);
+  });
 }
 
 function collapse(identifier: string): string {

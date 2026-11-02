@@ -780,7 +780,7 @@
     "systemStarId": 0,
     "name": "Deimos",
     "kind": "moon",
-    "radiusKm": 6.203050874487247,
+    "radiusKm": 6.203050874487246,
     "orbit": {
       "semiMajorAxisAu": 0.00015680704471417322,
       "eccentricity": 0.0002,

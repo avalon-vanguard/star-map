@@ -1565,29 +1565,38 @@ export class GalaxySystemSceneComponent implements AfterViewInit, OnDestroy {
       camera,
       [],
     );
-    const starLabels: LabeledPoint[] = isGalactic
+    // Ahead of the stars: it is what the search asked for, and behind them a star beside it took
+    // its place, as 'HD 36395' did the Great Orion Nebula's. Its entry among the backdrop's then
+    // gives way to this one.
+    const lookedAt = isGalactic
       ? []
       : this.spreadLabels(
-          candidates(this.stars, this.starsByBrightness),
+          this.deepSkyLabels.filter((label) => label.id === this.lookedAtDeepSky?.id),
           camera,
-          selectedId,
+          null,
           surveyEdge,
         );
+    const starLabels: LabeledPoint[] = isGalactic
+      ? []
+      : this.spreadLabels(candidates(this.stars, this.starsByBrightness), camera, selectedId, [
+          ...surveyEdge,
+          ...lookedAt,
+        ]);
     // After the stars and around them, but outside their count: near the Sun fifteen stars always
     // place, and sharing the count would leave no deep-sky object named at all.
     const backdropLabels = this.spreadLabels(
       isGalactic ? this.galacticLabels : this.deepSkyLabels,
       camera,
       null,
-      [...surveyEdge, ...starLabels],
+      [...surveyEdge, ...lookedAt, ...starLabels],
     );
     // The survey edge first again, so the rungs beside it give way to it rather than it to them.
     const ringLabels = this.ringLabelsInTheClear(
       [...surveyEdge, ...rings.filter((ring) => !surveyEdge.includes(ring))],
       camera,
-      [...starLabels, ...backdropLabels],
+      [...lookedAt, ...starLabels, ...backdropLabels],
     );
-    this.labelOverlay?.update([...starLabels, ...ringLabels, ...backdropLabels]);
+    this.labelOverlay?.update([...lookedAt, ...starLabels, ...ringLabels, ...backdropLabels]);
   }
 
   /** The frame's shape, from the canvas rather than the camera: only one of the two has it. */

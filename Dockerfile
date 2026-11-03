@@ -1,10 +1,10 @@
-# Image de star-map, servie sous /star-map/ derrière la passerelle projects.avalonvanguard.com,
-# qui transmet le chemin tel quel et pose les en-têtes de sécurité et la compression.
+# star-map image, served under /star-map/ behind the projects.avalonvanguard.com gateway,
+# which passes the path through as is and sets the security headers and compression.
 
-# Build Angular sous /star-map/ (les chemins des ressources sont relatifs à <base>)
+# Angular build under /star-map/ (asset paths are relative to <base>)
 FROM node:22-alpine AS build
 WORKDIR /src
-# .npmrc : le scope @avalon-vanguard (config partagée) vient du registre Gitea, lisible sans jeton
+# .npmrc: the @avalon-vanguard scope (shared config) comes from the Gitea registry, readable without a token
 COPY package.json package-lock.json .npmrc ./
 RUN npm ci
 COPY . .

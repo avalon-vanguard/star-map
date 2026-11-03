@@ -18,11 +18,11 @@ concurrency:
 jobs:
   ci:
     uses: avalon-vanguard/ci/.gitea/workflows/node.yml@v2
-    # e2e Playwright réactivés, sur le runner `big` du VPS (stack, services/gitea-runner/runner-big.yml) :
-    # la carte 3D rendue en logiciel par Chromium sur ng serve dépassait le petit runner (17 tests,
-    # 7 en échec par délai dépassé en 16,8 min). Le build de production n'y change rien : à 1 Go,
-    # l'onglet de Chromium plante (« Target crashed », 14 tests sur 17 en conteneur local à
-    # 0,45 CPU / 1 Go). Tout le job de vérification tourne donc là.
+    # e2e Playwright re-enabled, on the VPS `big` runner (stack, services/gitea-runner/runner-big.yml):
+    # the 3D map rendered in software by Chromium on ng serve overloaded the small runner (17 tests,
+    # 7 failed on timeout in 16.8 min). The production build changes nothing there: at 1 GB,
+    # the Chromium tab crashes ("Target crashed", 14 of 17 tests in a local container at
+    # 0.45 CPU / 1 GB). The whole verification job therefore runs there.
     with:
       e2e: true
       coverage: true

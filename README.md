@@ -13,7 +13,7 @@ The source lives on Gitea, where pull requests are made, and is mirrored to GitH
 
 The source of a small Claude Code plugin also lives here — see [Plugins](#plugins) below.
 
-![The solar neighbourhood: 455 518 catalogued stars, on a polar grid lying in the galactic plane](docs/screenshots/galaxy-view.jpg)
+![The solar neighbourhood: 455 556 catalogued stars, on a polar grid lying in the galactic plane](docs/screenshots/galaxy-view.jpg)
 
 ## Running it
 
@@ -35,7 +35,7 @@ npm run e2e:typecheck
 
 ## What's in it
 
-**Galaxy view** — 455 518 catalogued stars: every star Gaia DR3 measured to G 12 within 250
+**Galaxy view** — 455 556 catalogued stars: every star Gaia DR3 measured to G 12 within 250
 parsecs, with every fainter one within 50 pc that the Gaia Catalogue of Nearby Stars keeps; the
 HYG catalogue's Hipparcos, Yale Bright Star and Gliese stars; and the planet hosts only the NASA
 Exoplanet Archive places, some of them kiloparsecs out. The readout counts them by the catalogue
@@ -287,7 +287,7 @@ outright on a failed download, since no refresh is better than a partial one.
 ### On how many stars
 
 Not many, against the Galaxy. It holds 100–400 billion stars, and this map ships
-455 518 catalogued stars, about 0.0002% of them. That gap is not this project's to close: Gaia
+455 556 catalogued stars, about 0.0002% of them. That gap is not this project's to close: Gaia
 DR3, the largest stellar catalogue ever assembled, has ~1.8 billion sources, roughly 1% of the Galaxy, and is itself blocked by dust
 and blind to most red dwarfs beyond a few hundred parsecs. It is the same reason the galactic
 view is a model.
@@ -321,7 +321,7 @@ the line of sight is always known precisely, and the objects are drawn as a fixe
 backdrop shell where true distance would be unusable anyway. `distancePc` is optional metadata,
 derived from parallax for galactic objects or the Hubble law for genuinely distant galaxies,
 and left `null` — with its `distanceMethod` — whenever neither is trustworthy.
-340 of the 488 catalogued deep-sky objects get a distance; the rest honestly report none.
+330 of the 476 catalogued deep-sky objects get a distance; the rest honestly report none.
 
 ## Layout
 
@@ -362,7 +362,7 @@ plugin's own files are kept so it can be listed from a marketplace of its own la
 
 ## Data credits
 
-Star catalogue: 455 518 catalogued stars, from [Gaia DR3](https://www.cosmos.esa.int/web/gaia/dr3)
+Star catalogue: 455 556 catalogued stars, from [Gaia DR3](https://www.cosmos.esa.int/web/gaia/dr3)
 (ESA/Gaia/DPAC), the [HYG database](https://github.com/astronexus/HYG-Database) (Hipparcos, Yale
 Bright Star, Gliese) and the NASA Exoplanet Archive's own positions for the planet hosts neither
 holds. Solar-system orbits: JPL approximate planetary mean elements (Standish), JPL SSD satellite mean elements and the JPL Small-Body Database; rotation: the IAU WGCCRE 2015 report via NAIF's pck00011, with a locked moon's W and its pole's terms within 5 per cent of its node's rate re-rated to its JPL mean elements (but the Moon's and Phobos's) and Iapetus's pole carried round its orbit normal, and for Earth the IERS Conventions 2010; physical data, and the positions the orbits are checked against: NASA/JPL Horizons. Exoplanets: NASA Exoplanet

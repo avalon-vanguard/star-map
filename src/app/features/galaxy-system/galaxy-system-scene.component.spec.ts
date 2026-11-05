@@ -2522,8 +2522,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
             );
         }
       };
-      // The graph is (photograph × tint) × factor, each step held in a variable.
-      const factor = (colorNode as unknown as Graph).node.bNode;
+      // The graph is (photograph × tint) × factor. Since three r187 an operator's result is its own
+      // variable intent, so the top node is the last multiplication itself, not a VarNode holding it.
+      const factor = (colorNode as unknown as Graph).bNode;
       // The Sun's linear law, 1 − 0.6 (1 − μ): the centre at full brightness, the limb at 40 %, and
       // past the silhouette, where the normal turns away, no darker than the limb.
       expect(factorAt(factor, 1)).toBeCloseTo(1, 12);

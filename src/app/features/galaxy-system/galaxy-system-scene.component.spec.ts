@@ -1711,6 +1711,43 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
     update.mockRestore();
   });
 
+  it('names the deep-sky object the search turned to ahead of a star on the same spot, where any other gives way', async () => {
+    const ladder = vi
+      .spyOn(
+        GalaxySystemSceneComponent.prototype as unknown as { ringLabels: () => LabeledPoint[] },
+        'ringLabels',
+      )
+      .mockReturnValue([]);
+    const update = vi.spyOn(StarLabelOverlay.prototype, 'update');
+    const camera = engine.getCamera();
+    camera.updateMatrixWorld(true);
+    const near = new THREE.Vector3(SUN.x, SUN.y, SUN.z).project(camera);
+    near.x += 0.03;
+    const at = near.unproject(camera);
+    const scene = fixture.componentInstance as unknown as {
+      deepSkyLabels: LabeledPoint[];
+      lookedAtDeepSky: { id: string } | null;
+    };
+    scene.deepSkyLabels = [
+      { id: 'M42', name: 'Orion Nebula', kind: 'Nebula', x: at.x, y: at.y, z: at.z },
+    ];
+    const shown = async () => {
+      await advanceFrames(engine, 0.3);
+      return ((update.mock.calls.at(-1)?.[0] ?? []) as LabeledPoint[]).map((label) => label.id);
+    };
+
+    const unasked = await shown();
+    expect(unasked).toContain(SUN.id);
+    expect(unasked).not.toContain('M42');
+
+    scene.lookedAtDeepSky = { id: 'M42' };
+    const asked = await shown();
+    expect(asked.filter((id) => id === 'M42')).toHaveLength(1);
+    expect(asked).not.toContain(SUN.id);
+    ladder.mockRestore();
+    update.mockRestore();
+  });
+
   it('offers every star it names in the field as somewhere to go, as a neighbour’s name is from a system', async () => {
     const update = vi.spyOn(StarLabelOverlay.prototype, 'update');
     await advanceFrames(engine, 0.3);
@@ -2485,8 +2522,9 @@ describe('GalaxySystemSceneComponent camera-flight transitions', () => {
             );
         }
       };
-      // The graph is (photograph × tint) × factor, each step held in a variable.
-      const factor = (colorNode as unknown as Graph).node.bNode;
+      // The graph is (photograph × tint) × factor. Since three r187 an operator's result is its own
+      // variable intent, so the top node is the last multiplication itself, not a VarNode holding it.
+      const factor = (colorNode as unknown as Graph).bNode;
       // The Sun's linear law, 1 − 0.6 (1 − μ): the centre at full brightness, the limb at 40 %, and
       // past the silhouette, where the normal turns away, no darker than the limb.
       expect(factorAt(factor, 1)).toBeCloseTo(1, 12);

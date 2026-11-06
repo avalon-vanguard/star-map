@@ -200,7 +200,7 @@ describe('minimumRangeBetween', () => {
     expect(minimumRangeBetween(knotAndChain(), 0, CHAIN_END, 8).rangePc).toBeCloseTo(1, 1);
   });
 
-  // 7,5 s sur un poste récent, autour de 30 s sur le runner Gitea du VPS : 90 s de marge.
+  // 7.5 s on a recent workstation, around 30 s on the VPS Gitea runner: 90 s of margin.
   it(
     'stops bisecting where a search gave up, and hands back a range that does work',
     { timeout: 90_000 },
@@ -365,7 +365,7 @@ describe('jumpLinkSegments', () => {
     expect(segments.buffer.byteLength).toBe(segments.byteLength);
   });
 
-  // 1,2 s sur un poste récent ; le runner Gitea du VPS, couverture allumée, dépasse les 5 s par défaut : 30 s de marge.
+  // 1.2 s on a recent workstation; the VPS Gitea runner, with coverage on, exceeds the default 5 s: 30 s of margin.
   it(
     'keeps exactly the links a full nearest-first sort would, without sorting them all',
     { timeout: 30_000 },

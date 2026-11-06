@@ -1,41 +1,41 @@
-name: Actualisation des catalogues
+name: Catalogue refresh
 
-# Rejoue l'ETL contre les archives en ligne chaque semaine et, quand les données ont réellement
-# changé, ouvre une pull request vers main (correctif : branche fix/data-refresh-<date UTC>), pour
-# que les catalogues suivent la NASA sans toucher au code. main refuse les pushs directs : le
-# propriétaire relit et fusionne la PR, ce qui déclenche le déploiement, puis refusionne main dans
-# develop comme pour tout correctif. Les archives lues (HYG, Exoplanet Archive, JPL Horizons,
-# OpenNGC, Gaia) sont des points d'accès publics et anonymes : aucune clé.
+# Replays the ETL against the online archives every week and, when the data has actually
+# changed, opens a pull request to main (hotfix: branch fix/data-refresh-<UTC date>), so that
+# the catalogues follow NASA without touching the code. main refuses direct pushes: the
+# owner reviews and merges the PR, which triggers the deployment, then merges main back into
+# develop like any hotfix. The archives read (HYG, Exoplanet Archive, JPL Horizons,
+# OpenNGC, Gaia) are public, anonymous endpoints: no key.
 #
-# Le jeton du job ne déclenche aucun workflow : une PR ouverte avec lui n'aurait jamais ses
-# vérifications. Le push et la PR utilisent donc le secret de dépôt DATA_REFRESH_TOKEN, un PAT
-# (portée write:repository) d'un compte bot. Sans changement de données, il n'est pas lu.
+# The job's token triggers no workflow: a PR opened with it would never get its
+# checks. The push and the PR therefore use the DATA_REFRESH_TOKEN repository secret, a PAT
+# (write:repository scope) of a bot account. With no data change, it is not read.
 on:
   schedule:
-    # Lundi 05:23 UTC. Une minute quelconque plutôt que :00, la minute la plus chargée du cron.
+    # Monday 05:23 UTC. An arbitrary minute rather than :00, the busiest minute of cron.
     - cron: '23 5 * * 1'
   workflow_dispatch:
 
-# Jamais deux actualisations à la fois, et jamais d'annulation en plein push.
+# Never two refreshes at once, and never a cancellation in the middle of a push.
 concurrency:
   group: data-refresh
   cancel-in-progress: false
 
 permissions:
-  contents: read # le job ne pousse rien avec son propre jeton
+  contents: read # the job pushes nothing with its own token
 
 jobs:
   refresh:
-    name: Récupérer, valider, proposer
+    name: Fetch, validate, propose
     runs-on: big
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          # Les données vivent sur main, quelle que soit la ref d'où le fichier de workflow a été
-          # lancé : la branche de correctif part de ce commit.
+          # The data lives on main, whatever ref the workflow file was launched
+          # from: the hotfix branch starts from this commit.
           ref: main
-          # Le jeton du job ne doit pas rester dans la config git : le push utilise celui du bot.
+          # The job's token must not stay in the git config: the push uses the bot's.
           persist-credentials: false
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -45,11 +45,11 @@ jobs:
 
       - run: npm ci
 
-      # Gaia DR3 est une version figée : la même requête renvoie les mêmes octets, donc ses
-      # réponses passent d'une exécution à l'autre au lieu d'être retéléchargées chaque semaine
-      # depuis une archive qui expire sous charge. Idem pour la réduction Hipparcos de van Leeuwen
-      # (2007), dont fetchStars exige les erreurs de parallaxe. La clé suit gaia.ts, où les
-      # requêtes sont écrites : une requête modifiée est retéléchargée.
+      # Gaia DR3 is a frozen release: the same query returns the same bytes, so its
+      # responses carry over from one run to the next instead of being downloaded again every week
+      # from an archive that times out under load. Same for van Leeuwen's Hipparcos reduction
+      # (2007), whose parallax errors fetchStars requires. The key follows gaia.ts, where the
+      # queries are written: a modified query is downloaded again.
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
@@ -57,34 +57,34 @@ jobs:
             tools/etl/.cache/hipparcos-errors-*.csv
           key: gaia-dr3-hipparcos-${{ hashFiles('tools/etl/sources/gaia.ts') }}
 
-      # Les autres sources sont lues en direct sur ce runner neuf. Un téléchargement raté fait
-      # échouer l'exécution, volontairement : pas d'actualisation vaut mieux qu'une partielle.
-      - name: Reconstruire les jeux de données
+      # The other sources are read live on this fresh runner. A failed download fails
+      # the run, on purpose: no refresh is better than a partial one.
+      - name: Rebuild the datasets
         run: npm run etl
 
-      - name: Détecter un vrai changement
+      - name: Detect a real change
         id: diff
         run: |
           summary="${GITHUB_STEP_SUMMARY:-/dev/null}"
           if git diff --quiet -- src/assets/data; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Les archives n'ont rien publié de nouveau : catalogues identiques à l'octet près." >> "$summary"
+            echo "The archives published nothing new: catalogues are byte-for-byte identical." >> "$summary"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            { echo "Changements des catalogues :"; echo '```'; git diff --stat -- src/assets/data; echo '```'; } >> "$summary"
+            { echo "Catalogue changes:"; echo '```'; git diff --stat -- src/assets/data; echo '```'; } >> "$summary"
           fi
 
-      # La CI de la PR rejoue tests et build sur les nouvelles données : rien à rejouer ici.
-      # Le jeton passe par l'environnement git (GIT_CONFIG_*) et un fichier de config curl lu sur
-      # stdin : jamais dans une ligne de commande, jamais affiché.
-      - name: Ouvrir la pull request
+      # The PR's CI replays tests and build on the new data: nothing to replay here.
+      # The token goes through the git environment (GIT_CONFIG_*) and a curl config file read from
+      # stdin: never on a command line, never printed.
+      - name: Open the pull request
         if: steps.diff.outputs.changed == 'true'
         env:
           DATA_REFRESH_TOKEN: ${{ secrets.DATA_REFRESH_TOKEN }}
         run: |
           set -eu
           if [ -z "${DATA_REFRESH_TOKEN}" ]; then
-            printf '%s\n' "::error::Les données ont changé mais le secret DATA_REFRESH_TOKEN est vide : impossible d'ouvrir la pull request."
+            printf '%s\n' "::error::The data changed but the DATA_REFRESH_TOKEN secret is empty: cannot open the pull request."
             exit 1
           fi
           export GIT_CONFIG_COUNT=1
@@ -97,7 +97,7 @@ jobs:
           }
           branch="fix/data-refresh-$(date -u +%F)"
 
-          # Une PR d'actualisation déjà ouverte attend le propriétaire : pas d'empilement.
+          # A refresh PR that is already open is waiting for the owner: no stacking.
           open_prs=$(api_curl "${api}/pulls?state=open&limit=50")
           existing=$(printf '%s' "${open_prs}" | node -e '
             const prs = JSON.parse(require("fs").readFileSync(0, "utf8"));
@@ -105,31 +105,31 @@ jobs:
             if (pr) console.log(pr.html_url);
           ')
           if [ -n "${existing}" ]; then
-            echo "::notice::Une pull request d'actualisation est déjà ouverte : ${existing}"
+            echo "::notice::A refresh pull request is already open: ${existing}"
             exit 0
           fi
 
-          # Branche déjà présente sans PR ouverte (relance le même jour) : échec explicite.
+          # Branch already present with no open PR (rerun the same day): explicit failure.
           rc=0
           git ls-remote --exit-code --heads origin "refs/heads/${branch}" > /dev/null || rc=$?
           if [ "${rc}" -eq 0 ]; then
-            echo "::error::La branche ${branch} existe déjà sur le dépôt sans PR ouverte : la supprimer ou la traiter à la main."
+            echo "::error::Branch ${branch} already exists on the repository with no open PR: delete it or handle it by hand."
             exit 1
           elif [ "${rc}" -ne 2 ]; then
-            echo "::error::Impossible de lire les branches distantes (git ls-remote a échoué, code ${rc})."
+            echo "::error::Cannot read the remote branches (git ls-remote failed, code ${rc})."
             exit 1
           fi
 
           git config user.name "gitea-actions"
           git config user.email "actions@noreply.avalonvanguard.com"
           git switch -c "${branch}"
-          # Le README et index.html citent les comptes que l'ETL vient d'y réécrire (lib/public-counts.ts).
+          # The README and index.html quote the counts the ETL has just rewritten in them (lib/public-counts.ts).
           git add src/assets/data README.md src/index.html
           git commit -m "🐛 fix(data): refresh the astronomical catalogues" \
             -m "Scheduled ETL run against the online archives. The pull request checks validate the new data."
           git push origin "refs/heads/${branch}:refs/heads/${branch}"
 
-          # Le JSON est construit par node : la stat du diff peut contenir guillemets et sauts de ligne.
+          # The JSON is built by node: the diff stat can contain quotes and line breaks.
           payload=$(STAT="$(git diff --stat HEAD~1 HEAD)" BRANCH="${branch}" node -e '
             const body = "Weekly refresh of the astronomical catalogues.\n\n```\n" + process.env.STAT + "\n```\n";
             console.log(JSON.stringify({

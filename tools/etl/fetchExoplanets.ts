@@ -113,6 +113,28 @@ const ARCHIVE_SOURCE = 'exoplanet-archive';
  * epochs; a star placed from the archive has to pick one.
  */
 const ARCHIVE_TO_CATALOGUE_YEARS = CATALOGUE_EPOCH - ARCHIVE_EPOCH;
+/**
+ * Planets whose default reference gives no semi-major axis, without which the system view draws
+ * no orbit, kept on the previous default reference instead. The whole solution is taken, not
+ * just the axis, so that period, mass and orbit still come from one fit, as for every other
+ * planet. HD 39091 b: in November 2026 the archive's default row moved to a reference with no
+ * axis, inclination or mass; these are the previous default's, the 45.8° inclination included,
+ * without which the orbit would be drawn face-on.
+ */
+const PREVIOUS_SOLUTIONS: Readonly<
+  Record<string, Pick<ExoplanetRecord, 'massEarth' | 'periodDays' | 'orbit'>>
+> = {
+  'HD 39091 b': {
+    massEarth: 4481.3805387,
+    periodDays: 2088.8,
+    orbit: {
+      semiMajorAxisAu: 3.28,
+      eccentricity: 0.642,
+      inclinationDeg: 45.8,
+      argumentOfPeriapsisDeg: -30.1,
+    },
+  },
+};
 /** As in `fetchStars`: faint, for a host the archive gives neither a V nor a G magnitude. */
 const UNKNOWN_MAGNITUDE = 15;
 
@@ -274,6 +296,8 @@ export async function fetchExoplanets(
         inclinationDeg: parseOptionalNumber(row['pl_orbincl']),
         argumentOfPeriapsisDeg: parseOptionalNumber(row['pl_orblper']),
       },
+      // Spread last, over keys already in place, so the record keeps its key order.
+      ...(row['pl_orbsmax'] ? undefined : PREVIOUS_SOLUTIONS[row['pl_name']]),
     };
   });
 

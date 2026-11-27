@@ -113,6 +113,14 @@ const ARCHIVE_SOURCE = 'exoplanet-archive';
  * epochs; a star placed from the archive has to pick one.
  */
 const ARCHIVE_TO_CATALOGUE_YEARS = CATALOGUE_EPOCH - ARCHIVE_EPOCH;
+/**
+ * Semi-major axes for planets whose default reference leaves the cell blank, so that the system
+ * view, which draws no orbit without one, keeps them. HD 39091 b: in November 2026 the archive's
+ * default row moved to a reference with no axis; 3.28 AU is the previous default's. Kepler's
+ * third law from the new row's 2088.7-day period and the host's 1.07 solar masses gives 3.27 AU,
+ * so the old axis still fits the new orbit.
+ */
+const SEMI_MAJOR_AXIS_FALLBACK_AU: Readonly<Record<string, number>> = { 'HD 39091 b': 3.28 };
 /** As in `fetchStars`: faint, for a host the archive gives neither a V nor a G magnitude. */
 const UNKNOWN_MAGNITUDE = 15;
 
@@ -269,7 +277,8 @@ export async function fetchExoplanets(
       hostPmRaMasPerYear: pmRaMasPerYear,
       hostPmDecMasPerYear: pmDecMasPerYear,
       orbit: {
-        semiMajorAxisAu: parseOptionalNumber(row['pl_orbsmax']),
+        semiMajorAxisAu:
+          parseOptionalNumber(row['pl_orbsmax']) ?? SEMI_MAJOR_AXIS_FALLBACK_AU[row['pl_name']],
         eccentricity: parseOptionalNumber(row['pl_orbeccen']),
         inclinationDeg: parseOptionalNumber(row['pl_orbincl']),
         argumentOfPeriapsisDeg: parseOptionalNumber(row['pl_orblper']),

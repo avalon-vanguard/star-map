@@ -25,6 +25,7 @@ import {
   BYTES_PER_STAR_POSITION,
   decodeStarCatalog,
   encodeStarCatalog,
+  gaiaSourceIdOf,
   isDesignation,
 } from '../../src/app/shared/models/star-catalog';
 import { fetchStars, glieseGaiaDesignations } from './fetchStars';
@@ -195,6 +196,16 @@ function validateStars(stars: StarRecord[]): void {
         decoded[i].colorFromTemperature === !!stars[i].colorFromTemperature,
       `Star catalogue round-trip changed the photometry of star ${stars[i].id}.`,
     );
+    // A star named after one Gaia source while describing another keeps the name's id, by design.
+    if (!/^Gaia DR3 \d+$/.test(stars[i].name)) {
+      // Only a designation the 64-bit column can print back is kept; the rest decode as none.
+      const kept =
+        gaiaSourceIdOf(stars[i].gaiaDesignation) === 0n ? undefined : stars[i].gaiaDesignation;
+      assertCondition(
+        decoded[i].gaiaDesignation === kept,
+        `Star catalogue round-trip changed the Gaia designation of star ${stars[i].id}.`,
+      );
+    }
     // Stored as its square root in 65 535ths, up to 100 %; see `star-catalog.ts`.
     const error = stars[i].distanceError;
     assertCondition(

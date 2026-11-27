@@ -401,3 +401,76 @@ describe('star catalogue provenance and derived names', () => {
     expect(isDesignation({ ...MIXED[0], name: 'HD 48915' })).toBe(false);
   });
 });
+
+describe('the Gaia source id of a star named otherwise', () => {
+  const GAIA_ID = '3385963688580041088';
+  const base: StarRecord = {
+    id: 1_000_000_001,
+    name: 'TOI-4596',
+    x: 0,
+    y: 2,
+    z: 0,
+    magnitude: 11,
+    spectralType: 'Unknown',
+    colorIndex: 1.2,
+    source: 'gaia',
+    gaiaDesignation: `Gaia DR3 ${GAIA_ID}`,
+  };
+  const roundTrip = (star: StarRecord) => {
+    const packed = encodeStarCatalog([star]);
+    const [back] = decodeStarCatalog(packed.index, packed.positions, packed.meta);
+    return { packed, back };
+  };
+
+  it('keeps the name and decodes the designation of a Gaia source renamed after its host', () => {
+    const { packed, back } = roundTrip(base);
+    expect(packed.index.names).toEqual(['TOI-4596']);
+    expect(back.name).toBe('TOI-4596');
+    expect(back.gaiaDesignation).toBe(`Gaia DR3 ${GAIA_ID}`);
+  });
+
+  it('does not blank a name the source would generate when the source id belongs to another star', () => {
+    // Blanked, "HYG 7" would decode as the Gaia designation instead.
+    const { packed, back } = roundTrip({ ...base, id: 7, name: 'HYG 7', source: 'hyg' });
+    expect(packed.index.names).toEqual(['HYG 7']);
+    expect(back.name).toBe('HYG 7');
+    expect(back.gaiaDesignation).toBe(`Gaia DR3 ${GAIA_ID}`);
+  });
+
+  it('leaves a plain Gaia designation to the column, with nothing to alias', () => {
+    const { packed, back } = roundTrip({
+      ...base,
+      name: `Gaia DR3 ${GAIA_ID}`,
+      gaiaDesignation: undefined,
+    });
+    expect(packed.index.names).toEqual(['']);
+    expect(back.name).toBe(`Gaia DR3 ${GAIA_ID}`);
+    expect(back.gaiaDesignation).toBeUndefined();
+  });
+
+  it('drops a designation the 64-bit column cannot print back', () => {
+    for (const designation of ['Gaia DR3 18446744073709551617', 'Gaia DR3 0123']) {
+      const { packed, back } = roundTrip({ ...base, gaiaDesignation: designation });
+      expect(new BigUint64Array(packed.meta, 0, 1)[0]).toBe(0n);
+      expect(back.name).toBe('TOI-4596');
+      expect(back.gaiaDesignation).toBeUndefined();
+    }
+  });
+
+  it('lets the name win when it is itself a Gaia designation for another source', () => {
+    const { packed, back } = roundTrip({
+      ...base,
+      name: 'Gaia DR3 5853498713190525696',
+      gaiaDesignation: `Gaia DR3 ${GAIA_ID}`,
+    });
+    expect(packed.index.names).toEqual(['']);
+    expect(back.name).toBe('Gaia DR3 5853498713190525696');
+    expect(back.gaiaDesignation).toBeUndefined();
+  });
+
+  it('writes nothing for a named star with no designation', () => {
+    const { packed, back } = roundTrip({ ...base, gaiaDesignation: undefined });
+    expect(new BigUint64Array(packed.meta, 0, 1)[0]).toBe(0n);
+    expect(back.gaiaDesignation).toBeUndefined();
+  });
+});

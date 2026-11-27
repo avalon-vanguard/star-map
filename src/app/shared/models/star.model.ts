@@ -63,7 +63,9 @@ export interface StarRecord {
   pmDecMasYr?: number;
   /**
    * The Gaia DR3 source a Gaia entry is, kept once a HYG row has named it: what `foldByIdentity`
-   * looks up a star SIMBAD identifies by. Only the ETL sets it; the assets do not carry it.
+   * looks up a star SIMBAD identifies by. The ETL sets it, and the assets carry it for a star
+   * named otherwise (a Gaia source renamed after its planet host), which decodes with it; a star
+   * named by its Gaia designation decodes without, as the name already says it.
    */
   gaiaDesignation?: string;
 }

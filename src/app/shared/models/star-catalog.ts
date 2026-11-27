@@ -26,12 +26,13 @@ export const STAR_POSITION_COMPONENTS = 3;
 export const BYTES_PER_STAR_POSITION = STAR_POSITION_COMPONENTS * Float32Array.BYTES_PER_ELEMENT;
 
 /**
- * Columns in `stars-meta.bin`, in order: Gaia DR3 source id (see {@link GAIA_DESIGNATION}),
- * catalogue id, apparent magnitude, colour index, an index into the spectral-type dictionary, the
- * distance's relative error (see {@link DISTANCE_ERROR_STEPS}), and what those were measured in
- * (see {@link PHOTOMETRY}). Stored column by column rather than record by record so each one is a
- * single typed-array view over the buffer, with no per-record stride or alignment padding; the
- * 64-bit column goes first, the one offset every star count keeps it aligned at.
+ * Columns in `stars-meta.bin`, in order: Gaia DR3 source id (see {@link GAIA_DESIGNATION}; the
+ * star's name, or for a star named otherwise the Gaia source it is), catalogue id, apparent
+ * magnitude, colour index, an index into the spectral-type dictionary, the distance's relative
+ * error (see {@link DISTANCE_ERROR_STEPS}), and what those were measured in (see {@link
+ * PHOTOMETRY}). Stored column by column rather than record by record so each one is a single
+ * typed-array view over the buffer, with no per-record stride or alignment padding; the 64-bit
+ * column goes first, the one offset every star count keeps it aligned at.
  */
 export const BYTES_PER_STAR_META =
   BigUint64Array.BYTES_PER_ELEMENT +
@@ -75,11 +76,27 @@ const DISTANCE_ERROR_STEPS = 65_535;
 
 /**
  * A Gaia designation, whose number is the source id: 19 digits at most, past what a double holds
- * exactly, so it is carried as a 64-bit integer. The name is left empty in the index and printed
- * again on load. Written out, the 378 105 of them were 11.7 MB of the 13.5 MB index, 86 %.
+ * exactly, so it is carried as a 64-bit integer. When it is the star's name, the name is left
+ * empty in the index and printed again on load. Written out, the 378 105 of them were 11.7 MB of
+ * the 13.5 MB index, 86 %. A star named otherwise, such as a Gaia source renamed after its planet
+ * host, keeps its name in the index and carries the source id beside it, so that it decodes with
+ * a `gaiaDesignation` for search to find it by.
  */
 const GAIA_DESIGNATION = /^Gaia DR3 ([1-9]\d*)$/;
 const GAIA_DESIGNATION_PREFIX = 'Gaia DR3 ';
+
+/**
+ * The source id a Gaia designation carries, or 0 where the text is not one or its number does not
+ * survive a 64-bit column unchanged (past 64 bits wraps, so it would print back as another star).
+ */
+export function gaiaSourceIdOf(designation: string | undefined): bigint {
+  const digits = designation === undefined ? undefined : GAIA_DESIGNATION.exec(designation)?.[1];
+  if (digits === undefined) {
+    return 0n;
+  }
+  const id = BigInt.asUintN(64, BigInt(digits));
+  return id.toString() === digits ? id : 0n;
+}
 
 /** `stars-index.json`: everything that is a string, plus the count the columns are sized by. */
 export interface StarCatalogIndex {
@@ -125,7 +142,10 @@ const DESIGNATION_PREFIXES: Readonly<Record<string, string>> = {
 };
 
 interface StarMetaColumns {
-  /** 0 where the star's name is not a Gaia designation. */
+  /**
+   * The star's own Gaia source id; 0 where neither its name nor its `gaiaDesignation` is a Gaia
+   * designation. Which of the two it is shows in the index: the name is empty for the first.
+   */
   gaiaSourceIds: BigUint64Array;
   ids: Int32Array;
   magnitudes: Float32Array;
@@ -211,11 +231,15 @@ export function encodeStarCatalog(stars: readonly StarRecord[]): {
 
     // Left empty when it is simply the designation the source would generate anyway, or a Gaia
     // designation the source id column prints again, which a number past 64 bits would not be.
-    const digits = GAIA_DESIGNATION.exec(star.name)?.[1];
-    const gaiaSourceId = digits === undefined ? 0n : BigInt.asUintN(64, BigInt(digits));
-    if (gaiaSourceId !== 0n && gaiaSourceId.toString() === digits) {
-      columns.gaiaSourceIds[index] = gaiaSourceId;
+    // A star named otherwise keeps its name and writes the Gaia source it is beside it instead.
+    const nameSourceId = gaiaSourceIdOf(star.name);
+    const designationSourceId = gaiaSourceIdOf(star.gaiaDesignation);
+    if (nameSourceId !== 0n) {
+      columns.gaiaSourceIds[index] = nameSourceId;
       names.push('');
+    } else if (designationSourceId !== 0n) {
+      columns.gaiaSourceIds[index] = designationSourceId;
+      names.push(star.name);
     } else {
       names.push(
         star.name === designationFor(sources[sourceIndex]?.designationPrefix, star.id)
@@ -331,6 +355,9 @@ export function decodeStarCatalog(
       distanceError: distanceError === 0 ? undefined : (distanceError / DISTANCE_ERROR_STEPS) ** 2,
       distanceFromGaia: (photometry & PHOTOMETRY.distanceFromGaia) !== 0,
       colorFromTemperature: (photometry & PHOTOMETRY.colorFromTemperature) !== 0,
+      // Only where the name is not the source id's own, which is what an empty entry means.
+      gaiaDesignation:
+        gaiaSourceId && index.names[i] ? `${GAIA_DESIGNATION_PREFIX}${gaiaSourceId}` : undefined,
       ...(source ? { source: source.id } : {}),
     };
   }

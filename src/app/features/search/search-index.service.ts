@@ -14,7 +14,12 @@ import { buildSearchIndex, IndexedSearchEntry, SearchEntry } from './search-rank
 export const STARS_PER_SLICE = 20_000;
 
 function starEntry(star: StarRecord): SearchEntry {
-  return { kind: 'star', name: star.name, subtitle: '', star, starId: star.id };
+  const entry: SearchEntry = { kind: 'star', name: star.name, subtitle: '', star, starId: star.id };
+  // A star named otherwise (a planet host Gaia alone measured, renamed after it) is also found by the Gaia source it is.
+  // ponytail: an alias on 15 % of stars costs about a third more build time (13 to 17 ms on a synthetic 20 000-star slice); alias only renamed hosts if that matters.
+  return star.gaiaDesignation && star.gaiaDesignation !== star.name
+    ? { ...entry, aliases: [star.gaiaDesignation] }
+    : entry;
 }
 
 /** "NGC0224" as it is written, "NGC 224"; the padded form is OpenNGC's own. */

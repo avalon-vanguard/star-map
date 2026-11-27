@@ -89,7 +89,7 @@ export interface IndexedSearchEntry {
   readonly words: readonly string[];
   /** The subtitle, normalised; empty when there is none to search. See {@link searchableSubtitle}. */
   readonly normalizedSubtitle: string;
-  /** {@link SearchEntry.aliases}, broken up as the name is; absent, not empty, on the stars, which have none. */
+  /** {@link SearchEntry.aliases}, broken up as the name is; absent, not empty, where there are none, as on most stars. */
   readonly aliases?: readonly IndexedName[];
 }
 

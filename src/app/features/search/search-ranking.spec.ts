@@ -203,6 +203,23 @@ describe('rankSearchResults', () => {
     expect(rank([star('Mel 22'), pleiades], 'mel22')).toEqual(['Pleiades', 'Mel 22']);
   });
 
+  it('finds a star by its Gaia designation, whole, or by its digits from the start', () => {
+    const host: SearchEntry = {
+      kind: 'star',
+      name: 'TOI-4596',
+      subtitle: '',
+      aliases: ['Gaia DR3 3385963688580041088'],
+    };
+    // Named for what was typed, with more digits after it: a prefix match, behind the exact one.
+    const longer = star('Gaia DR3 33859636885800410880');
+
+    expect(rank([longer, host], 'Gaia DR3 3385963688580041088')).toEqual(['TOI-4596', longer.name]);
+    expect(rank([host], '3385963688580041088')).toEqual(['TOI-4596']);
+    expect(rank([host], '33859636')).toEqual(['TOI-4596']);
+    // A word start, below an exact or a prefix match on another star's name.
+    expect(rank([host, star('33859636 Cas')], '33859636')).toEqual(['33859636 Cas', 'TOI-4596']);
+  });
+
   it('carries the full entry through, not just the name', () => {
     const [result] = rankSearchResults(buildSearchIndex([body('Io')]), 'Io', 1);
     expect(result).toMatchObject({ kind: 'body', name: 'Io', bodyId: 'Io' });

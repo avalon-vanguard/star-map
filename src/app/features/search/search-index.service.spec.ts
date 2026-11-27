@@ -73,6 +73,26 @@ describe('SearchIndexService', () => {
     });
   });
 
+  it("indexes a star named otherwise by its Gaia designation, and leaves the others' aliases absent", async () => {
+    const named: StarRecord = {
+      ...STARS[0],
+      id: 1,
+      name: 'TOI-4596',
+      gaiaDesignation: 'Gaia DR3 3385963688580041088',
+    };
+    const plain = STARS[0];
+    TestBed.inject(DataLoaderService).loadStars = () =>
+      Promise.resolve({ stars: [named, plain], positions: new Float32Array(6) });
+    await service.load();
+
+    const [indexedNamed, indexedPlain] = service.stars();
+    expect(indexedNamed.aliases).toEqual([
+      expect.objectContaining({ normalizedName: 'gaia dr3 3385963688580041088' }),
+    ]);
+    expect('aliases' in indexedPlain).toBe(false);
+    expect('aliases' in indexedPlain.entry).toBe(false);
+  });
+
   it('goes on without the deep-sky objects when their file fails, as the map does', async () => {
     const loader = TestBed.inject(DataLoaderService);
     loader.loadDeepSky = () => Promise.reject(new Error('404'));
